@@ -35,10 +35,25 @@ const baseSuffix = base.endsWith('/') ? base.slice(0, -1) : base;
 const editUrl = `https://github.com/vllm-ascend/vllm-ascend-recipes/edit/main/models/en/${model._provider_slug}/${model._model_slug}.yaml`;
 const hasQuantization = !!modelEn.quantization;
 const hasPrerequisites = !!modelEn.prerequisites && modelEn.prerequisites.length > 0;
-const hasAccuracy = !!modelEn.performance_accuracy;
-const hasBenchmark = !!modelEn.performance_benchmark;
+const hasAccuracy = !!modelEn.performance?.accuracy;
+const hasBenchmark = !!modelEn.performance?.benchmark;
+const hasPerformance = hasAccuracy || hasBenchmark;
 const npus = [...new Set(modelEn.scenarios.map((s) => s.npu))];
 const sectionTitle = "font-display text-lg font-semibold text-ink-50 tracking-tight mb-4";
+
+// Build TOC items: each with an anchor id and an i18n key for the label
+interface TocItem { id: string; i18n: string }
+const tocItems: TocItem[] = [];
+function addToc(id: string, i18n: string) { tocItems.push({ id, i18n }); }
+
+addToc('overview', 'sectionOverview');
+addToc('weight-download', 'sectionWeightDownload');
+if (hasQuantization) addToc('quantization', 'sectionQuantization');
+if (hasPrerequisites) addToc('prerequisites', 'sectionPrerequisites');
+addToc('env-setup', 'sectionEnvSetup');
+addToc('scenarios', 'sectionScenario');
+if (hasPerformance) addToc('performance', 'sectionPerformance');
+addToc('references', 'sectionReferences');
 
 function renderDesc(text: string) {
   return `<p>${text}</p>`;
@@ -46,7 +61,28 @@ function renderDesc(text: string) {
 ---
 
 <BaseLayout title={`${model.title} | vLLM-Ascend Recipes`} description={modelEn.description}>
-  <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <div class="flex gap-12">
+      <!-- TOC sidebar -->
+      <aside class="hidden lg:block w-48 shrink-0">
+        <nav class="sticky top-20">
+          <p class="text-[10px] font-mono uppercase tracking-widest text-ink-600 mb-3">On this page</p>
+          <ul class="space-y-0.5 border-l border-ink-800/50">
+            {tocItems.map((item) => (
+              <li>
+                <a
+                  href={`#${item.id}`}
+                  class="block py-1.5 pl-3 text-xs font-mono text-ink-500 hover:text-accent-400 hover:border-l-2 hover:border-accent-400 -ml-px transition-colors"
+                  data-i18n={item.i18n}
+                ></a>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      </aside>
+
+      <!-- Main content -->
+      <div class="min-w-0 flex-1">
 
     <div class="mb-8">
       <div class="flex items-center gap-1.5 text-xs font-mono text-ink-600 mb-4">
@@ -82,7 +118,7 @@ function renderDesc(text: string) {
 
     <div class="section-divider"></div>
 
-    <section class="py-8">
+    <section class="py-8" id="overview">
       <h2 class={sectionTitle} data-i18n="sectionOverview">Overview</h2>
       <MarkdownContent markdown={modelEn.overview} lang="en" />
       <MarkdownContent markdown={modelZh.overview} lang="zh" hidden />
@@ -90,7 +126,7 @@ function renderDesc(text: string) {
 
     <div class="section-divider"></div>
 
-    <section class="py-8">
+    <section class="py-8" id="weight-download">
       <h2 class={sectionTitle} data-i18n="sectionWeightDownload">Weight Download</h2>
       <WeightDownloadTabs client:load downloadsEn={modelEn.weight_download} downloadsZh={modelZh.weight_download} />
     </section>
@@ -99,7 +135,7 @@ function renderDesc(text: string) {
 
     {hasQuantization && (
       <>
-        <section class="py-8">
+        <section class="py-8" id="quantization">
           <h2 class={sectionTitle} data-i18n="sectionQuantization">Quantization</h2>
           <MarkdownContent markdown={modelEn.quantization!.content} lang="en" />
           <MarkdownContent markdown={modelZh.quantization?.content ?? modelEn.quantization!.content} lang="zh" hidden />
@@ -110,7 +146,7 @@ function renderDesc(text: string) {
 
     {hasPrerequisites && (
       <>
-        <section class="py-8">
+        <section class="py-8" id="prerequisites">
           <h2 class={sectionTitle} data-i18n="sectionPrerequisites">Prerequisites</h2>
           <div class="space-y-6">
             {modelEn.prerequisites!.map((item, i) => {
@@ -130,14 +166,14 @@ function renderDesc(text: string) {
       </>
     )}
 
-    <section class="py-8">
+    <section class="py-8" id="env-setup">
       <h2 class={sectionTitle} data-i18n="sectionEnvSetup">Environment Setup</h2>
       <EnvSetupTabs client:load envSetupEn={modelEn.env_setup} envSetupZh={modelZh.env_setup} />
     </section>
 
     <div class="section-divider"></div>
 
-    <section class="py-8">
+    <section class="py-8" id="scenarios">
       <h2 class={sectionTitle} data-i18n="sectionScenario">Deployment Scenarios</h2>
       <p class="text-xs text-ink-500 mb-6 font-mono" data-i18n="sectionScenarioDescription">
         Select NPU type, precision, and deployment mode to view the corresponding deployment instructions.
@@ -147,65 +183,32 @@ function renderDesc(text: string) {
 
     <div class="section-divider"></div>
 
-    {hasAccuracy && (
+    {hasPerformance && (
       <>
-        <section class="py-8">
-          <h2 class={sectionTitle} data-i18n="sectionPerformanceAccuracy">Performance (Accuracy)</h2>
-          <div class="overflow-x-auto rounded-lg border border-ink-800/60">
-            <table class="w-full text-sm">
-              <thead>
-                <tr class="border-b border-ink-800/60 bg-ink-900/40">
-                  {modelEn.performance_accuracy!.headers.map((h) => (
-                    <th class="text-left py-2.5 px-4 font-mono text-xs font-medium text-accent-400 uppercase tracking-wider">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {modelEn.performance_accuracy!.rows.map((row) => (
-                  <tr class="border-b border-ink-800/40 last:border-0 hover:bg-ink-900/30 transition-colors">
-                    {row.map((cell) => (
-                      <td class="py-2.5 px-4 text-ink-400 font-mono text-xs">{cell}</td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        <section class="py-8" id="performance">
+          <h2 class={sectionTitle} data-i18n="sectionPerformance">Performance</h2>
+          <div class="space-y-8">
+            {hasAccuracy && (
+              <div>
+                <h3 class="font-display text-base font-semibold text-ink-200 mb-3" data-i18n="sectionAccuracy">Accuracy</h3>
+                <MarkdownContent markdown={modelEn.performance!.accuracy!} lang="en" />
+                <MarkdownContent markdown={modelZh.performance?.accuracy ?? modelEn.performance!.accuracy!} lang="zh" hidden />
+              </div>
+            )}
+            {hasBenchmark && (
+              <div>
+                <h3 class="font-display text-base font-semibold text-ink-200 mb-3" data-i18n="sectionBenchmark">Benchmark</h3>
+                <MarkdownContent markdown={modelEn.performance!.benchmark!} lang="en" />
+                <MarkdownContent markdown={modelZh.performance?.benchmark ?? modelEn.performance!.benchmark!} lang="zh" hidden />
+              </div>
+            )}
           </div>
         </section>
         <div class="section-divider"></div>
       </>
     )}
 
-    {hasBenchmark && (
-      <>
-        <section class="py-8">
-          <h2 class={sectionTitle} data-i18n="sectionPerformanceBenchmark">Performance (Benchmark)</h2>
-          <div class="overflow-x-auto rounded-lg border border-ink-800/60">
-            <table class="w-full text-sm">
-              <thead>
-                <tr class="border-b border-ink-800/60 bg-ink-900/40">
-                  {modelEn.performance_benchmark!.headers.map((h) => (
-                    <th class="text-left py-2.5 px-4 font-mono text-xs font-medium text-accent-400 uppercase tracking-wider">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {modelEn.performance_benchmark!.rows.map((row) => (
-                  <tr class="border-b border-ink-800/40 last:border-0 hover:bg-ink-900/30 transition-colors">
-                    {row.map((cell) => (
-                      <td class="py-2.5 px-4 text-ink-400 font-mono text-xs">{cell}</td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-        <div class="section-divider"></div>
-      </>
-    )}
-
-    <section class="py-8">
+    <section class="py-8" id="references">
       <h2 class={sectionTitle} data-i18n="sectionReferences">References</h2>
       <ul class="space-y-1.5">
         {modelEn.references.map((ref) => (
@@ -219,5 +222,41 @@ function renderDesc(text: string) {
       </ul>
     </section>
 
+      </div>
+      {/* end main content */}
+    </div>
+    {/* end flex container */}
   </div>
+
+  <script>
+    // Scroll spy: highlight active TOC link
+    const tocLinks = document.querySelectorAll('aside nav a[href^="#"]');
+    const sections = [...tocLinks].map(a => document.querySelector(a.getAttribute('href')));
+
+    function updateActiveLink() {
+      let currentId = '';
+      for (const section of sections) {
+        if (!section) continue;
+        const rect = section.getBoundingClientRect();
+        if (rect.top <= 120) {
+          currentId = section.id;
+        }
+      }
+      for (const link of tocLinks) {
+        const isActive = link.getAttribute('href') === '#' + currentId;
+        link.classList.toggle('!text-accent-400', isActive);
+        link.classList.toggle('!border-accent-400', isActive);
+        link.classList.toggle('border-l-2', isActive);
+      }
+    }
+
+    let ticking = false;
+    window.addEventListener('scroll', () => {
+      if (!ticking) {
+        requestAnimationFrame(() => { updateActiveLink(); ticking = false; });
+        ticking = true;
+      }
+    });
+    updateActiveLink();
+  </script>
 </BaseLayout>

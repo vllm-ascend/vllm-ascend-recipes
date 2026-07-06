@@ -1,428 +1,589 @@
 hf_id: Qwen/Qwen3-235B-A22B
 title: Qwen3-235B-A22B
 provider: Qwen
-description: 'The largest MoE variant of the Qwen3 series with 235B total parameters and 22B activated per token. Breakthrough
+description: The largest MoE variant of the Qwen3 series with 235B total parameters and 22B activated per token. Breakthrough
   advancements in reasoning, instruction-following, agent capabilities, and multilingual support.
-  '
 architecture: moe
 parameters: 235B
 active_parameters: 22B
 context_length: 131072
 modality: text
 updated: '2026-07-01'
-overview: 'Qwen3 is the latest generation of large language models in the Qwen series, offering a comprehensive suite of dense
-  and mixture-of-experts (MoE) models. Built upon extensive training, Qwen3 delivers groundbreaking advancements in reasoning,
-  instruction-following, agent capabilities, and multilingual support. Qwen3-235B-A22B is the largest MoE variant, featuring
-  235B total parameters with 22B activated per token.
+overview: |-
+  Qwen3 is the latest generation of large language models in the Qwen series, offering a comprehensive suite of dense and mixture-of-experts (MoE) models. Built upon extensive training, Qwen3 delivers groundbreaking advancements in reasoning, instruction-following, agent capabilities, and multilingual support. Qwen3-235B-A22B is the largest MoE variant, featuring 235B total parameters with 22B activated per token.
 
-  This document demonstrates the main validation steps for Qwen3-235B-A22B in the vLLM-Ascend environment, including supported
-  features, environment preparation, single-node and multi-node deployment, accuracy and performance evaluation.
+  This document demonstrates the main validation steps for Qwen3-235B-A22B in the vLLM-Ascend environment, including supported features, environment preparation, single-node and multi-node deployment, accuracy and performance evaluation.
 
-  **First supported version**: v0.8.4rc2. This document is validated on **vLLM-Ascend v0.21.0**. All v0.21.0 and later versions
-  can run stably.
-  '
+  **First supported version**: v0.8.4rc2. This document is validated on **vLLM-Ascend v0.21.0**. All v0.21.0 and later versions can run stably.
 weight_download:
 - weight_version: BF16
   sources:
   - source: ModelScope
     url: https://www.modelscope.cn/models/Qwen/Qwen3-235B-A22B
-    command: '```bash
-
+    command: |-
+      ```bash
       pip install modelscope
-
       modelscope download --model Qwen/Qwen3-235B-A22B
-
       ```
-
-      '
   - source: HuggingFace
     url: https://huggingface.co/Qwen/Qwen3-235B-A22B
-    command: '```bash
-
+    command: |-
+      ```bash
       pip install -U huggingface_hub
-
       huggingface-cli download Qwen/Qwen3-235B-A22B
-
       ```
-
-      '
-  - source: 魔乐社区
-    url: ''
-    command: '```bash
-
-      pip install modelers
-
-      modelers download --model Qwen/Qwen3-235B-A22B
-
-      ```
-
-      '
-  - source: GitCode
-    url: ''
-    command: '```bash
-
-      git clone https://gitcode.com/Qwen/Qwen3-235B-A22B.git
-
-      ```
-
-      '
-- weight_version: W8A8 (Pre-quantized)
+- weight_version: W8A8
   sources:
-  - source: 魔乐社区
-    url: https://modelers.cn/models/Modelers_Park/Qwen3-235B-A22B-w8a8
-    command: '```bash
-
-      pip install modelers
-
-      modelers download --model Modelers_Park/Qwen3-235B-A22B-w8a8
-
-      ```
-
-      '
   - source: ModelScope
     url: ''
     command: ''
   - source: HuggingFace
     url: ''
     command: ''
-  - source: GitCode
-    url: ''
-    command: ''
 quantization:
-  content: "To perform W8A8 quantization yourself, use the **msmodelslim** tool:\n\n### Install msmodelslim\n\n```bash\n#\
-    \ 1. Clone the msmodelslim repository.\ngit clone https://gitcode.com/Ascend/msmodelslim.git\n\n# 2. Enter the msmodelslim\
-    \ directory and run the installation script.\ncd msmodelslim\nbash install.sh\n\n# The following message indicates that\
-    \ msmodelslim has been installed successfully.\n# Successfully installed msmodelslim-{version}\n```\n\n### Run quantization\n\
-    \n```bash\ncd examples/Qwen3-MOE\npython3 quant_qwen_moe_w8a8.py \\\n    --model_path /path/to/your/Qwen3-235B-A22B \\\
-    \n    --save_path /path/to/your/Qwen3-235B-A22B-W8A8-rot \\\n    --anti_dataset ../common/qwen3-moe_anti_prompt_50.json\
-    \ \\\n    --calib_dataset ../common/qwen3-moe_calib_prompt_50.json \\\n    --trust_remote_code True \\\n    --rot\n```\n"
+  content: |-
+    To perform W8A8 quantization yourself, use the **msmodelslim** tool:
+
+    ### Install msmodelslim
+
+    ```bash
+    # 1. Clone the msmodelslim repository.
+    git clone https://gitcode.com/Ascend/msmodelslim.git
+
+    # 2. Enter the msmodelslim directory and run the installation script.
+    cd msmodelslim
+    bash install.sh
+
+    # The following message indicates that msmodelslim has been installed successfully.
+    # Successfully installed msmodelslim-{version}
+    ```
+
+    ### Run quantization
+
+    ```bash
+    cd examples/Qwen3-MOE
+    python3 quant_qwen_moe_w8a8.py \
+        --model_path /path/to/your/Qwen3-235B-A22B \
+        --save_path /path/to/your/Qwen3-235B-A22B-W8A8-rot \
+        --anti_dataset ../common/qwen3-moe_anti_prompt_50.json \
+        --calib_dataset ../common/qwen3-moe_calib_prompt_50.json \
+        --trust_remote_code True \
+        --rot
+    ```
 prerequisites:
 - title: Hardware Requirements
-  content: '| Model | Hardware Requirement |
-
+  content: |-
+    | Model | Hardware Requirement |
     |-------|---------------------|
-
     | Qwen3-235B-A22B (BF16) | 1 × Atlas 800I A3 (64G × 16), 1 × Atlas 800I A2 (64G × 8) |
-
     | Qwen3-235B-A22B-W8A8 | 1 × Atlas 800I A3 (64G × 16), 1 × Atlas 800I A2 (64G × 8) |
 
-
     > These are the recommended numbers of cards, which can be adjusted according to the actual situation.
-
-    '
 - title: Verify Multi-node Communication (Optional)
-  content: 'If you need to deploy a multi-node environment, verify the multi-node communication first.
-
+  content: |-
+    If you need to deploy a multi-node environment, verify the multi-node communication first.
 
     Refer to [Verify Multi-node Communication Environment](https://docs.vllm.ai/projects/ascend/en/latest/installation.html#verify-multi-node-communication).
-
-    '
 env_setup:
   pip:
-    content: '```bash
-
+    content: |-
+      ```bash
       git clone https://github.com/vllm-project/vllm.git
-
       cd vllm
-
       pip install -e .
-
 
       git clone https://github.com/vllm-project/vllm-ascend.git
-
       cd vllm-ascend
-
       pip install -e .
-
       ```
-
 
       Verify installation:
 
-
       ```bash
-
       pip show vllm-ascend
-
       ```
 
-
       > If deploying a multi-node environment, set up the environment on each node.
-
-      '
   container:
-    content: "**A3 series:**\n\n```bash\nexport IMAGE=quay.io/ascend/vllm-ascend:v0.22.1rc1-a3\ndocker run --rm \\\n    --name\
-      \ vllm-ascend-env \\\n    --shm-size=1g --net=host \\\n    --device /dev/davinci0 --device /dev/davinci1 \\\n    --device\
-      \ /dev/davinci2 --device /dev/davinci3 \\\n    --device /dev/davinci4 --device /dev/davinci5 \\\n    --device /dev/davinci6\
-      \ --device /dev/davinci7 \\\n    --device /dev/davinci8 --device /dev/davinci9 \\\n    --device /dev/davinci10 --device\
-      \ /dev/davinci11 \\\n    --device /dev/davinci12 --device /dev/davinci13 \\\n    --device /dev/davinci14 --device /dev/davinci15\
-      \ \\\n    --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc \\\n    -v /usr/local/dcmi:/usr/local/dcmi\
-      \ \\\n    -v /usr/local/Ascend/driver/tools/hccn_tool:/usr/local/Ascend/driver/tools/hccn_tool \\\n    -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi\
-      \ \\\n    -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \\\n    -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info\
-      \ \\\n    -v /etc/ascend_install.info:/etc/ascend_install.info \\\n    -v /root/.cache:/root/.cache \\\n    -it $IMAGE\
-      \ bash\n```\n\n> A3 has 8 NPUs with dual-die design (16 chips total: `/dev/davinci[0-15]`). On shared machines, map\
-      \ only the chips you need.\n\n**A2 series:**\n\n```bash\nexport IMAGE=quay.io/ascend/vllm-ascend:v0.22.1rc1\ndocker\
-      \ run --rm \\\n    --name vllm-ascend-env \\\n    --shm-size=1g --net=host \\\n    --device /dev/davinci0 --device /dev/davinci1\
-      \ \\\n    --device /dev/davinci2 --device /dev/davinci3 \\\n    --device /dev/davinci4 --device /dev/davinci5 \\\n \
-      \   --device /dev/davinci6 --device /dev/davinci7 \\\n    --device /dev/davinci_manager --device /dev/devmm_svm --device\
-      \ /dev/hisi_hdc \\\n    -v /usr/local/dcmi:/usr/local/dcmi \\\n    -v /usr/local/Ascend/driver/tools/hccn_tool:/usr/local/Ascend/driver/tools/hccn_tool\
-      \ \\\n    -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \\\n    -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/\
-      \ \\\n    -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \\\n    -v /etc/ascend_install.info:/etc/ascend_install.info\
-      \ \\\n    -v /root/.cache:/root/.cache \\\n    -it $IMAGE bash\n```\n\n> The default workdir is `/workspace`. vLLM and\
-      \ vLLM-Ascend are installed as Python packages in site-packages.\n"
+    A3:
+      content: |-
+        ```bash
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.22.1rc1-a3
+        docker run --rm \
+            --name vllm-ascend-env \
+            --shm-size=1g --net=host \
+            --device /dev/davinci0 --device /dev/davinci1 \
+            --device /dev/davinci2 --device /dev/davinci3 \
+            --device /dev/davinci4 --device /dev/davinci5 \
+            --device /dev/davinci6 --device /dev/davinci7 \
+            --device /dev/davinci8 --device /dev/davinci9 \
+            --device /dev/davinci10 --device /dev/davinci11 \
+            --device /dev/davinci12 --device /dev/davinci13 \
+            --device /dev/davinci14 --device /dev/davinci15 \
+            --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc \
+            -v /usr/local/dcmi:/usr/local/dcmi \
+            -v /usr/local/Ascend/driver/tools/hccn_tool:/usr/local/Ascend/driver/tools/hccn_tool \
+            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+            -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \
+            -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
+            -v /etc/ascend_install.info:/etc/ascend_install.info \
+            -v /root/.cache:/root/.cache \
+            -it $IMAGE bash
+        ```
+
+        > A3 has 8 NPUs with dual-die design (16 chips total: `/dev/davinci[0-15]`). On shared machines, map only the chips you need.
+    A2:
+      content: |-
+        ```bash
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.22.1rc1
+        docker run --rm \
+            --name vllm-ascend-env \
+            --shm-size=1g --net=host \
+            --device /dev/davinci0 --device /dev/davinci1 \
+            --device /dev/davinci2 --device /dev/davinci3 \
+            --device /dev/davinci4 --device /dev/davinci5 \
+            --device /dev/davinci6 --device /dev/davinci7 \
+            --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc \
+            -v /usr/local/dcmi:/usr/local/dcmi \
+            -v /usr/local/Ascend/driver/tools/hccn_tool:/usr/local/Ascend/driver/tools/hccn_tool \
+            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+            -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \
+            -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
+            -v /etc/ascend_install.info:/etc/ascend_install.info \
+            -v /root/.cache:/root/.cache \
+            -it $IMAGE bash
+        ```
+
+        > The default workdir is `/workspace`. vLLM and vLLM-Ascend are installed as Python packages in site-packages.
 scenarios:
 - npu: Atlas 800I A2
   precision: W8A8
   deployment: 单节点-多卡
-  verified: true
   steps:
   - title: Environment Variables
-    content: '```bash
-
+    content: |-
+      ```bash
       export VLLM_USE_MODELSCOPE=True
-
       export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
-
       export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
-
       export HCCL_BUFFSIZE=512
-
       export OMP_PROC_BIND=false
-
       export OMP_NUM_THREADS=1
-
       export TASK_QUEUE_ENABLE=1
-
+      ```
+  - title: Start Service
+    content: |-
+      ```bash
+      vllm serve your_model_path \
+          --host <host_ip> \
+          --port <port> \
+          --tensor-parallel-size 8 \
+          --data-parallel-size 1 \
+          --seed 1024 \
+          --quantization ascend \
+          --served-model-name qwen3 \
+          --max-num-seqs 32 \
+          --max-model-len 131072 \
+          --max-num-batched-tokens 8096 \
+          --enable-expert-parallel \
+          --trust-remote-code \
+          --gpu-memory-utilization 0.95 \
+          --hf-overrides '{"rope_parameters": {"rope_type":"yarn","rope_theta":1000000,"factor":4,"original_max_position_embeddings":32768}}' \
+          --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY"}' \
+          --additional-config '{"enable_flashcomm1": true}' \
+          --async-scheduling
       ```
 
-      '
-  - title: Start Service
-    content: "```bash\nvllm serve your_model_path \\\n    --host <host_ip> \\\n    --port <port> \\\n    --tensor-parallel-size\
-      \ 8 \\\n    --data-parallel-size 1 \\\n    --seed 1024 \\\n    --quantization ascend \\\n    --served-model-name qwen3\
-      \ \\\n    --max-num-seqs 32 \\\n    --max-model-len 131072 \\\n    --max-num-batched-tokens 8096 \\\n    --enable-expert-parallel\
-      \ \\\n    --trust-remote-code \\\n    --gpu-memory-utilization 0.95 \\\n    --hf-overrides '{\"rope_parameters\": {\"\
-      rope_type\":\"yarn\",\"rope_theta\":1000000,\"factor\":4,\"original_max_position_embeddings\":32768}}' \\\n    --compilation-config\
-      \ '{\"cudagraph_mode\":\"FULL_DECODE_ONLY\"}' \\\n    --additional-config '{\"enable_flashcomm1\": true}' \\\n    --async-scheduling\n\
-      ```\n\n> The above is an example configuration. Adjust parameters based on your actual scenario.\n"
+      > The above is an example configuration. Adjust parameters based on your actual scenario.
   - title: Verify Service
-    content: 'If the service starts successfully, the following startup log will be displayed:
-
+    content: |-
+      If the service starts successfully, the following startup log will be displayed:
 
       ```text
-
       (APIServer pid=<pid>) INFO:     Started server process [<pid>]
-
       (APIServer pid=<pid>) INFO:     Waiting for application startup.
-
       (APIServer pid=<pid>) INFO:     Application startup complete.
-
       ```
-
-      '
 - npu: Atlas 800I A3
   precision: W8A8
   deployment: 单节点-多卡
-  verified: true
   steps:
   - title: Environment Variables
-    content: '```bash
-
+    content: |-
+      ```bash
       export VLLM_USE_MODELSCOPE=True
-
       export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15
-
       export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
-
       export HCCL_BUFFSIZE=512
-
       export OMP_PROC_BIND=false
-
       export OMP_NUM_THREADS=1
-
       export TASK_QUEUE_ENABLE=1
-
+      ```
+  - title: Start Service
+    content: |-
+      ```bash
+      vllm serve your_model_path \
+          --host <host_ip> \
+          --port <port> \
+          --tensor-parallel-size 8 \
+          --data-parallel-size 1 \
+          --seed 1024 \
+          --quantization ascend \
+          --served-model-name qwen3 \
+          --max-num-seqs 32 \
+          --max-model-len 131072 \
+          --max-num-batched-tokens 8096 \
+          --enable-expert-parallel \
+          --trust-remote-code \
+          --gpu-memory-utilization 0.95 \
+          --hf-overrides '{"rope_parameters": {"rope_type":"yarn","rope_theta":1000000,"factor":4,"original_max_position_embeddings":32768}}' \
+          --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY"}' \
+          --additional-config '{"enable_flashcomm1": true}' \
+          --async-scheduling
       ```
 
-      '
-  - title: Start Service
-    content: "```bash\nvllm serve your_model_path \\\n    --host <host_ip> \\\n    --port <port> \\\n    --tensor-parallel-size\
-      \ 8 \\\n    --data-parallel-size 1 \\\n    --seed 1024 \\\n    --quantization ascend \\\n    --served-model-name qwen3\
-      \ \\\n    --max-num-seqs 32 \\\n    --max-model-len 131072 \\\n    --max-num-batched-tokens 8096 \\\n    --enable-expert-parallel\
-      \ \\\n    --trust-remote-code \\\n    --gpu-memory-utilization 0.95 \\\n    --hf-overrides '{\"rope_parameters\": {\"\
-      rope_type\":\"yarn\",\"rope_theta\":1000000,\"factor\":4,\"original_max_position_embeddings\":32768}}' \\\n    --compilation-config\
-      \ '{\"cudagraph_mode\":\"FULL_DECODE_ONLY\"}' \\\n    --additional-config '{\"enable_flashcomm1\": true}' \\\n    --async-scheduling\n\
-      ```\n\n> A3 series uses 16 chips. The command is the same as A2 except for `ASCEND_RT_VISIBLE_DEVICES`.\n"
+      > A3 series uses 16 chips. The command is the same as A2 except for `ASCEND_RT_VISIBLE_DEVICES`.
 - npu: Atlas 800I A3
   precision: W8A8
   deployment: 单节点-PD混合
-  verified: true
   steps:
   - title: High Throughput (TP4, DP4)
-    content: "Single-node PD hybrid deployment optimized for maximum throughput on Atlas 800I A3 (64G × 16):\n\n```bash\n\
-      export HCCL_IF_IP=<node_ip>\nexport GLOO_SOCKET_IFNAME=<ifname>\nexport TP_SOCKET_IFNAME=<ifname>\nexport HCCL_SOCKET_IFNAME=<ifname>\n\
-      export HCCL_OP_EXPANSION_MODE=\"AIV\"\nexport HCCL_BUFFSIZE=1024\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\n\
-      export OMP_NUM_THREADS=1\necho performance | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor\nsysctl -w vm.swappiness=0\n\
-      sysctl -w kernel.numa_balancing=0\nsysctl kernel.sched_migration_cost_ns=50000\nexport LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libjemalloc.so.2:$LD_PRELOAD\n\
-      export TASK_QUEUE_ENABLE=1\n\nvllm serve your_model_path \\\n    --served-model-name qwen3 \\\n    --host <host_ip>\
-      \ --port <port> \\\n    --async-scheduling \\\n    --tensor-parallel-size 4 \\\n    --data-parallel-size 4 \\\n    --data-parallel-size-local\
-      \ 4 \\\n    --data-parallel-start-rank 0 \\\n    --data-parallel-address <node_ip> \\\n    --data-parallel-rpc-port\
-      \ <rpc_port> \\\n    --enable-expert-parallel \\\n    --max-num-seqs 128 \\\n    --max-model-len 32768 \\\n    --max-num-batched-tokens\
-      \ 16384 \\\n    --gpu-memory-utilization 0.9 \\\n    --trust-remote-code --quantization ascend \\\n    --no-enable-prefix-caching\
-      \ \\\n    --compilation-config '{\"cudagraph_mode\": \"FULL_DECODE_ONLY\"}' \\\n    --additional-config '{\"enable_cpu_binding\"\
-      :true, \"enable_flashcomm1\": true, \"enable_fused_mc2\": 1}'\n```\n"
+    content: |-
+      Single-node PD hybrid deployment optimized for maximum throughput on Atlas 800I A3 (64G × 16):
+
+      ```bash
+      export HCCL_IF_IP=<node_ip>
+      export GLOO_SOCKET_IFNAME=<ifname>
+      export TP_SOCKET_IFNAME=<ifname>
+      export HCCL_SOCKET_IFNAME=<ifname>
+      export HCCL_OP_EXPANSION_MODE="AIV"
+      export HCCL_BUFFSIZE=1024
+      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+      export OMP_NUM_THREADS=1
+      echo performance | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
+      sysctl -w vm.swappiness=0
+      sysctl -w kernel.numa_balancing=0
+      sysctl kernel.sched_migration_cost_ns=50000
+      export LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libjemalloc.so.2:$LD_PRELOAD
+      export TASK_QUEUE_ENABLE=1
+
+      vllm serve your_model_path \
+          --served-model-name qwen3 \
+          --host <host_ip> --port <port> \
+          --async-scheduling \
+          --tensor-parallel-size 4 \
+          --data-parallel-size 4 \
+          --data-parallel-size-local 4 \
+          --data-parallel-start-rank 0 \
+          --data-parallel-address <node_ip> \
+          --data-parallel-rpc-port <rpc_port> \
+          --enable-expert-parallel \
+          --max-num-seqs 128 \
+          --max-model-len 32768 \
+          --max-num-batched-tokens 16384 \
+          --gpu-memory-utilization 0.9 \
+          --trust-remote-code --quantization ascend \
+          --no-enable-prefix-caching \
+          --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY"}' \
+          --additional-config '{"enable_cpu_binding":true, "enable_flashcomm1": true, "enable_fused_mc2": 1}'
+      ```
   - title: Low Latency (TP16, Eagle3 Speculative Decoding)
-    content: "Single-node PD hybrid deployment optimized for low latency with speculative decoding (Eagle3):\n\n```bash\n\
-      export HCCL_IF_IP=<node_ip>\nexport GLOO_SOCKET_IFNAME=<ifname>\nexport TP_SOCKET_IFNAME=<ifname>\nexport HCCL_SOCKET_IFNAME=<ifname>\n\
-      export HCCL_OP_EXPANSION_MODE=\"AIV\"\nexport HCCL_BUFFSIZE=1024\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\n\
-      export OMP_NUM_THREADS=1\necho performance | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor\nsysctl -w vm.swappiness=0\n\
-      sysctl -w kernel.numa_balancing=0\nsysctl kernel.sched_migration_cost_ns=50000\nexport LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libjemalloc.so.2:$LD_PRELOAD\n\
-      export TASK_QUEUE_ENABLE=1\n\nvllm serve your_model_path \\\n    --served-model-name qwen3 \\\n    --host <host_ip>\
-      \ --port <port> \\\n    --async-scheduling \\\n    --tensor-parallel-size 16 \\\n    --data-parallel-size 1 \\\n   \
-      \ --data-parallel-size-local 1 \\\n    --data-parallel-start-rank 0 \\\n    --data-parallel-address <node_ip> \\\n \
-      \   --data-parallel-rpc-port <rpc_port> \\\n    --enable-expert-parallel \\\n    --max-num-seqs 128 \\\n    --max-model-len\
-      \ 32768 \\\n    --max-num-batched-tokens 16384 \\\n    --gpu-memory-utilization 0.9 \\\n    --trust-remote-code --quantization\
-      \ ascend \\\n    --no-enable-prefix-caching \\\n    --compilation-config '{\"cudagraph_mode\": \"FULL_DECODE_ONLY\"\
-      }' \\\n    --speculative-config '{\"method\": \"eagle3\", \"model\":\"your_eagle3_model_path\", \"num_speculative_tokens\"\
-      : 3}' \\\n    --additional-config '{\"enable_cpu_binding\":true, \"enable_flashcomm1\": true}'\n```\n"
+    content: |-
+      Single-node PD hybrid deployment optimized for low latency with speculative decoding (Eagle3):
+
+      ```bash
+      export HCCL_IF_IP=<node_ip>
+      export GLOO_SOCKET_IFNAME=<ifname>
+      export TP_SOCKET_IFNAME=<ifname>
+      export HCCL_SOCKET_IFNAME=<ifname>
+      export HCCL_OP_EXPANSION_MODE="AIV"
+      export HCCL_BUFFSIZE=1024
+      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+      export OMP_NUM_THREADS=1
+      echo performance | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
+      sysctl -w vm.swappiness=0
+      sysctl -w kernel.numa_balancing=0
+      sysctl kernel.sched_migration_cost_ns=50000
+      export LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libjemalloc.so.2:$LD_PRELOAD
+      export TASK_QUEUE_ENABLE=1
+
+      vllm serve your_model_path \
+          --served-model-name qwen3 \
+          --host <host_ip> --port <port> \
+          --async-scheduling \
+          --tensor-parallel-size 16 \
+          --data-parallel-size 1 \
+          --data-parallel-size-local 1 \
+          --data-parallel-start-rank 0 \
+          --data-parallel-address <node_ip> \
+          --data-parallel-rpc-port <rpc_port> \
+          --enable-expert-parallel \
+          --max-num-seqs 128 \
+          --max-model-len 32768 \
+          --max-num-batched-tokens 16384 \
+          --gpu-memory-utilization 0.9 \
+          --trust-remote-code --quantization ascend \
+          --no-enable-prefix-caching \
+          --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY"}' \
+          --speculative-config '{"method": "eagle3", "model":"your_eagle3_model_path", "num_speculative_tokens": 3}' \
+          --additional-config '{"enable_cpu_binding":true, "enable_flashcomm1": true}'
+      ```
   - title: Long Context (TP8, CP2, YaRN)
-    content: "Single-node PD hybrid deployment optimized for long context with Context Parallelism and YaRN rope-scaling:\n\
-      \n```bash\nexport HCCL_IF_IP=<node_ip>\nexport GLOO_SOCKET_IFNAME=<ifname>\nexport TP_SOCKET_IFNAME=<ifname>\nexport\
-      \ HCCL_SOCKET_IFNAME=<ifname>\nexport HCCL_OP_EXPANSION_MODE=\"AIV\"\nexport HCCL_BUFFSIZE=1024\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\n\
-      export OMP_NUM_THREADS=1\necho performance | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor\nsysctl -w vm.swappiness=0\n\
-      sysctl -w kernel.numa_balancing=0\nsysctl kernel.sched_migration_cost_ns=50000\nexport LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libjemalloc.so.2:$LD_PRELOAD\n\
-      export TASK_QUEUE_ENABLE=1\n\nvllm serve your_model_path \\\n    --served-model-name qwen3 \\\n    --host <host_ip>\
-      \ --port <port> \\\n    --tensor-parallel-size 8 \\\n    --data-parallel-size 1 \\\n    --decode-context-parallel-size\
-      \ 2 \\\n    --prefill-context-parallel-size 2 \\\n    --enable-expert-parallel \\\n    --cp-kv-cache-interleave-size\
-      \ 128 \\\n    --max-num-seqs 32 \\\n    --max-model-len 135000 \\\n    --max-num-batched-tokens 16384 \\\n    --gpu-memory-utilization\
-      \ 0.85 \\\n    --trust-remote-code --quantization ascend \\\n    --no-enable-prefix-caching \\\n    --hf-overrides '{\"\
-      rope_parameters\": {\"rope_type\":\"yarn\",\"rope_theta\":1000000,\"factor\":4,\"original_max_position_embeddings\"\
-      :131072}}' \\\n    --compilation-config '{\"cudagraph_mode\": \"FULL_DECODE_ONLY\"}' \\\n    --additional-config '{\"\
-      enable_cpu_binding\":true, \"enable_flashcomm1\": true, \"enable_fused_mc2\": 1}'\n```\n"
+    content: |-
+      Single-node PD hybrid deployment optimized for long context with Context Parallelism and YaRN rope-scaling:
+
+      ```bash
+      export HCCL_IF_IP=<node_ip>
+      export GLOO_SOCKET_IFNAME=<ifname>
+      export TP_SOCKET_IFNAME=<ifname>
+      export HCCL_SOCKET_IFNAME=<ifname>
+      export HCCL_OP_EXPANSION_MODE="AIV"
+      export HCCL_BUFFSIZE=1024
+      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+      export OMP_NUM_THREADS=1
+      echo performance | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
+      sysctl -w vm.swappiness=0
+      sysctl -w kernel.numa_balancing=0
+      sysctl kernel.sched_migration_cost_ns=50000
+      export LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libjemalloc.so.2:$LD_PRELOAD
+      export TASK_QUEUE_ENABLE=1
+
+      vllm serve your_model_path \
+          --served-model-name qwen3 \
+          --host <host_ip> --port <port> \
+          --tensor-parallel-size 8 \
+          --data-parallel-size 1 \
+          --decode-context-parallel-size 2 \
+          --prefill-context-parallel-size 2 \
+          --enable-expert-parallel \
+          --cp-kv-cache-interleave-size 128 \
+          --max-num-seqs 32 \
+          --max-model-len 135000 \
+          --max-num-batched-tokens 16384 \
+          --gpu-memory-utilization 0.85 \
+          --trust-remote-code --quantization ascend \
+          --no-enable-prefix-caching \
+          --hf-overrides '{"rope_parameters": {"rope_type":"yarn","rope_theta":1000000,"factor":4,"original_max_position_embeddings":131072}}' \
+          --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY"}' \
+          --additional-config '{"enable_cpu_binding":true, "enable_flashcomm1": true, "enable_fused_mc2": 1}'
+      ```
 - npu: Atlas 800I A3
   precision: W8A8
   deployment: 多节点-PD分离
-  verified: true
   steps:
   - title: Overview
-    content: 'Hardware: 3 × Atlas 800 A3 (64G × 16), one for Prefill, two for Decode.
-
+    content: |-
+      Hardware: 3 × Atlas 800 A3 (64G × 16), one for Prefill, two for Decode.
 
       For the detailed deployment guide, refer to [Prefill-Decode Disaggregation Mooncake Verification](https://docs.vllm.ai/projects/ascend/en/latest/tutorials/features/pd_disaggregation_mooncake_multi_node.html).
-
-      '
   - title: Prepare Launch Script
-    content: "Prepare `launch_online_dp.py` on each node:\n\n```python\nimport argparse\nimport multiprocessing\nimport os\n\
-      import subprocess\nimport sys\n\ndef parse_args():\n    parser = argparse.ArgumentParser()\n    parser.add_argument(\"\
-      --dp-size\", type=int, required=True, help=\"Data parallel size.\")\n    parser.add_argument(\"--tp-size\", type=int,\
-      \ default=1, help=\"Tensor parallel size.\")\n    parser.add_argument(\"--dp-size-local\", type=int, default=-1, help=\"\
-      Local data parallel size.\")\n    parser.add_argument(\"--dp-rank-start\", type=int, default=0, help=\"Starting rank\
-      \ for data parallel.\")\n    parser.add_argument(\"--dp-address\", type=str, required=True, help=\"IP address for data\
-      \ parallel master node.\")\n    parser.add_argument(\"--dp-rpc-port\", type=str, default=12345, help=\"Port for data\
-      \ parallel master node.\")\n    parser.add_argument(\"--vllm-start-port\", type=int, default=9000, help=\"Starting port\
-      \ for the engine.\")\n    return parser.parse_args()\n\nargs = parse_args()\ndp_size = args.dp_size\ntp_size = args.tp_size\n\
-      dp_size_local = args.dp_size_local if args.dp_size_local != -1 else dp_size\ndp_rank_start = args.dp_rank_start\ndp_address\
-      \ = args.dp_address\ndp_rpc_port = args.dp_rpc_port\nvllm_start_port = args.vllm_start_port\n\ndef run_command(visible_devices,\
-      \ dp_rank, vllm_engine_port):\n    command = [\n        \"bash\", \"./run_dp_template.sh\",\n        visible_devices,\
-      \ str(vllm_engine_port),\n        str(dp_size), str(dp_rank),\n        dp_address, dp_rpc_port, str(tp_size),\n    ]\n\
-      \    subprocess.run(command, check=True)\n\nif __name__ == \"__main__\":\n    template_path = \"./run_dp_template.sh\"\
-      \n    if not os.path.exists(template_path):\n        print(f\"Template file {template_path} does not exist.\")\n   \
-      \     sys.exit(1)\n    processes = []\n    for i in range(dp_size_local):\n        dp_rank = dp_rank_start + i\n   \
-      \     vllm_engine_port = vllm_start_port + i\n        visible_devices = \",\".join(str(x) for x in range(i * tp_size,\
-      \ (i + 1) * tp_size))\n        process = multiprocessing.Process(\n            target=run_command,\n            args=(visible_devices,\
-      \ dp_rank, vllm_engine_port)\n        )\n        processes.append(process)\n        process.start()\n    for process\
-      \ in processes:\n        process.join()\n```\n"
+    content: |-
+      Prepare `launch_online_dp.py` on each node:
+
+      ```python
+      import argparse
+      import multiprocessing
+      import os
+      import subprocess
+      import sys
+
+      def parse_args():
+          parser = argparse.ArgumentParser()
+          parser.add_argument("--dp-size", type=int, required=True, help="Data parallel size.")
+          parser.add_argument("--tp-size", type=int, default=1, help="Tensor parallel size.")
+          parser.add_argument("--dp-size-local", type=int, default=-1, help="Local data parallel size.")
+          parser.add_argument("--dp-rank-start", type=int, default=0, help="Starting rank for data parallel.")
+          parser.add_argument("--dp-address", type=str, required=True, help="IP address for data parallel master node.")
+          parser.add_argument("--dp-rpc-port", type=str, default=12345, help="Port for data parallel master node.")
+          parser.add_argument("--vllm-start-port", type=int, default=9000, help="Starting port for the engine.")
+          return parser.parse_args()
+
+      args = parse_args()
+      dp_size = args.dp_size
+      tp_size = args.tp_size
+      dp_size_local = args.dp_size_local if args.dp_size_local != -1 else dp_size
+      dp_rank_start = args.dp_rank_start
+      dp_address = args.dp_address
+      dp_rpc_port = args.dp_rpc_port
+      vllm_start_port = args.vllm_start_port
+
+      def run_command(visible_devices, dp_rank, vllm_engine_port):
+          command = [
+              "bash", "./run_dp_template.sh",
+              visible_devices, str(vllm_engine_port),
+              str(dp_size), str(dp_rank),
+              dp_address, dp_rpc_port, str(tp_size),
+          ]
+          subprocess.run(command, check=True)
+
+      if __name__ == "__main__":
+          template_path = "./run_dp_template.sh"
+          if not os.path.exists(template_path):
+              print(f"Template file {template_path} does not exist.")
+              sys.exit(1)
+          processes = []
+          for i in range(dp_size_local):
+              dp_rank = dp_rank_start + i
+              vllm_engine_port = vllm_start_port + i
+              visible_devices = ",".join(str(x) for x in range(i * tp_size, (i + 1) * tp_size))
+              process = multiprocessing.Process(
+                  target=run_command,
+                  args=(visible_devices, dp_rank, vllm_engine_port)
+              )
+              processes.append(process)
+              process.start()
+          for process in processes:
+              process.join()
+      ```
   - title: Prefill Node Configuration
-    content: "```bash\nnic_name=\"<your_nic_name>\"\nlocal_ip=\"<your_ip>\"\nexport HCCL_IF_IP=$local_ip\nexport GLOO_SOCKET_IFNAME=$nic_name\n\
-      export TP_SOCKET_IFNAME=$nic_name\nexport HCCL_SOCKET_IFNAME=$nic_name\nexport HCCL_BUFFSIZE=512\nexport HCCL_OP_EXPANSION_MODE=\"\
-      AIV\"\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\nexport OMP_NUM_THREADS=1\necho performance | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor\n\
-      sysctl -w vm.swappiness=0\nsysctl -w kernel.numa_balancing=0\nsysctl kernel.sched_migration_cost_ns=50000\nexport LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libjemalloc.so.2:$LD_PRELOAD\n\
-      export TASK_QUEUE_ENABLE=1\nexport LD_LIBRARY_PATH=/usr/local/Ascend/ascend-toolkit/latest/python/site-packages/mooncake:$LD_LIBRARY_PATH\n\
-      export ASCEND_RT_VISIBLE_DEVICES=$1\n\nvllm serve \"/data/weights/Qwen3-235B-A22B-w8a8-rot\" \\\n    --host 0.0.0.0\
-      \ --port $2 \\\n    --data-parallel-size $3 --data-parallel-rank $4 \\\n    --data-parallel-address $5 --data-parallel-rpc-port\
-      \ $6 \\\n    --tensor-parallel-size $7 \\\n    --enable-expert-parallel \\\n    --served-model-name qwen3_235b \\\n\
-      \    --max-model-len 40960 --max-num-batched-tokens 16384 \\\n    --max-num-seqs 24 --trust-remote-code \\\n    --gpu-memory-utilization\
-      \ 0.9 --quantization ascend \\\n    --no-enable-prefix-caching --enforce-eager \\\n    --additional-config '{\"enable_flashcomm1\"\
-      : true, \"enable_fused_mc2\": 1}' \\\n    --kv-transfer-config \\\n        '{\"kv_connector\": \"MooncakeConnectorV1\"\
-      , \\\n        \"kv_role\": \"kv_producer\", \"kv_port\": \"30000\", \"engine_id\": \"0\", \\\n        \"kv_connector_extra_config\"\
-      : { \\\n            \"use_ascend_direct\": true, \\\n            \"prefill\": {\"dp_size\": 2, \"tp_size\": 8}, \\\n\
-      \            \"decode\": {\"dp_size\": 8, \"tp_size\": 4} \\\n        }}'\n```\n"
+    content: |-
+      ```bash
+      nic_name="<your_nic_name>"
+      local_ip="<your_ip>"
+      export HCCL_IF_IP=$local_ip
+      export GLOO_SOCKET_IFNAME=$nic_name
+      export TP_SOCKET_IFNAME=$nic_name
+      export HCCL_SOCKET_IFNAME=$nic_name
+      export HCCL_BUFFSIZE=512
+      export HCCL_OP_EXPANSION_MODE="AIV"
+      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+      export OMP_NUM_THREADS=1
+      echo performance | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
+      sysctl -w vm.swappiness=0
+      sysctl -w kernel.numa_balancing=0
+      sysctl kernel.sched_migration_cost_ns=50000
+      export LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libjemalloc.so.2:$LD_PRELOAD
+      export TASK_QUEUE_ENABLE=1
+      export LD_LIBRARY_PATH=/usr/local/Ascend/ascend-toolkit/latest/python/site-packages/mooncake:$LD_LIBRARY_PATH
+      export ASCEND_RT_VISIBLE_DEVICES=$1
+
+      vllm serve "/data/weights/Qwen3-235B-A22B-w8a8-rot" \
+          --host 0.0.0.0 --port $2 \
+          --data-parallel-size $3 --data-parallel-rank $4 \
+          --data-parallel-address $5 --data-parallel-rpc-port $6 \
+          --tensor-parallel-size $7 \
+          --enable-expert-parallel \
+          --served-model-name qwen3_235b \
+          --max-model-len 40960 --max-num-batched-tokens 16384 \
+          --max-num-seqs 24 --trust-remote-code \
+          --gpu-memory-utilization 0.9 --quantization ascend \
+          --no-enable-prefix-caching --enforce-eager \
+          --additional-config '{"enable_flashcomm1": true, "enable_fused_mc2": 1}' \
+          --kv-transfer-config \
+              '{"kv_connector": "MooncakeConnectorV1", \
+              "kv_role": "kv_producer", "kv_port": "30000", "engine_id": "0", \
+              "kv_connector_extra_config": { \
+                  "use_ascend_direct": true, \
+                  "prefill": {"dp_size": 2, "tp_size": 8}, \
+                  "decode": {"dp_size": 8, "tp_size": 4} \
+              }}'
+      ```
   - title: Decode Node Configuration
-    content: "```bash\nnic_name=\"<your_nic_name>\"\nlocal_ip=\"<your_ip>\"\nexport HCCL_IF_IP=$local_ip\nexport GLOO_SOCKET_IFNAME=$nic_name\n\
-      export TP_SOCKET_IFNAME=$nic_name\nexport HCCL_SOCKET_IFNAME=$nic_name\nexport HCCL_BUFFSIZE=1024\nexport HCCL_OP_EXPANSION_MODE=\"\
-      AIV\"\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\nexport OMP_NUM_THREADS=1\necho performance | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor\n\
-      sysctl -w vm.swappiness=0\nsysctl -w kernel.numa_balancing=0\nsysctl kernel.sched_migration_cost_ns=50000\nexport LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libjemalloc.so.2:$LD_PRELOAD\n\
-      export TASK_QUEUE_ENABLE=1\nexport LD_LIBRARY_PATH=/usr/local/Ascend/ascend-toolkit/latest/python/site-packages/mooncake:$LD_LIBRARY_PATH\n\
-      export VLLM_TORCH_PROFILER_WITH_STACK=0\nexport ASCEND_RT_VISIBLE_DEVICES=$1\n\nvllm serve \"/data/weights/Qwen3-235B-A22B-w8a8-rot\"\
-      \ \\\n    --host 0.0.0.0 --port $2 \\\n    --data-parallel-size $3 --data-parallel-rank $4 \\\n    --data-parallel-address\
-      \ $5 --data-parallel-rpc-port $6 \\\n    --tensor-parallel-size $7 \\\n    --enable-expert-parallel \\\n    --served-model-name\
-      \ qwen3_235b \\\n    --max-model-len 40960 --max-num-batched-tokens 512 \\\n    --max-num-seqs 128 --trust-remote-code\
-      \ \\\n    --gpu-memory-utilization 0.9 --quantization ascend \\\n    --no-enable-prefix-caching --async-scheduling \\\
-      \n    --compilation-config '{\"cudagraph_mode\":\"FULL_DECODE_ONLY\"}' \\\n    --additional-config '{\"enable_flashcomm1\"\
-      : true, \"enable_fused_mc2\": 2}' \\\n    --kv-transfer-config \\\n        '{\"kv_connector\": \"MooncakeConnectorV1\"\
-      , \\\n        \"kv_role\": \"kv_consumer\", \"kv_port\": \"30100\", \"engine_id\": \"1\", \\\n        \"kv_connector_extra_config\"\
-      : { \\\n            \"use_ascend_direct\": true, \\\n            \"prefill\": {\"dp_size\": 2, \"tp_size\": 8}, \\\n\
-      \            \"decode\": {\"dp_size\": 8, \"tp_size\": 4} \\\n        }}'\n```\n"
+    content: |-
+      ```bash
+      nic_name="<your_nic_name>"
+      local_ip="<your_ip>"
+      export HCCL_IF_IP=$local_ip
+      export GLOO_SOCKET_IFNAME=$nic_name
+      export TP_SOCKET_IFNAME=$nic_name
+      export HCCL_SOCKET_IFNAME=$nic_name
+      export HCCL_BUFFSIZE=1024
+      export HCCL_OP_EXPANSION_MODE="AIV"
+      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+      export OMP_NUM_THREADS=1
+      echo performance | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
+      sysctl -w vm.swappiness=0
+      sysctl -w kernel.numa_balancing=0
+      sysctl kernel.sched_migration_cost_ns=50000
+      export LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libjemalloc.so.2:$LD_PRELOAD
+      export TASK_QUEUE_ENABLE=1
+      export LD_LIBRARY_PATH=/usr/local/Ascend/ascend-toolkit/latest/python/site-packages/mooncake:$LD_LIBRARY_PATH
+      export VLLM_TORCH_PROFILER_WITH_STACK=0
+      export ASCEND_RT_VISIBLE_DEVICES=$1
+
+      vllm serve "/data/weights/Qwen3-235B-A22B-w8a8-rot" \
+          --host 0.0.0.0 --port $2 \
+          --data-parallel-size $3 --data-parallel-rank $4 \
+          --data-parallel-address $5 --data-parallel-rpc-port $6 \
+          --tensor-parallel-size $7 \
+          --enable-expert-parallel \
+          --served-model-name qwen3_235b \
+          --max-model-len 40960 --max-num-batched-tokens 512 \
+          --max-num-seqs 128 --trust-remote-code \
+          --gpu-memory-utilization 0.9 --quantization ascend \
+          --no-enable-prefix-caching --async-scheduling \
+          --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY"}' \
+          --additional-config '{"enable_flashcomm1": true, "enable_fused_mc2": 2}' \
+          --kv-transfer-config \
+              '{"kv_connector": "MooncakeConnectorV1", \
+              "kv_role": "kv_consumer", "kv_port": "30100", "engine_id": "1", \
+              "kv_connector_extra_config": { \
+                  "use_ascend_direct": true, \
+                  "prefill": {"dp_size": 2, "tp_size": 8}, \
+                  "decode": {"dp_size": 8, "tp_size": 4} \
+              }}'
+      ```
   - title: Start Service
-    content: "**Prefill node:**\n\n```bash\npython launch_online_dp.py \\\n    --dp-size 2 --tp-size 8 \\\n    --dp-size-local\
-      \ 2 --dp-rank-start 0 \\\n    --dp-address <prefill_ip> --dp-rpc-port 54951 \\\n    --vllm-start-port 9123\n```\n\n\
-      **Decode node 0:**\n\n```bash\npython launch_online_dp.py \\\n    --dp-size 8 --tp-size 4 \\\n    --dp-size-local 4\
-      \ --dp-rank-start 0 \\\n    --dp-address <decode_ip> --dp-rpc-port 54951 \\\n    --vllm-start-port 9123\n```\n\n**Decode\
-      \ node 1:**\n\n```bash\npython launch_online_dp.py \\\n    --dp-size 8 --tp-size 4 \\\n    --dp-size-local 4 --dp-rank-start\
-      \ 4 \\\n    --dp-address <decode_ip> --dp-rpc-port 54951 \\\n    --vllm-start-port 9123\n```\n"
+    content: |-
+      **Prefill node:**
+
+      ```bash
+      python launch_online_dp.py \
+          --dp-size 2 --tp-size 8 \
+          --dp-size-local 2 --dp-rank-start 0 \
+          --dp-address <prefill_ip> --dp-rpc-port 54951 \
+          --vllm-start-port 9123
+      ```
+
+      **Decode node 0:**
+
+      ```bash
+      python launch_online_dp.py \
+          --dp-size 8 --tp-size 4 \
+          --dp-size-local 4 --dp-rank-start 0 \
+          --dp-address <decode_ip> --dp-rpc-port 54951 \
+          --vllm-start-port 9123
+      ```
+
+      **Decode node 1:**
+
+      ```bash
+      python launch_online_dp.py \
+          --dp-size 8 --tp-size 4 \
+          --dp-size-local 4 --dp-rank-start 4 \
+          --dp-address <decode_ip> --dp-rpc-port 54951 \
+          --vllm-start-port 9123
+      ```
   - title: Request Forwarding Proxy
-    content: "Run the proxy on any machine that can reach both nodes:\n\n```bash\nunset http_proxy https_proxy\n\npython load_balance_proxy_server_example.py\
-      \ \\\n  --port 38085 --host <prefill_ip> \\\n  --prefiller-hosts <prefill_ip> <prefill_ip> \\\n  --prefiller-ports 9123\
-      \ 9124 \\\n  --decoder-hosts \\\n    <decode0_ip> <decode0_ip> <decode0_ip> <decode0_ip> \\\n    <decode1_ip> <decode1_ip>\
-      \ <decode1_ip> <decode1_ip> \\\n  --decoder-ports \\\n    9123 9124 9125 9126 \\\n    9123 9124 9125 9126\n```\n\n>\
-      \ The proxy script is available in the [vllm-ascend repository](https://github.com/vllm-project/vllm-ascend/blob/main/examples/disaggregated_prefill_v1/load_balance_proxy_server_example.py).\n"
-performance_benchmark:
-  headers:
-  - Scenario
-  - Deployment
-  - Total NPUs
-  - TP
-  - DP
-  - MTP
-  - FUSED_MC2
-  - EP
-  - Async
-  rows:
-  - - High Throughput
-    - Single-Node
-    - 16 (A3)
-    - '4'
-    - '4'
-    - none
-    - 'On'
-    - 'On'
-    - 'On'
-  - - Low Latency
-    - Single-Node
-    - 16 (A3)
-    - '16'
-    - '1'
-    - '3'
-    - 'Off'
-    - 'On'
-    - 'On'
-  - - Long Context
-    - Single-Node
-    - 16 (A3)
-    - '8'
-    - '1'
-    - none
-    - 'On'
-    - 'On'
-    - 'Off'
-  - - High Throughput
-    - PD Disaggregation (3 nodes)
-    - 48 (3×A3)
-    - —
-    - —
-    - —
-    - —
-    - —
-    - —
+    content: |-
+      Run the proxy on any machine that can reach both nodes:
+
+      ```bash
+      unset http_proxy https_proxy
+
+      python load_balance_proxy_server_example.py \
+        --port 38085 --host <prefill_ip> \
+        --prefiller-hosts <prefill_ip> <prefill_ip> \
+        --prefiller-ports 9123 9124 \
+        --decoder-hosts \
+          <decode0_ip> <decode0_ip> <decode0_ip> <decode0_ip> \
+          <decode1_ip> <decode1_ip> <decode1_ip> <decode1_ip> \
+        --decoder-ports \
+          9123 9124 9125 9126 \
+          9123 9124 9125 9126
+      ```
+
+      > The proxy script is available in the [vllm-ascend repository](https://github.com/vllm-project/vllm-ascend/blob/main/examples/disaggregated_prefill_v1/load_balance_proxy_server_example.py).
+performance:
+  accuracy: |
+    test
+  benchmark: |-
+    | Scenario | Deployment | Total NPUs | TP | DP | MTP | FUSED_MC2 | EP | Async |
+    | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+    | High Throughput | Single-Node | 16 (A3) | 4 | 4 | none | On | On | On |
+    | Low Latency | Single-Node | 16 (A3) | 16 | 1 | 3 | Off | On | On |
+    | Long Context | Single-Node | 16 (A3) | 8 | 1 | none | On | On | Off |
+    | High Throughput | PD Disaggregation (3 nodes) | 48 (3×A3) | — | — | — | — | — | — |
 references:
 - title: vllm-ascend Documentation
   url: https://docs.vllm.ai/projects/ascend/en/latest/tutorials/models/Qwen3-235B-A22B.html

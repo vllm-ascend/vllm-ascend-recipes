@@ -18,9 +18,13 @@ export interface EnvSetupItem {
   content: string;
 }
 
+export interface ContainerEnv {
+  [npu: string]: EnvSetupItem;
+}
+
 export interface EnvSetup {
   pip?: EnvSetupItem;
-  container?: EnvSetupItem;
+  container?: ContainerEnv;
 }
 
 export interface Quantization {
@@ -36,18 +40,12 @@ export interface Scenario {
   npu: string;
   precision: string;
   deployment: string;
-  verified: boolean;
   steps: ScenarioStep[];
 }
 
-export interface PerformanceTable {
-  headers: string[];
-  rows: string[][];
-}
-
-export interface Reference {
-  title: string;
-  url: string;
+export interface PerformanceSection {
+  accuracy?: string;
+  benchmark?: string;
 }
 
 export interface Model {
@@ -68,8 +66,7 @@ export interface Model {
   prerequisites?: PrerequisiteItem[];
   env_setup: EnvSetup;
   scenarios: Scenario[];
-  performance_accuracy?: PerformanceTable;
-  performance_benchmark?: PerformanceTable;
+  performance?: PerformanceSection;
   references: Reference[];
 
   _provider_slug: string;

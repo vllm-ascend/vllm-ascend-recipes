@@ -22,13 +22,47 @@ interface CascadeSelectorProps {
 function renderMarkdown(md: string): string {
   let html = md;
 
+  // Extract code blocks, replace with placeholders to prevent split() from
+  // breaking their internal newlines.
+  const codeBlocks: string[] = [];
   html = html.replace(/```(\w+)?\n([\s\S]*?)```/g, (_, lang, code) => {
     const escaped = code
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
       .trimEnd();
-    return `<div class="code-block group relative"><div class="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity z-10"><button class="copy-btn px-2 py-1 text-[10px] font-mono rounded border border-ink-700 bg-ink-800 text-ink-400 hover:text-accent-400 hover:border-accent-500/30 transition-colors" data-code="${encodeURIComponent(code.trim())}">copy</button></div><pre><code class="language-${lang || 'bash'}">${escaped}</code></pre></div>`;
+    const idx = codeBlocks.length;
+    codeBlocks.push(`<div class="code-block group relative"><div class="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity z-10"><button class="copy-btn px-2 py-1 text-[10px] font-mono rounded border border-ink-700 bg-ink-800 text-ink-400 hover:text-accent-400 hover:border-accent-500/30 transition-colors" data-code="${encodeURIComponent(code.trim())}">copy</button></div><pre><code class="language-${lang || 'bash'}">${escaped}</code></pre></div>`);
+    return `%%CODEBLOCK_${idx}%%`;
+  });
+
+  // Table support
+  html = html.replace(/(?:^\|.+\|$\n?)+/gm, (match) => {
+    const rows = match.trim().split('\n');
+    let tableHtml = '<div class="overflow-x-auto rounded-lg border border-ink-800/60 mb-4"><table class="w-full text-sm">';
+    let headerDone = false;
+    for (const row of rows) {
+      const cells = row.split('|').filter(c => c.trim() !== '');
+      if (cells.every(c => /^:?-{3,}:?$/.test(c.trim()))) {
+        headerDone = true;
+        continue;
+      }
+      const cellHtml = cells.map((c, i) => {
+        const tag = !headerDone && i === 0 ? 'th' : 'td';
+        const cls = tag === 'th'
+          ? 'text-left py-2.5 px-4 font-mono text-xs font-medium text-ink-300 uppercase tracking-wider'
+          : 'py-2.5 px-4 text-ink-400 font-mono text-xs';
+        return `<${tag} class="${cls}">${c.trim()}</${tag}>`;
+      }).join('');
+      if (!headerDone) {
+        tableHtml += `<thead><tr class="border-b border-ink-800/60 bg-ink-900/40">${cellHtml}</tr></thead>`;
+        headerDone = true;
+      } else {
+        tableHtml += `<tbody><tr class="border-b border-ink-800/40 last:border-0 hover:bg-ink-900/30 transition-colors">${cellHtml}</tr></tbody>`;
+      }
+    }
+    tableHtml += '</table></div>';
+    return tableHtml;
   });
 
   html = html.replace(/^### (.+)$/gm, '<h3 class="font-display text-base font-semibold mt-6 mb-2 text-ink-200">$1</h3>');
@@ -38,9 +72,28 @@ function renderMarkdown(md: string): string {
   const lines = html.split('\n');
   const result: string[] = [];
   let inList = false;
+  let paragraphBuf: string[] = [];
+
+  function flushParagraph() {
+    if (paragraphBuf.length > 0) {
+      const content = paragraphBuf.join('<br />\n');
+      result.push(`<p class="text-sm text-ink-400 leading-relaxed mb-4">${content}</p>`);
+      paragraphBuf = [];
+    }
+  }
 
   for (const line of lines) {
+    if (!line.trim()) {
+      if (inList) {
+        result.push('</ul>');
+        inList = false;
+      }
+      flushParagraph();
+      continue;
+    }
+
     if (line.match(/^- (.+)$/)) {
+      flushParagraph();
       if (!inList) {
         result.push('<ul class="list-none p-0 m-0 mb-4 space-y-1">');
         inList = true;
@@ -48,26 +101,40 @@ function renderMarkdown(md: string): string {
       const itemContent = line.replace(/^- (.+)$/, '$1')
         .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener" class="text-accent-400 hover:text-accent-300 border-b border-accent-500/30">$1</a>')
         .replace(/`([^`]+)`/g, '<code>$1</code>');
-      result.push(`<li class="text-sm text-ink-400 pl-4 relative before:content-[\'▸\'] before:absolute before:left-0 before:text-accent-500 before:text-xs before:top-0.5">${itemContent}</li>`);
-    } else {
+      result.push(`<li class="text-sm text-ink-400 pl-4 relative before:content-['▸'] before:absolute before:left-0 before:text-accent-500 before:text-xs before:top-0.5">${itemContent}</li>`);
+      continue;
+    }
+
+    if (line.startsWith('<') || line.startsWith('%%CODEBLOCK_')) {
       if (inList) {
         result.push('</ul>');
         inList = false;
       }
-      if (line.trim() && !line.startsWith('<') && !line.startsWith('```')) {
-        const processed = line
-          .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener" class="text-accent-400 hover:text-accent-300 border-b border-accent-500/30">$1</a>')
-          .replace(/`([^`]+)`/g, '<code>$1</code>')
-          .replace(/\*\*(.+?)\*\*/g, '<strong class="text-ink-200 font-semibold">$1</strong>');
-        result.push(`<p class="text-sm text-ink-400 leading-relaxed mb-4">${processed}</p>`);
-      } else {
-        result.push(line);
-      }
+      flushParagraph();
+      result.push(line);
+      continue;
     }
+
+    if (inList) {
+      result.push('</ul>');
+      inList = false;
+    }
+
+    const processed = line
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener" class="text-accent-400 hover:text-accent-300 border-b border-accent-500/30">$1</a>')
+      .replace(/`([^`]+)`/g, '<code>$1</code>')
+      .replace(/\*\*(.+?)\*\*/g, '<strong class="text-ink-200 font-semibold">$1</strong>');
+    paragraphBuf.push(processed);
   }
 
   if (inList) result.push('</ul>');
-  return result.join('\n');
+  flushParagraph();
+
+  // Restore code blocks
+  let output = result.join('\n');
+  output = output.replace(/%%CODEBLOCK_(\d+)%%/g, (_, idx) => codeBlocks[parseInt(idx)] || '');
+
+  return output;
 }
 
 export default function CascadeSelector({ scenariosEn, scenariosZh }: CascadeSelectorProps) {
@@ -152,26 +219,7 @@ export default function CascadeSelector({ scenariosEn, scenariosZh }: CascadeSel
 
       {currentScenario && (
         <div>
-          <div className="flex items-center gap-2 mb-6">
-            {currentScenario.verified ? (
-              <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md border border-accent-500/20 bg-accent-500/5 text-[11px] font-mono text-accent-400">
-                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                </svg>
-                {t('labelVerified')}
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md border border-amber-500/20 bg-amber-500/5 text-[11px] font-mono text-amber-400">
-                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01" />
-                  <circle cx="12" cy="12" r="9" />
-                </svg>
-                {t('labelUnverified')}
-              </span>
-            )}
-          </div>
-
-          <div className="space-y-8">
+          <div class="space-y-8">
             {currentScenario.steps.map((step, i) => (
               <div key={i} className="relative">
                 <div className="flex items-center gap-3 mb-3">
