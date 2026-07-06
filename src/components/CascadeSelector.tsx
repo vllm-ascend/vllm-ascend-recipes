@@ -10,7 +10,7 @@ interface Scenario {
   npu: string;
   precision: string;
   deployment: string;
-  verified: boolean;
+  case: string;
   steps: ScenarioStep[];
 }
 
@@ -65,6 +65,7 @@ function renderMarkdown(md: string): string {
     return tableHtml;
   });
 
+  html = html.replace(/^#### (.+)$/gm, '<h4 class="font-display text-sm font-semibold mt-4 mb-2 text-ink-300">$1</h4>');
   html = html.replace(/^### (.+)$/gm, '<h3 class="font-display text-base font-semibold mt-6 mb-2 text-ink-200">$1</h3>');
   html = html.replace(/^## (.+)$/gm, '<h2 class="font-display text-lg font-semibold mt-6 mb-3 text-ink-100">$1</h2>');
   html = html.replace(/^> (.+)$/gm, '<blockquote class="border-l-2 border-accent-500/40 pl-4 py-2 my-4 bg-accent-500/5 rounded-r text-sm text-ink-400">$1</blockquote>');
@@ -187,8 +188,29 @@ export default function CascadeSelector({ scenariosEn, scenariosZh }: CascadeSel
     ? selectedDeployment
     : deployments[0] || '';
 
+  // Fourth level: case
+  const cases = useMemo(() => {
+    const set = new Set<string>();
+    scenarios
+      .filter((s) => s.npu === selectedNpu && s.precision === effectivePrecision && s.deployment === effectiveDeployment)
+      .forEach((s) => set.add(s.case));
+    return Array.from(set);
+  }, [scenarios, selectedNpu, effectivePrecision, effectiveDeployment]);
+
+  const [selectedCase, setSelectedCase] = useState(cases[0] || '');
+
+  useEffect(() => {
+    if (!cases.includes(selectedCase)) {
+      setSelectedCase(cases[0] || '');
+    }
+  }, [cases, selectedCase]);
+
+  const effectiveCase = cases.includes(selectedCase)
+    ? selectedCase
+    : cases[0] || '';
+
   const currentScenario = scenarios.find(
-    (s) => s.npu === selectedNpu && s.precision === effectivePrecision && s.deployment === effectiveDeployment
+    (s) => s.npu === selectedNpu && s.precision === effectivePrecision && s.deployment === effectiveDeployment && s.case === effectiveCase
   );
 
   const selectClass = "w-full px-3 py-2 text-xs font-mono rounded-lg border border-ink-800/60 bg-ink-900/40 text-ink-200 focus:outline-none focus:border-accent-500/40 focus:ring-1 focus:ring-accent-500/20 cursor-pointer transition-colors";
@@ -196,7 +218,7 @@ export default function CascadeSelector({ scenariosEn, scenariosZh }: CascadeSel
 
   return (
     <div>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-8 p-4 rounded-lg border border-ink-800/60 bg-ink-900/30">
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 mb-8 p-4 rounded-lg border border-ink-800/60 bg-ink-900/30">
         <div>
           <label className={labelClass}>{t('labelNpu')}</label>
           <select value={selectedNpu} onChange={(e) => setSelectedNpu(e.target.value)} className={selectClass}>
@@ -213,6 +235,12 @@ export default function CascadeSelector({ scenariosEn, scenariosZh }: CascadeSel
           <label className={labelClass}>{t('labelDeployment')}</label>
           <select value={effectiveDeployment} onChange={(e) => setSelectedDeployment(e.target.value)} className={selectClass}>
             {deployments.map((d) => (<option key={d} value={d}>{d}</option>))}
+          </select>
+        </div>
+        <div>
+          <label className={labelClass}>{t('labelCase')}</label>
+          <select value={effectiveCase} onChange={(e) => setSelectedCase(e.target.value)} className={selectClass}>
+            {cases.map((c) => (<option key={c} value={c}>{c}</option>))}
           </select>
         </div>
       </div>

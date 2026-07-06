@@ -38,6 +38,9 @@ const hasPrerequisites = !!modelEn.prerequisites && modelEn.prerequisites.length
 const hasAccuracy = !!modelEn.performance?.accuracy;
 const hasBenchmark = !!modelEn.performance?.benchmark;
 const hasPerformance = hasAccuracy || hasBenchmark;
+const hasVerification = !!modelEn.verification;
+const hasTuning = !!modelEn.tuning;
+const hasFaq = !!modelEn.faq;
 const npus = [...new Set(modelEn.scenarios.map((s) => s.npu))];
 const sectionTitle = "font-display text-lg font-semibold text-ink-50 tracking-tight mb-4";
 
@@ -52,7 +55,10 @@ if (hasQuantization) addToc('quantization', 'sectionQuantization');
 if (hasPrerequisites) addToc('prerequisites', 'sectionPrerequisites');
 addToc('env-setup', 'sectionEnvSetup');
 addToc('scenarios', 'sectionScenario');
+if (hasVerification) addToc('verification', 'sectionVerification');
 if (hasPerformance) addToc('performance', 'sectionPerformance');
+if (hasTuning) addToc('tuning', 'sectionTuning');
+if (hasFaq) addToc('faq', 'sectionFaq');
 addToc('references', 'sectionReferences');
 
 function renderDesc(text: string) {
@@ -183,6 +189,17 @@ function renderDesc(text: string) {
 
     <div class="section-divider"></div>
 
+    {hasVerification && (
+      <>
+        <section class="py-8" id="verification">
+          <h2 class={sectionTitle} data-i18n="sectionVerification">Verification</h2>
+          <MarkdownContent markdown={modelEn.verification!} lang="en" />
+          <MarkdownContent markdown={modelZh.verification ?? modelEn.verification!} lang="zh" hidden />
+        </section>
+        <div class="section-divider"></div>
+      </>
+    )}
+
     {hasPerformance && (
       <>
         <section class="py-8" id="performance">
@@ -203,6 +220,28 @@ function renderDesc(text: string) {
               </div>
             )}
           </div>
+        </section>
+        <div class="section-divider"></div>
+      </>
+    )}
+
+    {hasTuning && (
+      <>
+        <section class="py-8" id="tuning">
+          <h2 class={sectionTitle} data-i18n="sectionTuning">Performance Tuning</h2>
+          <MarkdownContent markdown={modelEn.tuning!} lang="en" />
+          <MarkdownContent markdown={modelZh.tuning ?? modelEn.tuning!} lang="zh" hidden />
+        </section>
+        <div class="section-divider"></div>
+      </>
+    )}
+
+    {hasFaq && (
+      <>
+        <section class="py-8" id="faq">
+          <h2 class={sectionTitle} data-i18n="sectionFaq">FAQ</h2>
+          <MarkdownContent markdown={modelEn.faq!} lang="en" />
+          <MarkdownContent markdown={modelZh.faq ?? modelEn.faq!} lang="zh" hidden />
         </section>
         <div class="section-divider"></div>
       </>

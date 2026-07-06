@@ -48,6 +48,7 @@ export const scenarioSchema = z.object({
   npu: z.string(),
   precision: z.string(),
   deployment: z.string(),
+  case: z.string(),
   steps: z.array(scenarioStepSchema),
 });
 
@@ -79,6 +80,9 @@ export const modelSchema = z.object({
   env_setup: envSetupSchema,
   scenarios: z.array(scenarioSchema),
   performance: performanceSectionSchema.optional(),
+  verification: z.string().optional(),
+  tuning: z.string().optional(),
+  faq: z.string().optional(),
   references: z.array(referenceSchema),
 });
 

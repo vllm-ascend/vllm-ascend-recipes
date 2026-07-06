@@ -40,6 +40,7 @@ export interface Scenario {
   npu: string;
   precision: string;
   deployment: string;
+  case: string;
   steps: ScenarioStep[];
 }
 
@@ -67,6 +68,9 @@ export interface Model {
   env_setup: EnvSetup;
   scenarios: Scenario[];
   performance?: PerformanceSection;
+  verification?: string;
+  tuning?: string;
+  faq?: string;
   references: Reference[];
 
   _provider_slug: string;

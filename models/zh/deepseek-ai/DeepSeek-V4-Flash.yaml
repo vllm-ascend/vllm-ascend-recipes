@@ -141,6 +141,7 @@ scenarios:
 - npu: Atlas 800 A2
   precision: W8A8
   deployment: 单节点-多卡
+  case: Multi Card
   steps:
   - title: 环境变量配置
     content: |-
@@ -215,6 +216,7 @@ scenarios:
 - npu: Atlas 800 A3
   precision: W8A8
   deployment: 单节点-多卡
+  case: Multi Card
   steps:
   - title: 环境变量配置
     content: |-
@@ -267,6 +269,7 @@ scenarios:
 - npu: Atlas 800 A3
   precision: W8A8
   deployment: 多节点-PD分离
+  case: PD Separation
   steps:
   - title: 准备启动脚本
     content: |-
@@ -480,6 +483,7 @@ scenarios:
 - npu: Atlas 800 A2
   precision: W8A8
   deployment: 多节点-PD分离
+  case: PD Separation
   steps:
   - title: 概述
     content: |-
@@ -627,6 +631,72 @@ performance:
     | --- | --- | --- | --- | --- |
     | GPQA | accuracy | 88.17 | 1 × Atlas 800 A3 (128G×8) | W8A8 |
     | GSM8K | accuracy | 96.30 | 1 × Atlas 800 A3 (128G×8) | W8A8 |
+verification: |-
+  Once your server is started, you can query the model with input prompts:
+
+  In <node0_ip>:<port>, use the IP address and port number of the primary node. If the primary and standby nodes are separated, use the IP address and port number of the proxy node.
+
+  ```shell
+  curl http://<node0_ip>:<port>/v1/chat/completions \
+      -H "Content-Type: application/json" \
+      -d '{
+          "model": "dsv4",
+          "messages": [
+              {
+                  "role": "user",
+                  "content": "Who are you?"
+              }
+          ],
+          "max_tokens": 256,
+          "temperature": 0
+      }'
+  ```
+
+  Expected Result:
+
+  The service returns HTTP 200 OK with a JSON response containing the `choices` field.
+tuning: |-
+  ### 9.1 Recommended Configurations
+
+  > **Note**: The following configurations are validated in specific test environments and are for reference only. The optimal configuration depends on factors such as maximum input/output length, prefix cache hit rate, precision requirements, and deployment machine ratios. It is recommended to refer to Section 9.2 for tuning based on actual conditions.
+
+  #### Table 1: Scenario Overview
+
+  > `*Total NPUs` indicates the total number of NPUs used across all nodes.
+
+  |Scenario|Deployment Mode|*Total NPUs|Weight Version|Key Considerations|
+  |--------|---------------|-----------|---------------|-------------------|
+  |High Throughput|Single-Node Mixed|16 (A3)|DeepSeek-V4-Flash-w8a8-mtp|Use dp4 tp4 to balance memory capacity and compute efficiency|
+  |High Throughput|1P1D deployment|32 (A3)|DeepSeek-V4-Flash-w8a8-mtp|dp16 tp1 on both P and D nodes; balanced latency and throughput|
+  |Long Context (1M)|Single-Node (A3)|8 (A3)|DeepSeek-V4-Flash-w8a8-mtp|Use dp4 tp4 to balance memory capacity and compute efficiency|
+  |Long Context (1M)|1P1D deployment|32 (A3)|DeepSeek-V4-Flash-w8a8-mtp|dp16 tp1 on both P and D nodes; balanced latency and throughput|
+
+  #### Table 2: Detailed Node Configuration
+
+  |Scenario|Configuration|NPUs|TP|DP|Max Num Seqs|Max Num Batched Tokens|Max Model Len|MTP Speculation Num|
+  |--------|-------------|-----|--|--|------------|----------------------|--------------|--------------------|
+  |High Throughput (A3)|Server / Single Machine|8|4|4|64|10240|1048576|1|
+  |Long Context (1M, A3)|Server / Single Machine|8|4|4|64|10240|1048576|1|
+  |PD Separation (A3)|Server-P Node|8|4|4|16|8192|1048576|1|
+  |PD Separation (A3)|Server-D Node|8|1|16|60|120|1048576|1|
+
+  > For complete startup commands and parameter descriptions, please refer to the deployment examples in [Chapter 5](#5-online-service-deployment).
+
+  **Notice:**
+
+  `max-model-len` and `max-num-seqs` need to be set according to the actual usage scenario. For other settings, please refer to the [Deployment](#5-online-service-deployment) chapter.
+
+  Currently, we support 4K prefix cache hit in an experimental manner. You only need to change the value of --block-size from 128 to 32 in the service.
+
+  ### 9.2 Tuning Guidelines
+
+  #### 9.2.1 General Tuning Reference
+
+  Please refer to the [Public Performance Tuning Documentation](../../developer_guide/performance_and_debug/optimization_and_tuning.md) for tuning methods.
+
+  Please refer to the [Feature Guide](../../user_guide/support_matrix/feature_matrix.md) for detailed feature descriptions.
+faq: For common environment, installation, and general parameter issues, please refer to the [Public FAQ](https://docs.vllm.ai/projects/ascend/en/latest/faqs.html);
+  this chapter only covers model-specific issues.
 references:
 - title: vllm-ascend 官方文档
   url: https://docs.vllm.ai/projects/ascend/en/latest/tutorials/models/DeepSeek-V4-Flash.html

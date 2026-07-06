@@ -172,6 +172,7 @@ scenarios:
 - npu: Atlas 800I A3
   precision: W8A8
   deployment: 单节点-单卡
+  case: Single Card
   steps:
   - title: 环境变量配置
     content: |-
@@ -224,6 +225,7 @@ scenarios:
 - npu: Atlas 800I A3
   precision: W8A8
   deployment: 单节点-多卡
+  case: YaRN
   steps:
   - title: 环境变量配置
     content: |-
@@ -285,6 +287,7 @@ scenarios:
 - npu: Atlas 800I A2
   precision: W8A8
   deployment: 单节点-多卡
+  case: Multi Card
   steps:
   - title: 环境变量配置
     content: |-
@@ -332,6 +335,176 @@ performance:
     | GPQA-Diamond | accuracy (0-shot CoT) | 60.10% | Atlas 800I A3 | W8A8 |
     | LiveCodeBench | pass@1 (0-shot) | 60.05% | Atlas 800I A3 | W8A8 |
     | AIME 2024 | accuracy (0-shot) | 76.67% | Atlas 800I A3 | W8A8 |
+verification: |-
+  After the service is started, the model can be invoked by sending a prompt.
+
+  **Chat Completions API:**
+
+  ```shell
+  curl http://localhost:8000/v1/chat/completions \
+      -H "Content-Type: application/json" \
+      -d '{
+          "model": "qwen3",
+          "messages": [
+              {"role": "user", "content": "Give me a short introduction to large language models."}
+          ],
+          "temperature": 0.6,
+          "top_p": 0.95,
+          "top_k": 20,
+          "max_completion_tokens": 4096
+      }'
+  ```
+
+  :::{note}
+  Adjust the following fields based on your deployment:
+
+  - **URL** (`http://localhost:8000`): Replace `localhost` and `8000` with your server IP and the `--port` value from the `vllm serve` command.
+  - **`model`**: Must match the `--served-model-name` value from the `vllm serve` command (e.g., `qwen3`).
+
+
+  Expected result: HTTP 200 with a JSON response containing the `choices` field with generated text.
+tuning: |-
+  ### 9.1 Recommended Configurations
+
+  > **Note**: The following configurations are validated in specific test environments and are for reference only. The optimal configuration depends on factors such as maximum input/output length, prefix cache hit rate, precision requirements, and deployment machine ratios. It is recommended to refer to Section 9.2 for tuning based on actual conditions.
+
+  #### Table 1: Scenario Overview
+
+  | Scenario        | Deployment Mode   | *Total NPUs      | Weight Version | Key Considerations                                               |
+  | --------------- | ----------------- | ---------------- | -------------- | ---------------------------------------------------------------- |
+  | High Throughput | Single-Node (TP1) | 1 (A3)<br>2 (A2) | W8A8           | Single-card deployment maximizes concurrent request processing   |
+  | Low Latency     | Single-Node (TP4) | 2 (A3)<br>4 (A2) | W8A8           | Multi-card TP reduces per-token latency with expert parallelism  |
+  | Long Context    | Single-Node (TP4) | 2 (A3)<br>4 (A2) | W8A8           | Reduces concurrent sequences to accommodate longer max-model-len |
+
+  > `*Total NPUs` indicates the total number of NPUs used across all nodes. On Atlas 800I A3, each NPU contains two dies (chips), so TP4 requires 4 chips = 2 NPUs.
+
+  #### Table 2: Detailed Node Configuration
+
+  | Scenario        | NPUs   | TP  | max-model-len | max-num-seqs | FUSED_MC2 | EP  | hf-overrides |
+  | --------------- | ------ | --- | ------------- | ------------ | --------- | --- | ------------ |
+  | High Throughput | 1 (A3) | 1   | 37364         | 100          | Off       | Off | -            |
+  | Low Latency     | 2 (A3) | 4   | 37364         | 100          | Off       | On  | -            |
+  | Long Context    | 2 (A3) | 4   | 131072        | 14           | Off       | On  | YaRN         |
+
+  > For detailed parameter descriptions, please refer to the deployment examples in Section 5.
+
+  **Low Latency Configuration:**
+
+  ```shell
+  export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3
+  export HCCL_OP_EXPANSION_MODE="AIV"
+  export HCCL_BUFFSIZE=1024
+  export OMP_PROC_BIND=false
+  export OMP_NUM_THREADS=1
+  export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+
+  vllm serve your_model_path \
+      --served-model-name qwen3 \
+      --trust-remote-code \
+      --max-num-seqs 100 \
+      --max-model-len 37364 \
+      --max-num-batched-tokens 16384 \
+      --tensor-parallel-size 4 \
+      --enable-expert-parallel \
+      --distributed_executor_backend "mp" \
+      --no-enable-prefix-caching \
+      --async-scheduling \
+      --quantization ascend \
+      --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY"}' \
+      --additional-config '{"enable_flashcomm1": true, "weight_nz_mode": 2}' \
+      --gpu-memory-utilization 0.95 \
+      --port 8000 \
+      --speculative-config '{"method": "eagle3","model": "your_eagle3_model_path", "num_speculative_tokens": 3}'
+  ```
+
+  :::{tip}
+  Example AISBench settings for this configuration:
+
+  - `request_rate`: 0
+  - `batch_size`: 32
+  - Input/Output length: 2048/2048 or 3500/1500
+
+
+  **High Throughput Configuration:**
+
+  ```shell
+  export ASCEND_RT_VISIBLE_DEVICES=0
+  export HCCL_OP_EXPANSION_MODE="AIV"
+  export HCCL_BUFFSIZE=1024
+  export OMP_PROC_BIND=false
+  export OMP_NUM_THREADS=1
+  export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+
+  vllm serve your_model_path \
+      --served-model-name qwen3 \
+      --trust-remote-code \
+      --max-num-seqs 100 \
+      --max-model-len 37364 \
+      --max-num-batched-tokens 16384 \
+      --tensor-parallel-size 1 \
+      --distributed_executor_backend "mp" \
+      --no-enable-prefix-caching \
+      --async-scheduling \
+      --quantization ascend \
+      --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY"}' \
+      --additional-config '{"weight_nz_mode": 2}' \
+      --gpu-memory-utilization 0.95 \
+      --port 8000 \
+      --speculative-config '{"method": "eagle3","model": "your_eagle3_model_path", "num_speculative_tokens": 3}'
+  ```
+
+  :::{tip}
+  Example AISBench settings for this configuration:
+
+  - `request_rate`: 0
+  - `batch_size`: 32
+  - Input/Output length: 2048/2048 or 3500/1500
+
+
+  **Long Context Configuration:**
+
+  ```shell
+  export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3
+  export HCCL_OP_EXPANSION_MODE="AIV"
+  export HCCL_BUFFSIZE=1024
+  export OMP_PROC_BIND=false
+  export OMP_NUM_THREADS=1
+  export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+
+  vllm serve your_model_path \
+      --served-model-name qwen3 \
+      --trust-remote-code \
+      --max-num-seqs 14 \
+      --max-model-len 131072 \
+      --max-num-batched-tokens 16384 \
+      --tensor-parallel-size 4 \
+      --enable-expert-parallel \
+      --distributed_executor_backend "mp" \
+      --no-enable-prefix-caching \
+      --async-scheduling \
+      --quantization ascend \
+      --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY"}' \
+      --additional-config '{"enable_flashcomm1": true, "weight_nz_mode": 2}' \
+      --gpu-memory-utilization 0.95 \
+      --port 8000 \
+      --speculative-config '{"method": "eagle3","model": "your_eagle3_model_path", "num_speculative_tokens": 3}' \
+      --hf-overrides '{"rope_parameters": {"rope_type":"yarn","factor":4,"original_max_position_embeddings":32768}}'
+  ```
+
+  :::{tip}
+  Example AISBench settings for this configuration:
+
+  - `request_rate`: 0
+  - `batch_size`: 32
+  - Input/Output length: 65536/1024 or 131072/1024
+
+
+  ### 9.2 Tuning Guidelines
+
+  Please refer to the [Public Performance Tuning Documentation](../../developer_guide/performance_and_debug/optimization_and_tuning.md) for tuning methods.
+  Please refer to the [Feature Guide](../../user_guide/support_matrix/feature_matrix.md) for detailed feature descriptions.
+faq: For common environment, installation, and general parameter issues, please refer to the [Public FAQ](https://docs.vllm.ai/projects/ascend/en/latest/faqs.html).
+  This chapter only covers model-specific issues.
 references:
 - title: vllm-ascend 官方文档
   url: https://docs.vllm.ai/projects/ascend/en/latest/tutorials/models/Qwen3-30B-A3B.html

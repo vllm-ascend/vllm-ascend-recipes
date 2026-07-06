@@ -10,6 +10,35 @@ const { markdown, lang = 'en', hidden = false } = Astro.props;
 function renderMarkdown(md: string): string {
   let html = md;
 
+  // Substitution variables
+  html = html.replace(/\|vllm_ascend_version\|/g, 'v0.22.1rc1');
+
+  // Sphinx admonitions: :::{note}, :::{warning}, :::{tip} blocks
+  // Single-line: :::{note} content :::  → convert to styled blockquote
+  html = html.replace(/:::\{note\}\s*\n([\s\S]*?):::/g, (_, content) => {
+    return `<blockquote class="border-l-2 border-blue-500/40 pl-4 py-2 my-4 bg-blue-500/5 rounded-r text-sm text-ink-400"><p class="text-[11px] font-mono uppercase tracking-wider text-blue-400 mb-1">Note</p>${content.trim()}</blockquote>`;
+  });
+  html = html.replace(/:::\{warning\}\s*\n([\s\S]*?):::/g, (_, content) => {
+    return `<blockquote class="border-l-2 border-amber-500/40 pl-4 py-2 my-4 bg-amber-500/5 rounded-r text-sm text-ink-400"><p class="text-[11px] font-mono uppercase tracking-wider text-amber-400 mb-1">Warning</p>${content.trim()}</blockquote>`;
+  });
+  html = html.replace(/:::\{tip\}\s*\n([\s\S]*?):::/g, (_, content) => {
+    return `<blockquote class="border-l-2 border-accent-500/40 pl-4 py-2 my-4 bg-accent-500/5 rounded-r text-sm text-ink-400"><p class="text-[11px] font-mono uppercase tracking-wider text-accent-400 mb-1">Tip</p>${content.trim()}</blockquote>`;
+  });
+
+  // Second pass: note/warning/tip with title on first line: :::{note} Title\ncontent :::
+  html = html.replace(/:::\{note\}\s*\n(.+?)\n([\s\S]*?):::/g, (_, title, content) => {
+    return `<blockquote class="border-l-2 border-blue-500/40 pl-4 py-2 my-4 bg-blue-500/5 rounded-r text-sm text-ink-400"><p class="text-[11px] font-mono uppercase tracking-wider text-blue-400 mb-1">${title.trim()}</p>${content.trim()}</blockquote>`;
+  });
+
+  // Handle inline :::{note} ... ::: (single line)
+  html = html.replace(/:::\{note\}\s+(.+?)\s+:::/g, '<blockquote class="border-l-2 border-blue-500/40 pl-4 py-2 my-4 bg-blue-500/5 rounded-r text-sm text-ink-400"><p class="text-[11px] font-mono uppercase tracking-wider text-blue-400 mb-1">Note</p><p>$1</p></blockquote>');
+  html = html.replace(/:::\{warning\}\s+(.+?)\s+:::/g, '<blockquote class="border-l-2 border-amber-500/40 pl-4 py-2 my-4 bg-amber-500/5 rounded-r text-sm text-ink-400"><p class="text-[11px] font-mono uppercase tracking-wider text-amber-400 mb-1">Warning</p><p>$1</p></blockquote>');
+
+  // {code-block} bash :substitutions: blocks → convert to regular ```bash blocks first
+  html = html.replace(/\{code-block\}\s*(\w+)\s*\n\s*:substitutions:\s*\n([\s\S]*?)```/g, (_, lang, code) => {
+    return '```' + lang + '\n' + code + '```';
+  });
+
   // Extract code blocks, replace with placeholders to prevent split() from
   // breaking their internal newlines.
   const codeBlocks: string[] = [];
@@ -24,6 +53,7 @@ function renderMarkdown(md: string): string {
     return `%%CODEBLOCK_${idx}%%`;
   });
 
+  html = html.replace(/^#### (.+)$/gm, '<h4 class="font-display text-sm font-semibold mt-4 mb-2 text-ink-300">$1</h4>');
   html = html.replace(/^### (.+)$/gm, '<h3 class="font-display text-base font-semibold mt-6 mb-2 text-ink-200">$1</h3>');
   html = html.replace(/^## (.+)$/gm, '<h2 class="font-display text-lg font-semibold mt-6 mb-3 text-ink-100">$1</h2>');
   html = html.replace(/^> (.+)$/gm, '<blockquote class="border-l-2 border-accent-500/40 pl-4 py-2 my-4 bg-accent-500/5 rounded-r text-sm text-ink-400">$1</blockquote>');
