@@ -77,3 +77,9 @@ models/
 Push to `main` branch — GitHub Actions auto-builds and deploys to GitHub Pages.
 
 Configure in repo Settings → Pages → Source: GitHub Actions.
+
+### PR Preview
+
+When a PR targets `main`, CI builds the static site and uploads it as a workflow artifact, then comments download/preview instructions on the PR. Reviewers download the artifact, unzip, and serve locally (e.g. `npx serve .`) to inspect the rendered site before merge. When the PR is closed/merged, the comment is marked outdated; artifacts expire automatically after 14 days.
+
+> **Note:** PRs from forks cannot post comments or upload artifacts with the default `GITHUB_TOKEN`. Fork contributors may need a maintainer to run the workflow manually.

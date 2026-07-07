@@ -361,6 +361,7 @@ verification: |-
 
 
   Expected result: HTTP 200 with a JSON response containing the `choices` field with generated text.
+  :::
 tuning: |-
   ### 9.1 Recommended Configurations
 
@@ -421,7 +422,7 @@ tuning: |-
   - `request_rate`: 0
   - `batch_size`: 32
   - Input/Output length: 2048/2048 or 3500/1500
-
+  :::
 
   **High Throughput Configuration:**
 
@@ -457,7 +458,7 @@ tuning: |-
   - `request_rate`: 0
   - `batch_size`: 32
   - Input/Output length: 2048/2048 or 3500/1500
-
+  :::
 
   **Long Context Configuration:**
 
@@ -495,7 +496,7 @@ tuning: |-
   - `request_rate`: 0
   - `batch_size`: 32
   - Input/Output length: 65536/1024 or 131072/1024
-
+  :::
 
   ### 9.2 Tuning Guidelines
 

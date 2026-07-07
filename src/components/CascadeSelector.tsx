@@ -101,7 +101,8 @@ function renderMarkdown(md: string): string {
       }
       const itemContent = line.replace(/^- (.+)$/, '$1')
         .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener" class="text-accent-400 hover:text-accent-300 border-b border-accent-500/30">$1</a>')
-        .replace(/`([^`]+)`/g, '<code>$1</code>');
+        .replace(/`([^`]+)`/g, '<code>$1</code>')
+        .replace(/\*\*(.+?)\*\*/g, '<strong class="text-ink-200 font-semibold">$1</strong>');
       result.push(`<li class="text-sm text-ink-400 pl-4 relative before:content-['▸'] before:absolute before:left-0 before:text-accent-500 before:text-xs before:top-0.5">${itemContent}</li>`);
       continue;
     }
@@ -247,7 +248,7 @@ export default function CascadeSelector({ scenariosEn, scenariosZh }: CascadeSel
 
       {currentScenario && (
         <div>
-          <div class="space-y-8">
+          <div className="space-y-8">
             {currentScenario.steps.map((step, i) => (
               <div key={i} className="relative">
                 <div className="flex items-center gap-3 mb-3">
