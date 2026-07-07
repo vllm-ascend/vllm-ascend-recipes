@@ -19,14 +19,18 @@ interface WeightDownloadTabsProps {
 
 function renderMarkdown(md: string): string {
   let html = md;
+  const codeBlocks: string[] = [];
 
+  // Replace code blocks with placeholders to protect their content from further processing
   html = html.replace(/```(\w+)?\n([\s\S]*?)```/g, (_, lang, code) => {
     const escaped = code
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
       .trimEnd();
-    return `<div class="code-block group relative"><div class="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity z-10"><button class="copy-btn px-2 py-1 text-[10px] font-mono rounded border border-ink-700 bg-ink-800 text-ink-400 hover:text-accent-400 hover:border-accent-500/30 transition-colors" data-code="${encodeURIComponent(code.trim())}">copy</button></div><pre><code class="language-${lang || 'bash'}">${escaped}</code></pre></div>`;
+    const block = `<div class="code-block group relative"><div class="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity z-10"><button class="copy-btn px-2 py-1 text-[10px] font-mono rounded border border-ink-700 bg-ink-800 text-ink-400 hover:text-accent-400 hover:border-accent-500/30 transition-colors" data-code="${encodeURIComponent(code.trim())}">copy</button></div><pre><code class="language-${lang || 'bash'}">${escaped}</code></pre></div>`;
+    codeBlocks.push(block);
+    return `%%CODEBLOCK_${codeBlocks.length - 1}%%`;
   });
 
   html = html.replace(/^> (.+)$/gm, '<blockquote class="border-l-2 border-accent-500/40 pl-4 py-2 my-4 bg-accent-500/5 rounded-r text-sm text-ink-400">$1</blockquote>');
@@ -35,7 +39,7 @@ function renderMarkdown(md: string): string {
   const result: string[] = [];
 
   for (const line of lines) {
-    if (line.trim() && !line.startsWith('<') && !line.startsWith('```')) {
+    if (line.trim() && !line.startsWith('<') && !line.startsWith('```') && !line.startsWith('%%CODEBLOCK_')) {
       const processed = line
         .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener" class="text-accent-400 hover:text-accent-300 border-b border-accent-500/30">$1</a>')
         .replace(/`([^`]+)`/g, '<code>$1</code>');
@@ -45,7 +49,8 @@ function renderMarkdown(md: string): string {
     }
   }
 
-  return result.join('\n');
+  // Restore code blocks from placeholders
+  return result.join('\n').replace(/%%CODEBLOCK_(\d+)%%/g, (_, idx) => codeBlocks[parseInt(idx)]);
 }
 
 export default function WeightDownloadTabs({ downloadsEn, downloadsZh }: WeightDownloadTabsProps) {

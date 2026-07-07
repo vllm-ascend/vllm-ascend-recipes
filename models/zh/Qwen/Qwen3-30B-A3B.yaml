@@ -1,20 +1,20 @@
 hf_id: Qwen/Qwen3-30B-A3B
 title: Qwen3-30B-A3B
 provider: Qwen
-description: Qwen3 系列 MoE 模型，总参数 30.5B，每 token 激活 3.3B。 稀疏 MoE 架构实现高效训练和推理，在相近能力的稠密模型上具有更低计算成本。
+description: Qwen3 系列中的 MoE（混合专家）模型，总参数量 30.5B，每 token 激活 3.3B 参数。稀疏 MoE 架构实现高效训练与推理，在推理、指令遵循
+  和智能体能力方面表现优异，同时相比同等能力的稠密模型具有更低的计算成本。
 architecture: moe
 parameters: 30.5B
 active_parameters: 3.3B
 context_length: 40960
 modality: text
-updated: '2026-07-01'
+updated: '2026-07-07'
 overview: |-
-  Qwen3-30B-A3B 是 Qwen3 系列中的 MoE 模型，总参数 30.5B，每 token 激活 3.3B。
-  稀疏 MoE 架构实现了高效训练和推理，在推理、指令跟随和 Agent 能力方面表现优异，
-  同时保持比相近能力稠密模型更低的计算成本。
+  Qwen3-30B-A3B 是 Qwen3 系列中的混合专家（MoE）模型，总参数量 30.5B，每 token 激活 3.3B 参数。稀疏 MoE 架构实现了高效的训练和推理，在推理、指令遵循和智能体能力方面表现出色，同时相比同等能力的稠密模型保持了更低的计算成本。
 
-  **首次支持版本**：v0.8.4rc2。本文档基于 **vLLM-Ascend v0.22.1rc** 验证编写，
-  所有 v0.22.1rc 及以上版本可稳定运行。
+  本文档将演示 Qwen3-30B-A3B 在 vLLM-Ascend 环境中的主要验证步骤，包括支持的特性、环境准备、单节点部署，以及精度和性能评估。
+
+  Qwen3-30B-A3B 模型首次在 v0.8.4rc2 中支持。本文档基于 **vLLM-Ascend v0.22.1rc** 验证并编写。所有 **v0.22.1rc 及更高版本**均可稳定运行。如需使用最新特性，建议使用最新的候选版本或正式版本。
 weight_download:
 - weight_version: BF16
   sources:
@@ -45,7 +45,7 @@ weight_download:
       ```bash
       git clone https://gitcode.com/Qwen/Qwen3-30B-A3B.git
       ```
-- weight_version: W8A8 (预量化)
+- weight_version: W8A8（预量化）
   sources:
   - source: ModelScope
     url: https://www.modelscope.cn/models/Eco-Tech/Qwen3-30B-A3B-w8a8
@@ -80,265 +80,293 @@ weight_download:
   - source: GitCode
     url: ''
     command: ''
-prerequisites:
-- title: 硬件要求
+quantization:
   content: |-
-    | 模型版本 | 硬件要求 |
-    |---------|---------|
-    | Qwen3-30B-A3B (BF16) | Atlas 800I A3 (64G, 1~2 卡) 或 Atlas 800I A2 (64G, 2~4 卡) |
-    | Qwen3-30B-A3B-W8A8 | Atlas 800I A3 (64G, 1~2 卡) 或 Atlas 800I A2 (64G, 2~4 卡) |
-
-    > 以上为推荐卡数，可根据实际情况调整。
-- title: W8A8 量化说明
-  content: |-
-    Qwen3-30B-A3B-W8A8 采用混合量化策略（按模型结构顺序）：
+    Qwen3-30B-A3B-W8A8 采用混合量化策略（按模型结构顺序排列）：
 
     - **Embedding 层**：BF16（不量化）
     - **Q/K 归一化** (q_norm, k_norm)：BF16
-    - **Attention 投影** (q/k/v/o_proj)：静态 W8A8，预计算 per-tensor scales
+    - **Attention 投影** (q/k/v/o_proj)：静态 W8A8，使用预计算的 per-tensor scales
     - **MoE 路由门** (mlp.gate)：BF16
     - **MoE 专家投影** (gate/up/down_proj)：动态 W8A8，推理时实时计算输入 scales
 
-    > 如 W8A8 量化权重无法直接下载，可使用 msmodelslim 从 BF16 模型自行量化。
-    > 参考 [量化指南](https://docs.vllm.ai/projects/ascend/en/latest/user_guide/feature_guide/quantization.html)。
+    如果无法直接下载 W8A8 量化权重，您可以使用 **msmodelslim** 从 BF16 模型量化获取。详情请参考[量化指南](../../user_guide/feature_guide/quantization.md)。本文档中的所有模型路径应调整为您实际本地的路径。
+prerequisites:
+- title: 模型权重
+  content: |-
+    以下模型变体可供使用。建议将模型权重下载到所有节点均可访问的共享目录中。
+
+    | 模型                  | 硬件需求                                                                                         | 下载                                                                     |
+    | -------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------ |
+    | Qwen3-30B-A3B (BF16) | Atlas 800I A3 (64G, 1\~2 卡)<br>Atlas 800I A2 (64G, 2\~4 卡) | [下载](https://www.modelscope.cn/models/Qwen/Qwen3-30B-A3B)              |
+    | Qwen3-30B-A3B-W8A8   | Atlas 800I A3 (64G, 1\~2 卡)<br>Atlas 800I A2 (64G, 2\~4 卡)                                     | [下载](https://www.modelscope.cn/models/Eco-Tech/Qwen3-30B-A3B-w8a8)     |
+    | Eagle3 Draft Model   | 不适用                                                                                           | [下载](https://huggingface.co/AngelSlim/Qwen3-a3B_eagle3)                |
+
+    以上为推荐卡数，可根据实际情况调整。
+- title: 模型量化
+  content: |-
+    请参考上方的量化部分。
 env_setup:
+  container:
+    A3:
+      content: |-
+        您可以使用官方的 Qwen3 MoE 模型一体化 Docker 镜像。
+
+        **拉取 Docker 镜像：**
+
+        ```bash
+        docker pull quay.io/ascend/vllm-ascend:{{ vllm_ascend_version }}
+        ```
+
+        **启动 Docker 容器：**
+
+        ```bash
+
+        export IMAGE=quay.io/ascend/vllm-ascend:{{ vllm_ascend_version }}-a3
+
+        docker run \
+            --name vllm-ascend-env \
+            --shm-size=128g \
+            --net=host \
+            --privileged=true \
+            --device /dev/davinci0 \
+            --device /dev/davinci1 \
+            --device /dev/davinci2 \
+            --device /dev/davinci3 \
+            --device /dev/davinci4 \
+            --device /dev/davinci5 \
+            --device /dev/davinci6 \
+            --device /dev/davinci7 \
+            --device /dev/davinci8 \
+            --device /dev/davinci9 \
+            --device /dev/davinci10 \
+            --device /dev/davinci11 \
+            --device /dev/davinci12 \
+            --device /dev/davinci13 \
+            --device /dev/davinci14 \
+            --device /dev/davinci15 \
+            --device /dev/davinci_manager \
+            --device /dev/devmm_svm \
+            --device /dev/hisi_hdc \
+            -v /usr/local/Ascend/driver:/usr/local/Ascend/driver \
+            -v /usr/local/dcmi:/usr/local/dcmi \
+            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+            -v /etc/ascend_install.info:/etc/ascend_install.info \
+            -v /usr/local/sbin:/usr/local/sbin \
+            -v /home:/home \
+            -v /data:/data \
+            -v /tmp:/tmp \
+            -v /mnt:/mnt \
+            -v /usr/share/zoneinfo/Asia/Shanghai:/etc/localtime \
+            -v /root:/host_root \
+            -it -d $IMAGE bash
+        ```
+
+        > **说明**：A3 有 8 个 NPU，采用双 die 设计（共 16 芯片：`/dev/davinci[0-15]`）。如果您在共享机器上，仅映射所需的芯片（例如，NPU 0-3 使用 `/dev/davinci[0-7]`）。
+    A2:
+      content: |-
+        您可以使用官方的 Qwen3 MoE 模型一体化 Docker 镜像。
+
+        **拉取 Docker 镜像：**
+
+        ```bash
+        docker pull quay.io/ascend/vllm-ascend:{{ vllm_ascend_version }}
+        ```
+
+        **启动 Docker 容器：**
+
+        ```bash
+
+        export IMAGE=quay.io/ascend/vllm-ascend:{{ vllm_ascend_version }}
+
+        docker run \
+            --name vllm-ascend-env \
+            --shm-size=128g \
+            --net=host \
+            --privileged=true \
+            --device /dev/davinci0 \
+            --device /dev/davinci1 \
+            --device /dev/davinci2 \
+            --device /dev/davinci3 \
+            --device /dev/davinci4 \
+            --device /dev/davinci5 \
+            --device /dev/davinci6 \
+            --device /dev/davinci7 \
+            --device /dev/davinci_manager \
+            --device /dev/devmm_svm \
+            --device /dev/hisi_hdc \
+            -v /usr/local/Ascend/driver:/usr/local/Ascend/driver \
+            -v /usr/local/dcmi:/usr/local/dcmi \
+            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+            -v /etc/ascend_install.info:/etc/ascend_install.info \
+            -v /usr/local/sbin:/usr/local/sbin \
+            -v /home:/home \
+            -v /data:/data \
+            -v /tmp:/tmp \
+            -v /mnt:/mnt \
+            -v /usr/share/zoneinfo/Asia/Shanghai:/etc/localtime \
+            -v /root:/host_root \
+            -it -d $IMAGE bash
+        ```
+
+        默认工作目录为 `/workspace`。vLLM 和 vLLM-Ascend 已作为 Python 包安装在 site-packages 中。
+
+        **安装验证：**
+
+        启动容器后，运行以下命令验证安装：
+
+        ```bash
+        docker ps | grep vllm-ascend-env
+        ```
+
+        预期结果：容器状态显示为 `Up`。您也可以在容器内验证 vllm-ascend 版本：
+
+        ```bash
+        pip show vllm-ascend
+        ```
+
+        预期结果：显示版本信息，与拉取的镜像版本一致。
   pip:
     content: |-
-      ```bash
-      git clone https://github.com/vllm-project/vllm.git
-      cd vllm && pip install -e .
+      如果您不想使用 Docker 镜像，可以从源码构建。首先从源码安装 vLLM：
 
-      git clone https://github.com/vllm-project/vllm-ascend.git
-      cd vllm-ascend && pip install -e .
-      ```
+      1. 克隆并安装 vLLM：
 
-      验证安装：
+         ```bash
+         git clone https://github.com/vllm-project/vllm.git
+         cd vllm
+         pip install -e .
+         ```
+
+      2. 克隆并安装 vLLM-Ascend 仓库：
+
+         ```bash
+         git clone https://github.com/vllm-project/vllm-ascend.git
+         cd vllm-ascend
+         pip install -e .
+         ```
+
+      **安装验证：**
 
       ```bash
       pip show vllm vllm-ascend
       ```
-  container:
-    A3:
-      content: |-
-        ```bash
-        export IMAGE=quay.io/ascend/vllm-ascend:v0.22.1rc1
-        docker run \
-            --name vllm-ascend-env \
-            --shm-size=128g --net=host --privileged=true \
-            --device /dev/davinci0 --device /dev/davinci1 \
-            --device /dev/davinci2 --device /dev/davinci3 \
-            --device /dev/davinci4 --device /dev/davinci5 \
-            --device /dev/davinci6 --device /dev/davinci7 \
-            --device /dev/davinci8 --device /dev/davinci9 \
-            --device /dev/davinci10 --device /dev/davinci11 \
-            --device /dev/davinci12 --device /dev/davinci13 \
-            --device /dev/davinci14 --device /dev/davinci15 \
-            --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc \
-            -v /usr/local/Ascend/driver:/usr/local/Ascend/driver \
-            -v /usr/local/dcmi:/usr/local/dcmi \
-            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
-            -v /etc/ascend_install.info:/etc/ascend_install.info \
-            -v /usr/local/sbin:/usr/local/sbin \
-            -v /home:/home -v /data:/data -v /tmp:/tmp -v /mnt:/mnt \
-            -v /usr/share/zoneinfo/Asia/Shanghai:/etc/localtime \
-            -v /root:/host_root \
-            -it -d $IMAGE bash
-        ```
-    A2:
-      content: |-
-        ```bash
-        export IMAGE=quay.io/ascend/vllm-ascend:v0.22.1rc1
-        docker run \
-            --name vllm-ascend-env \
-            --shm-size=128g --net=host --privileged=true \
-            --device /dev/davinci0 --device /dev/davinci1 \
-            --device /dev/davinci2 --device /dev/davinci3 \
-            --device /dev/davinci4 --device /dev/davinci5 \
-            --device /dev/davinci6 --device /dev/davinci7 \
-            --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc \
-            -v /usr/local/Ascend/driver:/usr/local/Ascend/driver \
-            -v /usr/local/dcmi:/usr/local/dcmi \
-            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
-            -v /etc/ascend_install.info:/etc/ascend_install.info \
-            -v /usr/local/sbin:/usr/local/sbin \
-            -v /home:/home -v /data:/data -v /tmp:/tmp -v /mnt:/mnt \
-            -v /usr/share/zoneinfo/Asia/Shanghai:/etc/localtime \
-            -v /root:/host_root \
-            -it -d $IMAGE bash
-        ```
 
-        > 默认工作目录为 `/workspace`，vLLM 和 vLLM-Ascend 已作为 Python 包安装在 site-packages 中。
+      预期结果：显示两个包的版本信息，表明安装成功。
+
+      > **说明**：如果部署多节点环境，需在每个节点上完成环境配置。
+
+      更多详情请参考[安装指南](../../installation.md)。
 scenarios:
 - npu: Atlas 800I A3
   precision: W8A8
-  deployment: 单节点-单卡
-  case: Single Card
-  steps:
-  - title: 环境变量配置
-    content: |-
-      ```bash
-      export ASCEND_RT_VISIBLE_DEVICES=0
-      export HCCL_OP_EXPANSION_MODE="AIV"
-      export HCCL_BUFFSIZE=1024
-      export OMP_PROC_BIND=false
-      export OMP_NUM_THREADS=1
-      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
-      ```
-  - title: 启动服务（高吞吐配置）
-    content: |-
-      ```bash
-      vllm serve your_model_path \
-          --served-model-name qwen3 \
-          --trust-remote-code \
-          --max-num-seqs 100 \
-          --max-model-len 37364 \
-          --max-num-batched-tokens 16384 \
-          --tensor-parallel-size 1 \
-          --distributed_executor_backend "mp" \
-          --no-enable-prefix-caching \
-          --async-scheduling \
-          --quantization ascend \
-          --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY"}' \
-          --additional-config '{"weight_nz_mode": 2}' \
-          --gpu-memory-utilization 0.95 \
-          --port 8000 \
-          --speculative-config '{"method": "eagle3","model": "your_eagle3_model_path", "num_speculative_tokens": 3}'
-      ```
-
-      > 单卡部署最大化并发请求处理。`--speculative-config` 配置 Eagle3 投机解码。
-  - title: 验证服务
-    content: |-
-      ```bash
-      curl http://localhost:8000/v1/chat/completions \
-          -H "Content-Type: application/json" \
-          -d '{
-              "model": "qwen3",
-              "messages": [
-                  {"role": "user", "content": "Give me a short introduction to large language models."}
-              ],
-              "temperature": 0.6,
-              "top_p": 0.95,
-              "top_k": 20,
-              "max_completion_tokens": 4096
-          }'
-      ```
-- npu: Atlas 800I A3
-  precision: W8A8
   deployment: 单节点-多卡
-  case: YaRN
+  case: Single Node Multi Card
   steps:
-  - title: 环境变量配置
+  - title: 启动服务
     content: |-
+      单节点部署在同一节点内完成 Prefill 和 Decode，适用于开发、测试及中小规模推理场景。对于 Qwen3-30B-A3B MoE 模型，需要使用 Expert Parallelism (EP) 将专家分布到各个 NPU 上。
+
+      以下命令为示例配置。请根据实际场景调整参数。
+
+      **Atlas 800I A2/A3：**
+
       ```bash
       export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3
-      export HCCL_OP_EXPANSION_MODE="AIV"
+      export HCCL_OP_EXPANSION_MODE="AIV"  # not needed on A2
       export HCCL_BUFFSIZE=1024
       export OMP_PROC_BIND=false
       export OMP_NUM_THREADS=1
       export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
-      ```
-  - title: 启动服务（低延迟配置, TP4）
-    content: |-
-      ```bash
+
       vllm serve your_model_path \
           --served-model-name qwen3 \
           --trust-remote-code \
           --max-num-seqs 100 \
-          --max-model-len 37364 \
+          --max-model-len 40960 \
           --max-num-batched-tokens 16384 \
           --tensor-parallel-size 4 \
           --enable-expert-parallel \
+          --quantization ascend \
           --distributed_executor_backend "mp" \
           --no-enable-prefix-caching \
           --async-scheduling \
-          --quantization ascend \
           --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY"}' \
           --additional-config '{"enable_flashcomm1": true, "weight_nz_mode": 2}' \
           --gpu-memory-utilization 0.95 \
           --port 8000 \
-          --speculative-config '{"method": "eagle3","model": "your_eagle3_model_path", "num_speculative_tokens": 3}'
+          --speculative-config '{"method": "eagle3", "model": "your_eagle3_model_path", "draft_tensor_parallel_size": 1, "num_speculative_tokens": 3}'
       ```
 
-      > 多卡 TP 降低每 token 延迟，配合 Expert Parallelism 分散 MoE 专家。
-  - title: 长上下文配置（TP4, YaRN）
+      > - `ASCEND_RT_VISIBLE_DEVICES`：必须设置为分配给您环境的 NPU 芯片 ID（例如，4 芯片为 `0,1,2,3`）。
+      > - `--port`：请根据实际情况调整，避免与同一机器上运行的其他服务冲突。
+      > - `--no-enable-prefix-caching`：默认禁用，因为该模型在 Ascend NPU 上的前缀缓存效果尚未充分验证。您可以尝试启用该参数以评估工作负载的缓存命中率。
+      > - `--quantization ascend`：使用 W8A8 量化模型时必需。使用 BF16 权重时请移除此参数。
+
+      参数详情请参考：
+
+      - [vLLM CLI 文档](https://docs.vllm.ai/en/stable/cli/) — 标准 serve 参数（`--host`、`--port`、`--max-model-len` 等）
+      - [环境变量](../../user_guide/configuration/env_vars.md) — Ascend 特定环境变量（`HCCL_*` 等）
+      - [额外配置](../../user_guide/configuration/additional_config.md) — `--additional-config` 格式和选项
+  - title: 服务验证
     content: |-
-      ```bash
-      vllm serve your_model_path \
-          --served-model-name qwen3 \
-          --trust-remote-code \
-          --max-num-seqs 14 \
-          --max-model-len 131072 \
-          --max-num-batched-tokens 16384 \
-          --tensor-parallel-size 4 \
-          --enable-expert-parallel \
-          --distributed_executor_backend "mp" \
-          --no-enable-prefix-caching \
-          --async-scheduling \
-          --quantization ascend \
-          --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY"}' \
-          --additional-config '{"enable_flashcomm1": true, "weight_nz_mode": 2}' \
-          --gpu-memory-utilization 0.95 \
-          --port 8000 \
-          --speculative-config '{"method": "eagle3","model": "your_eagle3_model_path", "num_speculative_tokens": 3}' \
-          --hf-overrides '{"rope_parameters": {"rope_type":"yarn","factor":4,"original_max_position_embeddings":32768}}'
-      ```
-
-      > 使用 YaRN 扩展上下文至 131K，减少并发序列数以适应更长上下文。
+      服务启动后，通过发送 prompt 验证其运行状态。使用示例请参考下方的验证部分。
 - npu: Atlas 800I A2
   precision: W8A8
   deployment: 单节点-多卡
-  case: Multi Card
+  case: Single Node Multi Card (A2)
   steps:
-  - title: 环境变量配置
+  - title: 启动服务
     content: |-
+      单节点部署在同一节点内完成 Prefill 和 Decode，适用于开发、测试及中小规模推理场景。对于 Qwen3-30B-A3B MoE 模型，需要使用 Expert Parallelism (EP) 将专家分布到各个 NPU 上。
+
+      以下命令为示例配置。请根据实际场景调整参数。
+
+      **Atlas 800I A2/A3：**
+
       ```bash
       export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3
       export HCCL_BUFFSIZE=1024
       export OMP_PROC_BIND=false
       export OMP_NUM_THREADS=1
       export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
-      ```
-  - title: 启动服务（TP4）
-    content: |-
-      ```bash
+
       vllm serve your_model_path \
           --served-model-name qwen3 \
           --trust-remote-code \
           --max-num-seqs 100 \
-          --max-model-len 37364 \
+          --max-model-len 40960 \
           --max-num-batched-tokens 16384 \
           --tensor-parallel-size 4 \
           --enable-expert-parallel \
+          --quantization ascend \
           --distributed_executor_backend "mp" \
           --no-enable-prefix-caching \
           --async-scheduling \
-          --quantization ascend \
           --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY"}' \
           --additional-config '{"enable_flashcomm1": true, "weight_nz_mode": 2}' \
           --gpu-memory-utilization 0.95 \
           --port 8000 \
-          --speculative-config '{"method": "eagle3","model": "your_eagle3_model_path", "num_speculative_tokens": 3}'
+          --speculative-config '{"method": "eagle3", "model": "your_eagle3_model_path", "draft_tensor_parallel_size": 1, "num_speculative_tokens": 3}'
       ```
 
-      > A2 系列不需要 `HCCL_OP_EXPANSION_MODE="AIV"`。
-performance:
-  benchmark: |-
-    | Scenario | NPUs | TP | max-model-len | max-num-seqs | EP | Eagle3 |
-    | --- | --- | --- | --- | --- | --- | --- |
-    | 高吞吐 | 1 (A3) | 1 | 37364 | 100 | Off | On |
-    | 低延迟 | 2 (A3) | 4 | 37364 | 100 | On | On |
-    | 长上下文 | 2 (A3) | 4 | 131072 | 14 | On | On |
-  accuracy: |-
-    | Dataset | Metric | Score | Hardware | Weight Version |
-    | --- | --- | --- | --- | --- |
-    | GSM8K | accuracy (4-shot CoT) | 92.87% | Atlas 800I A3 | W8A8 |
-    | GPQA-Diamond | accuracy (0-shot CoT) | 60.10% | Atlas 800I A3 | W8A8 |
-    | LiveCodeBench | pass@1 (0-shot) | 60.05% | Atlas 800I A3 | W8A8 |
-    | AIME 2024 | accuracy (0-shot) | 76.67% | Atlas 800I A3 | W8A8 |
-verification: |-
-  After the service is started, the model can be invoked by sending a prompt.
+      > - `ASCEND_RT_VISIBLE_DEVICES`：必须设置为分配给您环境的 NPU 芯片 ID（例如，4 芯片为 `0,1,2,3`）。
+      > - `--port`：请根据实际情况调整，避免与同一机器上运行的其他服务冲突。
+      > - `--no-enable-prefix-caching`：默认禁用，因为该模型在 Ascend NPU 上的前缀缓存效果尚未充分验证。您可以尝试启用该参数以评估工作负载的缓存命中率。
+      > - `--quantization ascend`：使用 W8A8 量化模型时必需。使用 BF16 权重时请移除此参数。
 
-  **Chat Completions API:**
+      参数详情请参考：
+
+      - [vLLM CLI 文档](https://docs.vllm.ai/en/stable/cli/) — 标准 serve 参数（`--host`、`--port`、`--max-model-len` 等）
+      - [环境变量](../../user_guide/configuration/env_vars.md) — Ascend 特定环境变量（`HCCL_*` 等）
+      - [额外配置](../../user_guide/configuration/additional_config.md) — `--additional-config` 格式和选项
+  - title: 服务验证
+    content: |-
+      服务启动后，通过发送 prompt 验证其运行状态。使用示例请参考下方的验证部分。
+verification: |-
+  服务启动后，可以通过发送 prompt 调用模型。
+
+  **Chat Completions API：**
 
   ```shell
   curl http://localhost:8000/v1/chat/completions \
@@ -355,163 +383,306 @@ verification: |-
       }'
   ```
 
-  :::{note}
-  Adjust the following fields based on your deployment:
+  > - **URL** (`http://localhost:8000`)：请将 `localhost` 和 `8000` 替换为您的服务器 IP 和 `vllm serve` 命令中的 `--port` 值。
+  > - **`model`**：必须与 `vllm serve` 命令中的 `--served-model-name` 值匹配（例如 `qwen3`）。
 
-  - **URL** (`http://localhost:8000`): Replace `localhost` and `8000` with your server IP and the `--port` value from the `vllm serve` command.
-  - **`model`**: Must match the `--served-model-name` value from the `vllm serve` command (e.g., `qwen3`).
+  预期结果：HTTP 200，JSON 响应中包含 `choices` 字段及生成的文本。
+evaluation:
+  accuracy:
+    content: |-
+      ### 使用 AISBench
 
+      关于环境配置的详细信息（包括安装、数据集下载和配置文件设置），请参考[使用 AISBench](../../developer_guide/evaluation/using_ais_bench.md)。
 
-  Expected result: HTTP 200 with a JSON response containing the `choices` field with generated text.
-  :::
+      以下是以 GSM8K 数据集为例的精度评估配置文件示例：
+
+      ```python
+      # Example configuration: benchmarks/ais_bench/benchmark/configs/models/vllm_api/vllm_api_general_chat.py
+      from ais_bench.benchmark.models import VLLMCustomAPIChat
+
+      models = [
+          dict(
+              attr="service",
+              type=VLLMCustomAPIChat,
+              abbr='vllm-api-general-chat',
+              path="your_model_path",
+              model="qwen3",
+              request_rate=0,
+              retry=2,
+              host_ip="localhost",
+              host_port=8000,
+              max_out_len=32768,
+              batch_size=32,
+              trust_remote_code=True,
+              generation_kwargs=dict(
+                  temperature=0.6,
+                  top_k=20,
+                  top_p=0.95,
+              ),
+          )
+      ]
+      ```
+
+      以 `gsm8k` 数据集为例，运行精度评估：
+
+      ```shell
+      ais_bench --models vllm_api_general_chat --datasets gsm8k_gen_4_shot_cot_str --mode all --dump-eval-details --debug
+      ```
+
+      以下表格列出了每个评估数据集的 `--datasets` 参数：
+
+      | 数据集         | `--datasets` 参数                    |
+      | ------------- | ------------------------------------ |
+      | GSM8K         | `gsm8k_gen_4_shot_cot_str`           |
+      | GPQA-Diamond  | `gpqa_gen_0_shot_cot_chat_prompt`    |
+      | AIME 2024     | `aime2024_gen_0_shot_str`            |
+      | LiveCodeBench | `livecodebench_0_shot_chat_v4_v5_v6` |
+
+      > `--models` 参数值对应配置文件名（例如 `vllm_api_general_chat` 对应 `vllm_api_general_chat.py`）。请根据实际场景调整 `max_out_len`、`batch_size` 和数据集任务。
+
+      关于数据集准备，请参考 [AISBench 数据集指南](https://github.com/AISBench/benchmark/blob/master/docs/source_zh_cn/get_started/datasets.md)。
+
+      vLLM-Ascend 还支持以下评估工具：
+
+      - [lm_eval](../../developer_guide/evaluation/using_lm_eval.md)
+      - [OpenCompass](../../developer_guide/evaluation/using_opencompass.md)
+      - [EvalScope](../../developer_guide/evaluation/using_evalscope.md)
+
+      **精度结果（Atlas 800I A3，vLLM-Ascend v0.22.1rc，W8A8）：**
+
+      | 数据集         | 指标                   | 分数    |
+      | ------------- | --------------------- | ------ |
+      | GSM8K         | accuracy (4-shot CoT) | 92.87% |
+      | GPQA-Diamond  | accuracy (0-shot CoT) | 60.10% |
+      | LiveCodeBench | pass@1 (0-shot)       | 60.05% |
+      | AIME 2024     | accuracy (0-shot)     | 76.67% |
+  performance:
+    content: |-
+      ### 使用 AISBench
+
+      关于环境配置的详细信息，请参考[使用 AISBench 进行性能评估](../../developer_guide/evaluation/using_ais_bench.md#execute-performance-evaluation)。
+
+      首先，配置流式性能测试的模型配置（`ais_bench/benchmark/configs/models/vllm_api/vllm_api_stream_chat.py`）：
+
+      ```python
+      from ais_bench.benchmark.models import VLLMCustomAPIChat
+      from ais_bench.benchmark.utils.postprocess.model_postprocessors import extract_non_reasoning_content
+
+      models = [
+          dict(
+              attr="service",
+              type=VLLMCustomAPIChat,
+              abbr='vllm-api-stream-chat',
+              path="your_model_path",
+              model="qwen3",
+              stream=True,
+              request_rate=0,
+              retry=2,
+              host_ip="localhost",
+              host_port=8000,
+              max_out_len=1500,
+              batch_size=32,
+              trust_remote_code=True,
+              generation_kwargs=dict(
+                  temperature=0.01,
+                  ignore_eos=True,
+              ),
+              pred_postprocessor=dict(type=extract_non_reasoning_content),
+          )
+      ]
+      ```
+
+      > 与精度配置的主要区别：`stream=True`、`ignore_eos=True`（确保输出达到 `max_out_len` 以保证 TPOT 测量的一致性），以及 `batch_size` 控制并发度。
+
+      然后，配置合成数据集分布（`ais_bench/datasets/synthetic/synthetic_config.py`）。请根据实际场景调整配置。注意，随机合成数据不适合启用前缀缓存的基准测试场景，因为随机输入会产生零缓存命中率。
+
+      ```python
+      synthetic_config = {
+          "Type": "string",
+          "RequestCount": 200,
+          "StringConfig": {
+              "Input": {
+                  "Method": "uniform",
+                  "Params": {"MinValue": 3500, "MaxValue": 3500}
+              },
+              "Output": {
+                  "Method": "uniform",
+                  "Params": {"MinValue": 1500, "MaxValue": 1500}
+              }
+          }
+      }
+      ```
+
+      然后运行性能评估：
+
+      ```shell
+      ais_bench --models vllm_api_stream_chat --datasets synthetic_gen --mode perf --debug
+      ```
+
+      > `--models` 的值应与模型配置文件中的 `abbr` 匹配。使用 `--num-prompts` 限制测试请求数量。
+
+      ### 使用 vLLM Benchmark
+
+      更多详情请参考 [vLLM benchmark](https://docs.vllm.ai/en/latest/benchmarking/)。
+
+      以 `serve` 子命令为例。`--random-output-len` 参数控制每个请求的输出 token 数量；请根据目标场景进行调整（例如，短输出为 2048，长输出为 32768）。
+
+      ```shell
+      vllm bench serve \
+          --model your_model_path \
+          --served-model-name qwen3 \
+          --port 8000 \
+          --dataset-name random \
+          --random-input 200 \
+          --random-output-len 2048 \
+          --num-prompts 200 \
+          --request-rate 1 \
+          --save-result \
+          --result-dir ./
+      ```
+performance:
+  benchmark: |-
+    ### 推荐配置
+
+    > **注意**：以下配置在特定测试环境中验证，仅供参考。最优配置取决于最大输入/输出长度、前缀缓存命中率、精度要求以及部署机器配比等因素。建议参考第 9.2 节根据实际情况进行调优。
+
+    #### 表 1：场景概览
+
+    | 场景     | 部署模式          | *总 NPU 数        | 权重版本 | 关键考量                                         |
+    | ------- | ---------------- | ---------------- | ------- | ------------------------------------------------ |
+    | 高吞吐   | 单节点（TP1）      | 1 (A3)<br>2 (A2) | W8A8    | 单卡部署最大化并发请求处理                           |
+    | 低延迟   | 单节点（TP4）      | 2 (A3)<br>4 (A2) | W8A8    | 多卡 TP 配合 Expert Parallelism 降低每 token 延迟  |
+    | 长上下文  | 单节点（TP4）      | 2 (A3)<br>4 (A2) | W8A8    | 减少并发序列数以适应更长的 max-model-len              |
+
+    > `*总 NPU 数` 表示所有节点使用的 NPU 总数。在 Atlas 800I A3 上，每个 NPU 包含两个 die（芯片），因此 TP4 需要 4 个芯片 = 2 个 NPU。
+
+    #### 表 2：详细节点配置
+
+    | 场景     | NPU    | TP  | max-model-len | max-num-seqs | FUSED_MC2 | EP  | hf-overrides |
+    | ------- | ------ | --- | ------------- | ------------ | --------- | --- | ------------ |
+    | 高吞吐   | 1 (A3) | 1   | 37364         | 100          | Off       | Off | -            |
+    | 低延迟   | 2 (A3) | 4   | 37364         | 100          | Off       | On  | -            |
+    | 长上下文  | 2 (A3) | 4   | 131072        | 14           | Off       | On  | YaRN         |
+
+    > 详细参数说明请参考第 5 节的部署示例。
+
+    **低延迟配置：**
+
+    ```shell
+    export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3
+    export HCCL_OP_EXPANSION_MODE="AIV"
+    export HCCL_BUFFSIZE=1024
+    export OMP_PROC_BIND=false
+    export OMP_NUM_THREADS=1
+    export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+
+    vllm serve your_model_path \
+        --served-model-name qwen3 \
+        --trust-remote-code \
+        --max-num-seqs 100 \
+        --max-model-len 37364 \
+        --max-num-batched-tokens 16384 \
+        --tensor-parallel-size 4 \
+        --enable-expert-parallel \
+        --distributed_executor_backend "mp" \
+        --no-enable-prefix-caching \
+        --async-scheduling \
+        --quantization ascend \
+        --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY"}' \
+        --additional-config '{"enable_flashcomm1": true, "weight_nz_mode": 2}' \
+        --gpu-memory-utilization 0.95 \
+        --port 8000 \
+        --speculative-config '{"method": "eagle3","model": "your_eagle3_model_path", "num_speculative_tokens": 3}'
+    ```
+
+    该配置的 AISBench 示例设置：
+
+    - `request_rate`：0
+    - `batch_size`：32
+    - 输入/输出长度：2048/2048 或 3500/1500
+
+    **高吞吐配置：**
+
+    ```shell
+    export ASCEND_RT_VISIBLE_DEVICES=0
+    export HCCL_OP_EXPANSION_MODE="AIV"
+    export HCCL_BUFFSIZE=1024
+    export OMP_PROC_BIND=false
+    export OMP_NUM_THREADS=1
+    export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+
+    vllm serve your_model_path \
+        --served-model-name qwen3 \
+        --trust-remote-code \
+        --max-num-seqs 100 \
+        --max-model-len 37364 \
+        --max-num-batched-tokens 16384 \
+        --tensor-parallel-size 1 \
+        --distributed_executor_backend "mp" \
+        --no-enable-prefix-caching \
+        --async-scheduling \
+        --quantization ascend \
+        --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY"}' \
+        --additional-config '{"weight_nz_mode": 2}' \
+        --gpu-memory-utilization 0.95 \
+        --port 8000 \
+        --speculative-config '{"method": "eagle3","model": "your_eagle3_model_path", "num_speculative_tokens": 3}'
+    ```
+
+    该配置的 AISBench 示例设置：
+
+    - `request_rate`：0
+    - `batch_size`：32
+    - 输入/输出长度：2048/2048 或 3500/1500
+
+    **长上下文配置：**
+
+    ```shell
+    export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3
+    export HCCL_OP_EXPANSION_MODE="AIV"
+    export HCCL_BUFFSIZE=1024
+    export OMP_PROC_BIND=false
+    export OMP_NUM_THREADS=1
+    export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+
+    vllm serve your_model_path \
+        --served-model-name qwen3 \
+        --trust-remote-code \
+        --max-num-seqs 14 \
+        --max-model-len 131072 \
+        --max-num-batched-tokens 16384 \
+        --tensor-parallel-size 4 \
+        --enable-expert-parallel \
+        --distributed_executor_backend "mp" \
+        --no-enable-prefix-caching \
+        --async-scheduling \
+        --quantization ascend \
+        --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY"}' \
+        --additional-config '{"enable_flashcomm1": true, "weight_nz_mode": 2}' \
+        --gpu-memory-utilization 0.95 \
+        --port 8000 \
+        --speculative-config '{"method": "eagle3","model": "your_eagle3_model_path", "num_speculative_tokens": 3}' \
+        --hf-overrides '{"rope_parameters": {"rope_type":"yarn","factor":4,"original_max_position_embeddings":32768}}'
+    ```
+
+    该配置的 AISBench 示例设置：
+
+    - `request_rate`：0
+    - `batch_size`：32
+    - 输入/输出长度：65536/1024 或 131072/1024
 tuning: |-
-  ### 9.1 Recommended Configurations
+  ### 调优指南
 
-  > **Note**: The following configurations are validated in specific test environments and are for reference only. The optimal configuration depends on factors such as maximum input/output length, prefix cache hit rate, precision requirements, and deployment machine ratios. It is recommended to refer to Section 9.2 for tuning based on actual conditions.
-
-  #### Table 1: Scenario Overview
-
-  | Scenario        | Deployment Mode   | *Total NPUs      | Weight Version | Key Considerations                                               |
-  | --------------- | ----------------- | ---------------- | -------------- | ---------------------------------------------------------------- |
-  | High Throughput | Single-Node (TP1) | 1 (A3)<br>2 (A2) | W8A8           | Single-card deployment maximizes concurrent request processing   |
-  | Low Latency     | Single-Node (TP4) | 2 (A3)<br>4 (A2) | W8A8           | Multi-card TP reduces per-token latency with expert parallelism  |
-  | Long Context    | Single-Node (TP4) | 2 (A3)<br>4 (A2) | W8A8           | Reduces concurrent sequences to accommodate longer max-model-len |
-
-  > `*Total NPUs` indicates the total number of NPUs used across all nodes. On Atlas 800I A3, each NPU contains two dies (chips), so TP4 requires 4 chips = 2 NPUs.
-
-  #### Table 2: Detailed Node Configuration
-
-  | Scenario        | NPUs   | TP  | max-model-len | max-num-seqs | FUSED_MC2 | EP  | hf-overrides |
-  | --------------- | ------ | --- | ------------- | ------------ | --------- | --- | ------------ |
-  | High Throughput | 1 (A3) | 1   | 37364         | 100          | Off       | Off | -            |
-  | Low Latency     | 2 (A3) | 4   | 37364         | 100          | Off       | On  | -            |
-  | Long Context    | 2 (A3) | 4   | 131072        | 14           | Off       | On  | YaRN         |
-
-  > For detailed parameter descriptions, please refer to the deployment examples in Section 5.
-
-  **Low Latency Configuration:**
-
-  ```shell
-  export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3
-  export HCCL_OP_EXPANSION_MODE="AIV"
-  export HCCL_BUFFSIZE=1024
-  export OMP_PROC_BIND=false
-  export OMP_NUM_THREADS=1
-  export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
-
-  vllm serve your_model_path \
-      --served-model-name qwen3 \
-      --trust-remote-code \
-      --max-num-seqs 100 \
-      --max-model-len 37364 \
-      --max-num-batched-tokens 16384 \
-      --tensor-parallel-size 4 \
-      --enable-expert-parallel \
-      --distributed_executor_backend "mp" \
-      --no-enable-prefix-caching \
-      --async-scheduling \
-      --quantization ascend \
-      --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY"}' \
-      --additional-config '{"enable_flashcomm1": true, "weight_nz_mode": 2}' \
-      --gpu-memory-utilization 0.95 \
-      --port 8000 \
-      --speculative-config '{"method": "eagle3","model": "your_eagle3_model_path", "num_speculative_tokens": 3}'
-  ```
-
-  :::{tip}
-  Example AISBench settings for this configuration:
-
-  - `request_rate`: 0
-  - `batch_size`: 32
-  - Input/Output length: 2048/2048 or 3500/1500
-  :::
-
-  **High Throughput Configuration:**
-
-  ```shell
-  export ASCEND_RT_VISIBLE_DEVICES=0
-  export HCCL_OP_EXPANSION_MODE="AIV"
-  export HCCL_BUFFSIZE=1024
-  export OMP_PROC_BIND=false
-  export OMP_NUM_THREADS=1
-  export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
-
-  vllm serve your_model_path \
-      --served-model-name qwen3 \
-      --trust-remote-code \
-      --max-num-seqs 100 \
-      --max-model-len 37364 \
-      --max-num-batched-tokens 16384 \
-      --tensor-parallel-size 1 \
-      --distributed_executor_backend "mp" \
-      --no-enable-prefix-caching \
-      --async-scheduling \
-      --quantization ascend \
-      --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY"}' \
-      --additional-config '{"weight_nz_mode": 2}' \
-      --gpu-memory-utilization 0.95 \
-      --port 8000 \
-      --speculative-config '{"method": "eagle3","model": "your_eagle3_model_path", "num_speculative_tokens": 3}'
-  ```
-
-  :::{tip}
-  Example AISBench settings for this configuration:
-
-  - `request_rate`: 0
-  - `batch_size`: 32
-  - Input/Output length: 2048/2048 or 3500/1500
-  :::
-
-  **Long Context Configuration:**
-
-  ```shell
-  export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3
-  export HCCL_OP_EXPANSION_MODE="AIV"
-  export HCCL_BUFFSIZE=1024
-  export OMP_PROC_BIND=false
-  export OMP_NUM_THREADS=1
-  export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
-
-  vllm serve your_model_path \
-      --served-model-name qwen3 \
-      --trust-remote-code \
-      --max-num-seqs 14 \
-      --max-model-len 131072 \
-      --max-num-batched-tokens 16384 \
-      --tensor-parallel-size 4 \
-      --enable-expert-parallel \
-      --distributed_executor_backend "mp" \
-      --no-enable-prefix-caching \
-      --async-scheduling \
-      --quantization ascend \
-      --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY"}' \
-      --additional-config '{"enable_flashcomm1": true, "weight_nz_mode": 2}' \
-      --gpu-memory-utilization 0.95 \
-      --port 8000 \
-      --speculative-config '{"method": "eagle3","model": "your_eagle3_model_path", "num_speculative_tokens": 3}' \
-      --hf-overrides '{"rope_parameters": {"rope_type":"yarn","factor":4,"original_max_position_embeddings":32768}}'
-  ```
-
-  :::{tip}
-  Example AISBench settings for this configuration:
-
-  - `request_rate`: 0
-  - `batch_size`: 32
-  - Input/Output length: 65536/1024 or 131072/1024
-  :::
-
-  ### 9.2 Tuning Guidelines
-
-  Please refer to the [Public Performance Tuning Documentation](../../developer_guide/performance_and_debug/optimization_and_tuning.md) for tuning methods.
-  Please refer to the [Feature Guide](../../user_guide/support_matrix/feature_matrix.md) for detailed feature descriptions.
-faq: For common environment, installation, and general parameter issues, please refer to the [Public FAQ](https://docs.vllm.ai/projects/ascend/en/latest/faqs.html).
-  This chapter only covers model-specific issues.
+  关于调优方法，请参考[公开性能调优文档](../../developer_guide/performance_and_debug/optimization_and_tuning.md)。
+  关于详细特性说明，请参考[特性指南](../../user_guide/support_matrix/feature_matrix.md)。
+faq: |-
+  关于常见的环境、安装和通用参数问题，请参考[公开 FAQ](https://docs.vllm.ai/projects/ascend/en/latest/faqs.html)。本章仅涵盖模型特定问题。
 references:
-- title: vllm-ascend 官方文档
+- title: vllm-ascend 文档
   url: https://docs.vllm.ai/projects/ascend/en/latest/tutorials/models/Qwen3-30B-A3B.html
-- title: ModelScope 模型下载 (BF16)
+- title: ModelScope 模型下载（BF16）
   url: https://www.modelscope.cn/models/Qwen/Qwen3-30B-A3B
-- title: ModelScope 模型下载 (W8A8)
+- title: ModelScope 模型下载（W8A8）
   url: https://www.modelscope.cn/models/Eco-Tech/Qwen3-30B-A3B-w8a8
 - title: Eagle3 Draft Model
   url: https://huggingface.co/AngelSlim/Qwen3-a3B_eagle3
