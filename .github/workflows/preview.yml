@@ -14,7 +14,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
+  build-and-deploy:
     if: github.event.action != 'closed'
     runs-on: ubuntu-latest
     steps:
@@ -37,47 +37,81 @@ jobs:
         run: npx tsx scripts/validate-yaml.ts
 
       - name: Build
-        run: pnpm exec astro build --base /
+        run: pnpm exec astro build
         env:
           ASTRO_TELEMETRY_DISABLED: '1'
+          ASTRO_BASE: '/'
 
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v4
+      - name: Deploy to Netlify
+        id: netlify
+        uses: nwtgck/actions-netlify@v3
         with:
-          name: pr-${{ github.event.pull_request.number }}-preview
-          path: ./dist
-          retention-days: 14
+          publish-dir: ./dist
+          production-deploy: false
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          deploy-message: 'PR #${{ github.event.pull_request.number }}'
+          enable-pull-request-comment: false
+          overwrites-pull-request-comment: false
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+        timeout-minutes: 5
 
-  comment:
-    if: github.event.action != 'closed'
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Comment preview instructions on PR
+      - name: Comment preview URL on PR
+        if: always() && steps.netlify.outcome == 'success'
+        uses: actions/github-script@v7
+        env:
+          DEPLOY_URL: ${{ steps.netlify.outputs.deploy-url }}
+        with:
+          script: |
+            const prNumber = context.payload.pull_request.number;
+            const deployUrl = process.env.DEPLOY_URL;
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const marker = '<!-- pr-preview -->';
+            const body = `## 🔨 Preview ready
+
+            **👉 [Open preview](${deployUrl})**
+
+            <details>
+            <summary>Build details</summary>
+
+            - [Workflow run](${runUrl})
+            - Deploy URL: \`${deployUrl}\`
+
+            _Deploys automatically on each push. The preview is removed when the PR is closed._
+            </details>`;
+
+            const { data: comments } = await github.rest.issues.listComments({
+              ...context.repo,
+              issue_number: prNumber,
+            });
+            const existing = comments.find(c => c.body && c.body.includes(marker));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                ...context.repo,
+                comment_id: existing.id,
+                body: `${marker}\n${body}`,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                ...context.repo,
+                issue_number: prNumber,
+                body: `${marker}\n${body}`,
+              });
+            }
+
+      - name: Comment failure on PR
+        if: failure()
         uses: actions/github-script@v7
         with:
           script: |
             const prNumber = context.payload.pull_request.number;
             const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
-            const artifactName = `pr-${prNumber}-preview`;
-            const artifactUrl = `${runUrl}#artifacts`;
             const marker = '<!-- pr-preview -->';
-            const body = `## 🔨 Static build ready for review
+            const body = `## 🔨 Preview build failed
 
-            This PR's static site has been built. To preview:
-
-            1. Download the \`${artifactName}\` artifact from the [workflow run](${artifactUrl})
-            2. Unzip it and serve locally:
-
-               \`\`\`bash
-               npx serve .
-               \`\`\`
-
-            3. Open the printed URL in your browser
-
-            Or inspect the build output directly in [the workflow run](${runUrl}).
-
-            _The artifact is retained for 14 days._`;
+            The preview build failed. Check the [workflow run](${runUrl}) for details.`;
 
             const { data: comments } = await github.rest.issues.listComments({
               ...context.repo,
@@ -118,6 +152,6 @@ jobs:
               await github.rest.issues.updateComment({
                 ...context.repo,
                 comment_id: existing.id,
-                body: `${marker}\n## 🔨 Preview outdated\n\nThe PR was merged/closed. The build artifact will expire automatically (14-day retention).`,
+                body: `${marker}\n## 🔨 Preview outdated\n\nThe PR was merged or closed. The preview is no longer available.`,
               });
             }
