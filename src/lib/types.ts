@@ -34,6 +34,12 @@ export interface Quantization {
 export interface ScenarioStep {
   title: string;
   content: string;
+  config_values?: Record<string, { enabled: string; disabled: string }>;
+}
+
+export interface ExtraConfigItem {
+  key: string;
+  label: string;
 }
 
 export interface Scenario {
@@ -42,6 +48,7 @@ export interface Scenario {
   deployment: string;
   case: string;
   steps: ScenarioStep[];
+  default_configs?: string[];
 }
 
 export interface PerformanceSection {
@@ -67,6 +74,7 @@ export interface Model {
   prerequisites?: PrerequisiteItem[];
   env_setup: EnvSetup;
   scenarios: Scenario[];
+  extra_config?: ExtraConfigItem[];
   performance?: PerformanceSection;
   verification?: string;
   tuning?: string;

@@ -123,11 +123,32 @@ env_setup:
       - Install `vllm-ascend` from source, refer to [installation](../../installation.md).
 
       If you want to deploy a multi-node environment, you need to set up the environment on each node.
+extra_config:
+- key: mtp-spec-decoding
+  label: MTP Speculative Decoding
+- key: prefix-caching
+  label: Prefix Caching
+- key: async-scheduling
+  label: Async Scheduling
+- key: flashcomm1
+  label: FlashComm1
+- key: npugraph-ex
+  label: NPUGraph EX
+- key: cpu-binding
+  label: CPU Binding
+- key: dsa-cp
+  label: DSA CP
+- key: multistream-overlap
+  label: Multi-stream Overlap
 scenarios:
 - npu: Atlas 800I A2
   precision: W8A8
   deployment: 单节点-多卡
-  case: Multi Card
+  case: 高吞吐
+  default_configs:
+  - mtp-spec-decoding
+  - async-scheduling
+  - flashcomm1
   steps:
   - title: Start the server
     content: |-
@@ -141,7 +162,7 @@ scenarios:
       export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
       export LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libjemalloc.so.2:$LD_PRELOAD
       export HCCL_BUFFSIZE=1024
-      export VLLM_ASCEND_ENABLE_FLASHCOMM1=1
+      %%CONFIG:flashcomm1%%export VLLM_ASCEND_ENABLE_FLASHCOMM1=1%%/CONFIG:flashcomm1%%
       export TASK_QUEUE_ENABLE=1
       export HCCL_OP_EXPANSION_MODE="AIV"
 
@@ -159,34 +180,38 @@ scenarios:
           --enable-auto-tool-choice \
           --reasoning-parser deepseek_v4 \
           --safetensors-load-strategy 'prefetch' \
-          --no-enable-prefix-caching \
+          %%CONFIG:prefix-caching%%--enable-prefix-caching%%/CONFIG:prefix-caching%% \
           --model-loader-extra-config='{"enable_multithread_load": "true", "num_threads": 128}' \
           --quantization ascend \
           --port 8900 \
           --block-size 128 \
-          --speculative-config '{"num_speculative_tokens": 1,"method": "mtp","enforce_eager": true}' \
+          %%CONFIG:mtp-spec-decoding%%--speculative-config '{"num_speculative_tokens": 1,"method": "mtp","enforce_eager": true}' \%%/CONFIG:mtp-spec-decoding%%
           --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY"}' \
-          --async-scheduling \
+          %%CONFIG:async-scheduling%%--async-scheduling \%%/CONFIG:async-scheduling%%
           --additional-config '
           {"ascend_compilation_config":{
-              "enable_npugraph_ex":true,
+              %%CONFIG:npugraph-ex%%"enable_npugraph_ex":true,%%/CONFIG:npugraph-ex%%
               "enable_static_kernel":false
-              },
-          "enable_cpu_binding": true,
-          "enable_dsa_cp": true,
-          "multistream_overlap_shared_expert":true}'
+          }%%CONFIG:cpu-binding%%,
+          "enable_cpu_binding": true%%/CONFIG:cpu-binding%%%%CONFIG:dsa-cp%%,
+          "enable_dsa_cp": true%%/CONFIG:dsa-cp%%%%CONFIG:multistream-overlap%%,
+          "multistream_overlap_shared_expert":true%%/CONFIG:multistream-overlap%%
+          }'
       ```
 
       Key Parameter Descriptions:
 
       - `--max-model-len` specifies the maximum context length - that is, the sum of input and output tokens for a single request. Adjust it according to your actual scenario.
-      - `--no-enable-prefix-caching` indicates that prefix caching is disabled. To enable it, remove this option.
       - `--speculative-config` configures the MTP (Multi-Token Prediction) speculative decoding to accelerate inference.
       - `--compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY"}'` enables full ACL graph execution in the decode phase to reduce scheduling latency.
       - `--async-scheduling` enables asynchronous scheduling to overlap CPU scheduling with NPU computation.
       - `VLLM_ASCEND_ENABLE_FLASHCOMM1=1` enables the FlashComm communication optimization.
 
       Common Issues Tip: If you encounter issues, please refer to the [Public FAQ](https://docs.vllm.ai/projects/ascend/en/latest/faqs.html) for troubleshooting.
+    config_values:
+      prefix-caching:
+        enabled: "--enable-prefix-caching"
+        disabled: "--no-enable-prefix-caching"
   - title: Service Verification
     content: |-
       ```shell
@@ -211,7 +236,7 @@ scenarios:
 - npu: Atlas 800I A3
   precision: W8A8
   deployment: 单节点-多卡
-  case: Multi Card
+  case: 低时延
   steps:
   - title: Start the server
     content: |-

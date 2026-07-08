@@ -1,9 +1,15 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useLang } from '../lib/useLang';
 
+interface ExtraConfigItem {
+  key: string;
+  label: string;
+}
+
 interface ScenarioStep {
   title: string;
   content: string;
+  config_values?: Record<string, { enabled: string; disabled: string }>;
 }
 
 interface Scenario {
@@ -12,18 +18,23 @@ interface Scenario {
   deployment: string;
   case: string;
   steps: ScenarioStep[];
+  default_configs?: string[];
 }
 
 interface CascadeSelectorProps {
   scenariosEn: Scenario[];
   scenariosZh: Scenario[];
+  extraConfig?: ExtraConfigItem[];
 }
 
+// ---- Markdown renderer ----
 function renderMarkdown(md: string): string {
   let html = md;
 
-  // Extract code blocks, replace with placeholders to prevent split() from
-  // breaking their internal newlines.
+  // Strip %%CONFIG%% markers (keeping inner content) so SSR always shows full content.
+  // applyConfigReplace handles the actual selection-based replacement later.
+  html = html.replace(/%%CONFIG:\w[\w-]*%%|%%\/CONFIG:\w[\w-]*%%/g, '');
+
   const codeBlocks: string[] = [];
   html = html.replace(/```(\w+)?\n([\s\S]*?)```/g, (_, lang, code) => {
     const escaped = code
@@ -36,17 +47,13 @@ function renderMarkdown(md: string): string {
     return `%%CODEBLOCK_${idx}%%`;
   });
 
-  // Table support
   html = html.replace(/(?:^\|.+\|$\n?)+/gm, (match) => {
     const rows = match.trim().split('\n');
     let tableHtml = '<div class="overflow-x-auto rounded-lg border border-ink-800/60 mb-4"><table class="w-full text-sm">';
     let headerDone = false;
     for (const row of rows) {
       const cells = row.split('|').filter(c => c.trim() !== '');
-      if (cells.every(c => /^:?-{3,}:?$/.test(c.trim()))) {
-        headerDone = true;
-        continue;
-      }
+      if (cells.every(c => /^:?-{3,}:?$/.test(c.trim()))) { headerDone = true; continue; }
       const cellHtml = cells.map((c, i) => {
         const tag = !headerDone && i === 0 ? 'th' : 'td';
         const cls = tag === 'th'
@@ -54,12 +61,8 @@ function renderMarkdown(md: string): string {
           : 'py-2.5 px-4 text-ink-400 font-mono text-xs';
         return `<${tag} class="${cls}">${c.trim()}</${tag}>`;
       }).join('');
-      if (!headerDone) {
-        tableHtml += `<thead><tr class="border-b border-ink-800/60 bg-ink-900/40">${cellHtml}</tr></thead>`;
-        headerDone = true;
-      } else {
-        tableHtml += `<tbody><tr class="border-b border-ink-800/40 last:border-0 hover:bg-ink-900/30 transition-colors">${cellHtml}</tr></tbody>`;
-      }
+      if (!headerDone) { tableHtml += `<thead><tr class="border-b border-ink-800/60 bg-ink-900/40">${cellHtml}</tr></thead>`; headerDone = true; }
+      else { tableHtml += `<tbody><tr class="border-b border-ink-800/40 last:border-0 hover:bg-ink-900/30 transition-colors">${cellHtml}</tr></tbody>`; }
     }
     tableHtml += '</table></div>';
     return tableHtml;
@@ -77,28 +80,20 @@ function renderMarkdown(md: string): string {
 
   function flushParagraph() {
     if (paragraphBuf.length > 0) {
-      const content = paragraphBuf.join('<br />\n');
-      result.push(`<p class="text-sm text-ink-400 leading-relaxed mb-4">${content}</p>`);
+      result.push(`<p class="text-sm text-ink-400 leading-relaxed mb-4">${paragraphBuf.join('<br />\n')}</p>`);
       paragraphBuf = [];
     }
   }
 
   for (const line of lines) {
     if (!line.trim()) {
-      if (inList) {
-        result.push('</ul>');
-        inList = false;
-      }
+      if (inList) { result.push('</ul>'); inList = false; }
       flushParagraph();
       continue;
     }
-
     if (line.match(/^- (.+)$/)) {
       flushParagraph();
-      if (!inList) {
-        result.push('<ul class="list-none p-0 m-0 mb-4 space-y-1">');
-        inList = true;
-      }
+      if (!inList) { result.push('<ul class="list-none p-0 m-0 mb-4 space-y-1">'); inList = true; }
       const itemContent = line.replace(/^- (.+)$/, '$1')
         .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener" class="text-accent-400 hover:text-accent-300 border-b border-accent-500/30">$1</a>')
         .replace(/`([^`]+)`/g, '<code>$1</code>')
@@ -106,40 +101,57 @@ function renderMarkdown(md: string): string {
       result.push(`<li class="text-sm text-ink-400 pl-4 relative before:content-['▸'] before:absolute before:left-0 before:text-accent-500 before:text-xs before:top-0.5">${itemContent}</li>`);
       continue;
     }
-
     if (line.startsWith('<') || line.startsWith('%%CODEBLOCK_')) {
-      if (inList) {
-        result.push('</ul>');
-        inList = false;
-      }
+      if (inList) { result.push('</ul>'); inList = false; }
       flushParagraph();
       result.push(line);
       continue;
     }
-
-    if (inList) {
-      result.push('</ul>');
-      inList = false;
-    }
-
+    if (inList) { result.push('</ul>'); inList = false; }
     const processed = line
       .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener" class="text-accent-400 hover:text-accent-300 border-b border-accent-500/30">$1</a>')
       .replace(/`([^`]+)`/g, '<code>$1</code>')
       .replace(/\*\*(.+?)\*\*/g, '<strong class="text-ink-200 font-semibold">$1</strong>');
     paragraphBuf.push(processed);
   }
-
   if (inList) result.push('</ul>');
   flushParagraph();
 
-  // Restore code blocks
   let output = result.join('\n');
   output = output.replace(/%%CODEBLOCK_(\d+)%%/g, (_, idx) => codeBlocks[parseInt(idx)] || '');
-
   return output;
 }
 
-export default function CascadeSelector({ scenariosEn, scenariosZh }: CascadeSelectorProps) {
+// ---- Config placeholder replacer ----
+// Replaces %%CONFIG:key%%...%%/CONFIG:key%% blocks based on selected configs.
+// If config_values specified, uses enabled/disabled strings; otherwise keeps/removes content.
+// After replacement, cleans up blank lines and trailing commas left by removed blocks.
+function applyConfigReplace(
+  html: string,
+  selectedConfigs: Set<string>,
+  configValues?: Record<string, { enabled: string; disabled: string }>,
+): string {
+  let result = html.replace(
+    /[ \t]*%%CONFIG:(\w[\w-]*)%%([\s\S]*?)%%\/CONFIG:\1%%/g,
+    (_, key: string, content: string) => {
+      if (configValues?.[key]) {
+        return selectedConfigs.has(key)
+          ? configValues[key].enabled
+          : configValues[key].disabled;
+      }
+      return selectedConfigs.has(key) ? content : '';
+    },
+  );
+  // Clean up: remove blank lines, trailing commas, and consecutive empty lines
+  // left by removed config blocks (including inside JSON objects)
+  result = result.replace(/,\s*\n/g, '\n');         // remove trailing comma + newline
+  result = result.replace(/^\s*\n/gm, '');           // remove blank lines
+  result = result.replace(/\n\s*\n\s*\n/g, '\n\n'); // collapse multiple blank lines
+  return result;
+}
+
+// ---- Component ----
+export default function CascadeSelector({ scenariosEn, scenariosZh, extraConfig }: CascadeSelectorProps) {
   const { lang, t } = useLang();
   const scenarios = lang === 'zh' ? scenariosZh : scenariosEn;
 
@@ -189,7 +201,6 @@ export default function CascadeSelector({ scenariosEn, scenariosZh }: CascadeSel
     ? selectedDeployment
     : deployments[0] || '';
 
-  // Fourth level: case
   const cases = useMemo(() => {
     const set = new Set<string>();
     scenarios
@@ -214,53 +225,159 @@ export default function CascadeSelector({ scenariosEn, scenariosZh }: CascadeSel
     (s) => s.npu === selectedNpu && s.precision === effectivePrecision && s.deployment === effectiveDeployment && s.case === effectiveCase
   );
 
-  const selectClass = "w-full px-3 py-2 text-xs font-mono rounded-lg border border-ink-800/60 bg-ink-900/40 text-ink-200 focus:outline-none focus:border-accent-500/40 focus:ring-1 focus:ring-accent-500/20 cursor-pointer transition-colors";
-  const labelClass = "text-[10px] font-mono uppercase tracking-wider text-ink-600 mb-1.5 block";
+  // Step tab state — reset when scenario changes
+  const [activeStep, setActiveStep] = useState(0);
+  useEffect(() => {
+    setActiveStep(0);
+  }, [currentScenario]);
+
+  // Extra config multi-select — initialize from current scenario defaults
+  const [selectedConfigs, setSelectedConfigs] = useState<Set<string>>(() => {
+    if (currentScenario?.default_configs) {
+      return new Set(currentScenario.default_configs);
+    }
+    return new Set();
+  });
+
+  useEffect(() => {
+    if (currentScenario?.default_configs) {
+      setSelectedConfigs(new Set(currentScenario.default_configs));
+    } else {
+      setSelectedConfigs(new Set());
+    }
+  }, [currentScenario]);
+
+  const toggleConfig = (key: string) => {
+    setSelectedConfigs((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
+
+  const chipClass = (active: boolean) =>
+    `px-3 py-1.5 text-xs font-mono rounded-md transition-all cursor-pointer ${
+      active
+        ? 'bg-accent-500/10 text-accent-400 border border-accent-500/30'
+        : 'border border-ink-700/60 text-ink-400 hover:text-ink-200 hover:border-ink-600 bg-ink-900/50'
+    }`;
+
+  if (npus.length === 0) return null;
+
+  // ---- Build filter rows ----
+  interface FilterRow {
+    label: string;
+    options: string[];
+    selected: string;
+    onSelect: (v: string) => void;
+  }
+
+  const rows: FilterRow[] = [
+    { label: t('labelNpu'), options: npus, selected: selectedNpu, onSelect: setSelectedNpu },
+    { label: t('labelPrecision'), options: precisions, selected: effectivePrecision, onSelect: setSelectedPrecision },
+    { label: t('labelDeployment'), options: deployments, selected: effectiveDeployment, onSelect: setSelectedDeployment },
+    { label: t('labelCase'), options: cases, selected: effectiveCase, onSelect: setSelectedCase },
+  ];
+
+  // Resolve rendered content for current step
+  const currentStep = currentScenario?.steps[activeStep];
+  const rawContent = useMemo(() => {
+    if (!currentStep) return '';
+    return applyConfigReplace(currentStep.content, selectedConfigs, currentStep.config_values);
+  }, [currentStep, selectedConfigs]);
 
   return (
     <div>
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 mb-8 p-4 rounded-lg border border-ink-800/60 bg-ink-900/30">
-        <div>
-          <label className={labelClass}>{t('labelNpu')}</label>
-          <select value={selectedNpu} onChange={(e) => setSelectedNpu(e.target.value)} className={selectClass}>
-            {npus.map((n) => (<option key={n} value={n}>{n}</option>))}
-          </select>
-        </div>
-        <div>
-          <label className={labelClass}>{t('labelPrecision')}</label>
-          <select value={effectivePrecision} onChange={(e) => setSelectedPrecision(e.target.value)} className={selectClass}>
-            {precisions.map((p) => (<option key={p} value={p}>{p}</option>))}
-          </select>
-        </div>
-        <div>
-          <label className={labelClass}>{t('labelDeployment')}</label>
-          <select value={effectiveDeployment} onChange={(e) => setSelectedDeployment(e.target.value)} className={selectClass}>
-            {deployments.map((d) => (<option key={d} value={d}>{d}</option>))}
-          </select>
-        </div>
-        <div>
-          <label className={labelClass}>{t('labelCase')}</label>
-          <select value={effectiveCase} onChange={(e) => setSelectedCase(e.target.value)} className={selectClass}>
-            {cases.map((c) => (<option key={c} value={c}>{c}</option>))}
-          </select>
-        </div>
+      {/* Filter panel */}
+      <div className="rounded-lg border border-ink-800/60 bg-ink-900/70 overflow-hidden mb-8">
+        {rows.map((row, ri) => (
+          <div
+            key={ri}
+            className={`flex items-start gap-4 px-4 py-3 ${
+              ri < rows.length - 1 ? 'border-b border-ink-800/40' : ''
+            }`}
+          >
+            <span className="shrink-0 w-24 pt-0.5 text-xs font-mono text-ink-300">
+              {row.label}
+            </span>
+            <div className="flex flex-wrap gap-1.5">
+              {row.options.map((opt) => (
+                <button
+                  key={opt}
+                  onClick={() => row.onSelect(opt)}
+                  className={chipClass(row.selected === opt)}
+                >
+                  {opt}
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+
+        {/* More Config — multi-select, synced with scenario defaults */}
+        {extraConfig && extraConfig.length > 0 && (
+          <div className="flex items-start gap-4 px-4 py-3 border-t border-ink-800/40">
+            <span className="shrink-0 w-24 pt-0.5 text-xs font-mono text-ink-300">
+              {t('labelMoreConfig')}
+            </span>
+            <div className="flex flex-wrap gap-1.5">
+              {extraConfig.map((cfg) => {
+                const isSelected = selectedConfigs.has(cfg.key);
+                return (
+                  <button
+                    key={cfg.key}
+                    onClick={() => toggleConfig(cfg.key)}
+                    title={cfg.label}
+                    className={`px-3 py-1.5 text-xs font-mono rounded-md transition-all cursor-pointer ${
+                      isSelected
+                        ? 'bg-accent-500/10 text-accent-400 border border-accent-500/30'
+                        : 'border border-ink-700/60 text-ink-400 hover:text-ink-200 hover:border-ink-600 bg-ink-900/50'
+                    }`}
+                  >
+                    {cfg.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
+      {/* Result panel */}
       {currentScenario && (
-        <div>
-          <div className="space-y-8">
+        <div className="rounded-lg border border-ink-800/60 overflow-hidden">
+          {/* Step tabs header */}
+          <div className="flex items-center border-b border-ink-800/60 bg-ink-900/70">
+            <span className="shrink-0 px-3 text-[10px] font-mono text-ink-500 uppercase tracking-wider">{t('step') || 'Steps'}</span>
             {currentScenario.steps.map((step, i) => (
-              <div key={i} className="relative">
-                <div className="flex items-center gap-3 mb-3">
-                  <span className="inline-flex items-center justify-center w-6 h-6 rounded-md border border-accent-500/20 bg-accent-500/5 font-mono text-xs text-accent-400 font-semibold">
-                    {i + 1}
-                  </span>
-                  <h3 className="font-display text-base font-semibold text-ink-100">{step.title}</h3>
-                </div>
-                <div className="ml-[18px] prose" dangerouslySetInnerHTML={{ __html: renderMarkdown(step.content) }} />
-              </div>
+              <button
+                key={i}
+                onClick={() => setActiveStep(i)}
+                className={`px-4 py-2.5 text-xs font-mono font-semibold transition-all border-b-2 -mb-px ${
+                  activeStep === i
+                    ? 'border-accent-400 text-accent-400 bg-accent-500/5'
+                    : 'border-transparent text-ink-500 hover:text-ink-300 hover:bg-ink-800/40'
+                }`}
+              >
+                {i + 1}
+              </button>
             ))}
           </div>
+
+          {/* Active step content */}
+          {currentStep && (
+            <div className="px-5 py-5 bg-ink-950/60">
+              <div className="flex items-center gap-3 mb-4">
+                <span className="inline-flex items-center justify-center w-7 h-7 rounded-md border border-accent-500/20 bg-accent-500/5 font-mono text-xs text-accent-400 font-semibold">
+                  {activeStep + 1}
+                </span>
+                <h3 className="font-display text-lg font-semibold text-ink-50">
+                  {currentStep.title}
+                </h3>
+              </div>
+              <div className="ml-[22px] prose" dangerouslySetInnerHTML={{ __html: renderMarkdown(rawContent) }} />
+            </div>
+          )}
         </div>
       )}
     </div>

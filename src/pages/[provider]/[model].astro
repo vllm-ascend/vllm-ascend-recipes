@@ -4,8 +4,8 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 import Tag from '../../components/Tag.astro';
 import MarkdownContent from '../../components/MarkdownContent.astro';
 import CascadeSelector from '../../components/CascadeSelector.tsx';
-import WeightDownloadTabs from '../../components/WeightDownloadTabs.tsx';
-import EnvSetupTabs from '../../components/EnvSetupTabs.tsx';
+import PrepareTabs from '../../components/PrepareTabs.tsx';
+import ReferenceTabs from '../../components/ReferenceTabs.tsx';
 import { getAllModels, formatContextLength, formatParameters } from '../../lib/models';
 import type { Model } from '../../lib/types';
 
@@ -34,14 +34,19 @@ const baseSuffix = base.endsWith('/') ? base.slice(0, -1) : base;
 
 const editUrl = `https://github.com/vllm-ascend/vllm-ascend-recipes/edit/main/models/en/${model._provider_slug}/${model._model_slug}.yaml`;
 const hasQuantization = !!modelEn.quantization;
-const hasPrerequisites = !!modelEn.prerequisites && modelEn.prerequisites.length > 0;
-const hasAccuracy = !!modelEn.performance?.accuracy;
-const hasBenchmark = !!modelEn.performance?.benchmark;
-const hasPerformance = hasAccuracy || hasBenchmark;
-const hasVerification = !!modelEn.verification;
-const hasTuning = !!modelEn.tuning;
-const hasFaq = !!modelEn.faq;
 const npus = [...new Set(modelEn.scenarios.map((s) => s.npu))];
+
+// Collect unique sources with URLs across all weight versions
+const weightLinks: { source: string; url: string }[] = [];
+const seenSources = new Set<string>();
+for (const wd of modelEn.weight_download) {
+  for (const src of wd.sources) {
+    if (src.url && !seenSources.has(src.source)) {
+      seenSources.add(src.source);
+      weightLinks.push({ source: src.source, url: src.url });
+    }
+  }
+}
 const sectionTitle = "font-display text-lg font-semibold text-ink-50 tracking-tight mb-4";
 
 // Build TOC items: each with an anchor id and an i18n key for the label
@@ -49,17 +54,9 @@ interface TocItem { id: string; i18n: string }
 const tocItems: TocItem[] = [];
 function addToc(id: string, i18n: string) { tocItems.push({ id, i18n }); }
 
-addToc('overview', 'sectionOverview');
-addToc('weight-download', 'sectionWeightDownload');
-if (hasQuantization) addToc('quantization', 'sectionQuantization');
-if (hasPrerequisites) addToc('prerequisites', 'sectionPrerequisites');
-addToc('env-setup', 'sectionEnvSetup');
+addToc('prepare', 'sectionPrepare');
 addToc('scenarios', 'sectionScenario');
-if (hasVerification) addToc('verification', 'sectionVerification');
-if (hasPerformance) addToc('performance', 'sectionPerformance');
-if (hasTuning) addToc('tuning', 'sectionTuning');
-if (hasFaq) addToc('faq', 'sectionFaq');
-addToc('references', 'sectionReferences');
+addToc('reference', 'sectionMoreInfo');
 
 function renderDesc(text: string) {
   return `<p>${text}</p>`;
@@ -113,6 +110,24 @@ function renderDesc(text: string) {
         {npus.map((npu) => <Tag label={npu} color="blue" />)}
       </div>
 
+      {weightLinks.length > 0 && (
+        <div class="flex flex-wrap gap-1.5 mt-1 mb-4">
+          {weightLinks.map((wl) => (
+            <a
+              href={wl.url}
+              target="_blank"
+              rel="noopener"
+              class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-mono text-ink-500 hover:text-accent-400 border border-transparent hover:border-accent-500/20 rounded transition-colors"
+            >
+              <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+              <span data-i18n="viewOn">View on</span> {wl.source}
+            </a>
+          ))}
+        </div>
+      )}
+
       <div class="flex items-center gap-3 text-[11px] font-mono text-ink-600">
         <span><span data-i18n="updated">Updated</span>: {model.updated}</span>
         <span>·</span>
@@ -124,141 +139,49 @@ function renderDesc(text: string) {
 
     <div class="section-divider"></div>
 
-    <section class="py-8" id="overview">
-      <h2 class={sectionTitle} data-i18n="sectionOverview">Overview</h2>
-      <MarkdownContent markdown={modelEn.overview} lang="en" />
-      <MarkdownContent markdown={modelZh.overview} lang="zh" hidden />
-    </section>
-
-    <div class="section-divider"></div>
-
-    <section class="py-8" id="weight-download">
-      <h2 class={sectionTitle} data-i18n="sectionWeightDownload">Weight Download</h2>
-      <WeightDownloadTabs client:load downloadsEn={modelEn.weight_download} downloadsZh={modelZh.weight_download} />
-    </section>
-
-    <div class="section-divider"></div>
-
-    {hasQuantization && (
-      <>
-        <section class="py-8" id="quantization">
-          <h2 class={sectionTitle} data-i18n="sectionQuantization">Quantization</h2>
-          <MarkdownContent markdown={modelEn.quantization!.content} lang="en" />
-          <MarkdownContent markdown={modelZh.quantization?.content ?? modelEn.quantization!.content} lang="zh" hidden />
-        </section>
-        <div class="section-divider"></div>
-      </>
-    )}
-
-    {hasPrerequisites && (
-      <>
-        <section class="py-8" id="prerequisites">
-          <h2 class={sectionTitle} data-i18n="sectionPrerequisites">Prerequisites</h2>
-          <div class="space-y-6">
-            {modelEn.prerequisites!.map((item, i) => {
-              const itemZh = modelZh.prerequisites?.[i] ?? item;
-              return (
-                <div>
-                  <h3 class="lang-en font-display text-base font-semibold text-ink-200 mb-2">{item.title}</h3>
-                  <h3 class="lang-zh hidden font-display text-base font-semibold text-ink-200 mb-2">{itemZh.title}</h3>
-                  <MarkdownContent markdown={item.content} lang="en" />
-                  <MarkdownContent markdown={itemZh.content} lang="zh" hidden />
-                </div>
-              );
-            })}
-          </div>
-        </section>
-        <div class="section-divider"></div>
-      </>
-    )}
-
-    <section class="py-8" id="env-setup">
-      <h2 class={sectionTitle} data-i18n="sectionEnvSetup">Environment Setup</h2>
-      <EnvSetupTabs client:load envSetupEn={modelEn.env_setup} envSetupZh={modelZh.env_setup} />
+    <section class="py-8" id="prepare">
+      <h2 class={sectionTitle} data-i18n="sectionPrepare">Preparation</h2>
+      <PrepareTabs
+        client:load
+        overviewEn={modelEn.overview}
+        overviewZh={modelZh.overview}
+        prerequisitesEn={modelEn.prerequisites}
+        prerequisitesZh={modelZh.prerequisites}
+        envSetupEn={modelEn.env_setup}
+        envSetupZh={modelZh.env_setup}
+        hasQuantization={hasQuantization}
+        quantizationEn={modelEn.quantization?.content}
+        quantizationZh={modelZh.quantization?.content ?? modelEn.quantization?.content}
+      />
     </section>
 
     <div class="section-divider"></div>
 
     <section class="py-8" id="scenarios">
-      <h2 class={sectionTitle} data-i18n="sectionScenario">Deployment Scenarios</h2>
+      <h2 class={sectionTitle} data-i18n="sectionScenario">Deployment Guide</h2>
       <p class="text-xs text-ink-500 mb-6 font-mono" data-i18n="sectionScenarioDescription">
         Select NPU type, precision, and deployment mode to view the corresponding deployment instructions.
       </p>
-      <CascadeSelector client:load scenariosEn={modelEn.scenarios} scenariosZh={modelZh.scenarios} />
+      <CascadeSelector client:only="react" scenariosEn={modelEn.scenarios} scenariosZh={modelZh.scenarios} extraConfig={modelEn.extra_config} />
     </section>
 
     <div class="section-divider"></div>
 
-    {hasVerification && (
-      <>
-        <section class="py-8" id="verification">
-          <h2 class={sectionTitle} data-i18n="sectionVerification">Verification</h2>
-          <MarkdownContent markdown={modelEn.verification!} lang="en" />
-          <MarkdownContent markdown={modelZh.verification ?? modelEn.verification!} lang="zh" hidden />
-        </section>
-        <div class="section-divider"></div>
-      </>
-    )}
-
-    {hasPerformance && (
-      <>
-        <section class="py-8" id="performance">
-          <h2 class={sectionTitle} data-i18n="sectionPerformance">Performance</h2>
-          <div class="space-y-8">
-            {hasAccuracy && (
-              <div>
-                <h3 class="font-display text-base font-semibold text-ink-200 mb-3" data-i18n="sectionAccuracy">Accuracy</h3>
-                <MarkdownContent markdown={modelEn.performance!.accuracy!} lang="en" />
-                <MarkdownContent markdown={modelZh.performance?.accuracy ?? modelEn.performance!.accuracy!} lang="zh" hidden />
-              </div>
-            )}
-            {hasBenchmark && (
-              <div>
-                <h3 class="font-display text-base font-semibold text-ink-200 mb-3" data-i18n="sectionBenchmark">Benchmark</h3>
-                <MarkdownContent markdown={modelEn.performance!.benchmark!} lang="en" />
-                <MarkdownContent markdown={modelZh.performance?.benchmark ?? modelEn.performance!.benchmark!} lang="zh" hidden />
-              </div>
-            )}
-          </div>
-        </section>
-        <div class="section-divider"></div>
-      </>
-    )}
-
-    {hasTuning && (
-      <>
-        <section class="py-8" id="tuning">
-          <h2 class={sectionTitle} data-i18n="sectionTuning">Performance Tuning</h2>
-          <MarkdownContent markdown={modelEn.tuning!} lang="en" />
-          <MarkdownContent markdown={modelZh.tuning ?? modelEn.tuning!} lang="zh" hidden />
-        </section>
-        <div class="section-divider"></div>
-      </>
-    )}
-
-    {hasFaq && (
-      <>
-        <section class="py-8" id="faq">
-          <h2 class={sectionTitle} data-i18n="sectionFaq">FAQ</h2>
-          <MarkdownContent markdown={modelEn.faq!} lang="en" />
-          <MarkdownContent markdown={modelZh.faq ?? modelEn.faq!} lang="zh" hidden />
-        </section>
-        <div class="section-divider"></div>
-      </>
-    )}
-
-    <section class="py-8" id="references">
-      <h2 class={sectionTitle} data-i18n="sectionReferences">References</h2>
-      <ul class="space-y-1.5">
-        {modelEn.references.map((ref) => (
-          <li>
-            <a href={ref.url} target="_blank" rel="noopener" class="inline-flex items-center gap-2 text-sm text-accent-400 hover:text-accent-300 transition-colors font-mono">
-              <span class="text-ink-600">→</span>
-              {ref.title}
-            </a>
-          </li>
-        ))}
-      </ul>
+    <section class="py-8" id="reference">
+      <h2 class={sectionTitle} data-i18n="sectionMoreInfo">More Info</h2>
+      <ReferenceTabs
+        client:load
+        accuracyEn={modelEn.performance?.accuracy}
+        accuracyZh={modelZh.performance?.accuracy}
+        benchmarkEn={modelEn.performance?.benchmark}
+        benchmarkZh={modelZh.performance?.benchmark}
+        tuningEn={modelEn.tuning}
+        tuningZh={modelZh.tuning}
+        faqEn={modelEn.faq}
+        faqZh={modelZh.faq}
+        referencesEn={modelEn.references}
+        referencesZh={modelZh.references}
+      />
     </section>
 
       </div>

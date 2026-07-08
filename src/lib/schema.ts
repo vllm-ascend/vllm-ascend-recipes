@@ -39,9 +39,20 @@ export const quantizationSchema = z.object({
   content: z.string(),
 });
 
+const configValueSchema = z.object({
+  enabled: z.string(),
+  disabled: z.string(),
+});
+
 export const scenarioStepSchema = z.object({
   title: z.string(),
   content: z.string(),
+  config_values: z.record(z.string(), configValueSchema).optional(),
+});
+
+export const extraConfigItemSchema = z.object({
+  key: z.string(),
+  label: z.string(),
 });
 
 export const scenarioSchema = z.object({
@@ -50,6 +61,7 @@ export const scenarioSchema = z.object({
   deployment: z.string(),
   case: z.string(),
   steps: z.array(scenarioStepSchema),
+  default_configs: z.array(z.string()).optional(),
 });
 
 export const referenceSchema = z.object({
@@ -79,6 +91,7 @@ export const modelSchema = z.object({
   prerequisites: z.array(prerequisiteItemSchema).optional(),
   env_setup: envSetupSchema,
   scenarios: z.array(scenarioSchema),
+  extra_config: z.array(extraConfigItemSchema).optional(),
   performance: performanceSectionSchema.optional(),
   verification: z.string().optional(),
   tuning: z.string().optional(),
