@@ -354,3 +354,17 @@ html[lang="en"] .lang-en { display: block; }
 html[lang="en"] .lang-zh { display: none; }
 html[lang="zh"] .lang-en { display: none; }
 html[lang="zh"] .lang-zh { display: block; }
+
+/* ===== CONFIG HIGHLIGHT ===== */
+/* Color-coded spans for extra config parameters in code blocks */
+.config-hl {
+  font-weight: 500;
+}
+
+pre code .config-hl {
+  background: none;
+  border: none;
+  padding: 0;
+  border-radius: 0;
+  font-size: inherit;
+}

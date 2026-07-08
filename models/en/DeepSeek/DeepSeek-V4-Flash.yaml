@@ -180,7 +180,7 @@ scenarios:
           --enable-auto-tool-choice \
           --reasoning-parser deepseek_v4 \
           --safetensors-load-strategy 'prefetch' \
-          %%CONFIG:prefix-caching%%--enable-prefix-caching%%/CONFIG:prefix-caching%% \
+          %%CONFIG:prefix-caching%%--enable-prefix-caching \%%/CONFIG:prefix-caching%%
           --model-loader-extra-config='{"enable_multithread_load": "true", "num_threads": 128}' \
           --quantization ascend \
           --port 8900 \
@@ -188,15 +188,7 @@ scenarios:
           %%CONFIG:mtp-spec-decoding%%--speculative-config '{"num_speculative_tokens": 1,"method": "mtp","enforce_eager": true}' \%%/CONFIG:mtp-spec-decoding%%
           --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY"}' \
           %%CONFIG:async-scheduling%%--async-scheduling \%%/CONFIG:async-scheduling%%
-          --additional-config '
-          {"ascend_compilation_config":{
-              %%CONFIG:npugraph-ex%%"enable_npugraph_ex":true,%%/CONFIG:npugraph-ex%%
-              "enable_static_kernel":false
-          }%%CONFIG:cpu-binding%%,
-          "enable_cpu_binding": true%%/CONFIG:cpu-binding%%%%CONFIG:dsa-cp%%,
-          "enable_dsa_cp": true%%/CONFIG:dsa-cp%%%%CONFIG:multistream-overlap%%,
-          "multistream_overlap_shared_expert":true%%/CONFIG:multistream-overlap%%
-          }'
+          --additional-config '{"ascend_compilation_config":{%%CONFIG:npugraph-ex%%"enable_npugraph_ex":true,%%/CONFIG:npugraph-ex%%"enable_static_kernel":false}%%CONFIG:cpu-binding%%,"enable_cpu_binding": true%%/CONFIG:cpu-binding%%%%CONFIG:dsa-cp%%,"enable_dsa_cp": true%%/CONFIG:dsa-cp%%%%CONFIG:multistream-overlap%%,"multistream_overlap_shared_expert":true%%/CONFIG:multistream-overlap%%}'
       ```
 
       Key Parameter Descriptions:

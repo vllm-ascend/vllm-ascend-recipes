@@ -122,6 +122,18 @@ function renderMarkdown(md: string): string {
   return output;
 }
 
+// ---- Color map for extra config highlighting ----
+const CONFIG_COLORS: Record<string, string> = {
+  'mtp-spec-decoding': 'text-amber-400',
+  'prefix-caching': 'text-emerald-400',
+  'async-scheduling': 'text-sky-400',
+  'flashcomm1': 'text-rose-400',
+  'npugraph-ex': 'text-violet-400',
+  'cpu-binding': 'text-cyan-400',
+  'dsa-cp': 'text-orange-400',
+  'multistream-overlap': 'text-pink-400',
+};
+
 // ---- Config placeholder replacer ----
 // Replaces %%CONFIG:key%%...%%/CONFIG:key%% blocks based on selected configs.
 // If config_values specified, uses enabled/disabled strings; otherwise keeps/removes content.
@@ -132,14 +144,22 @@ function applyConfigReplace(
   configValues?: Record<string, { enabled: string; disabled: string }>,
 ): string {
   let result = html.replace(
-    /[ \t]*%%CONFIG:(\w[\w-]*)%%([\s\S]*?)%%\/CONFIG:\1%%/g,
-    (_, key: string, content: string) => {
+    /([ \t]*)%%CONFIG:(\w[\w-]*)%%([\s\S]*?)%%\/CONFIG:\2%%/g,
+    (_, indent: string, key: string, content: string) => {
       if (configValues?.[key]) {
-        return selectedConfigs.has(key)
+        const val = selectedConfigs.has(key)
           ? configValues[key].enabled
           : configValues[key].disabled;
+        if (selectedConfigs.has(key)) {
+          return `${indent}%%HL:${key}%%${val}%%/HL:${key}%%`;
+        }
+        return indent + val;
       }
-      return selectedConfigs.has(key) ? content : '';
+      if (selectedConfigs.has(key)) {
+        // Preserve the content, wrap with color highlight markers
+        return `${indent}%%HL:${key}%%${content}%%/HL:${key}%%`;
+      }
+      return '';
     },
   );
   // Clean up: remove blank lines, trailing commas, and consecutive empty lines
@@ -148,6 +168,19 @@ function applyConfigReplace(
   result = result.replace(/^\s*\n/gm, '');           // remove blank lines
   result = result.replace(/\n\s*\n\s*\n/g, '\n\n'); // collapse multiple blank lines
   return result;
+}
+
+// ---- Color highlight applier ----
+// Replaces %%HL:key%%...%%/HL:key%% markers with colored <span> tags.
+// Called on the FINAL rendered HTML (after renderMarkdown) so spans don't get escaped.
+function applyColorHighlights(html: string, selectedConfigs: Set<string>): string {
+  return html.replace(
+    /%%HL:(\w[\w-]*)%%([\s\S]*?)%%\/HL:\1%%/g,
+    (_, key: string, content: string) => {
+      const colorClass = CONFIG_COLORS[key] || 'text-ink-400';
+      return `<span class="config-hl ${colorClass}">${content}</span>`;
+    },
+  );
 }
 
 // ---- Component ----
@@ -286,6 +319,12 @@ export default function CascadeSelector({ scenariosEn, scenariosZh, extraConfig 
     return applyConfigReplace(currentStep.content, selectedConfigs, currentStep.config_values);
   }, [currentStep, selectedConfigs]);
 
+  const renderedHtml = useMemo(() => {
+    if (!rawContent) return '';
+    const mdHtml = renderMarkdown(rawContent);
+    return applyColorHighlights(mdHtml, selectedConfigs);
+  }, [rawContent, selectedConfigs]);
+
   return (
     <div>
       {/* Filter panel */}
@@ -323,17 +362,20 @@ export default function CascadeSelector({ scenariosEn, scenariosZh, extraConfig 
             <div className="flex flex-wrap gap-1.5">
               {extraConfig.map((cfg) => {
                 const isSelected = selectedConfigs.has(cfg.key);
+                const colorClass = CONFIG_COLORS[cfg.key] || 'text-ink-400';
+                const bgClass = colorClass.replace('text-', 'bg-');
                 return (
                   <button
                     key={cfg.key}
                     onClick={() => toggleConfig(cfg.key)}
                     title={cfg.label}
-                    className={`px-3 py-1.5 text-xs font-mono rounded-md transition-all cursor-pointer ${
+                    className={`px-3 py-1.5 text-xs font-mono rounded-md transition-all cursor-pointer inline-flex items-center gap-1.5 ${
                       isSelected
-                        ? 'bg-accent-500/10 text-accent-400 border border-accent-500/30'
+                        ? `${colorClass} bg-accent-500/10 border border-current/30`
                         : 'border border-ink-700/60 text-ink-400 hover:text-ink-200 hover:border-ink-600 bg-ink-900/50'
                     }`}
                   >
+                    <span className={`inline-block w-2 h-2 rounded-full ${bgClass} ${isSelected ? 'opacity-100' : 'opacity-30'}`}></span>
                     {cfg.label}
                   </button>
                 );
@@ -348,7 +390,7 @@ export default function CascadeSelector({ scenariosEn, scenariosZh, extraConfig 
         <div className="rounded-lg border border-ink-800/60 overflow-hidden">
           {/* Step tabs header */}
           <div className="flex items-center border-b border-ink-800/60 bg-ink-900/70">
-            <span className="shrink-0 px-3 text-[10px] font-mono text-ink-500 uppercase tracking-wider">{t('step') || 'Steps'}</span>
+            <span className="shrink-0 px-3 text-[10px] font-mono font-bold text-ink-300 uppercase tracking-wider">{t('step') || 'Steps'}</span>
             {currentScenario.steps.map((step, i) => (
               <button
                 key={i}
@@ -375,7 +417,7 @@ export default function CascadeSelector({ scenariosEn, scenariosZh, extraConfig 
                   {currentStep.title}
                 </h3>
               </div>
-              <div className="ml-[22px] prose" dangerouslySetInnerHTML={{ __html: renderMarkdown(rawContent) }} />
+              <div className="ml-[22px] prose" dangerouslySetInnerHTML={{ __html: renderedHtml }} />
             </div>
           )}
         </div>
