@@ -1,0 +1,585 @@
+hf_id: zai-org/GLM-5
+title: GLM-5/GLM-5.1
+provider: THUDM
+description: GLM-5 and GLM-5.1 are Mixture-of-Experts (MoE) models from Zhipu AI, targeting complex systems
+  engineering and long-horizon agentic tasks. GLM-5 features 754B total parameters, with support for MTP speculative
+  decoding, expert parallelism, and PD disaggregation on Ascend NPUs.
+architecture: moe
+parameters: 754B
+active_parameters: null
+context_length: 131072
+modality: text
+updated: '2026-07-13'
+overview: |-
+  GLM-5 and GLM-5.1 are Mixture-of-Experts (MoE) models from Zhipu AI (THUDM), targeting complex systems engineering and long-horizon agentic tasks. With 754B total parameters, these models support Multi-Token Prediction (MTP) speculative decoding, expert parallelism, data parallelism, and Prefill-Decode disaggregation on Ascend NPUs.
+
+  This document demonstrates the main validation steps for GLM-5/GLM-5.1 in the vLLM-Ascend environment, including supported features, environment preparation, single-node and multi-node deployment, as well as accuracy and performance evaluation.
+
+  The GLM-5 model is first supported in vllm-ascend v0.17.0rc1. This document is validated and written based on **vLLM-Ascend v0.22.1rc**. All **v0.22.1rc and later versions** can run stably. To use the latest features, it is recommended to use the latest release candidate or official version.
+
+  > **Note**: GLM-5 and GLM-5.1 share the same architecture and deployment commands. The differences are in the training data and model weights. This document uses GLM-5 as the primary example; simply replace the model path for GLM-5.1.
+weight_download:
+- weight_version: BF16
+  sources:
+  - source: ModelScope
+    url: https://www.modelscope.cn/models/ZhipuAI/GLM-5
+    command: |-
+      ```bash
+      pip install modelscope
+      modelscope download --model ZhipuAI/GLM-5
+      ```
+  - source: HuggingFace
+    url: https://huggingface.co/zai-org/GLM-5
+    command: |-
+      ```bash
+      pip install -U huggingface_hub
+      huggingface-cli download zai-org/GLM-5
+      ```
+- weight_version: W4A8 (Pre-quantized)
+  sources:
+  - source: ModelScope
+    url: https://modelscope.cn/models/Eco-Tech/GLM-5-w4a8
+    command: |-
+      ```bash
+      pip install modelscope
+      modelscope download --model Eco-Tech/GLM-5-w4a8
+      ```
+- weight_version: W8A8 (Pre-quantized)
+  sources:
+  - source: ModelScope
+    url: https://www.modelscope.cn/models/Eco-Tech/GLM-5-w8a8
+    command: |-
+      ```bash
+      pip install modelscope
+      modelscope download --model Eco-Tech/GLM-5-w8a8
+      ```
+- weight_version: GLM-5.1 BF16
+  sources:
+  - source: HuggingFace
+    url: https://huggingface.co/zai-org/GLM-5.1
+    command: |-
+      ```bash
+      pip install -U huggingface_hub
+      huggingface-cli download zai-org/GLM-5.1
+      ```
+- weight_version: GLM-5.1 W4A8 (Pre-quantized)
+  sources:
+  - source: Modelers
+    url: https://modelers.cn/models/Eco-Tech/GLM-5.1-w4a8
+    command: |-
+      ```bash
+      pip install modelers
+      modelers download --model Eco-Tech/GLM-5.1-w4a8
+      ```
+- weight_version: GLM-5.1 W8A8 (Pre-quantized)
+  sources:
+  - source: Modelers
+    url: https://modelers.cn/models/Eco-Tech/GLM-5.1-w8a8
+    command: |-
+      ```bash
+      pip install modelers
+      modelers download --model Eco-Tech/GLM-5.1-w8a8
+      ```
+prerequisites:
+- title: Model Weight
+  content: |-
+    The following model variants are available. It is recommended to download the model weight to a shared directory accessible to all nodes.
+
+    | Model | Hardware Requirement | Download |
+    |-------|---------------------|----------|
+    | GLM-5 (BF16) | Atlas 800I A3 (64G×16) × 2 | [Download](https://www.modelscope.cn/models/ZhipuAI/GLM-5) |
+    | GLM-5-w4a8 | Atlas 800I A3 (64G×16) × 1 | [Download](https://modelscope.cn/models/Eco-Tech/GLM-5-w4a8) |
+    | GLM-5-w8a8 | Atlas 800I A3 (64G×16) × 1 | [Download](https://www.modelscope.cn/models/Eco-Tech/GLM-5-w8a8) |
+    | GLM-5-w4a8 (A2) | Atlas 800I A2 (64G×8) × 1 | [Download](https://modelscope.cn/models/Eco-Tech/GLM-5-w4a8) |
+    | GLM-5.1 (BF16) | Atlas 800I A3 (64G×16) × 2 | [Download](https://huggingface.co/zai-org/GLM-5.1) |
+    | GLM-5.1-w4a8 | Atlas 800I A3 (64G×16) × 1 | [Download](https://modelers.cn/models/Eco-Tech/GLM-5.1-w4a8) |
+    | GLM-5.1-w8a8 | Atlas 800I A3 (64G×16) × 1 | [Download](https://modelers.cn/models/Eco-Tech/GLM-5.1-w8a8) |
+
+    These are the recommended numbers of cards, which can be adjusted according to the actual situation.
+- title: BF16 MTP Weight Adjustment
+  content: |-
+    For BF16 weights with MTP speculative decoding, you need to run `adjust_weight.py` to create `mtp-others.safetensors` containing remapped `embed_tokens.weight` and `lm_head.weight` for layer 78. This step is not required for quantized (W4A8/W8A8) weights.
+env_setup:
+  container:
+    A3:
+      content: |-
+        You can use the official all-in-one Docker image for GLM-5 models.
+
+        **Docker Pull:**
+
+        ```bash
+        docker pull quay.io/ascend/vllm-ascend:{{ vllm_ascend_version }}-a3
+        ```
+
+        **Docker Run:**
+
+        ```bash
+
+        export IMAGE=quay.io/ascend/vllm-ascend:{{ vllm_ascend_version }}-a3
+
+        docker run \
+            --name vllm-ascend-env \
+            --shm-size=128g \
+            --net=host \
+            --privileged=true \
+            --device /dev/davinci0 \
+            --device /dev/davinci1 \
+            --device /dev/davinci2 \
+            --device /dev/davinci3 \
+            --device /dev/davinci4 \
+            --device /dev/davinci5 \
+            --device /dev/davinci6 \
+            --device /dev/davinci7 \
+            --device /dev/davinci8 \
+            --device /dev/davinci9 \
+            --device /dev/davinci10 \
+            --device /dev/davinci11 \
+            --device /dev/davinci12 \
+            --device /dev/davinci13 \
+            --device /dev/davinci14 \
+            --device /dev/davinci15 \
+            --device /dev/davinci_manager \
+            --device /dev/devmm_svm \
+            --device /dev/hisi_hdc \
+            -v /usr/local/Ascend/driver:/usr/local/Ascend/driver \
+            -v /usr/local/dcmi:/usr/local/dcmi \
+            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+            -v /etc/ascend_install.info:/etc/ascend_install.info \
+            -v /usr/local/sbin:/usr/local/sbin \
+            -v /home:/home \
+            -v /data:/data \
+            -v /tmp:/tmp \
+            -v /mnt:/mnt \
+            -v /usr/share/zoneinfo/Asia/Shanghai:/etc/localtime \
+            -v /root:/host_root \
+            -it -d $IMAGE bash
+        ```
+
+        > **Note**: A3 has 8 NPUs with dual-die design (16 chips total: `/dev/davinci[0-15]`). If you are on a shared machine, map only the chips you need.
+    A2:
+      content: |-
+        You can use the official all-in-one Docker image for GLM-5 models.
+
+        **Docker Pull:**
+
+        ```bash
+        docker pull quay.io/ascend/vllm-ascend:{{ vllm_ascend_version }}
+        ```
+
+        **Docker Run:**
+
+        ```bash
+
+        export IMAGE=quay.io/ascend/vllm-ascend:{{ vllm_ascend_version }}
+
+        docker run \
+            --name vllm-ascend-env \
+            --shm-size=128g \
+            --net=host \
+            --privileged=true \
+            --device /dev/davinci0 \
+            --device /dev/davinci1 \
+            --device /dev/davinci2 \
+            --device /dev/davinci3 \
+            --device /dev/davinci4 \
+            --device /dev/davinci5 \
+            --device /dev/davinci6 \
+            --device /dev/davinci7 \
+            --device /dev/davinci_manager \
+            --device /dev/devmm_svm \
+            --device /dev/hisi_hdc \
+            -v /usr/local/Ascend/driver:/usr/local/Ascend/driver \
+            -v /usr/local/dcmi:/usr/local/dcmi \
+            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+            -v /etc/ascend_install.info:/etc/ascend_install.info \
+            -v /usr/local/sbin:/usr/local/sbin \
+            -v /home:/home \
+            -v /data:/data \
+            -v /tmp:/tmp \
+            -v /mnt:/mnt \
+            -v /usr/share/zoneinfo/Asia/Shanghai:/etc/localtime \
+            -v /root:/host_root \
+            -it -d $IMAGE bash
+        ```
+
+        The default workdir is `/workspace`. vLLM and vLLM-Ascend are installed as Python packages in site-packages.
+
+        **Installation Verification:**
+
+        After starting the container, run the following command to verify the installation:
+
+        ```bash
+        docker ps | grep vllm-ascend-env
+        ```
+
+        Expected result: The container is listed with status `Up`. You can also verify the vllm-ascend version inside the container:
+
+        ```bash
+        pip show vllm-ascend
+        ```
+
+        Expected result: The version information is displayed, matching the pulled image version.
+  pip:
+    content: |-
+      If you prefer not to use the Docker image, you can build from source. Install vLLM from source first:
+
+      1. Clone and install vLLM:
+
+         ```bash
+         git clone https://github.com/vllm-project/vllm.git
+         cd vllm
+         pip install -e .
+         ```
+
+      2. Clone and install the vLLM-Ascend repository:
+
+         ```bash
+         git clone https://github.com/vllm-project/vllm-ascend.git
+         cd vllm-ascend
+         pip install -e .
+         ```
+
+      **Installation Verification:**
+
+      ```bash
+      pip show vllm vllm-ascend
+      ```
+
+      Expected result: The version information for both packages is displayed, confirming a successful installation.
+
+      > **Note**: `transformers >= 5.2.0` is required for GLM-5 models. If you encounter tokenizer errors, update transformers:
+
+      ```bash
+      pip install transformers>=5.2.0
+      ```
+
+      > **Note**: If deploying a multi-node environment, set up the environment on each node.
+
+      For more details, please refer to the [Installation Guide](../../installation.md).
+scenarios:
+- npu: Atlas 800I A3
+  precision: W4A8
+  deployment: 单节点-多卡
+  case: Multi Card
+  steps:
+  - title: Start the server
+    content: |-
+      Single-node deployment completes both Prefill and Decode within the same node, suitable for development, testing, and small-to-medium scale inference scenarios. For the GLM-5 MoE model, Expert Parallelism (EP) is required to distribute experts across NPUs.
+
+      The following command is an example configuration. Adjust the parameters based on your actual scenario.
+
+      **Atlas 800I A3 (W4A8):**
+
+      ```bash
+      export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15
+      export HCCL_OP_EXPANSION_MODE="AIV"
+      export HCCL_BUFFSIZE=200
+      export OMP_PROC_BIND=false
+      export OMP_NUM_THREADS=1
+      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+      export VLLM_ASCEND_BALANCE_SCHEDULING=1
+      export VLLM_ASCEND_ENABLE_FLASHCOMM1=1
+
+      vllm serve your_model_path \
+          --served-model-name glm-5 \
+          --trust-remote-code \
+          --max-num-seqs 8 \
+          --max-model-len 200000 \
+          --max-num-batched-tokens 4096 \
+          --tensor-parallel-size 16 \
+          --enable-expert-parallel \
+          --quantization ascend \
+          --gpu-memory-utilization 0.95 \
+          --enable-chunked-prefill \
+          --enable-prefix-caching \
+          --additional-config '{"multistream_overlap_shared_expert": true}' \
+          --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY"}' \
+          --speculative-config '{"num_speculative_tokens": 3, "method": "deepseek_mtp"}' \
+          --seed 1024 \
+          --port 8000
+      ```
+
+      > - `ASCEND_RT_VISIBLE_DEVICES`: must be set to the NPU chip IDs allocated to your environment.
+      > - `--quantization ascend`: required for W4A8 quantized models. Remove this parameter when using BF16 weights.
+      > - `--speculative-config`: configures MTP (Multi-Token Prediction) speculative decoding to accelerate inference.
+      > - `--enable-chunked-prefill` and `--enable-prefix-caching`: recommended for long context scenarios.
+
+      For parameter details, refer to:
+
+      - [vLLM CLI documentation](https://docs.vllm.ai/en/stable/cli/) — standard serve parameters
+      - [Environment Variables](../../user_guide/configuration/env_vars.md) — Ascend-specific environment variables
+      - [Additional Configuration](../../user_guide/configuration/additional_config.md) — `--additional-config` format and options
+  - title: Service Verification
+    content: |-
+      After the service is started, verify it is running by sending a prompt. Refer to the verification section below for a usage example.
+- npu: Atlas 800I A3
+  precision: W8A8
+  deployment: 单节点-多卡
+  case: Multi Card
+  steps:
+  - title: Start the server
+    content: |-
+      Single-node deployment for GLM-5 W8A8 quantized model on Atlas 800I A3.
+
+      ```bash
+      export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15
+      export HCCL_OP_EXPANSION_MODE="AIV"
+      export HCCL_BUFFSIZE=200
+      export OMP_PROC_BIND=false
+      export OMP_NUM_THREADS=1
+      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+      export VLLM_ASCEND_BALANCE_SCHEDULING=1
+      export VLLM_ASCEND_ENABLE_FLASHCOMM1=1
+      export VLLM_ASCEND_ENABLE_MLAPO=1
+
+      vllm serve your_model_path \
+          --served-model-name glm-5 \
+          --trust-remote-code \
+          --max-num-seqs 8 \
+          --max-model-len 40960 \
+          --max-num-batched-tokens 4096 \
+          --tensor-parallel-size 16 \
+          --enable-expert-parallel \
+          --quantization ascend \
+          --gpu-memory-utilization 0.95 \
+          --enable-chunked-prefill \
+          --enable-prefix-caching \
+          --additional-config '{"multistream_overlap_shared_expert": true}' \
+          --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY"}' \
+          --speculative-config '{"num_speculative_tokens": 3, "method": "deepseek_mtp"}' \
+          --seed 1024 \
+          --port 8000
+      ```
+
+      > - `VLLM_ASCEND_ENABLE_MLAPO=1`: required for W8A8 quantized models to enable MLAPO optimization.
+      > - `--max-model-len`: W8A8 supports up to 40960 on single-node A3 due to memory constraints.
+  - title: Service Verification
+    content: |-
+      After the service is started, verify it is running by sending a prompt. Refer to the verification section below for a usage example.
+- npu: Atlas 800I A2
+  precision: W4A8
+  deployment: 单节点-多卡
+  case: Multi Card
+  steps:
+  - title: Start the server
+    content: |-
+      Single-node deployment for GLM-5 W4A8 quantized model on Atlas 800I A2.
+
+      ```bash
+      export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
+      export HCCL_OP_EXPANSION_MODE="AIV"
+      export HCCL_BUFFSIZE=200
+      export OMP_PROC_BIND=false
+      export OMP_NUM_THREADS=1
+      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+      export VLLM_ASCEND_BALANCE_SCHEDULING=1
+      export VLLM_ASCEND_ENABLE_FLASHCOMM1=1
+
+      vllm serve your_model_path \
+          --served-model-name glm-5 \
+          --trust-remote-code \
+          --max-num-seqs 2 \
+          --max-model-len 32768 \
+          --max-num-batched-tokens 4096 \
+          --tensor-parallel-size 8 \
+          --enable-expert-parallel \
+          --quantization ascend \
+          --gpu-memory-utilization 0.95 \
+          --enable-chunked-prefill \
+          --enable-prefix-caching \
+          --additional-config '{"multistream_overlap_shared_expert": true}' \
+          --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY"}' \
+          --speculative-config '{"num_speculative_tokens": 3, "method": "deepseek_mtp"}' \
+          --seed 1024 \
+          --port 8000
+      ```
+
+      > - A2 has 8 NPUs, so `--tensor-parallel-size 8` uses all available NPUs.
+      > - `--max-num-seqs 2` and `--max-model-len 32768` are limited due to A2 memory constraints.
+  - title: Service Verification
+    content: |-
+      After the service is started, verify it is running by sending a prompt. Refer to the verification section below for a usage example.
+- npu: Atlas 800I A3
+  precision: BF16
+  deployment: 多节点
+  case: Multi Node
+  steps:
+  - title: Start the server
+    content: |-
+      Multi-node deployment for GLM-5 BF16 model on Atlas 800I A3 (2 nodes).
+
+      **Node 0:**
+
+      ```bash
+      export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15
+      export HCCL_OP_EXPANSION_MODE="AIV"
+      export HCCL_BUFFSIZE=200
+      export OMP_PROC_BIND=false
+      export OMP_NUM_THREADS=1
+      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+      export VLLM_ASCEND_BALANCE_SCHEDULING=1
+      export VLLM_ASCEND_ENABLE_FLASHCOMM1=1
+      export HCCL_IF_IP=<node0_ip>
+      export GLOO_SOCKET_IFNAME=<nic_name>
+      export TP_SOCKET_IFNAME=<nic_name>
+      export HCCL_SOCKET_IFNAME=<nic_name>
+
+      vllm serve your_model_path \
+          --served-model-name glm-5 \
+          --trust-remote-code \
+          --max-num-seqs 8 \
+          --max-model-len 131072 \
+          --max-num-batched-tokens 4096 \
+          --data-parallel-size 2 \
+          --data-parallel-size-local 1 \
+          --data-parallel-address <node0_ip> \
+          --data-parallel-rpc-port 12890 \
+          --tensor-parallel-size 16 \
+          --enable-expert-parallel \
+          --gpu-memory-utilization 0.95 \
+          --enable-chunked-prefill \
+          --enable-prefix-caching \
+          --additional-config '{"multistream_overlap_shared_expert": true}' \
+          --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY"}' \
+          --speculative-config '{"num_speculative_tokens": 3, "method": "deepseek_mtp"}' \
+          --seed 1024 \
+          --port 8000
+      ```
+
+      **Node 1:**
+
+      ```bash
+      export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15
+      export HCCL_OP_EXPANSION_MODE="AIV"
+      export HCCL_BUFFSIZE=200
+      export OMP_PROC_BIND=false
+      export OMP_NUM_THREADS=1
+      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+      export VLLM_ASCEND_BALANCE_SCHEDULING=1
+      export VLLM_ASCEND_ENABLE_FLASHCOMM1=1
+      export HCCL_IF_IP=<node1_ip>
+      export GLOO_SOCKET_IFNAME=<nic_name>
+      export TP_SOCKET_IFNAME=<nic_name>
+      export HCCL_SOCKET_IFNAME=<nic_name>
+
+      vllm serve your_model_path \
+          --served-model-name glm-5 \
+          --trust-remote-code \
+          --max-num-seqs 8 \
+          --max-model-len 131072 \
+          --max-num-batched-tokens 4096 \
+          --data-parallel-size 2 \
+          --data-parallel-size-local 1 \
+          --data-parallel-start-rank 1 \
+          --data-parallel-address <node0_ip> \
+          --data-parallel-rpc-port 12890 \
+          --tensor-parallel-size 16 \
+          --enable-expert-parallel \
+          --headless \
+          --gpu-memory-utilization 0.95 \
+          --enable-chunked-prefill \
+          --enable-prefix-caching \
+          --additional-config '{"multistream_overlap_shared_expert": true}' \
+          --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY"}' \
+          --speculative-config '{"num_speculative_tokens": 3, "method": "deepseek_mtp"}' \
+          --seed 1024 \
+          --port 8000
+      ```
+
+      > - Replace `<node0_ip>` and `<node1_ip>` with actual node IP addresses.
+      > - Replace `<nic_name>` with the actual network interface name (e.g., `eth0`).
+      > - Node 1 requires `--headless` and `--data-parallel-start-rank 1`.
+  - title: Service Verification
+    content: |-
+      After the service is started, verify it is running by sending a prompt. Refer to the verification section below for a usage example.
+verification: |-
+  After the service is started, the model can be invoked by sending a prompt.
+
+  **Chat Completions API:**
+
+  ```shell
+  curl http://localhost:8000/v1/chat/completions \
+      -H "Content-Type: application/json" \
+      -d '{
+          "model": "glm-5",
+          "messages": [
+              {"role": "user", "content": "Give me a short introduction to large language models."}
+          ],
+          "max_tokens": 256,
+          "temperature": 0
+      }'
+  ```
+
+  > - **URL** (`http://localhost:8000`): Replace `localhost` and `8000` with your server IP and the `--port` value from the `vllm serve` command.
+  > - **`model`**: Must match the `--served-model-name` value from the `vllm serve` command (e.g., `glm-5`).
+
+  **Function Calling:**
+
+  To enable function calling, add the following flags to the `vllm serve` command:
+
+  ```bash
+  --tool-call-parser glm47 --reasoning-parser glm45 --enable-auto-tool-choice
+  ```
+
+  Expected result: HTTP 200 with a JSON response containing the `choices` field with generated text.
+performance:
+  benchmark: |-
+    ### Recommended Configurations
+
+    > **Note**: The following configurations are validated in specific test environments and are for reference only. The optimal configuration depends on factors such as maximum input/output length, prefix cache hit rate, precision requirements, and deployment machine ratios.
+
+    #### Table 1: Scenario Overview
+
+    | Scenario | Deployment Mode | *Total NPUs | Weight Version | Key Considerations |
+    |----------|----------------|-------------|----------------|-------------------|
+    | High Throughput | Single-Node (A3) | 16 (A3) | W4A8 | dp1 tp16 with expert parallel for maximum throughput |
+    | Low Latency | Single-Node (A3) | 16 (A3) | W4A8 | dp1 tp16 with expert parallel disabled for lower latency |
+    | Long Context | Multi-Node (A3) | 32 (A3) | W4A8 | 2 nodes, dp2 tp16 for extended context |
+    | PD Separation | Multi-Node (A3) | 32 (A3) | W4A8 | 1P1D deployment for production workloads |
+
+    > `*Total NPUs` indicates the total number of NPU chips used across all nodes.
+
+    #### Table 2: PD Separation Configuration
+
+    | Scenario | P-node Config | D-node Config | Max Model Len | MTP Tokens |
+    |----------|--------------|--------------|---------------|------------|
+    | High Throughput | dp=4, tp=8 | dp=8, tp=4 | P:133120, D:150000 | 3 |
+    | Low Latency | dp=4, tp=8 | dp=4, tp=8 | P:133120, D:150000 | 3 |
+tuning: |-
+  ### Tuning Guidelines
+
+  Please refer to the [Public Performance Tuning Documentation](../../developer_guide/performance_and_debug/optimization_and_tuning.md) for tuning methods.
+  Please refer to the [Feature Guide](../../user_guide/support_matrix/feature_matrix.md) for detailed feature descriptions.
+
+  **Key tuning notes for GLM-5:**
+
+  - For single-node low-latency scenarios, recommend `dp1 tp16` with expert parallel disabled.
+  - `VLLM_ASCEND_ENABLE_FLASHCOMM1=1` should be disabled for long-sequence (>=16k) and low-concurrency (<=8 batch size) scenarios.
+  - `VLLM_ASCEND_ENABLE_MLAPO=1` is required for W8A8 quantized models.
+faq: |-
+  For common environment, installation, and general parameter issues, please refer to the [Public FAQ](https://docs.vllm.ai/projects/ascend/en/latest/faqs.html). This chapter only covers model-specific issues.
+
+  **Q: Tokenizer error when loading GLM-5?**
+  A: Ensure `transformers >= 5.2.0` is installed. Run `pip install transformers>=5.2.0` to update.
+
+  **Q: How to enable function calling?**
+  A: Add the following flags to the `vllm serve` command:
+  ```
+  --tool-call-parser glm47 --reasoning-parser glm45 --enable-auto-tool-choice
+  ```
+
+  **Q: Single-node low-latency recommendation?**
+  A: Use `dp1 tp16` with expert parallel disabled for lower per-token latency.
+references:
+- title: vllm-ascend Documentation (GLM-5)
+  url: https://docs.vllm.ai/projects/ascend/en/latest/tutorials/models/GLM5.html
+- title: ModelScope Model Download (GLM-5 BF16)
+  url: https://www.modelscope.cn/models/ZhipuAI/GLM-5
+- title: ModelScope Model Download (GLM-5 W4A8)
+  url: https://modelscope.cn/models/Eco-Tech/GLM-5-w4a8
+- title: ModelScope Model Download (GLM-5 W8A8)
+  url: https://www.modelscope.cn/models/Eco-Tech/GLM-5-w8a8
+- title: HuggingFace Model Download (GLM-5.1 BF16)
+  url: https://huggingface.co/zai-org/GLM-5.1
+- title: vllm-ascend GitHub
+  url: https://github.com/vllm-project/vllm-ascend
