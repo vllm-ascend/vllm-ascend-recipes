@@ -102,7 +102,7 @@ const baseSuffix = base.endsWith('/') ? base.slice(0, -1) : base;
         document.documentElement.lang = lang;
         document.querySelectorAll('[data-i18n]').forEach((el) => {
           const key = el.getAttribute('data-i18n');
-          if (key && dict[key]) {
+          if (key && Object.prototype.hasOwnProperty.call(dict, key)) {
             el.textContent = dict[key];
           }
         });
