@@ -123,11 +123,32 @@ env_setup:
       - 从源码安装 `vllm-ascend`，参考[安装指南](../../installation.md)。
 
       如果您需要部署多节点环境，需要在每个节点上设置环境。
+extra_config:
+- key: mtp-spec-decoding
+  label: MTP Speculative Decoding
+- key: prefix-caching
+  label: Prefix Caching
+- key: async-scheduling
+  label: Async Scheduling
+- key: flashcomm1
+  label: FlashComm1
+- key: npugraph-ex
+  label: NPUGraph EX
+- key: cpu-binding
+  label: CPU Binding
+- key: dsa-cp
+  label: DSA CP
+- key: multistream-overlap
+  label: Multi-Stream Overlap
 scenarios:
 - npu: Atlas 800I A2
   precision: W8A8
   deployment: 单节点-多卡
   case: Multi Card
+  default_configs:
+  - mtp-spec-decoding
+  - async-scheduling
+  - flashcomm1
   steps:
   - title: 启动服务
     content: |-
@@ -141,7 +162,7 @@ scenarios:
       export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
       export LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libjemalloc.so.2:$LD_PRELOAD
       export HCCL_BUFFSIZE=1024
-      export VLLM_ASCEND_ENABLE_FLASHCOMM1=1
+      %%CONFIG:flashcomm1%%export VLLM_ASCEND_ENABLE_FLASHCOMM1=1%%/CONFIG:flashcomm1%%
       export TASK_QUEUE_ENABLE=1
       export HCCL_OP_EXPANSION_MODE="AIV"
 
@@ -159,15 +180,15 @@ scenarios:
           --enable-auto-tool-choice \
           --reasoning-parser deepseek_v4 \
           --safetensors-load-strategy 'prefetch' \
-          --no-enable-prefix-caching \
+          %%CONFIG:prefix-caching%%--enable-prefix-caching \%%/CONFIG:prefix-caching%%
           --model-loader-extra-config='{"enable_multithread_load": "true", "num_threads": 128}' \
           --quantization ascend \
           --port 8900 \
           --block-size 128 \
-          --speculative-config '{"num_speculative_tokens": 1,"method": "mtp","enforce_eager": true}' \
+          %%CONFIG:mtp-spec-decoding%%--speculative-config '{"num_speculative_tokens": 1,"method": "mtp","enforce_eager": true}' \%%/CONFIG:mtp-spec-decoding%%
           --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY"}' \
-          --async-scheduling \
-          --additional-config '{"ascend_compilation_config":{"enable_npugraph_ex":true,"enable_static_kernel":false},"enable_cpu_binding": true,"enable_dsa_cp": true,"multistream_overlap_shared_expert":true}'
+          %%CONFIG:async-scheduling%%--async-scheduling \%%/CONFIG:async-scheduling%%
+          --additional-config '{"ascend_compilation_config":{%%CONFIG:npugraph-ex%%"enable_npugraph_ex":true,%%/CONFIG:npugraph-ex%%"enable_static_kernel":false}%%CONFIG:cpu-binding%%,"enable_cpu_binding": true%%/CONFIG:cpu-binding%%%%CONFIG:dsa-cp%%,"enable_dsa_cp": true%%/CONFIG:dsa-cp%%%%CONFIG:multistream-overlap%%,"multistream_overlap_shared_expert":true%%/CONFIG:multistream-overlap%%}'
       ```
 
       关键参数说明：
@@ -180,6 +201,10 @@ scenarios:
       - `VLLM_ASCEND_ENABLE_FLASHCOMM1=1` 启用 FlashComm 通信优化。
 
       常见问题提示：如果遇到问题，请参考[公共 FAQ](https://docs.vllm.ai/projects/ascend/en/latest/faqs.html) 进行排查。
+    config_values:
+      prefix-caching:
+        enabled: "--enable-prefix-caching"
+        disabled: "--no-enable-prefix-caching"
   - title: 服务验证
     content: |-
       ```shell
