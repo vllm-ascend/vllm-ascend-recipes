@@ -1,0 +1,521 @@
+hf_id: ZhipuAI/GLM-4.7
+title: GLM-4.5/4.6/4.7
+provider: THUDM
+description: GLM-4.x 系列是智谱 AI 推出的混合专家（MoE）基础模型，专为智能体应用设计。GLM-4.7
+  包含最新改进，支持 MTP 投机解码、专家并行和 PD 分离部署于昇腾 NPU。
+architecture: moe
+parameters: 31B
+active_parameters: null
+context_length: 133000
+modality: text
+updated: '2026-07-13'
+overview: |-
+  GLM-4.x（GLM-4.5/4.6/4.7）是智谱 AI（THUDM）推出的混合专家（MoE）基础模型，专为智能体应用设计。支持多 Token 预测（MTP）投机解码、专家并行、数据并行和 Prefill-Decode 分离部署于昇腾 NPU。
+
+  本文档将演示 GLM-4.x 在 vLLM-Ascend 环境中的主要验证步骤，包括支持的特性、环境准备、单节点和多节点部署，以及精度和性能评估。
+
+  GLM-4.5 模型首次在 vllm-ascend v0.10.0rc1 中支持。本文档基于 **vLLM-Ascend v0.22.1rc** 验证并编写。所有 **v0.22.1rc 及更高版本**均可稳定运行。如需使用最新特性，建议使用最新的候选版本或正式版本。
+
+  > **注意**：GLM-4.5、GLM-4.6 和 GLM-4.7 共享相同的架构和部署命令，区别在于训练数据和模型权重。本文档以 GLM-4.7 为主要示例，使用 GLM-4.5 或 GLM-4.6 时只需替换模型路径即可。
+weight_download:
+- weight_version: GLM-4.5 BF16
+  sources:
+  - source: ModelScope
+    url: https://www.modelscope.cn/models/ZhipuAI/GLM-4.5
+    command: |-
+      ```bash
+      pip install modelscope
+      modelscope download --model ZhipuAI/GLM-4.5
+      ```
+- weight_version: GLM-4.5 W8A8（含 MTP）
+  sources:
+  - source: Modelers
+    url: https://modelers.cn/models/Modelers_Park/GLM-4.5-w8a8
+    command: |-
+      ```bash
+      pip install modelers
+      modelers download --model Modelers_Park/GLM-4.5-w8a8
+      ```
+- weight_version: GLM-4.6 BF16
+  sources:
+  - source: ModelScope
+    url: https://www.modelscope.cn/models/ZhipuAI/GLM-4.6
+    command: |-
+      ```bash
+      pip install modelscope
+      modelscope download --model ZhipuAI/GLM-4.6
+      ```
+- weight_version: GLM-4.6 W8A8
+  sources:
+  - source: Modelers
+    url: https://modelers.cn/models/Modelers_Park/GLM-4.6-w8a8
+    command: |-
+      ```bash
+      pip install modelers
+      modelers download --model Modelers_Park/GLM-4.6-w8a8
+      ```
+- weight_version: GLM-4.7 BF16
+  sources:
+  - source: ModelScope
+    url: https://www.modelscope.cn/models/ZhipuAI/GLM-4.7
+    command: |-
+      ```bash
+      pip install modelscope
+      modelscope download --model ZhipuAI/GLM-4.7
+      ```
+- weight_version: GLM-4.7 W8A8（含 MTP）
+  sources:
+  - source: ModelScope
+    url: https://modelscope.cn/models/Eco-Tech/GLM-4.7-W8A8-floatmtp
+    command: |-
+      ```bash
+      pip install modelscope
+      modelscope download --model Eco-Tech/GLM-4.7-W8A8-floatmtp
+      ```
+prerequisites:
+- title: 模型权重
+  content: |-
+    以下模型变体可用。建议将模型权重下载到所有节点可访问的共享目录。
+
+    | 模型 | 硬件需求 | 下载 |
+    |------|---------|------|
+    | GLM-4.5（BF16） | Atlas 800I A3 (64G×16) × 1 | [下载](https://www.modelscope.cn/models/ZhipuAI/GLM-4.5) |
+    | GLM-4.5-w8a8 | Atlas 800I A3 (64G×16) × 1<br>Atlas 800I A2 (64G×8) × 1 | [下载](https://modelers.cn/models/Modelers_Park/GLM-4.5-w8a8) |
+    | GLM-4.6（BF16） | Atlas 800I A3 (64G×16) × 1 | [下载](https://www.modelscope.cn/models/ZhipuAI/GLM-4.6) |
+    | GLM-4.6-w8a8 | Atlas 800I A3 (64G×16) × 1<br>Atlas 800I A2 (64G×8) × 1 | [下载](https://modelers.cn/models/Modelers_Park/GLM-4.6-w8a8) |
+    | GLM-4.7（BF16） | Atlas 800I A3 (64G×16) × 1 | [下载](https://www.modelscope.cn/models/ZhipuAI/GLM-4.7) |
+    | GLM-4.7-w8a8 | Atlas 800I A3 (64G×16) × 1<br>Atlas 800I A2 (64G×8) × 1 | [下载](https://modelscope.cn/models/Eco-Tech/GLM-4.7-W8A8-floatmtp) |
+
+    以上为推荐卡数，可根据实际情况调整。
+
+    > **注意**：GLM-4.6 没有 MTP 量化版本，因为 vLLM 不支持 GLM-4.6 MTP。
+- title: 验证多节点通信
+  content: |-
+    如需部署多节点环境，请按照 [验证多节点通信环境](../../installation.md#verify-multi-node-communication) 进行验证。
+env_setup:
+  container:
+    A3:
+      content: |-
+        您可以使用 GLM-4.x 模型的官方一体化 Docker 镜像。
+
+        **Docker 拉取：**
+
+        ```bash
+        docker pull quay.io/ascend/vllm-ascend:{{ vllm_ascend_version }}-a3
+        ```
+
+        **Docker 运行：**
+
+        ```bash
+
+        export IMAGE=quay.io/ascend/vllm-ascend:{{ vllm_ascend_version }}-a3
+
+        docker run \
+            --name vllm-ascend-env \
+            --shm-size=128g \
+            --net=host \
+            --privileged=true \
+            --device /dev/davinci0 \
+            --device /dev/davinci1 \
+            --device /dev/davinci2 \
+            --device /dev/davinci3 \
+            --device /dev/davinci4 \
+            --device /dev/davinci5 \
+            --device /dev/davinci6 \
+            --device /dev/davinci7 \
+            --device /dev/davinci8 \
+            --device /dev/davinci9 \
+            --device /dev/davinci10 \
+            --device /dev/davinci11 \
+            --device /dev/davinci12 \
+            --device /dev/davinci13 \
+            --device /dev/davinci14 \
+            --device /dev/davinci15 \
+            --device /dev/davinci_manager \
+            --device /dev/devmm_svm \
+            --device /dev/hisi_hdc \
+            -v /usr/local/Ascend/driver:/usr/local/Ascend/driver \
+            -v /usr/local/dcmi:/usr/local/dcmi \
+            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+            -v /etc/ascend_install.info:/etc/ascend_install.info \
+            -v /usr/local/sbin:/usr/local/sbin \
+            -v /home:/home \
+            -v /data:/data \
+            -v /tmp:/tmp \
+            -v /mnt:/mnt \
+            -v /usr/share/zoneinfo/Asia/Shanghai:/etc/localtime \
+            -v /root:/host_root \
+            -it -d $IMAGE bash
+        ```
+
+        > **注意**：A3 有 8 个 NPU，采用双 Die 设计（共 16 个芯片：`/dev/davinci[0-15]`）。
+    A2:
+      content: |-
+        您可以使用 GLM-4.x 模型的官方一体化 Docker 镜像。
+
+        **Docker 拉取：**
+
+        ```bash
+        docker pull quay.io/ascend/vllm-ascend:{{ vllm_ascend_version }}
+        ```
+
+        **Docker 运行：**
+
+        ```bash
+
+        export IMAGE=quay.io/ascend/vllm-ascend:{{ vllm_ascend_version }}
+
+        docker run \
+            --name vllm-ascend-env \
+            --shm-size=128g \
+            --net=host \
+            --privileged=true \
+            --device /dev/davinci0 \
+            --device /dev/davinci1 \
+            --device /dev/davinci2 \
+            --device /dev/davinci3 \
+            --device /dev/davinci4 \
+            --device /dev/davinci5 \
+            --device /dev/davinci6 \
+            --device /dev/davinci7 \
+            --device /dev/davinci_manager \
+            --device /dev/devmm_svm \
+            --device /dev/hisi_hdc \
+            -v /usr/local/Ascend/driver:/usr/local/Ascend/driver \
+            -v /usr/local/dcmi:/usr/local/dcmi \
+            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+            -v /etc/ascend_install.info:/etc/ascend_install.info \
+            -v /usr/local/sbin:/usr/local/sbin \
+            -v /home:/home \
+            -v /data:/data \
+            -v /tmp:/tmp \
+            -v /mnt:/mnt \
+            -v /usr/share/zoneinfo/Asia/Shanghai:/etc/localtime \
+            -v /root:/host_root \
+            -it -d $IMAGE bash
+        ```
+
+        默认工作目录为 `/workspace`。vLLM 和 vLLM-Ascend 作为 Python 包安装在 site-packages 中。
+
+        **安装验证：**
+
+        启动容器后，运行以下命令验证安装：
+
+        ```bash
+        docker ps | grep vllm-ascend-env
+        ```
+
+        预期结果：容器状态为 `Up`。
+  pip:
+    content: |-
+      如果您不想使用 Docker 镜像，可以从源码构建。首先安装 vLLM：
+
+      1. 克隆并安装 vLLM：
+
+         ```bash
+         git clone https://github.com/vllm-project/vllm.git
+         cd vllm
+         pip install -e .
+         ```
+
+      2. 克隆并安装 vLLM-Ascend：
+
+         ```bash
+         git clone https://github.com/vllm-project/vllm-ascend.git
+         cd vllm-ascend
+         pip install -e .
+         ```
+
+      **安装验证：**
+
+      ```bash
+      pip show vllm vllm-ascend
+      ```
+
+      预期结果：显示两个包的版本信息，确认安装成功。
+
+      > **注意**：如果部署多节点环境，需要在每个节点上设置环境。
+
+      更多详情请参考 [安装指南](../../installation.md)。
+scenarios:
+- npu: Atlas 800I A3
+  precision: W8A8
+  deployment: 单节点-多卡
+  case: Multi Card
+  steps:
+  - title: 启动服务
+    content: |-
+      GLM-4.7 W8A8 量化模型在 Atlas 800I A3 上的单节点部署。
+
+      ```bash
+      export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15
+      export HCCL_OP_EXPANSION_MODE="AIV"
+      export HCCL_BUFFSIZE=512
+      export OMP_PROC_BIND=false
+      export OMP_NUM_THREADS=1
+      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+      export VLLM_ASCEND_BALANCE_SCHEDULING=1
+      export VLLM_ASCEND_ENABLE_TOPK_OPTIMIZE=1
+
+      vllm serve your_model_path \
+          --served-model-name glm \
+          --trust-remote-code \
+          --max-num-seqs 16 \
+          --max-model-len 133000 \
+          --max-num-batched-tokens 8192 \
+          --data-parallel-size 2 \
+          --tensor-parallel-size 8 \
+          --enable-expert-parallel \
+          --quantization ascend \
+          --gpu-memory-utilization 0.9 \
+          --speculative-config '{"num_speculative_tokens": 3, "method": "mtp"}' \
+          --compilation-config '{"cudagraph_capture_sizes": [1,2,4,8,16,32,64,128,256,512], "cudagraph_mode": "FULL_DECODE_ONLY"}' \
+          --additional-config '{"enable_shared_expert_dp": true, "ascend_fusion_config": {"fusion_ops_gmmswigluquant": false}}' \
+          --seed 1024 \
+          --port 8000
+      ```
+
+      > - `--quantization ascend`：W8A8 量化模型必需。使用 BF16 权重时请移除此参数。
+      > - `--speculative-config`：配置 MTP 投机解码以加速推理。
+      > - `fusion_ops_gmmswigluquant`：当 NPU 总数 <= 16 时应设为 `false`，以避免性能下降。
+      > - 长上下文低并发（<=4）场景推荐 `dp1 tp16`；高并发（>4）场景推荐 `dp2 tp8`。
+
+      参数详情请参考：
+
+      - [vLLM CLI 文档](https://docs.vllm.ai/en/stable/cli/) — 标准服务参数
+      - [环境变量](../../user_guide/configuration/env_vars.md) — 昇腾专用环境变量
+      - [附加配置](../../user_guide/configuration/additional_config.md) — `--additional-config` 格式和选项
+  - title: 服务验证
+    content: |-
+      服务启动后，通过发送提示词验证服务是否正常运行。请参考下方的验证示例。
+- npu: Atlas 800I A2
+  precision: W8A8
+  deployment: 单节点-多卡
+  case: Multi Card
+  steps:
+  - title: 启动服务
+    content: |-
+      GLM-4.7 W8A8 量化模型在 Atlas 800I A2 上的单节点部署。
+
+      ```bash
+      export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
+      export HCCL_OP_EXPANSION_MODE="AIV"
+      export HCCL_BUFFSIZE=512
+      export OMP_PROC_BIND=false
+      export OMP_NUM_THREADS=1
+      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+      export VLLM_ASCEND_BALANCE_SCHEDULING=1
+      export VLLM_ASCEND_ENABLE_TOPK_OPTIMIZE=1
+
+      vllm serve your_model_path \
+          --served-model-name glm \
+          --trust-remote-code \
+          --max-num-seqs 16 \
+          --max-model-len 133000 \
+          --max-num-batched-tokens 8192 \
+          --tensor-parallel-size 8 \
+          --enable-expert-parallel \
+          --quantization ascend \
+          --gpu-memory-utilization 0.9 \
+          --speculative-config '{"num_speculative_tokens": 3, "method": "mtp"}' \
+          --compilation-config '{"cudagraph_capture_sizes": [1,2,4,8,16,32,64,128,256,512], "cudagraph_mode": "FULL_DECODE_ONLY"}' \
+          --additional-config '{"enable_shared_expert_dp": true, "ascend_fusion_config": {"fusion_ops_gmmswigluquant": false}}' \
+          --seed 1024 \
+          --port 8000
+      ```
+
+      > - A2 有 8 个 NPU，`--tensor-parallel-size 8` 使用所有可用 NPU。
+  - title: 服务验证
+    content: |-
+      服务启动后，通过发送提示词验证服务是否正常运行。请参考下方的验证示例。
+- npu: Atlas 800I A3
+  precision: BF16
+  deployment: 多节点
+  case: Multi Node
+  steps:
+  - title: 启动服务
+    content: |-
+      GLM-4.7 BF16 模型在 Atlas 800I A3（2 节点）上的多节点部署。
+
+      **节点 0：**
+
+      ```bash
+      export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15
+      export HCCL_OP_EXPANSION_MODE="AIV"
+      export HCCL_BUFFSIZE=512
+      export OMP_PROC_BIND=false
+      export OMP_NUM_THREADS=1
+      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+      export VLLM_ASCEND_BALANCE_SCHEDULING=1
+      export VLLM_ASCEND_ENABLE_TOPK_OPTIMIZE=1
+      export HCCL_IF_IP=<node0_ip>
+      export GLOO_SOCKET_IFNAME=<nic_name>
+      export TP_SOCKET_IFNAME=<nic_name>
+      export HCCL_SOCKET_IFNAME=<nic_name>
+
+      vllm serve your_model_path \
+          --served-model-name glm \
+          --trust-remote-code \
+          --max-num-seqs 16 \
+          --max-model-len 140000 \
+          --max-num-batched-tokens 8192 \
+          --data-parallel-size 2 \
+          --data-parallel-size-local 1 \
+          --data-parallel-start-rank 0 \
+          --data-parallel-address <node0_ip> \
+          --data-parallel-rpc-port 13389 \
+          --tensor-parallel-size 16 \
+          --enable-expert-parallel \
+          --gpu-memory-utilization 0.9 \
+          --enable-auto-tool-choice \
+          --tool-call-parser glm47 \
+          --reasoning-parser glm45 \
+          --speculative-config '{"num_speculative_tokens": 3, "method": "mtp"}' \
+          --compilation-config '{"cudagraph_capture_sizes": [1,2,4,8,16,32,64,128,256,512], "cudagraph_mode": "FULL_DECODE_ONLY"}' \
+          --additional-config '{"enable_shared_expert_dp": true, "ascend_fusion_config": {"fusion_ops_gmmswigluquant": false}}' \
+          --seed 1024 \
+          --port 8000
+      ```
+
+      **节点 1：**
+
+      ```bash
+      export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15
+      export HCCL_OP_EXPANSION_MODE="AIV"
+      export HCCL_BUFFSIZE=512
+      export OMP_PROC_BIND=false
+      export OMP_NUM_THREADS=1
+      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+      export VLLM_ASCEND_BALANCE_SCHEDULING=1
+      export VLLM_ASCEND_ENABLE_TOPK_OPTIMIZE=1
+      export HCCL_IF_IP=<node1_ip>
+      export GLOO_SOCKET_IFNAME=<nic_name>
+      export TP_SOCKET_IFNAME=<nic_name>
+      export HCCL_SOCKET_IFNAME=<nic_name>
+
+      vllm serve your_model_path \
+          --served-model-name glm \
+          --trust-remote-code \
+          --max-num-seqs 16 \
+          --max-model-len 140000 \
+          --max-num-batched-tokens 8192 \
+          --data-parallel-size 2 \
+          --data-parallel-size-local 1 \
+          --data-parallel-start-rank 1 \
+          --data-parallel-address <node0_ip> \
+          --data-parallel-rpc-port 13389 \
+          --tensor-parallel-size 16 \
+          --enable-expert-parallel \
+          --headless \
+          --gpu-memory-utilization 0.9 \
+          --enable-auto-tool-choice \
+          --tool-call-parser glm47 \
+          --reasoning-parser glm45 \
+          --speculative-config '{"num_speculative_tokens": 3, "method": "mtp"}' \
+          --compilation-config '{"cudagraph_capture_sizes": [1,2,4,8,16,32,64,128,256,512], "cudagraph_mode": "FULL_DECODE_ONLY"}' \
+          --additional-config '{"enable_shared_expert_dp": true, "ascend_fusion_config": {"fusion_ops_gmmswigluquant": false}}' \
+          --seed 1024 \
+          --port 8000
+      ```
+
+      > - 将 `<node0_ip>` 和 `<node1_ip>` 替换为实际的节点 IP 地址。
+      > - 将 `<nic_name>` 替换为实际的网络接口名称。
+      > - 节点 1 需要 `--headless` 和 `--data-parallel-start-rank 1`。
+  - title: 服务验证
+    content: |-
+      服务启动后，通过发送提示词验证服务是否正常运行。请参考下方的验证示例。
+verification: |-
+  服务启动后，可以通过发送提示词调用模型。
+
+  **Chat Completions API：**
+
+  ```shell
+  curl http://localhost:8000/v1/chat/completions \
+      -H "Content-Type: application/json" \
+      -d '{
+          "model": "glm",
+          "messages": [
+              {"role": "user", "content": "请简要介绍大语言模型。"}
+          ],
+          "max_tokens": 256,
+          "temperature": 0
+      }'
+  ```
+
+  > - **URL**（`http://localhost:8000`）：将 `localhost` 和 `8000` 替换为服务器 IP 和 `vllm serve` 命令中的 `--port` 值。
+  > - **`model`**：必须与 `vllm serve` 命令中的 `--served-model-name` 值匹配（如 `glm`）。
+
+  **函数调用：**
+
+  要启用函数调用，请在 `vllm serve` 命令中添加以下参数：
+
+  ```bash
+  --tool-call-parser glm47 --reasoning-parser glm45 --enable-auto-tool-choice
+  ```
+
+  预期结果：HTTP 200，返回包含 `choices` 字段的 JSON 响应及生成文本。
+performance:
+  accuracy: |-
+    **精度结果（GLM-4.7，vllm-ascend >=0.14.0rc1，Atlas 800 A3）：**
+
+    | 数据集 | 指标 | 分数 |
+    |--------|------|------|
+    | GPQA | accuracy (gen) | 84.85 |
+    | MATH500 | accuracy (gen) | 98.8 |
+  benchmark: |-
+    ### 推荐配置
+
+    > **注意**：以下配置在特定测试环境中验证，仅供参考。
+
+    #### 最佳实践
+
+    | 场景 | 推荐配置 | 说明 |
+    |------|---------|------|
+    | 长上下文低并发（<=4） | dp1 tp16 | 最大化上下文容量 |
+    | 长上下文高并发（>4） | dp2 tp8 | 平衡吞吐和上下文 |
+    | 低延迟短序列 | dp2 tp8 | 降低每 token 延迟 |
+    | 高吞吐短序列 | dp2 tp8 | 最大化并发请求处理 |
+
+    > `max-model-len` 和 `max-num-seqs` 应根据场景调优。
+tuning: |-
+  ### 调优指南
+
+  请参考 [公开性能调优文档](../../developer_guide/performance_and_debug/optimization_and_tuning.md) 了解调优方法。
+  请参考 [功能指南](../../user_guide/support_matrix/feature_matrix.md) 了解详细功能描述。
+
+  **GLM-4.x 关键调优说明：**
+
+  - `fusion_ops_gmmswigluquant` 在 NPU 总数 <= 16 时应设为 `false`，以避免性能下降。
+  - `VLLM_ASCEND_ENABLE_FLASHCOMM1`：在长序列（>=16k）和低并发（<=8 batch size）场景下应禁用。
+  - `VLLM_ASCEND_ENABLE_TOPK_OPTIMIZE=1` 推荐 GLM-4.x 模型使用。
+faq: |-
+  常见环境、安装和通用参数问题请参考 [公开 FAQ](https://docs.vllm.ai/projects/ascend/en/latest/faqs.html)。本章仅涵盖模型特定问题。
+
+  **Q：HCCL 端口冲突？**
+
+  运行 `pkill -f VLLM*` 清理旧进程。
+
+  **Q：OOM 或启动不稳定？**
+
+  降低 `--max-num-seqs` 和 `--max-model-len`，减少并发和压测压力。
+
+  **Q：如何启用函数调用？**
+
+  在 `vllm serve` 命令中添加以下参数：
+
+  ```bash
+  --tool-call-parser glm47 --reasoning-parser glm45 --enable-auto-tool-choice
+  ```
+references:
+- title: vllm-ascend 文档
+  url: https://docs.vllm.ai/projects/ascend/en/latest/tutorials/models/GLM4.x.html
+- title: ModelScope 模型下载（GLM-4.5 BF16）
+  url: https://www.modelscope.cn/models/ZhipuAI/GLM-4.5
+- title: ModelScope 模型下载（GLM-4.6 BF16）
+  url: https://www.modelscope.cn/models/ZhipuAI/GLM-4.6
+- title: ModelScope 模型下载（GLM-4.7 BF16）
+  url: https://www.modelscope.cn/models/ZhipuAI/GLM-4.7
+- title: ModelScope 模型下载（GLM-4.7 W8A8）
+  url: https://modelscope.cn/models/Eco-Tech/GLM-4.7-W8A8-floatmtp
+- title: vllm-ascend GitHub
+  url: https://github.com/vllm-project/vllm-ascend
