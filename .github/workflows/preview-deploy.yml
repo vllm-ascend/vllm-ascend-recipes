@@ -1,0 +1,191 @@
+name: PR Preview Deploy
+
+on:
+  workflow_run:
+    workflows: [PR Preview Build]
+    types: [completed]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: preview-deploy-${{ github.event.workflow_run.id }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.event.workflow_run.event == 'pull_request' && github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get PR number
+        id: pr
+        run: |
+          PR_NUMBER=$(curl -sS -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github+json" \
+            "${{ github.event.workflow_run.url }}" | jq -r '.pull_requests[0].number // empty')
+          if [ -z "$PR_NUMBER" ] || [ "$PR_NUMBER" = "null" ]; then
+            echo "Failed to get PR number from workflow run"
+            exit 1
+          fi
+          echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: pr-preview-dist-${{ steps.pr.outputs.pr_number }}
+          path: ./dist
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Deploy to Netlify
+        id: netlify
+        uses: nwtgck/actions-netlify@v3
+        with:
+          publish-dir: ./dist
+          production-deploy: false
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          deploy-message: 'PR #${{ steps.pr.outputs.pr_number }}'
+          enable-pull-request-comment: false
+          overwrites-pull-request-comment: false
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+        timeout-minutes: 5
+
+      - name: Comment preview URL on PR
+        uses: actions/github-script@v7
+        env:
+          DEPLOY_URL: ${{ steps.netlify.outputs.deploy-url }}
+          PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
+          BUILD_RUN_URL: ${{ github.event.workflow_run.html_url }}
+        with:
+          script: |
+            const prNumber = parseInt(process.env.PR_NUMBER);
+            const deployUrl = process.env.DEPLOY_URL;
+            const buildRunUrl = process.env.BUILD_RUN_URL;
+            const marker = '<!-- pr-preview -->';
+            const body = [
+              `## 🔨 Preview ready`,
+              '',
+              `**👉 [Open preview](${deployUrl})**`,
+              '',
+              '<details>',
+              '<summary>Build details</summary>',
+              '',
+              `- [Build workflow run](${buildRunUrl})`,
+              `- Deploy URL: \`${deployUrl}\``,
+              '',
+              '_Deploys automatically on each push. The preview is removed when the PR is closed._',
+              '</details>',
+            ].join('\n');
+
+            const { data: comments } = await github.rest.issues.listComments({
+              ...context.repo,
+              issue_number: prNumber,
+            });
+            const existing = comments.find(c => c.body && c.body.includes(marker));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                ...context.repo,
+                comment_id: existing.id,
+                body: `${marker}\n${body}`,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                ...context.repo,
+                issue_number: prNumber,
+                body: `${marker}\n${body}`,
+              });
+            }
+
+      - name: Comment failure on PR
+        if: failure()
+        uses: actions/github-script@v7
+        env:
+          PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
+          BUILD_RUN_URL: ${{ github.event.workflow_run.html_url }}
+        with:
+          script: |
+            const prNumber = parseInt(process.env.PR_NUMBER);
+            const buildRunUrl = process.env.BUILD_RUN_URL;
+            const marker = '<!-- pr-preview -->';
+            const body = [
+              '## 🔨 Preview deploy failed',
+              '',
+              `The preview deploy failed. Check the [build workflow run](${buildRunUrl}) for details.`,
+            ].join('\n');
+
+            const { data: comments } = await github.rest.issues.listComments({
+              ...context.repo,
+              issue_number: prNumber,
+            });
+            const existing = comments.find(c => c.body && c.body.includes(marker));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                ...context.repo,
+                comment_id: existing.id,
+                body: `${marker}\n${body}`,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                ...context.repo,
+                issue_number: prNumber,
+                body: `${marker}\n${body}`,
+              });
+            }
+
+  comment-failure:
+    if: github.event.workflow_run.event == 'pull_request' && github.event.workflow_run.conclusion == 'failure'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get PR number
+        id: pr
+        run: |
+          PR_NUMBER=$(curl -sS -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github+json" \
+            "${{ github.event.workflow_run.url }}" | jq -r '.pull_requests[0].number // empty')
+          if [ -z "$PR_NUMBER" ] || [ "$PR_NUMBER" = "null" ]; then
+            echo "Failed to get PR number from workflow run"
+            exit 1
+          fi
+          echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+
+      - name: Comment build failure on PR
+        uses: actions/github-script@v7
+        env:
+          PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
+          BUILD_RUN_URL: ${{ github.event.workflow_run.html_url }}
+        with:
+          script: |
+            const prNumber = parseInt(process.env.PR_NUMBER);
+            const buildRunUrl = process.env.BUILD_RUN_URL;
+            const marker = '<!-- pr-preview -->';
+            const body = [
+              '## 🔨 Preview build failed',
+              '',
+              `The preview build failed. Check the [build workflow run](${buildRunUrl}) for details.`,
+            ].join('\n');
+
+            const { data: comments } = await github.rest.issues.listComments({
+              ...context.repo,
+              issue_number: prNumber,
+            });
+            const existing = comments.find(c => c.body && c.body.includes(marker));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                ...context.repo,
+                comment_id: existing.id,
+                body: `${marker}\n${body}`,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                ...context.repo,
+                issue_number: prNumber,
+                body: `${marker}\n${body}`,
+              });
+            }
