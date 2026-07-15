@@ -24,10 +24,17 @@ interface Scenario {
 interface CascadeSelectorProps {
   scenariosEn: Scenario[];
   scenariosZh: Scenario[];
-  extraConfig?: ExtraConfigItem[];
+  extraConfigEn?: ExtraConfigItem[];
+  extraConfigZh?: ExtraConfigItem[];
 }
 
 // ---- Markdown renderer ----
+function stripRenderMarkers(content: string): string {
+  return content
+    .replace(/%%CONFIG:\w[\w-]*%%|%%\/CONFIG:\w[\w-]*%%/g, '')
+    .replace(/%%HL:\w[\w-]*%%|%%\/HL:\w[\w-]*%%/g, '');
+}
+
 function renderMarkdown(md: string): string {
   let html = md;
 
@@ -37,13 +44,14 @@ function renderMarkdown(md: string): string {
 
   const codeBlocks: string[] = [];
   html = html.replace(/```(\w+)?\n([\s\S]*?)```/g, (_, lang, code) => {
+    const copyCode = stripRenderMarkers(code).trim();
     const escaped = code
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
       .trimEnd();
     const idx = codeBlocks.length;
-    codeBlocks.push(`<div class="code-block group relative"><div class="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity z-10"><button class="copy-btn px-2 py-1 text-[10px] font-mono rounded border border-ink-700 bg-ink-800 text-ink-400 hover:text-accent-400 hover:border-accent-500/30 transition-colors" data-code="${encodeURIComponent(code.trim())}">copy</button></div><pre><code class="language-${lang || 'bash'}">${escaped}</code></pre></div>`);
+    codeBlocks.push(`<div class="code-block group relative"><div class="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity z-10"><button class="copy-btn px-2 py-1 text-[10px] font-mono rounded border border-ink-700 bg-ink-800 text-ink-400 hover:text-accent-400 hover:border-accent-500/30 transition-colors" data-code="${encodeURIComponent(copyCode)}">copy</button></div><pre><code class="language-${lang || 'bash'}">${escaped}</code></pre></div>`);
     return `%%CODEBLOCK_${idx}%%`;
   });
 
@@ -184,9 +192,17 @@ function applyColorHighlights(html: string, selectedConfigs: Set<string>): strin
 }
 
 // ---- Component ----
-export default function CascadeSelector({ scenariosEn, scenariosZh, extraConfig }: CascadeSelectorProps) {
+export default function CascadeSelector({
+  scenariosEn,
+  scenariosZh,
+  extraConfigEn,
+  extraConfigZh,
+}: CascadeSelectorProps) {
   const { lang, t } = useLang();
   const scenarios = lang === 'zh' ? scenariosZh : scenariosEn;
+  const extraConfig = lang === 'zh'
+    ? (extraConfigZh ?? extraConfigEn)
+    : (extraConfigEn ?? extraConfigZh);
 
   const npus = useMemo(() => {
     const set = new Set<string>();

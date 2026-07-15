@@ -162,7 +162,13 @@ function renderDesc(text: string) {
       <p class="text-xs text-ink-500 mb-6 font-mono" data-i18n="sectionScenarioDescription">
         Select NPU type, precision, and deployment mode to view the corresponding deployment instructions.
       </p>
-      <CascadeSelector client:only="react" scenariosEn={modelEn.scenarios} scenariosZh={modelZh.scenarios} extraConfig={modelEn.extra_config} />
+      <CascadeSelector
+        client:only="react"
+        scenariosEn={modelEn.scenarios}
+        scenariosZh={modelZh.scenarios}
+        extraConfigEn={modelEn.extra_config}
+        extraConfigZh={modelZh.extra_config ?? modelEn.extra_config}
+      />
     </section>
 
     <div class="section-divider"></div>
