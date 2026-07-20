@@ -17,6 +17,11 @@ interface ReferenceTabsProps {
   faqZh?: string;
   referencesEn: Reference[];
   referencesZh: Reference[];
+  // Legacy evaluation format (used by DeepSeek, Qwen models)
+  evaluationAccuracyEn?: string;
+  evaluationAccuracyZh?: string;
+  evaluationPerformanceEn?: string;
+  evaluationPerformanceZh?: string;
 }
 
 function renderContent(md: string): string {
@@ -172,16 +177,27 @@ export default function ReferenceTabs({
   faqZh,
   referencesEn,
   referencesZh,
+  evaluationAccuracyEn,
+  evaluationAccuracyZh,
+  evaluationPerformanceEn,
+  evaluationPerformanceZh,
 }: ReferenceTabsProps) {
   const { lang, t } = useLang();
   const accuracy = lang === 'zh' && accuracyZh ? accuracyZh : accuracyEn || '';
   const benchmark = lang === 'zh' && benchmarkZh ? benchmarkZh : benchmarkEn || '';
+  // Legacy evaluation format (used by DeepSeek, Qwen models)
+  const evaluationAccuracy =
+    lang === 'zh' && evaluationAccuracyZh ? evaluationAccuracyZh : evaluationAccuracyEn || '';
+  const evaluationPerformance =
+    lang === 'zh' && evaluationPerformanceZh
+      ? evaluationPerformanceZh
+      : evaluationPerformanceEn || '';
   const tuning = lang === 'zh' && tuningZh ? tuningZh : tuningEn || '';
   const faq = lang === 'zh' && faqZh ? faqZh : faqEn || '';
   const references = lang === 'zh' ? referencesZh : referencesEn;
 
-  const hasAccuracy = !!accuracyEn;
-  const hasBenchmark = !!benchmarkEn;
+  const hasAccuracy = !!accuracyEn || !!evaluationAccuracyEn;
+  const hasBenchmark = !!benchmarkEn || !!evaluationPerformanceEn;
   const hasPerformance = hasAccuracy || hasBenchmark;
   const hasTuning = !!tuningEn;
   const hasFaq = !!faqEn;
@@ -230,6 +246,17 @@ export default function ReferenceTabs({
                 />
               </div>
             )}
+            {!!evaluationAccuracy && (
+              <div>
+                <h3 className="font-display text-base font-semibold text-ink-200 mb-3">
+                  {t('sectionAccuracy')}
+                </h3>
+                <div
+                  className="prose"
+                  dangerouslySetInnerHTML={{ __html: renderContent(evaluationAccuracy) }}
+                />
+              </div>
+            )}
             {hasBenchmark && (
               <div>
                 <h3 className="font-display text-base font-semibold text-ink-200 mb-3">
@@ -238,6 +265,17 @@ export default function ReferenceTabs({
                 <div
                   className="prose"
                   dangerouslySetInnerHTML={{ __html: renderContent(benchmark) }}
+                />
+              </div>
+            )}
+            {!!evaluationPerformance && (
+              <div>
+                <h3 className="font-display text-base font-semibold text-ink-200 mb-3">
+                  {t('sectionBenchmark')}
+                </h3>
+                <div
+                  className="prose"
+                  dangerouslySetInnerHTML={{ __html: renderContent(evaluationPerformance) }}
                 />
               </div>
             )}

@@ -1,14 +1,23 @@
-hf_id: Qwen/Qwen3-30B-A3B
-title: Qwen3-30B-A3B
-provider: Qwen
-description: Qwen3 系列中的 MoE（混合专家）模型，总参数量 30.5B，每 token 激活 3.3B 参数。稀疏 MoE 架构实现高效训练与推理，在推理、指令遵循
-  和智能体能力方面表现优异，同时相比同等能力的稠密模型具有更低的计算成本。
-architecture: moe
-parameters: 30.5B
-active_parameters: 3.3B
-context_length: 40960
-modality: text
-updated: '2026-07-07'
+meta:
+  title: "Qwen3-30B-A3B"
+  slug: "qwen3-30b-a3b"
+  provider: "Qwen"
+  description: "Qwen3 系列中的 MoE（混合专家）模型，总参数量 30.5B，每 token 激活 3.3B 参数。稀疏 MoE 架构实现高效训练与推理，在推理、指令遵循和智能体能力方面表现优异，同时相比同等能力的稠密模型具有更低的计算成本。"
+  date_added: 2026-07-07
+  performance_headline: "Atlas 800 A2/A3 单节点部署，支持 W8A8 精度"
+  hardware:
+    atlas_800_a3: verified
+    atlas_800_a2: verified
+
+model:
+  model_id: "Qwen/Qwen3-30B-A3B"
+  min_vllm_version: "0.8.4rc2"
+  architecture: moe
+  parameter_count: "30.5B"
+  active_parameters: "3.3B"
+  context_length: 40960
+  modality: text
+
 overview: |-
   Qwen3-30B-A3B 是 Qwen3 系列中的混合专家（MoE）模型，总参数量 30.5B，每 token 激活 3.3B 参数。稀疏 MoE 架构实现了高效的训练和推理，在推理、指令遵循和智能体能力方面表现出色，同时相比同等能力的稠密模型保持了更低的计算成本。
 

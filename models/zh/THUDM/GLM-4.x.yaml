@@ -1,14 +1,23 @@
-hf_id: ZhipuAI/GLM-4.7
-title: GLM-4.5/4.6/4.7
-provider: THUDM
-description: GLM-4.x 系列是智谱 AI 推出的混合专家（MoE）基础模型，专为智能体应用设计。GLM-4.7
-  包含最新改进，支持 MTP 投机解码、专家并行和 PD 分离部署于昇腾 NPU。
-architecture: moe
-parameters: 31B
-active_parameters: null
-context_length: 133000
-modality: text
-updated: '2026-07-13'
+meta:
+  title: "GLM-4.5/4.6/4.7"
+  slug: "glm-4.x"
+  provider: "THUDM"
+  description: "GLM-4.x 系列是智谱 AI 推出的混合专家（MoE）基础模型，专为智能体应用设计。GLM-4.7 包含最新改进，支持 MTP 投机解码、专家并行和 PD 分离部署于昇腾 NPU。"
+  date_added: 2026-07-13
+  performance_headline: "Atlas 800 A3（128G × 8）单节点部署，支持 W8A8 精度"
+  hardware:
+    atlas_800_a3: verified
+    atlas_800_a2: verified
+
+model:
+  model_id: "ZhipuAI/GLM-4.7"
+  min_vllm_version: "0.10.0rc1"
+  architecture: moe
+  parameter_count: "31B"
+  active_parameters: null
+  context_length: 133000
+  modality: text
+
 overview: |-
   GLM-4.x（GLM-4.5/4.6/4.7）是智谱 AI（THUDM）推出的混合专家（MoE）基础模型，专为智能体应用设计。支持多 Token 预测（MTP）投机解码、专家并行、数据并行和 Prefill-Decode 分离部署于昇腾 NPU。
 

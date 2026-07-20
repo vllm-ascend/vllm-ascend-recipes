@@ -1,14 +1,23 @@
-hf_id: zai-org/GLM-5
-title: GLM-5/GLM-5.1
-provider: THUDM
-description: GLM-5 和 GLM-5.1 是智谱 AI 推出的混合专家（MoE）模型，面向复杂系统工程和长周期智能体任务。GLM-5 拥有
-  754B 总参数量，支持 MTP 投机解码、专家并行和 PD 分离部署于昇腾 NPU。
-architecture: moe
-parameters: 754B
-active_parameters: null
-context_length: 131072
-modality: text
-updated: '2026-07-13'
+meta:
+  title: "GLM-5"
+  slug: "glm-5"
+  provider: "THUDM"
+  description: "GLM-5 和 GLM-5.1 是智谱 AI 推出的混合专家（MoE）模型，面向复杂系统工程和长周期智能体任务。GLM-5 拥有 754B 总参数量，支持 MTP 投机解码、专家并行和 PD 分离部署于昇腾 NPU。"
+  date_added: 2026-07-13
+  performance_headline: "Atlas 800 A3（128G × 8）多节点部署，支持 W4A8/W8A8 精度"
+  hardware:
+    atlas_800_a3: verified
+    atlas_800_a2: verified
+
+model:
+  model_id: "zai-org/GLM-5"
+  min_vllm_version: "0.17.0rc1"
+  architecture: moe
+  parameter_count: "754B"
+  active_parameters: null
+  context_length: 131072
+  modality: text
+
 overview: |-
   GLM-5 和 GLM-5.1 是智谱 AI（THUDM）推出的混合专家（MoE）模型，面向复杂系统工程和长周期智能体任务。模型总参数量 754B，支持多 Token 预测（MTP）投机解码、专家并行、数据并行和 Prefill-Decode 分离部署于昇腾 NPU。
 

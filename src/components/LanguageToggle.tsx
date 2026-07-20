@@ -1,23 +1,29 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 export default function LanguageToggle() {
   const [lang, setLang] = useState<'en' | 'zh'>('en');
 
-  useEffect(() => {
-    const saved = localStorage.getItem('lang') as 'en' | 'zh' | null;
-    if (saved) {
-      setLang(saved);
-      document.documentElement.lang = saved;
-    } else {
-      document.documentElement.lang = 'en';
+  // Hydrate from localStorage on first client render. We do this during render
+  // (guarded by a ref) rather than in an effect so React only commits once.
+  const hydratedRef = useRef<boolean | null>(null);
+  if (hydratedRef.current == null) {
+    hydratedRef.current = true;
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('lang') as 'en' | 'zh' | null;
+      if (saved) {
+        setLang(saved);
+      }
     }
-  }, []);
+  }
+
+  useEffect(() => {
+    document.documentElement.lang = lang;
+  }, [lang]);
 
   const switchTo = (next: 'en' | 'zh') => {
     if (next === lang) return;
     setLang(next);
     localStorage.setItem('lang', next);
-    document.documentElement.lang = next;
     window.dispatchEvent(new CustomEvent('langchange', { detail: next }));
   };
 

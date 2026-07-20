@@ -1,15 +1,23 @@
-hf_id: Qwen/Qwen3-30B-A3B
-title: Qwen3-30B-A3B
-provider: Qwen
-description: A Mixture-of-Experts (MoE) model in the Qwen3 series, featuring 30.5B total parameters with 3.3B activated
-  per token. The sparse MoE architecture enables efficient training and inference, delivering strong performance across
-  reasoning, instruction-following, and agent capabilities while maintaining lower computational cost.
-architecture: moe
-parameters: 30.5B
-active_parameters: 3.3B
-context_length: 40960
-modality: text
-updated: '2026-07-07'
+meta:
+  title: "Qwen3-30B-A3B"
+  slug: "qwen3-30b-a3b"
+  provider: "Qwen"
+  description: "A Mixture-of-Experts (MoE) model in the Qwen3 series, featuring 30.5B total parameters with 3.3B activated per token. The sparse MoE architecture enables efficient training and inference, delivering strong performance across reasoning, instruction-following, and agent capabilities while maintaining lower computational cost."
+  date_added: 2026-07-07
+  performance_headline: "Single-node deployment on Atlas 800 A2/A3 with W8A8 precision"
+  hardware:
+    atlas_800_a3: verified
+    atlas_800_a2: verified
+
+model:
+  model_id: "Qwen/Qwen3-30B-A3B"
+  min_vllm_version: "0.8.4rc2"
+  architecture: moe
+  parameter_count: "30.5B"
+  active_parameters: "3.3B"
+  context_length: 40960
+  modality: text
+
 overview: |-
   Qwen3-30B-A3B is a Mixture-of-Experts (MoE) model in the Qwen3 series, featuring 30.5B total parameters with 3.3B activated per token. The sparse MoE architecture enables efficient training and inference, delivering strong performance across reasoning, instruction-following, and agent capabilities while maintaining lower computational cost compared to dense models of similar capability.
 

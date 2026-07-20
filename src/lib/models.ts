@@ -33,7 +33,8 @@ function loadGlob(lang: 'en' | 'zh') {
 
 export async function getAllModels(lang: 'en' | 'zh' = 'en'): Promise<Model[]> {
   const entries = await loadGlob(lang);
-  return entries.sort((a, b) => b.updated.localeCompare(a.updated));
+  // Use date_added for sorting (fallback to empty string if not present)
+  return entries.sort((a, b) => (b.meta.date_added || '').localeCompare(a.meta.date_added || ''));
 }
 
 export async function getModel(
@@ -58,7 +59,7 @@ export async function getProviders(lang: 'en' | 'zh' = 'en'): Promise<ProviderIn
   for (const m of all) {
     const slug = m._provider_slug;
     if (!map.has(slug)) {
-      map.set(slug, { name: m.provider, slug, count: 0 });
+      map.set(slug, { name: m.meta.provider, slug, count: 0 });
     }
     map.get(slug)!.count++;
   }
@@ -74,16 +75,16 @@ export async function getModelList(lang: 'en' | 'zh' = 'en'): Promise<ModelListI
     const deployments = [...new Set(m.scenarios.map((s) => s.deployment))];
 
     return {
-      hf_id: m.hf_id,
-      title: m.title,
-      provider: m.provider,
-      description: m.description,
-      architecture: m.architecture,
-      parameters: m.parameters,
-      active_parameters: m.active_parameters,
-      context_length: m.context_length,
-      modality: m.modality,
-      updated: m.updated,
+      hf_id: m.model.model_id,
+      title: m.meta.title,
+      provider: m.meta.provider,
+      description: m.meta.description,
+      architecture: m.model.architecture,
+      parameters: m.model.parameter_count,
+      active_parameters: m.model.active_parameters,
+      context_length: m.model.context_length,
+      modality: m.model.modality,
+      updated: m.meta.date_added,
       url: `/${m._provider_slug}/${m._model_slug}`,
       json: `/${m._provider_slug}/${m._model_slug}.json`,
       npus,

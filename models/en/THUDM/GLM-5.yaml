@@ -1,15 +1,23 @@
-hf_id: zai-org/GLM-5
-title: GLM-5/GLM-5.1
-provider: THUDM
-description: GLM-5 and GLM-5.1 are Mixture-of-Experts (MoE) models from Zhipu AI, targeting complex systems
-  engineering and long-horizon agentic tasks. GLM-5 features 754B total parameters, with support for MTP speculative
-  decoding, expert parallelism, and PD disaggregation on Ascend NPUs.
-architecture: moe
-parameters: 754B
-active_parameters: null
-context_length: 131072
-modality: text
-updated: '2026-07-13'
+meta:
+  title: "GLM-5"
+  slug: "glm-5"
+  provider: "THUDM"
+  description: "GLM-5 and GLM-5.1 are Mixture-of-Experts (MoE) models from Zhipu AI, targeting complex systems engineering and long-horizon agentic tasks. GLM-5 features 754B total parameters, with support for MTP speculative decoding, expert parallelism, and PD disaggregation on Ascend NPUs."
+  date_added: 2026-07-13
+  performance_headline: "Multi-node deployment on Atlas 800 A3 (128G × 8) with W4A8/W8A8 precision"
+  hardware:
+    atlas_800_a3: verified
+    atlas_800_a2: verified
+
+model:
+  model_id: "zai-org/GLM-5"
+  min_vllm_version: "0.17.0rc1"
+  architecture: moe
+  parameter_count: "754B"
+  active_parameters: null
+  context_length: 131072
+  modality: text
+
 overview: |-
   GLM-5 and GLM-5.1 are Mixture-of-Experts (MoE) models from Zhipu AI (THUDM), targeting complex systems engineering and long-horizon agentic tasks. With 754B total parameters, these models support Multi-Token Prediction (MTP) speculative decoding, expert parallelism, data parallelism, and Prefill-Decode disaggregation on Ascend NPUs.
 

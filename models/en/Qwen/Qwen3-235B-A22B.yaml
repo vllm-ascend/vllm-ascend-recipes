@@ -1,14 +1,23 @@
-hf_id: Qwen/Qwen3-235B-A22B
-title: Qwen3-235B-A22B
-provider: Qwen
-description: The largest MoE variant of the Qwen3 series with 235B total parameters and 22B activated per token. Breakthrough
-  advancements in reasoning, instruction-following, agent capabilities, and multilingual support.
-architecture: moe
-parameters: 235B
-active_parameters: 22B
-context_length: 131072
-modality: text
-updated: '2026-07-01'
+meta:
+  title: "Qwen3-235B-A22B"
+  slug: "qwen3-235b-a22b"
+  provider: "Qwen"
+  description: "The largest MoE variant of the Qwen3 series with 235B total parameters and 22B activated per token. Breakthrough advancements in reasoning, instruction-following, agent capabilities, and multilingual support."
+  date_added: 2026-07-01
+  performance_headline: "Verified on Atlas 800 A3 (128G × 8) nodes with W8A8 precision"
+  hardware:
+    atlas_800_a3: verified
+    atlas_800_a2: unsupported
+
+model:
+  model_id: "Qwen/Qwen3-235B-A22B"
+  min_vllm_version: "0.8.4rc2"
+  architecture: moe
+  parameter_count: "235B"
+  active_parameters: "22B"
+  context_length: 131072
+  modality: text
+
 overview: |-
   Qwen3 is the latest generation of large language models in Qwen series, offering a comprehensive suite of dense and mixture-of-experts (MoE) models. Built upon extensive training, Qwen3 delivers groundbreaking advancements in reasoning, instruction-following, agent capabilities, and multilingual support. Qwen3-235B-A22B is the largest MoE variant, featuring 235B total parameters with 22B activated per token.
 
