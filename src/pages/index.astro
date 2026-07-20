@@ -15,33 +15,69 @@ const basePrefix = base.endsWith('/') ? base : base + '/';
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-16">
       <div class="max-w-3xl">
         <div class="animate-fade-up flex items-center gap-2 mb-6">
-          <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-accent-500/20 bg-accent-500/5 text-[11px] font-mono text-accent-400">
+          <span
+            class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-accent-500/20 bg-accent-500/5 text-[11px] font-mono text-accent-400"
+          >
             <span class="w-1.5 h-1.5 rounded-full bg-accent-400 animate-pulse"></span>
-            {allModels.length} <span data-i18n="recipes">recipes</span>
+            {allModels.length}
+            <span data-i18n="recipes">recipes</span>
           </span>
         </div>
 
-        <h1 class="animate-fade-up stagger-1 font-display text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-ink-50 mb-5 leading-[1.05]">
+        <h1
+          class="animate-fade-up stagger-1 font-display text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-ink-50 mb-5 leading-[1.05]"
+        >
           <span data-i18n="heroH1Pre">Deploy any model</span>
-          <br/>
-          <span data-i18n="heroH1On">on</span> <span class="text-accent-400 terminal-glow" data-i18n="heroH1Highlight">Ascend NPUs</span>
+          <br />
+          <span data-i18n="heroH1On">on</span>
+          <span class="text-accent-400 terminal-glow" data-i18n="heroH1Highlight">Ascend NPUs</span>
         </h1>
 
-        <p class="animate-fade-up stagger-2 text-base text-ink-400 max-w-xl leading-relaxed mb-2" data-i18n="heroDescription">
-          Pick a model, choose your hardware, copy the <code class="bg-accent-500/10 text-accent-400 px-1.5 py-0.5 rounded text-[13px] border border-accent-500/15">vllm serve</code> command and run.
+        <p
+          class="animate-fade-up stagger-2 text-base text-ink-400 max-w-xl leading-relaxed mb-2"
+          data-i18n="heroDescription"
+        >
+          Pick a model, choose your hardware, copy the <code
+            class="bg-accent-500/10 text-accent-400 px-1.5 py-0.5 rounded text-[13px] border border-accent-500/15"
+            >vllm serve</code
+          > command and run.
         </p>
 
-        <p class="animate-fade-up stagger-3 text-sm text-ink-600 max-w-xl mb-8" data-i18n="heroSubtitle">
+        <p
+          class="animate-fade-up stagger-3 text-sm text-ink-600 max-w-xl mb-8"
+          data-i18n="heroSubtitle"
+        >
           Community-maintained recipes for Atlas 800 A2/A3 and other Ascend NPU hardware.
         </p>
 
         <div class="animate-fade-up stagger-4 flex items-center gap-3">
-          <a href={`${basePrefix}browse`} class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-accent-500/10 border border-accent-500/30 text-accent-400 text-sm font-medium hover:bg-accent-500/20 hover:border-accent-500/40 transition-all" data-i18n="heroBrowse">
+          <a
+            href={`${basePrefix}browse`}
+            class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-accent-500/10 border border-accent-500/30 text-accent-400 text-sm font-medium hover:bg-accent-500/20 hover:border-accent-500/40 transition-all"
+            data-i18n="heroBrowse"
+          >
             Browse all models
-            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+            <svg
+              class="w-4 h-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              stroke-width="2"
+              ><path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"
+              ></path></svg
+            >
           </a>
-          <a href="https://github.com/vllm-project/vllm-ascend" target="_blank" rel="noopener" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg border border-ink-700 text-ink-300 text-sm font-medium hover:border-ink-600 hover:text-ink-100 transition-all">
-            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+          <a
+            href="https://github.com/vllm-project/vllm-ascend"
+            target="_blank"
+            rel="noopener"
+            class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg border border-ink-700 text-ink-300 text-sm font-medium hover:border-ink-600 hover:text-ink-100 transition-all"
+          >
+            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"
+              ><path
+                d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"
+              ></path></svg
+            >
             GitHub
           </a>
         </div>
@@ -52,54 +88,86 @@ const basePrefix = base.endsWith('/') ? base : base + '/';
   <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
     <div class="flex items-center justify-between mb-6">
       <div class="flex items-center gap-3">
-        <h2 class="font-display text-lg font-semibold text-ink-100 tracking-tight" data-i18n="latestRecipes">Latest recipes</h2>
-        <span class="font-mono text-xs text-ink-600">[ <span data-i18n="newestLabel">newest</span> {allModels.length} ]</span>
+        <h2
+          class="font-display text-lg font-semibold text-ink-100 tracking-tight"
+          data-i18n="latestRecipes"
+        >
+          Latest recipes
+        </h2>
+        <span class="font-mono text-xs text-ink-600"
+          >[ <span data-i18n="newestLabel">newest</span> {allModels.length} ]</span
+        >
       </div>
-      {allModels.length > 8 && (
-        <a href={`${basePrefix}browse`} class="text-xs font-mono text-accent-400 hover:text-accent-300 transition-colors" data-i18n="viewAll">
-          View all →
-        </a>
-      )}
+      {
+        allModels.length > 8 && (
+          <a
+            href={`${basePrefix}browse`}
+            class="text-xs font-mono text-accent-400 hover:text-accent-300 transition-colors"
+            data-i18n="viewAll"
+          >
+            View all →
+          </a>
+        )
+      }
     </div>
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-      {latestModels.map((model, i) => {
-        const listItem = {
-          hf_id: model.hf_id,
-          title: model.title,
-          provider: model.provider,
-          description: model.description,
-          architecture: model.architecture,
-          parameters: model.parameters,
-          active_parameters: model.active_parameters,
-          context_length: model.context_length,
-          modality: model.modality,
-          updated: model.updated,
-          url: `${basePrefix}${model._provider_slug}/${model._model_slug}`,
-          json: '',
-          npus: [...new Set(model.scenarios.map((s) => s.npu))],
-          precisions: [],
-          deployments: [],
-        };
-        return <div class={`animate-fade-up stagger-${Math.min(i + 1, 8)}`}><ModelCard model={listItem} /></div>;
-      })}
+      {
+        latestModels.map((model, i) => {
+          const listItem = {
+            hf_id: model.hf_id,
+            title: model.title,
+            provider: model.provider,
+            description: model.description,
+            architecture: model.architecture,
+            parameters: model.parameters,
+            active_parameters: model.active_parameters,
+            context_length: model.context_length,
+            modality: model.modality,
+            updated: model.updated,
+            url: `${basePrefix}${model._provider_slug}/${model._model_slug}`,
+            json: '',
+            npus: [...new Set(model.scenarios.map((s) => s.npu))],
+            precisions: [],
+            deployments: [],
+          };
+          return (
+            <div class={`animate-fade-up stagger-${Math.min(i + 1, 8)}`}>
+              <ModelCard model={listItem} />
+            </div>
+          );
+        })
+      }
     </div>
   </section>
 
   <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
     <div class="flex items-center gap-3 mb-6">
-      <h2 class="font-display text-lg font-semibold text-ink-100 tracking-tight" data-i18n="browseByProvider">Browse by provider</h2>
-      <span class="font-mono text-xs text-ink-600">[ {providers.length} <span data-i18n="providersLabel">providers</span> ]</span>
+      <h2
+        class="font-display text-lg font-semibold text-ink-100 tracking-tight"
+        data-i18n="browseByProvider"
+      >
+        Browse by provider
+      </h2>
+      <span class="font-mono text-xs text-ink-600"
+        >[ {providers.length} <span data-i18n="providersLabel">providers</span> ]</span
+      >
     </div>
     <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-      {providers.map((p) => (
-        <a
-          href={`${basePrefix}browse`}
-          class="group flex items-center justify-between p-3.5 rounded-lg border border-ink-800/60 hover:border-accent-500/30 bg-ink-900/30 hover:bg-ink-900/50 transition-all"
-        >
-          <span class="text-sm font-medium text-ink-300 group-hover:text-accent-300 transition-colors">{p.name}</span>
-          <span class="text-xs font-mono text-ink-600 group-hover:text-accent-500 transition-colors">{p.count}</span>
-        </a>
-      ))}
+      {
+        providers.map((p) => (
+          <a
+            href={`${basePrefix}browse`}
+            class="group flex items-center justify-between p-3.5 rounded-lg border border-ink-800/60 hover:border-accent-500/30 bg-ink-900/30 hover:bg-ink-900/50 transition-all"
+          >
+            <span class="text-sm font-medium text-ink-300 group-hover:text-accent-300 transition-colors">
+              {p.name}
+            </span>
+            <span class="text-xs font-mono text-ink-600 group-hover:text-accent-500 transition-colors">
+              {p.count}
+            </span>
+          </a>
+        ))
+      }
     </div>
   </section>
 </BaseLayout>

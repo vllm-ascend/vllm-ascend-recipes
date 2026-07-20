@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useLang } from '../lib/useLang';
 
 interface ModelItem {
@@ -68,14 +68,25 @@ export default function SearchBar({ modelsEn, modelsZh }: SearchBarProps) {
     });
   }, [models, query, filterNpu, filterArch, filterModality]);
 
-  const selectClass = "px-3 py-2 text-xs font-mono rounded-lg border border-ink-800/60 bg-ink-900/40 text-ink-300 focus:outline-none focus:border-accent-500/40 focus:ring-1 focus:ring-accent-500/20 cursor-pointer transition-colors";
+  const selectClass =
+    'px-3 py-2 text-xs font-mono rounded-lg border border-ink-800/60 bg-ink-900/40 text-ink-300 focus:outline-none focus:border-accent-500/40 focus:ring-1 focus:ring-accent-500/20 cursor-pointer transition-colors';
 
   return (
     <div>
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <div className="relative flex-1">
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          <svg
+            className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-600"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+            />
           </svg>
           <input
             type="text"
@@ -85,17 +96,41 @@ export default function SearchBar({ modelsEn, modelsZh }: SearchBarProps) {
             className="w-full pl-10 pr-4 py-2 text-sm font-mono rounded-lg border border-ink-800/60 bg-ink-900/40 text-ink-200 placeholder:text-ink-600 focus:outline-none focus:border-accent-500/40 focus:ring-1 focus:ring-accent-500/20 transition-colors"
           />
         </div>
-        <select value={filterNpu} onChange={(e) => setFilterNpu(e.target.value)} className={selectClass}>
+        <select
+          value={filterNpu}
+          onChange={(e) => setFilterNpu(e.target.value)}
+          className={selectClass}
+        >
           <option value="">{t('filterAllNpu')}</option>
-          {allNpus.map((n) => (<option key={n} value={n}>{n}</option>))}
+          {allNpus.map((n) => (
+            <option key={n} value={n}>
+              {n}
+            </option>
+          ))}
         </select>
-        <select value={filterArch} onChange={(e) => setFilterArch(e.target.value)} className={selectClass}>
+        <select
+          value={filterArch}
+          onChange={(e) => setFilterArch(e.target.value)}
+          className={selectClass}
+        >
           <option value="">{t('filterAllArch')}</option>
-          {allArchitectures.map((a) => (<option key={a} value={a}>{a}</option>))}
+          {allArchitectures.map((a) => (
+            <option key={a} value={a}>
+              {a}
+            </option>
+          ))}
         </select>
-        <select value={filterModality} onChange={(e) => setFilterModality(e.target.value)} className={selectClass}>
+        <select
+          value={filterModality}
+          onChange={(e) => setFilterModality(e.target.value)}
+          className={selectClass}
+        >
           <option value="">{t('filterAllModality')}</option>
-          {allModalities.map((m) => (<option key={m} value={m}>{m}</option>))}
+          {allModalities.map((m) => (
+            <option key={m} value={m}>
+              {m}
+            </option>
+          ))}
         </select>
       </div>
 
@@ -112,16 +147,27 @@ export default function SearchBar({ modelsEn, modelsZh }: SearchBarProps) {
           >
             <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-accent-500/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
             <div className="flex items-start justify-between mb-2">
-              <h3 className="font-display font-semibold text-sm text-ink-100 group-hover:text-accent-300 transition-colors tracking-tight">{m.title}</h3>
-              <span className="text-[10px] font-mono uppercase tracking-wider text-ink-500 px-1.5 py-0.5 rounded border border-ink-700/50">{m.architecture}</span>
+              <h3 className="font-display font-semibold text-sm text-ink-100 group-hover:text-accent-300 transition-colors tracking-tight">
+                {m.title}
+              </h3>
+              <span className="text-[10px] font-mono uppercase tracking-wider text-ink-500 px-1.5 py-0.5 rounded border border-ink-700/50">
+                {m.architecture}
+              </span>
             </div>
-            <p className="text-xs text-ink-500 line-clamp-2 mb-3 leading-relaxed">{m.description}</p>
+            <p className="text-xs text-ink-500 line-clamp-2 mb-3 leading-relaxed">
+              {m.description}
+            </p>
             <div className="flex flex-wrap gap-1.5">
               <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-accent-500/10 text-accent-400 border border-accent-500/15">
                 {m.active_parameters ? `${m.parameters}/${m.active_parameters}` : m.parameters}
               </span>
               {m.npus.slice(0, 2).map((n) => (
-                <span key={n} className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/15">{n}</span>
+                <span
+                  key={n}
+                  className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/15"
+                >
+                  {n}
+                </span>
               ))}
             </div>
           </a>

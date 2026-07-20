@@ -9,10 +9,8 @@ interface Props {
   description?: string;
 }
 
-const {
-  title = translations.en.siteTitle,
-  description = translations.en.siteDescription,
-} = Astro.props;
+const { title = translations.en.siteTitle, description = translations.en.siteDescription } =
+  Astro.props;
 
 const baseUrl = 'https://vllm-ascend.github.io/vllm-ascend-recipes';
 const base = import.meta.env.BASE_URL;
@@ -20,7 +18,7 @@ const basePrefix = base.endsWith('/') ? base : base + '/';
 const baseSuffix = base.endsWith('/') ? base.slice(0, -1) : base;
 ---
 
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en" class="dark scroll-smooth">
   <head>
     <meta charset="UTF-8" />
@@ -48,25 +46,61 @@ const baseSuffix = base.endsWith('/') ? base.slice(0, -1) : base;
   <body class="min-h-screen flex flex-col relative">
     <div class="fixed inset-0 grid-pattern pointer-events-none" style="z-index:0"></div>
 
-    <header class="sticky top-0 z-50 border-b border-ink-800/50 backdrop-blur-xl bg-ink-950/70 relative">
+    <header
+      class="sticky top-0 z-50 border-b border-ink-800/50 backdrop-blur-xl bg-ink-950/70 relative"
+    >
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="h-14 flex items-center justify-between">
           <a href={baseSuffix} class="flex items-center gap-2.5 group">
-            <span class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-accent-500/10 border border-accent-500/20 text-accent-400">
-              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
-                <rect x="6" y="6" width="12" height="12" rx="2" />
-                <path d="M9 2v2M12 2v2M15 2v2M9 20v2M12 20v2M15 20v2M2 9h2M2 12h2M2 15h2M20 9h2M20 12h2M20 15h2" stroke-linecap="round" />
+            <span
+              class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-accent-500/10 border border-accent-500/20 text-accent-400"
+            >
+              <svg
+                class="w-4 h-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                stroke-width="1.8"
+              >
+                <rect x="6" y="6" width="12" height="12" rx="2"></rect>
+                <path
+                  d="M9 2v2M12 2v2M15 2v2M9 20v2M12 20v2M15 20v2M2 9h2M2 12h2M2 15h2M20 9h2M20 12h2M20 15h2"
+                  stroke-linecap="round"></path>
               </svg>
             </span>
-            <span class="font-display font-semibold text-sm tracking-tight text-ink-100 group-hover:text-accent-300 transition-colors">
-              vllm-ascend<span class="text-ink-600">/</span><span class="text-accent-400">recipes</span>
+            <span
+              class="font-display font-semibold text-sm tracking-tight text-ink-100 group-hover:text-accent-300 transition-colors"
+            >
+              vllm-ascend<span class="text-ink-600">/</span><span class="text-accent-400"
+                >recipes</span
+              >
             </span>
           </a>
           <nav class="flex items-center gap-1 sm:gap-2">
-            <a href={`${basePrefix}browse`} class="px-3 py-1.5 text-xs font-medium text-ink-400 hover:text-accent-400 transition-colors rounded-md hover:bg-accent-500/5" data-i18n="navBrowse">Browse</a>
-            <a href="https://docs.vllm.ai/projects/ascend/" target="_blank" rel="noopener" class="px-3 py-1.5 text-xs font-medium text-ink-400 hover:text-accent-400 transition-colors rounded-md hover:bg-accent-500/5" data-i18n="navDocs">Docs</a>
-            <a href="https://github.com/vllm-project/vllm-ascend" target="_blank" rel="noopener" class="px-3 py-1.5 text-xs font-medium text-ink-400 hover:text-accent-400 transition-colors rounded-md hover:bg-accent-500/5">GitHub</a>
-            <a href={`${basePrefix}models.json`} class="px-3 py-1.5 text-xs font-mono text-ink-500 hover:text-accent-400 transition-colors rounded-md hover:bg-accent-500/5">.json</a>
+            <a
+              href={`${basePrefix}browse`}
+              class="px-3 py-1.5 text-xs font-medium text-ink-400 hover:text-accent-400 transition-colors rounded-md hover:bg-accent-500/5"
+              data-i18n="navBrowse">Browse</a
+            >
+            <a
+              href="https://docs.vllm.ai/projects/ascend/"
+              target="_blank"
+              rel="noopener"
+              class="px-3 py-1.5 text-xs font-medium text-ink-400 hover:text-accent-400 transition-colors rounded-md hover:bg-accent-500/5"
+              data-i18n="navDocs">Docs</a
+            >
+            <a
+              href="https://github.com/vllm-project/vllm-ascend"
+              target="_blank"
+              rel="noopener"
+              class="px-3 py-1.5 text-xs font-medium text-ink-400 hover:text-accent-400 transition-colors rounded-md hover:bg-accent-500/5"
+              >GitHub</a
+            >
+            <a
+              href={`${basePrefix}models.json`}
+              class="px-3 py-1.5 text-xs font-mono text-ink-500 hover:text-accent-400 transition-colors rounded-md hover:bg-accent-500/5"
+              >.json</a
+            >
             <div class="w-px h-5 bg-ink-800 mx-1"></div>
             <LanguageToggle client:load />
             <ThemeToggle client:load />
@@ -83,13 +117,27 @@ const baseSuffix = base.endsWith('/') ? base.slice(0, -1) : base;
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div class="flex flex-col sm:flex-row items-center justify-between gap-3">
           <div class="flex items-center gap-2 text-xs text-ink-500 font-mono">
-            <svg class="w-3 h-3 text-accent-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
-              <rect x="6" y="6" width="12" height="12" rx="2" />
-              <path d="M9 2v2M12 2v2M15 2v2M9 20v2M12 20v2M15 20v2M2 9h2M2 12h2M2 15h2M20 9h2M20 12h2M20 15h2" stroke-linecap="round" />
+            <svg
+              class="w-3 h-3 text-accent-500"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              stroke-width="1.8"
+            >
+              <rect x="6" y="6" width="12" height="12" rx="2"></rect>
+              <path
+                d="M9 2v2M12 2v2M15 2v2M9 20v2M12 20v2M15 20v2M2 9h2M2 12h2M2 15h2M20 9h2M20 12h2M20 15h2"
+                stroke-linecap="round"></path>
             </svg>
             <span data-i18n="footerText">Community-maintained vllm-ascend deployment recipes</span>
           </div>
-          <a href={`https://github.com/vllm-ascend/vllm-ascend-recipes/edit/main/models/`} target="_blank" rel="noopener" class="text-xs font-mono text-ink-500 hover:text-accent-400 transition-colors" data-i18n="contribute">
+          <a
+            href={`https://github.com/vllm-ascend/vllm-ascend-recipes/edit/main/models/`}
+            target="_blank"
+            rel="noopener"
+            class="text-xs font-mono text-ink-500 hover:text-accent-400 transition-colors"
+            data-i18n="contribute"
+          >
             [ contribute ]
           </a>
         </div>
@@ -108,8 +156,8 @@ const baseSuffix = base.endsWith('/') ? base.slice(0, -1) : base;
         });
       }
 
-      const savedLang = localStorage.getItem('lang') || 'en';
-      applyLang(savedLang);
+      const savedLangValue = localStorage.getItem('lang') || 'en';
+      applyLang(savedLangValue);
 
       window.addEventListener('langchange', (e) => {
         applyLang(e.detail);

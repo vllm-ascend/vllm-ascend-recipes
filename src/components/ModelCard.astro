@@ -13,13 +13,20 @@ const { model } = Astro.props;
   href={model.url}
   class="group relative block p-5 rounded-lg border border-ink-800/60 hover:border-accent-500/30 bg-ink-900/40 hover:bg-ink-900/60 transition-all duration-200 overflow-hidden"
 >
-  <div class="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-accent-500/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+  <div
+    class="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-accent-500/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"
+  >
+  </div>
 
   <div class="flex items-start justify-between mb-2">
-    <h3 class="font-display font-semibold text-sm text-ink-100 group-hover:text-accent-300 transition-colors tracking-tight">
+    <h3
+      class="font-display font-semibold text-sm text-ink-100 group-hover:text-accent-300 transition-colors tracking-tight"
+    >
       {model.title}
     </h3>
-    <span class="text-[10px] font-mono uppercase tracking-wider text-ink-500 px-1.5 py-0.5 rounded border border-ink-700/50">
+    <span
+      class="text-[10px] font-mono uppercase tracking-wider text-ink-500 px-1.5 py-0.5 rounded border border-ink-700/50"
+    >
       {model.architecture}
     </span>
   </div>
@@ -29,19 +36,29 @@ const { model } = Astro.props;
   </p>
 
   <div class="flex flex-wrap gap-1.5">
-    <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-accent-500/10 text-accent-400 border border-accent-500/15">
+    <span
+      class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-accent-500/10 text-accent-400 border border-accent-500/15"
+    >
       {formatParameters(model.parameters, model.active_parameters)}
     </span>
-    <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-400 border border-violet-500/15">
+    <span
+      class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-400 border border-violet-500/15"
+    >
       {formatContextLength(model.context_length)}
     </span>
-    <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/15">
+    <span
+      class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/15"
+    >
       {model.modality}
     </span>
-    {model.npus.slice(0, 2).map((n) => (
-      <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/15">
-        {n}
-      </span>
-    ))}
+    {
+      model.npus
+        .slice(0, 2)
+        .map((n) => (
+          <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/15">
+            {n}
+          </span>
+        ))
+    }
   </div>
 </a>

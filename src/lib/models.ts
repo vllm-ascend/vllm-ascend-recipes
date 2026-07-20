@@ -27,7 +27,7 @@ function loadGlob(lang: 'en' | 'zh') {
         _model_slug: modelSlug,
         _yaml_path: path,
       } as Model;
-    })
+    }),
   );
 }
 
@@ -36,13 +36,19 @@ export async function getAllModels(lang: 'en' | 'zh' = 'en'): Promise<Model[]> {
   return entries.sort((a, b) => b.updated.localeCompare(a.updated));
 }
 
-export async function getModel(provider: string, model: string, lang: 'en' | 'zh' = 'en'): Promise<Model | null> {
+export async function getModel(
+  provider: string,
+  model: string,
+  lang: 'en' | 'zh' = 'en',
+): Promise<Model | null> {
   const all = await getAllModels(lang);
-  return all.find(
-    (m) =>
-      m._provider_slug.toLowerCase() === provider.toLowerCase() &&
-      m._model_slug.toLowerCase() === model.toLowerCase()
-  ) ?? null;
+  return (
+    all.find(
+      (m) =>
+        m._provider_slug.toLowerCase() === provider.toLowerCase() &&
+        m._model_slug.toLowerCase() === model.toLowerCase(),
+    ) ?? null
+  );
 }
 
 export async function getProviders(lang: 'en' | 'zh' = 'en'): Promise<ProviderInfo[]> {

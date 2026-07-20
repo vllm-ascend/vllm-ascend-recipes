@@ -33,15 +33,26 @@ function renderMarkdown(md: string): string {
     return `%%CODEBLOCK_${codeBlocks.length - 1}%%`;
   });
 
-  html = html.replace(/^> (.+)$/gm, '<blockquote class="border-l-2 border-accent-500/40 pl-4 py-2 my-4 bg-accent-500/5 rounded-r text-sm text-ink-400">$1</blockquote>');
+  html = html.replace(
+    /^> (.+)$/gm,
+    '<blockquote class="border-l-2 border-accent-500/40 pl-4 py-2 my-4 bg-accent-500/5 rounded-r text-sm text-ink-400">$1</blockquote>',
+  );
 
   const lines = html.split('\n');
   const result: string[] = [];
 
   for (const line of lines) {
-    if (line.trim() && !line.startsWith('<') && !line.startsWith('```') && !line.startsWith('%%CODEBLOCK_')) {
+    if (
+      line.trim() &&
+      !line.startsWith('<') &&
+      !line.startsWith('```') &&
+      !line.startsWith('%%CODEBLOCK_')
+    ) {
       const processed = line
-        .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener" class="text-accent-400 hover:text-accent-300 border-b border-accent-500/30">$1</a>')
+        .replace(
+          /\[([^\]]+)\]\(([^)]+)\)/g,
+          '<a href="$2" target="_blank" rel="noopener" class="text-accent-400 hover:text-accent-300 border-b border-accent-500/30">$1</a>',
+        )
         .replace(/`([^`]+)`/g, '<code>$1</code>');
       result.push(`<p class="text-sm text-ink-400 leading-relaxed mb-4">${processed}</p>`);
     } else {
@@ -66,7 +77,7 @@ export default function WeightDownloadTabs({ downloadsEn, downloadsZh }: WeightD
   if (!currentSource) return null;
 
   const effectiveSourceIdx = currentDownload.sources.findIndex(
-    (s) => s.source === currentSource.source
+    (s) => s.source === currentSource.source,
   );
 
   const tabClass = (active: boolean) =>
@@ -83,7 +94,10 @@ export default function WeightDownloadTabs({ downloadsEn, downloadsZh }: WeightD
           {downloads.map((d, i) => (
             <button
               key={i}
-              onClick={() => { setVersionIdx(i); setSourceIdx(0); }}
+              onClick={() => {
+                setVersionIdx(i);
+                setSourceIdx(0);
+              }}
               className={tabClass(versionIdx === i)}
             >
               {d.weight_version}
@@ -104,16 +118,25 @@ export default function WeightDownloadTabs({ downloadsEn, downloadsZh }: WeightD
         ))}
       </div>
 
-      <div className="prose" dangerouslySetInnerHTML={{ __html: renderMarkdown(currentSource.command) }} />
+      <div
+        className="prose"
+        dangerouslySetInnerHTML={{ __html: renderMarkdown(currentSource.command) }}
+      />
 
       {currentSource.url && (
         <a
           href={currentSource.url}
           target="_blank"
-          rel="noopener"
+          rel="noopener noreferrer"
           className="inline-flex items-center gap-1.5 mt-3 text-xs font-mono text-accent-400 hover:text-accent-300 transition-colors"
         >
-          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <svg
+            className="w-3.5 h-3.5"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
             <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
           </svg>
           {t('goSource')} {currentSource.source}

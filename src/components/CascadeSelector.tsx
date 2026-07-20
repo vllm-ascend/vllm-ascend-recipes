@@ -51,35 +51,60 @@ function renderMarkdown(md: string): string {
       .replace(/>/g, '&gt;')
       .trimEnd();
     const idx = codeBlocks.length;
-    codeBlocks.push(`<div class="code-block group relative"><div class="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity z-10"><button class="copy-btn px-2 py-1 text-[10px] font-mono rounded border border-ink-700 bg-ink-800 text-ink-400 hover:text-accent-400 hover:border-accent-500/30 transition-colors" data-code="${encodeURIComponent(copyCode)}">copy</button></div><pre><code class="language-${lang || 'bash'}">${escaped}</code></pre></div>`);
+    codeBlocks.push(
+      `<div class="code-block group relative"><div class="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity z-10"><button class="copy-btn px-2 py-1 text-[10px] font-mono rounded border border-ink-700 bg-ink-800 text-ink-400 hover:text-accent-400 hover:border-accent-500/30 transition-colors" data-code="${encodeURIComponent(copyCode)}">copy</button></div><pre><code class="language-${lang || 'bash'}">${escaped}</code></pre></div>`,
+    );
     return `%%CODEBLOCK_${idx}%%`;
   });
 
   html = html.replace(/(?:^\|.+\|$\n?)+/gm, (match) => {
     const rows = match.trim().split('\n');
-    let tableHtml = '<div class="overflow-x-auto rounded-lg border border-ink-800/60 mb-4"><table class="w-full text-sm">';
+    let tableHtml =
+      '<div class="overflow-x-auto rounded-lg border border-ink-800/60 mb-4"><table class="w-full text-sm">';
     let headerDone = false;
     for (const row of rows) {
-      const cells = row.split('|').filter(c => c.trim() !== '');
-      if (cells.every(c => /^:?-{3,}:?$/.test(c.trim()))) { headerDone = true; continue; }
-      const cellHtml = cells.map((c, i) => {
-        const tag = !headerDone && i === 0 ? 'th' : 'td';
-        const cls = tag === 'th'
-          ? 'text-left py-2.5 px-4 font-mono text-xs font-medium text-ink-300 uppercase tracking-wider'
-          : 'py-2.5 px-4 text-ink-400 font-mono text-xs';
-        return `<${tag} class="${cls}">${c.trim()}</${tag}>`;
-      }).join('');
-      if (!headerDone) { tableHtml += `<thead><tr class="border-b border-ink-800/60 bg-ink-900/40">${cellHtml}</tr></thead>`; headerDone = true; }
-      else { tableHtml += `<tbody><tr class="border-b border-ink-800/40 last:border-0 hover:bg-ink-900/30 transition-colors">${cellHtml}</tr></tbody>`; }
+      const cells = row.split('|').filter((c) => c.trim() !== '');
+      if (cells.every((c) => /^:?-{3,}:?$/.test(c.trim()))) {
+        headerDone = true;
+        continue;
+      }
+      const cellHtml = cells
+        .map((c, i) => {
+          const tag = !headerDone && i === 0 ? 'th' : 'td';
+          const cls =
+            tag === 'th'
+              ? 'text-left py-2.5 px-4 font-mono text-xs font-medium text-ink-300 uppercase tracking-wider'
+              : 'py-2.5 px-4 text-ink-400 font-mono text-xs';
+          return `<${tag} class="${cls}">${c.trim()}</${tag}>`;
+        })
+        .join('');
+      if (!headerDone) {
+        tableHtml += `<thead><tr class="border-b border-ink-800/60 bg-ink-900/40">${cellHtml}</tr></thead>`;
+        headerDone = true;
+      } else {
+        tableHtml += `<tbody><tr class="border-b border-ink-800/40 last:border-0 hover:bg-ink-900/30 transition-colors">${cellHtml}</tr></tbody>`;
+      }
     }
     tableHtml += '</table></div>';
     return tableHtml;
   });
 
-  html = html.replace(/^#### (.+)$/gm, '<h4 class="font-display text-sm font-semibold mt-4 mb-2 text-ink-300">$1</h4>');
-  html = html.replace(/^### (.+)$/gm, '<h3 class="font-display text-base font-semibold mt-6 mb-2 text-ink-200">$1</h3>');
-  html = html.replace(/^## (.+)$/gm, '<h2 class="font-display text-lg font-semibold mt-6 mb-3 text-ink-100">$1</h2>');
-  html = html.replace(/^> (.+)$/gm, '<blockquote class="border-l-2 border-accent-500/40 pl-4 py-2 my-4 bg-accent-500/5 rounded-r text-sm text-ink-400">$1</blockquote>');
+  html = html.replace(
+    /^#### (.+)$/gm,
+    '<h4 class="font-display text-sm font-semibold mt-4 mb-2 text-ink-300">$1</h4>',
+  );
+  html = html.replace(
+    /^### (.+)$/gm,
+    '<h3 class="font-display text-base font-semibold mt-6 mb-2 text-ink-200">$1</h3>',
+  );
+  html = html.replace(
+    /^## (.+)$/gm,
+    '<h2 class="font-display text-lg font-semibold mt-6 mb-3 text-ink-100">$1</h2>',
+  );
+  html = html.replace(
+    /^> (.+)$/gm,
+    '<blockquote class="border-l-2 border-accent-500/40 pl-4 py-2 my-4 bg-accent-500/5 rounded-r text-sm text-ink-400">$1</blockquote>',
+  );
 
   const lines = html.split('\n');
   const result: string[] = [];
@@ -88,36 +113,59 @@ function renderMarkdown(md: string): string {
 
   function flushParagraph() {
     if (paragraphBuf.length > 0) {
-      result.push(`<p class="text-sm text-ink-400 leading-relaxed mb-4">${paragraphBuf.join('<br />\n')}</p>`);
+      result.push(
+        `<p class="text-sm text-ink-400 leading-relaxed mb-4">${paragraphBuf.join('<br />\n')}</p>`,
+      );
       paragraphBuf = [];
     }
   }
 
   for (const line of lines) {
     if (!line.trim()) {
-      if (inList) { result.push('</ul>'); inList = false; }
+      if (inList) {
+        result.push('</ul>');
+        inList = false;
+      }
       flushParagraph();
       continue;
     }
     if (line.match(/^- (.+)$/)) {
       flushParagraph();
-      if (!inList) { result.push('<ul class="list-none p-0 m-0 mb-4 space-y-1">'); inList = true; }
-      const itemContent = line.replace(/^- (.+)$/, '$1')
-        .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener" class="text-accent-400 hover:text-accent-300 border-b border-accent-500/30">$1</a>')
+      if (!inList) {
+        result.push('<ul class="list-none p-0 m-0 mb-4 space-y-1">');
+        inList = true;
+      }
+      const itemContent = line
+        .replace(/^- (.+)$/, '$1')
+        .replace(
+          /\[([^\]]+)\]\(([^)]+)\)/g,
+          '<a href="$2" target="_blank" rel="noopener" class="text-accent-400 hover:text-accent-300 border-b border-accent-500/30">$1</a>',
+        )
         .replace(/`([^`]+)`/g, '<code>$1</code>')
         .replace(/\*\*(.+?)\*\*/g, '<strong class="text-ink-200 font-semibold">$1</strong>');
-      result.push(`<li class="text-sm text-ink-400 pl-4 relative before:content-['▸'] before:absolute before:left-0 before:text-accent-500 before:text-xs before:top-0.5">${itemContent}</li>`);
+      result.push(
+        `<li class="text-sm text-ink-400 pl-4 relative before:content-['▸'] before:absolute before:left-0 before:text-accent-500 before:text-xs before:top-0.5">${itemContent}</li>`,
+      );
       continue;
     }
     if (line.startsWith('<') || line.startsWith('%%CODEBLOCK_')) {
-      if (inList) { result.push('</ul>'); inList = false; }
+      if (inList) {
+        result.push('</ul>');
+        inList = false;
+      }
       flushParagraph();
       result.push(line);
       continue;
     }
-    if (inList) { result.push('</ul>'); inList = false; }
+    if (inList) {
+      result.push('</ul>');
+      inList = false;
+    }
     const processed = line
-      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener" class="text-accent-400 hover:text-accent-300 border-b border-accent-500/30">$1</a>')
+      .replace(
+        /\[([^\]]+)\]\(([^)]+)\)/g,
+        '<a href="$2" target="_blank" rel="noopener" class="text-accent-400 hover:text-accent-300 border-b border-accent-500/30">$1</a>',
+      )
       .replace(/`([^`]+)`/g, '<code>$1</code>')
       .replace(/\*\*(.+?)\*\*/g, '<strong class="text-ink-200 font-semibold">$1</strong>');
     paragraphBuf.push(processed);
@@ -135,7 +183,7 @@ const CONFIG_COLORS: Record<string, string> = {
   'mtp-spec-decoding': 'text-amber-400',
   'prefix-caching': 'text-emerald-400',
   'async-scheduling': 'text-sky-400',
-  'flashcomm1': 'text-rose-400',
+  flashcomm1: 'text-rose-400',
   'npugraph-ex': 'text-violet-400',
   'cpu-binding': 'text-cyan-400',
   'dsa-cp': 'text-orange-400',
@@ -172,8 +220,8 @@ function applyConfigReplace(
   );
   // Clean up: remove blank lines, trailing commas, and consecutive empty lines
   // left by removed config blocks (including inside JSON objects)
-  result = result.replace(/,\s*\n/g, '\n');         // remove trailing comma + newline
-  result = result.replace(/^\s*\n/gm, '');           // remove blank lines
+  result = result.replace(/,\s*\n/g, '\n'); // remove trailing comma + newline
+  result = result.replace(/^\s*\n/gm, ''); // remove blank lines
   result = result.replace(/\n\s*\n\s*\n/g, '\n\n'); // collapse multiple blank lines
   return result;
 }
@@ -181,7 +229,7 @@ function applyConfigReplace(
 // ---- Color highlight applier ----
 // Replaces %%HL:key%%...%%/HL:key%% markers with colored <span> tags.
 // Called on the FINAL rendered HTML (after renderMarkdown) so spans don't get escaped.
-function applyColorHighlights(html: string, selectedConfigs: Set<string>): string {
+function applyColorHighlights(html: string, _selectedConfigs: Set<string>): string {
   return html.replace(
     /%%HL:(\w[\w-]*)%%([\s\S]*?)%%\/HL:\1%%/g,
     (_, key: string, content: string) => {
@@ -200,9 +248,8 @@ export default function CascadeSelector({
 }: CascadeSelectorProps) {
   const { lang, t } = useLang();
   const scenarios = lang === 'zh' ? scenariosZh : scenariosEn;
-  const extraConfig = lang === 'zh'
-    ? (extraConfigZh ?? extraConfigEn)
-    : (extraConfigEn ?? extraConfigZh);
+  const extraConfig =
+    lang === 'zh' ? (extraConfigZh ?? extraConfigEn) : (extraConfigEn ?? extraConfigZh);
 
   const npus = useMemo(() => {
     const set = new Set<string>();
@@ -253,7 +300,12 @@ export default function CascadeSelector({
   const cases = useMemo(() => {
     const set = new Set<string>();
     scenarios
-      .filter((s) => s.npu === selectedNpu && s.precision === effectivePrecision && s.deployment === effectiveDeployment)
+      .filter(
+        (s) =>
+          s.npu === selectedNpu &&
+          s.precision === effectivePrecision &&
+          s.deployment === effectiveDeployment,
+      )
       .forEach((s) => set.add(s.case));
     return Array.from(set);
   }, [scenarios, selectedNpu, effectivePrecision, effectiveDeployment]);
@@ -266,12 +318,14 @@ export default function CascadeSelector({
     }
   }, [cases, selectedCase]);
 
-  const effectiveCase = cases.includes(selectedCase)
-    ? selectedCase
-    : cases[0] || '';
+  const effectiveCase = cases.includes(selectedCase) ? selectedCase : cases[0] || '';
 
   const currentScenario = scenarios.find(
-    (s) => s.npu === selectedNpu && s.precision === effectivePrecision && s.deployment === effectiveDeployment && s.case === effectiveCase
+    (s) =>
+      s.npu === selectedNpu &&
+      s.precision === effectivePrecision &&
+      s.deployment === effectiveDeployment &&
+      s.case === effectiveCase,
   );
 
   // Step tab state — reset when scenario changes
@@ -299,7 +353,8 @@ export default function CascadeSelector({
   const toggleConfig = (key: string) => {
     setSelectedConfigs((prev) => {
       const next = new Set(prev);
-      if (next.has(key)) next.delete(key); else next.add(key);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       return next;
     });
   };
@@ -310,6 +365,20 @@ export default function CascadeSelector({
         ? 'bg-accent-500/10 text-accent-400 border border-accent-500/30'
         : 'border border-ink-700/60 text-ink-400 hover:text-ink-200 hover:border-ink-600 bg-ink-900/50'
     }`;
+
+  // Resolve rendered content for current step (hooks must run before any
+  // early return to keep call order stable across renders)
+  const currentStep = currentScenario?.steps[activeStep];
+  const rawContent = useMemo(() => {
+    if (!currentStep) return '';
+    return applyConfigReplace(currentStep.content, selectedConfigs, currentStep.config_values);
+  }, [currentStep, selectedConfigs]);
+
+  const renderedHtml = useMemo(() => {
+    if (!rawContent) return '';
+    const mdHtml = renderMarkdown(rawContent);
+    return applyColorHighlights(mdHtml, selectedConfigs);
+  }, [rawContent, selectedConfigs]);
 
   if (npus.length === 0) return null;
 
@@ -323,23 +392,20 @@ export default function CascadeSelector({
 
   const rows: FilterRow[] = [
     { label: t('labelNpu'), options: npus, selected: selectedNpu, onSelect: setSelectedNpu },
-    { label: t('labelPrecision'), options: precisions, selected: effectivePrecision, onSelect: setSelectedPrecision },
-    { label: t('labelDeployment'), options: deployments, selected: effectiveDeployment, onSelect: setSelectedDeployment },
+    {
+      label: t('labelPrecision'),
+      options: precisions,
+      selected: effectivePrecision,
+      onSelect: setSelectedPrecision,
+    },
+    {
+      label: t('labelDeployment'),
+      options: deployments,
+      selected: effectiveDeployment,
+      onSelect: setSelectedDeployment,
+    },
     { label: t('labelCase'), options: cases, selected: effectiveCase, onSelect: setSelectedCase },
   ];
-
-  // Resolve rendered content for current step
-  const currentStep = currentScenario?.steps[activeStep];
-  const rawContent = useMemo(() => {
-    if (!currentStep) return '';
-    return applyConfigReplace(currentStep.content, selectedConfigs, currentStep.config_values);
-  }, [currentStep, selectedConfigs]);
-
-  const renderedHtml = useMemo(() => {
-    if (!rawContent) return '';
-    const mdHtml = renderMarkdown(rawContent);
-    return applyColorHighlights(mdHtml, selectedConfigs);
-  }, [rawContent, selectedConfigs]);
 
   return (
     <div>
@@ -352,9 +418,7 @@ export default function CascadeSelector({
               ri < rows.length - 1 ? 'border-b border-ink-800/40' : ''
             }`}
           >
-            <span className="shrink-0 w-24 pt-0.5 text-xs font-mono text-ink-300">
-              {row.label}
-            </span>
+            <span className="shrink-0 w-24 pt-0.5 text-xs font-mono text-ink-300">{row.label}</span>
             <div className="flex flex-wrap gap-1.5">
               {row.options.map((opt) => (
                 <button
@@ -391,7 +455,9 @@ export default function CascadeSelector({
                         : 'border border-ink-700/60 text-ink-400 hover:text-ink-200 hover:border-ink-600 bg-ink-900/50'
                     }`}
                   >
-                    <span className={`inline-block w-2 h-2 rounded-full ${bgClass} ${isSelected ? 'opacity-100' : 'opacity-30'}`}></span>
+                    <span
+                      className={`inline-block w-2 h-2 rounded-full ${bgClass} ${isSelected ? 'opacity-100' : 'opacity-30'}`}
+                    ></span>
                     {cfg.label}
                   </button>
                 );
@@ -406,7 +472,9 @@ export default function CascadeSelector({
         <div className="rounded-lg border border-ink-800/60 overflow-hidden">
           {/* Step tabs header */}
           <div className="flex items-center border-b border-ink-800/60 bg-ink-900/70">
-            <span className="shrink-0 px-3 text-[10px] font-mono font-bold text-ink-300 uppercase tracking-wider">{t('step') || 'Steps'}</span>
+            <span className="shrink-0 px-3 text-[10px] font-mono font-bold text-ink-300 uppercase tracking-wider">
+              {t('step') || 'Steps'}
+            </span>
             {currentScenario.steps.map((step, i) => (
               <button
                 key={i}

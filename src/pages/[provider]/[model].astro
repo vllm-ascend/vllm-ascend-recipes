@@ -12,7 +12,7 @@ import type { Model } from '../../lib/types';
 export const getStaticPaths = (async () => {
   const modelsEn = await getAllModels('en');
   const modelsZh = await getAllModels('zh');
-  const zhMap = new Map(modelsZh.map(m => [`${m._provider_slug}/${m._model_slug}`, m]));
+  const zhMap = new Map(modelsZh.map((m) => [`${m._provider_slug}/${m._model_slug}`, m]));
 
   return modelsEn.map((modelEn) => {
     const key = `${modelEn._provider_slug}/${modelEn._model_slug}`;
@@ -24,7 +24,10 @@ export const getStaticPaths = (async () => {
   });
 }) satisfies GetStaticPaths;
 
-interface Props { modelEn: Model; modelZh: Model; }
+interface Props {
+  modelEn: Model;
+  modelZh: Model;
+}
 
 const { modelEn, modelZh } = Astro.props;
 const model = modelEn;
@@ -47,20 +50,21 @@ for (const wd of modelEn.weight_download) {
     }
   }
 }
-const sectionTitle = "font-display text-lg font-semibold text-ink-50 tracking-tight mb-4";
+const sectionTitle = 'font-display text-lg font-semibold text-ink-50 tracking-tight mb-4';
 
 // Build TOC items: each with an anchor id and an i18n key for the label
-interface TocItem { id: string; i18n: string }
+interface TocItem {
+  id: string;
+  i18n: string;
+}
 const tocItems: TocItem[] = [];
-function addToc(id: string, i18n: string) { tocItems.push({ id, i18n }); }
+function addToc(id: string, i18n: string) {
+  tocItems.push({ id, i18n });
+}
 
 addToc('prepare', 'sectionPrepare');
 addToc('scenarios', 'sectionScenario');
 addToc('reference', 'sectionMoreInfo');
-
-function renderDesc(text: string) {
-  return `<p>${text}</p>`;
-}
 ---
 
 <BaseLayout title={`${model.title} | vLLM-Ascend Recipes`} description={modelEn.description}>
@@ -69,127 +73,159 @@ function renderDesc(text: string) {
       <!-- TOC sidebar -->
       <aside class="hidden lg:block w-48 shrink-0">
         <nav class="sticky top-20">
-          <p class="text-[10px] font-mono uppercase tracking-widest text-ink-600 mb-3">On this page</p>
+          <p class="text-[10px] font-mono uppercase tracking-widest text-ink-600 mb-3">
+            On this page
+          </p>
           <ul class="space-y-0.5 border-l border-ink-800/50">
-            {tocItems.map((item) => (
-              <li>
-                <a
-                  href={`#${item.id}`}
-                  class="block py-1.5 pl-3 text-xs font-mono text-ink-500 hover:text-accent-400 hover:border-l-2 hover:border-accent-400 -ml-px transition-colors"
-                  data-i18n={item.i18n}
-                ></a>
-              </li>
-            ))}
+            {
+              tocItems.map((item) => (
+                <li>
+                  <a
+                    href={`#${item.id}`}
+                    class="block py-1.5 pl-3 text-xs font-mono text-ink-500 hover:text-accent-400 hover:border-l-2 hover:border-accent-400 -ml-px transition-colors"
+                    data-i18n={item.i18n}
+                  />
+                </li>
+              ))
+            }
           </ul>
         </nav>
       </aside>
 
       <!-- Main content -->
       <div class="min-w-0 flex-1">
-
-    <div class="mb-8">
-      <div class="flex items-center gap-1.5 text-xs font-mono text-ink-600 mb-4">
-        <a href={baseSuffix} class="hover:text-accent-400 transition-colors" data-i18n="home">~</a>
-        <span>/</span>
-        <a href={`${basePrefix}browse`} class="hover:text-accent-400 transition-colors" data-i18n="navBrowse">browse</a>
-        <span>/</span>
-        <span class="text-ink-500">{model._provider_slug}</span>
-      </div>
-
-      <h1 class="font-display text-3xl font-bold text-ink-50 tracking-tight mb-2">{model.title}</h1>
-      <div class="text-sm text-ink-400 max-w-2xl leading-relaxed mb-4">
-        <MarkdownContent markdown={modelEn.description} lang="en" />
-        <MarkdownContent markdown={modelZh.description} lang="zh" hidden />
-      </div>
-
-      <div class="flex flex-wrap gap-2 mb-4">
-        <Tag label={model.architecture === 'moe' ? 'MoE' : 'Dense'} color="purple" />
-        <Tag label={formatParameters(model.parameters, model.active_parameters)} color="accent" />
-        <Tag label={formatContextLength(model.context_length)} color="orange" />
-        <Tag label={model.modality} color="gray" />
-        {npus.map((npu) => <Tag label={npu} color="blue" />)}
-      </div>
-
-      {weightLinks.length > 0 && (
-        <div class="flex flex-wrap gap-1.5 mt-1 mb-4">
-          {weightLinks.map((wl) => (
+        <div class="mb-8">
+          <div class="flex items-center gap-1.5 text-xs font-mono text-ink-600 mb-4">
+            <a href={baseSuffix} class="hover:text-accent-400 transition-colors" data-i18n="home"
+              >~</a
+            >
+            <span>/</span>
             <a
-              href={wl.url}
+              href={`${basePrefix}browse`}
+              class="hover:text-accent-400 transition-colors"
+              data-i18n="navBrowse">browse</a
+            >
+            <span>/</span>
+            <span class="text-ink-500">{model._provider_slug}</span>
+          </div>
+
+          <h1 class="font-display text-3xl font-bold text-ink-50 tracking-tight mb-2">
+            {model.title}
+          </h1>
+          <div class="text-sm text-ink-400 max-w-2xl leading-relaxed mb-4">
+            <MarkdownContent markdown={modelEn.description} lang="en" />
+            <MarkdownContent markdown={modelZh.description} lang="zh" hidden />
+          </div>
+
+          <div class="flex flex-wrap gap-2 mb-4">
+            <Tag label={model.architecture === 'moe' ? 'MoE' : 'Dense'} color="purple" />
+            <Tag
+              label={formatParameters(model.parameters, model.active_parameters)}
+              color="accent"
+            />
+            <Tag label={formatContextLength(model.context_length)} color="orange" />
+            <Tag label={model.modality} color="gray" />
+            {npus.map((npu) => <Tag label={npu} color="blue" />)}
+          </div>
+
+          {
+            weightLinks.length > 0 && (
+              <div class="flex flex-wrap gap-1.5 mt-1 mb-4">
+                {weightLinks.map((wl) => (
+                  <a
+                    href={wl.url}
+                    target="_blank"
+                    rel="noopener"
+                    class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-mono text-ink-500 hover:text-accent-400 border border-transparent hover:border-accent-500/20 rounded transition-colors"
+                  >
+                    <svg
+                      class="w-3 h-3"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      stroke-width="2"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                      />
+                    </svg>
+                    <span data-i18n="viewOn">View on</span> {wl.source}
+                  </a>
+                ))}
+              </div>
+            )
+          }
+
+          <div class="flex items-center gap-3 text-[11px] font-mono text-ink-600">
+            <span><span data-i18n="updated">Updated</span>: {model.updated}</span>
+            <span>·</span>
+            <a
+              href={editUrl}
               target="_blank"
               rel="noopener"
-              class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-mono text-ink-500 hover:text-accent-400 border border-transparent hover:border-accent-500/20 rounded transition-colors"
+              class="hover:text-accent-400 transition-colors"
+              data-i18n="editRecipe"
             >
-              <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-              </svg>
-              <span data-i18n="viewOn">View on</span> {wl.source}
+              [ edit ]
             </a>
-          ))}
+          </div>
         </div>
-      )}
 
-      <div class="flex items-center gap-3 text-[11px] font-mono text-ink-600">
-        <span><span data-i18n="updated">Updated</span>: {model.updated}</span>
-        <span>·</span>
-        <a href={editUrl} target="_blank" rel="noopener" class="hover:text-accent-400 transition-colors" data-i18n="editRecipe">
-          [ edit ]
-        </a>
-      </div>
-    </div>
+        <div class="section-divider"></div>
 
-    <div class="section-divider"></div>
+        <section class="py-8" id="prepare">
+          <h2 class={sectionTitle} data-i18n="sectionPrepare">Preparation</h2>
+          <PrepareTabs
+            client:load
+            overviewEn={modelEn.overview}
+            overviewZh={modelZh.overview}
+            prerequisitesEn={modelEn.prerequisites}
+            prerequisitesZh={modelZh.prerequisites}
+            envSetupEn={modelEn.env_setup}
+            envSetupZh={modelZh.env_setup}
+            hasQuantization={hasQuantization}
+            quantizationEn={modelEn.quantization?.content}
+            quantizationZh={modelZh.quantization?.content ?? modelEn.quantization?.content}
+          />
+        </section>
 
-    <section class="py-8" id="prepare">
-      <h2 class={sectionTitle} data-i18n="sectionPrepare">Preparation</h2>
-      <PrepareTabs
-        client:load
-        overviewEn={modelEn.overview}
-        overviewZh={modelZh.overview}
-        prerequisitesEn={modelEn.prerequisites}
-        prerequisitesZh={modelZh.prerequisites}
-        envSetupEn={modelEn.env_setup}
-        envSetupZh={modelZh.env_setup}
-        hasQuantization={hasQuantization}
-        quantizationEn={modelEn.quantization?.content}
-        quantizationZh={modelZh.quantization?.content ?? modelEn.quantization?.content}
-      />
-    </section>
+        <div class="section-divider"></div>
 
-    <div class="section-divider"></div>
+        <section class="py-8" id="scenarios">
+          <h2 class={sectionTitle} data-i18n="sectionScenario">Deployment Guide</h2>
+          <p class="text-xs text-ink-500 mb-6 font-mono" data-i18n="sectionScenarioDescription">
+            Select NPU type, precision, and deployment mode to view the corresponding deployment
+            instructions.
+          </p>
+          <CascadeSelector
+            client:only="react"
+            scenariosEn={modelEn.scenarios}
+            scenariosZh={modelZh.scenarios}
+            extraConfigEn={modelEn.extra_config}
+            extraConfigZh={modelZh.extra_config ?? modelEn.extra_config}
+          />
+        </section>
 
-    <section class="py-8" id="scenarios">
-      <h2 class={sectionTitle} data-i18n="sectionScenario">Deployment Guide</h2>
-      <p class="text-xs text-ink-500 mb-6 font-mono" data-i18n="sectionScenarioDescription">
-        Select NPU type, precision, and deployment mode to view the corresponding deployment instructions.
-      </p>
-      <CascadeSelector
-        client:only="react"
-        scenariosEn={modelEn.scenarios}
-        scenariosZh={modelZh.scenarios}
-        extraConfigEn={modelEn.extra_config}
-        extraConfigZh={modelZh.extra_config ?? modelEn.extra_config}
-      />
-    </section>
+        <div class="section-divider"></div>
 
-    <div class="section-divider"></div>
-
-    <section class="py-8" id="reference">
-      <h2 class={sectionTitle} data-i18n="sectionMoreInfo">More Info</h2>
-      <ReferenceTabs
-        client:load
-        accuracyEn={modelEn.performance?.accuracy}
-        accuracyZh={modelZh.performance?.accuracy}
-        benchmarkEn={modelEn.performance?.benchmark}
-        benchmarkZh={modelZh.performance?.benchmark}
-        tuningEn={modelEn.tuning}
-        tuningZh={modelZh.tuning}
-        faqEn={modelEn.faq}
-        faqZh={modelZh.faq}
-        referencesEn={modelEn.references}
-        referencesZh={modelZh.references}
-      />
-    </section>
-
+        <section class="py-8" id="reference">
+          <h2 class={sectionTitle} data-i18n="sectionMoreInfo">More Info</h2>
+          <ReferenceTabs
+            client:load
+            accuracyEn={modelEn.performance?.accuracy}
+            accuracyZh={modelZh.performance?.accuracy}
+            benchmarkEn={modelEn.performance?.benchmark}
+            benchmarkZh={modelZh.performance?.benchmark}
+            tuningEn={modelEn.tuning}
+            tuningZh={modelZh.tuning}
+            faqEn={modelEn.faq}
+            faqZh={modelZh.faq}
+            referencesEn={modelEn.references}
+            referencesZh={modelZh.references}
+          />
+        </section>
       </div>
       {/* end main content */}
     </div>
@@ -199,7 +235,10 @@ function renderDesc(text: string) {
   <script>
     // Scroll spy: highlight active TOC link
     const tocLinks = document.querySelectorAll('aside nav a[href^="#"]');
-    const sections = [...tocLinks].map(a => document.querySelector(a.getAttribute('href')));
+    const sections = [...tocLinks]
+      .map((a) => a.getAttribute('href'))
+      .filter((href): href is string => !!href)
+      .map((href) => document.querySelector(href));
 
     function updateActiveLink() {
       let currentId = '';
@@ -221,7 +260,10 @@ function renderDesc(text: string) {
     let ticking = false;
     window.addEventListener('scroll', () => {
       if (!ticking) {
-        requestAnimationFrame(() => { updateActiveLink(); ticking = false; });
+        requestAnimationFrame(() => {
+          updateActiveLink();
+          ticking = false;
+        });
         ticking = true;
       }
     });

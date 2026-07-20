@@ -11,7 +11,12 @@
     "build": "astro build",
     "preview": "astro preview",
     "astro": "astro",
-    "validate": "npx tsx scripts/validate-yaml.ts"
+    "validate": "npx tsx scripts/validate-yaml.ts",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write \"src/**/*.{ts,tsx,astro,css}\" \"scripts/**/*.ts\" \"*.mjs\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,astro,css}\" \"scripts/**/*.ts\" \"*.mjs\"",
+    "typecheck": "astro check"
   },
   "dependencies": {
     "@astrojs/react": "^6.0.0",
@@ -26,6 +31,21 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "tsx": "^4.22.4"
+    "@astrojs/check": "^0.9.9",
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^26.1.1",
+    "@typescript-eslint/eslint-plugin": "^8.64.0",
+    "@typescript-eslint/parser": "^8.64.0",
+    "eslint": "^10.7.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-astro": "^3.0.1",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.7.0",
+    "prettier": "^3.9.5",
+    "prettier-plugin-astro": "^0.14.1",
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.64.0"
   }
 }

@@ -3,8 +3,10 @@ export type Lang = 'en' | 'zh';
 export const translations = {
   en: {
     siteTitle: 'vLLM-Ascend Recipes',
-    siteDescription: 'Deploy any model on Ascend NPUs — community-maintained vllm-ascend deployment recipes',
-    siteSubtitle: 'Community-maintained recipes for Atlas 800 A2/A3, Atlas 300I and other Ascend NPU hardware',
+    siteDescription:
+      'Deploy any model on Ascend NPUs — community-maintained vllm-ascend deployment recipes',
+    siteSubtitle:
+      'Community-maintained recipes for Atlas 800 A2/A3, Atlas 300I and other Ascend NPU hardware',
     navBrowse: 'Browse',
     navDocs: 'Docs',
     navGitHub: 'GitHub',
@@ -12,8 +14,10 @@ export const translations = {
 
     heroTitle: 'vLLM-Ascend Recipes',
     heroHighlight: 'Recipes',
-    heroDescription: 'Deploy any model on Ascend NPUs — pick a model, choose your hardware, copy the vllm serve command and run',
-    heroSubtitle: 'Community-maintained recipes for Atlas 800 A2/A3, Atlas 300I and other Ascend NPU hardware',
+    heroDescription:
+      'Deploy any model on Ascend NPUs — pick a model, choose your hardware, copy the vllm serve command and run',
+    heroSubtitle:
+      'Community-maintained recipes for Atlas 800 A2/A3, Atlas 300I and other Ascend NPU hardware',
     heroBrowse: 'Browse all models',
     heroGithub: 'GitHub',
     heroH1Pre: 'Deploy any model',
@@ -42,7 +46,8 @@ export const translations = {
     sectionPrerequisites: 'Prerequisites',
     sectionEnvSetup: 'Environment Setup',
     sectionScenario: 'Deployment Guide',
-    sectionScenarioDescription: 'Choose NPU type, precision, and deployment mode below to view the corresponding deployment instructions.',
+    sectionScenarioDescription:
+      'Choose NPU type, precision, and deployment mode below to view the corresponding deployment instructions.',
     sectionVerification: 'Verification',
     sectionAccuracy: 'Accuracy',
     sectionBenchmark: 'Benchmark',
@@ -86,7 +91,8 @@ export const translations = {
 
     heroTitle: 'vLLM-Ascend',
     heroHighlight: 'Recipes',
-    heroDescription: '在 Ascend NPU 上部署任何大模型 — 选模型、选硬件、复制 vllm serve 命令即可运行',
+    heroDescription:
+      '在 Ascend NPU 上部署任何大模型 — 选模型、选硬件、复制 vllm serve 命令即可运行',
     heroSubtitle: '社区维护的 vllm-ascend 部署指南，覆盖 Atlas 800 A2/A3, Atlas 300I, 等 NPU 硬件',
     heroBrowse: '浏览全部模型',
     heroGithub: 'GitHub',

@@ -1,6 +1,6 @@
 import { parse } from 'yaml';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { join, basename } from 'node:path';
+import { join } from 'node:path';
 import { modelSchema } from '../src/lib/schema';
 
 function findYamlFiles(dir: string): string[] {

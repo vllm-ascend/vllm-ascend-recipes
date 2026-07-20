@@ -22,7 +22,7 @@ export function useLang() {
     (key: TranslationKey) => {
       return translations[lang][key] ?? translations.en[key] ?? key;
     },
-    [lang]
+    [lang],
   );
 
   return { lang, t };

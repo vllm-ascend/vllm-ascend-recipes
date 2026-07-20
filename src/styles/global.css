@@ -1,4 +1,4 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 @custom-variant dark (&:where(.dark, .dark *));
 
@@ -26,25 +26,27 @@
   --color-ink-900: #0f172a;
   --color-ink-950: #020617;
 
-  --font-display: "Space Grotesk", "Fira Code", monospace;
-  --font-mono: "JetBrains Mono", "Fira Code", "SF Mono", Consolas, monospace;
-  --font-sans: "Space Grotesk", "Helvetica Neue", sans-serif;
+  --font-display: 'Space Grotesk', 'Fira Code', monospace;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'SF Mono', Consolas, monospace;
+  --font-sans: 'Space Grotesk', 'Helvetica Neue', sans-serif;
 }
 
 @font-face {
-  font-family: "Space Grotesk";
+  font-family: 'Space Grotesk';
   font-style: normal;
   font-weight: 300 700;
   font-display: swap;
-  src: url("https://fonts.gstatic.com/s/spacegrotesk/v16/V8mDoQDjQSkFtoMM3T6r8E7mPbF4Cw.woff2") format("woff2");
+  src: url('https://fonts.gstatic.com/s/spacegrotesk/v16/V8mDoQDjQSkFtoMM3T6r8E7mPbF4Cw.woff2')
+    format('woff2');
 }
 
 @font-face {
-  font-family: "JetBrains Mono";
+  font-family: 'JetBrains Mono';
   font-style: normal;
   font-weight: 400 700;
   font-display: swap;
-  src: url("https://fonts.gstatic.com/s/jetbrainsmono/v18/tDbY2o-flEEny0FZhsfKu5WU4zr3E_BX0PnT8RD8yKxjPVmUsaaDhw.woff2") format("woff2");
+  src: url('https://fonts.gstatic.com/s/jetbrainsmono/v18/tDbY2o-flEEny0FZhsfKu5WU4zr3E_BX0PnT8RD8yKxjPVmUsaaDhw.woff2')
+    format('woff2');
 }
 
 html {
@@ -65,7 +67,7 @@ body {
 }
 
 body::before {
-  content: "";
+  content: '';
   position: fixed;
   inset: 0;
   pointer-events: none;
@@ -84,7 +86,8 @@ a:hover {
   color: var(--color-accent-300);
 }
 
-code, pre {
+code,
+pre {
   font-family: var(--font-mono);
 }
 
@@ -162,7 +165,7 @@ pre code {
 }
 
 .prose ul li::before {
-  content: "▸";
+  content: '▸';
   position: absolute;
   left: 0;
   color: var(--color-accent-500);
@@ -270,14 +273,31 @@ pre code {
   border: none !important;
 }
 
-:root:not(.dark) .prose h2 { color: #0f172a; }
-:root:not(.dark) .prose h3 { color: #1e293b; }
-:root:not(.dark) .prose p { color: #475569; }
-:root:not(.dark) .prose ul li { color: #475569; }
-:root:not(.dark) .prose ul li::before { color: var(--color-accent-600); }
-:root:not(.dark) .prose a { color: var(--color-accent-600); }
-:root:not(.dark) .prose blockquote { color: #475569; background: rgba(16, 185, 129, 0.05); }
-:root:not(.dark) .prose strong { color: #0f172a; }
+:root:not(.dark) .prose h2 {
+  color: #0f172a;
+}
+:root:not(.dark) .prose h3 {
+  color: #1e293b;
+}
+:root:not(.dark) .prose p {
+  color: #475569;
+}
+:root:not(.dark) .prose ul li {
+  color: #475569;
+}
+:root:not(.dark) .prose ul li::before {
+  color: var(--color-accent-600);
+}
+:root:not(.dark) .prose a {
+  color: var(--color-accent-600);
+}
+:root:not(.dark) .prose blockquote {
+  color: #475569;
+  background: rgba(16, 185, 129, 0.05);
+}
+:root:not(.dark) .prose strong {
+  color: #0f172a;
+}
 
 :root:not(.dark) ::selection {
   background: rgba(16, 185, 129, 0.2);
@@ -307,13 +327,23 @@ pre code {
 
 /* ===== ANIMATIONS ===== */
 @keyframes fade-up {
-  from { opacity: 0; transform: translateY(12px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .animate-fade-up {
@@ -324,14 +354,38 @@ pre code {
   animation: fade-in 0.4s ease-out forwards;
 }
 
-.stagger-1 { animation-delay: 0.05s; opacity: 0; }
-.stagger-2 { animation-delay: 0.1s; opacity: 0; }
-.stagger-3 { animation-delay: 0.15s; opacity: 0; }
-.stagger-4 { animation-delay: 0.2s; opacity: 0; }
-.stagger-5 { animation-delay: 0.25s; opacity: 0; }
-.stagger-6 { animation-delay: 0.3s; opacity: 0; }
-.stagger-7 { animation-delay: 0.35s; opacity: 0; }
-.stagger-8 { animation-delay: 0.4s; opacity: 0; }
+.stagger-1 {
+  animation-delay: 0.05s;
+  opacity: 0;
+}
+.stagger-2 {
+  animation-delay: 0.1s;
+  opacity: 0;
+}
+.stagger-3 {
+  animation-delay: 0.15s;
+  opacity: 0;
+}
+.stagger-4 {
+  animation-delay: 0.2s;
+  opacity: 0;
+}
+.stagger-5 {
+  animation-delay: 0.25s;
+  opacity: 0;
+}
+.stagger-6 {
+  animation-delay: 0.3s;
+  opacity: 0;
+}
+.stagger-7 {
+  animation-delay: 0.35s;
+  opacity: 0;
+}
+.stagger-8 {
+  animation-delay: 0.4s;
+  opacity: 0;
+}
 
 .grid-pattern {
   background-image:
@@ -350,10 +404,18 @@ pre code {
 }
 
 /* ===== LANGUAGE TOGGLE ===== */
-html[lang="en"] .lang-en { display: block; }
-html[lang="en"] .lang-zh { display: none; }
-html[lang="zh"] .lang-en { display: none; }
-html[lang="zh"] .lang-zh { display: block; }
+html[lang='en'] .lang-en {
+  display: block;
+}
+html[lang='en'] .lang-zh {
+  display: none;
+}
+html[lang='zh'] .lang-en {
+  display: none;
+}
+html[lang='zh'] .lang-zh {
+  display: block;
+}
 
 /* ===== CONFIG HIGHLIGHT ===== */
 /* Color-coded spans for extra config parameters in code blocks */

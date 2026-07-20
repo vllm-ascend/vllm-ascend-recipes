@@ -4,6 +4,11 @@ export interface WeightSource {
   command: string;
 }
 
+export interface Reference {
+  title: string;
+  url: string;
+}
+
 export interface WeightDownload {
   weight_version: string;
   sources: WeightSource[];
