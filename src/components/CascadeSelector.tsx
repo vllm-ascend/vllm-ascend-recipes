@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { useLang } from '../lib/useLang';
 
 interface ExtraConfigItem {
@@ -266,13 +266,6 @@ export default function CascadeSelector({
   }, [scenarios, selectedNpu]);
 
   const [selectedPrecision, setSelectedPrecision] = useState(precisions[0] || '');
-
-  useEffect(() => {
-    if (!precisions.includes(selectedPrecision)) {
-      setSelectedPrecision(precisions[0] || '');
-    }
-  }, [precisions, selectedPrecision]);
-
   const effectivePrecision = precisions.includes(selectedPrecision)
     ? selectedPrecision
     : precisions[0] || '';
@@ -286,13 +279,6 @@ export default function CascadeSelector({
   }, [scenarios, selectedNpu, effectivePrecision]);
 
   const [selectedDeployment, setSelectedDeployment] = useState(deployments[0] || '');
-
-  useEffect(() => {
-    if (!deployments.includes(selectedDeployment)) {
-      setSelectedDeployment(deployments[0] || '');
-    }
-  }, [deployments, selectedDeployment]);
-
   const effectiveDeployment = deployments.includes(selectedDeployment)
     ? selectedDeployment
     : deployments[0] || '';
@@ -311,13 +297,6 @@ export default function CascadeSelector({
   }, [scenarios, selectedNpu, effectivePrecision, effectiveDeployment]);
 
   const [selectedCase, setSelectedCase] = useState(cases[0] || '');
-
-  useEffect(() => {
-    if (!cases.includes(selectedCase)) {
-      setSelectedCase(cases[0] || '');
-    }
-  }, [cases, selectedCase]);
-
   const effectiveCase = cases.includes(selectedCase) ? selectedCase : cases[0] || '';
 
   const currentScenario = scenarios.find(
@@ -328,27 +307,28 @@ export default function CascadeSelector({
       s.case === effectiveCase,
   );
 
-  // Step tab state — reset when scenario changes
+  // Step tab state — reset when scenario changes (adjust during render, per
+  // https://react.dev/reference/react/useState#storing-information-from-previous-renders)
   const [activeStep, setActiveStep] = useState(0);
-  useEffect(() => {
+  const [trackedScenario, setTrackedScenario] = useState(currentScenario);
+  if (currentScenario !== trackedScenario) {
+    setTrackedScenario(currentScenario);
     setActiveStep(0);
-  }, [currentScenario]);
+  }
 
-  // Extra config multi-select — initialize from current scenario defaults
+  // Extra config multi-select — initialize from current scenario defaults,
+  // and re-sync when the scenario changes
   const [selectedConfigs, setSelectedConfigs] = useState<Set<string>>(() => {
     if (currentScenario?.default_configs) {
       return new Set(currentScenario.default_configs);
     }
     return new Set();
   });
-
-  useEffect(() => {
-    if (currentScenario?.default_configs) {
-      setSelectedConfigs(new Set(currentScenario.default_configs));
-    } else {
-      setSelectedConfigs(new Set());
-    }
-  }, [currentScenario]);
+  if (currentScenario !== trackedScenario) {
+    setSelectedConfigs(
+      currentScenario?.default_configs ? new Set(currentScenario.default_configs) : new Set(),
+    );
+  }
 
   const toggleConfig = (key: string) => {
     setSelectedConfigs((prev) => {
@@ -475,7 +455,7 @@ export default function CascadeSelector({
             <span className="shrink-0 px-3 text-[10px] font-mono font-bold text-ink-300 uppercase tracking-wider">
               {t('step') || 'Steps'}
             </span>
-            {currentScenario.steps.map((step, i) => (
+            {currentScenario.steps.map((_step, i) => (
               <button
                 key={i}
                 onClick={() => setActiveStep(i)}

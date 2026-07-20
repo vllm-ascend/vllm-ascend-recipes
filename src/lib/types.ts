@@ -1,3 +1,24 @@
+export interface Meta {
+  title: string;
+  slug: string;
+  provider: string;
+  description: string;
+  date_added: string;
+  tasks?: string[];
+  performance_headline?: string;
+  hardware?: Record<string, 'verified' | 'unsupported' | 'experimental'>;
+}
+
+export interface ModelInfo {
+  model_id: string;
+  min_vllm_version?: string;
+  architecture: 'dense' | 'moe';
+  parameter_count: string;
+  active_parameters: string | null;
+  context_length: number;
+  modality: string;
+}
+
 export interface WeightSource {
   source: string;
   url: string;
@@ -61,18 +82,14 @@ export interface PerformanceSection {
   benchmark?: string;
 }
 
-export interface Model {
-  hf_id: string;
-  title: string;
-  provider: string;
-  description: string;
-  architecture: 'dense' | 'moe';
-  parameters: string;
-  active_parameters: string | null;
-  context_length: number;
-  modality: string;
-  updated: string;
+export interface Evaluation {
+  accuracy?: { content: string };
+  performance?: { content: string };
+}
 
+export interface Model {
+  meta: Meta;
+  model: ModelInfo;
   overview: string;
   weight_download: WeightDownload[];
   quantization?: Quantization;
@@ -81,6 +98,7 @@ export interface Model {
   scenarios: Scenario[];
   extra_config?: ExtraConfigItem[];
   performance?: PerformanceSection;
+  evaluation?: Evaluation;
   verification?: string;
   tuning?: string;
   faq?: string;

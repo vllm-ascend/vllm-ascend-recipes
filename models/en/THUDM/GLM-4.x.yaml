@@ -1,15 +1,23 @@
-hf_id: ZhipuAI/GLM-4.7
-title: GLM-4.5/4.6/4.7
-provider: THUDM
-description: GLM-4.x series are Mixture-of-Experts (MoE) foundational models from Zhipu AI, specifically designed
-  for agent applications. GLM-4.7 features the latest improvements with support for MTP speculative decoding,
-  expert parallelism, and PD disaggregation on Ascend NPUs.
-architecture: moe
-parameters: 31B
-active_parameters: null
-context_length: 133000
-modality: text
-updated: '2026-07-13'
+meta:
+  title: "GLM-4.5/4.6/4.7"
+  slug: "glm-4.x"
+  provider: "THUDM"
+  description: "GLM-4.x series are Mixture-of-Experts (MoE) foundational models from Zhipu AI, specifically designed for agent applications. GLM-4.7 features the latest improvements with support for MTP speculative decoding, expert parallelism, and PD disaggregation on Ascend NPUs."
+  date_added: 2026-07-13
+  performance_headline: "Single-node deployment on Atlas 800 A3 (128G × 8) with W8A8 precision"
+  hardware:
+    atlas_800_a3: verified
+    atlas_800_a2: verified
+
+model:
+  model_id: "ZhipuAI/GLM-4.7"
+  min_vllm_version: "0.10.0rc1"
+  architecture: moe
+  parameter_count: "31B"
+  active_parameters: null
+  context_length: 133000
+  modality: text
+
 overview: |-
   GLM-4.x (GLM-4.5/4.6/4.7) are Mixture-of-Experts (MoE) foundational models from Zhipu AI (THUDM), specifically designed for agent applications. They support Multi-Token Prediction (MTP) speculative decoding, expert parallelism, data parallelism, and Prefill-Decode disaggregation on Ascend NPUs.
 

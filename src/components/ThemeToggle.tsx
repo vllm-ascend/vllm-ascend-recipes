@@ -1,12 +1,17 @@
-import { useEffect, useState } from 'react';
+import { useRef, useState } from 'react';
 
 export default function ThemeToggle() {
   const [isDark, setIsDark] = useState(true);
 
-  useEffect(() => {
-    const isDarkMode = document.documentElement.classList.contains('dark');
-    setIsDark(isDarkMode);
-  }, []);
+  // Hydrate from the DOM class set by the inline boot script. Done during
+  // render (guarded by a ref) so React only commits once with the real value.
+  const hydratedRef = useRef<boolean | null>(null);
+  if (hydratedRef.current == null) {
+    hydratedRef.current = true;
+    if (typeof document !== 'undefined') {
+      setIsDark(document.documentElement.classList.contains('dark'));
+    }
+  }
 
   const switchTo = (dark: boolean) => {
     if (dark === isDark) return;

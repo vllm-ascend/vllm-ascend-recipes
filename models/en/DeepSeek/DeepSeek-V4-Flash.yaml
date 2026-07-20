@@ -1,20 +1,33 @@
-hf_id: deepseek-ai/DeepSeek-V4-Flash
-title: DeepSeek-V4-Flash
-provider: DeepSeek
-description: DeepSeek-V4-Flash is the lightweight variant of the DeepSeek-V4 family, suitable for high-throughput and low-latency serving scenarios.
-architecture: moe
-parameters: 284B
-active_parameters: 13B
-context_length: 1048576
-modality: text
-updated: '2026-07-07'
+meta:
+  title: "DeepSeek-V4-Flash"
+  slug: "deepseek-v4-flash"
+  provider: "DeepSeek"
+  description: "DeepSeek V4 MoE model with hybrid CSA+HCA attention, manifold-constrained hyper-connections, and three-tier reasoning (Non-think / Think High / Think Max)."
+  date_added: 2026-07-07
+  performance_headline: "Compact 284B/13B V4 sibling — single-node 1M-context serving with W8A8 weights and MTP"
+  hardware:
+    atlas_800_a3: verified
+    atlas_800_a2: verified
+
+model:
+  model_id: "deepseek-ai/DeepSeek-V4-Flash"
+  min_vllm_version: "0.8.4rc2"
+  architecture: moe
+  parameter_count: "284B"
+  active_parameters: "13B"
+  context_length: 1048576
+  modality: text
+
 overview: |-
-  DeepSeek-V4 introduces several key upgrades over DeepSeek-V3:
+  DeepSeek-V4-Flash is a 284B-total / 13B-active MoE model in the V4 preview family.
+  It pairs a **hybrid attention stack** — Compressed Sparse Attention (CSA) + Heavily
+  Compressed Attention (HCA) — with **Manifold-Constrained Hyper-Connections (mHC)** to
+  reach 27% of V3.2's per-token inference FLOPs and 10% of V3.2's KV cache at 1M
+  context. Pre-trained on 32T+ tokens; post-training is a two-stage pipeline (domain-
+  specific expert cultivation + unified consolidation via on-policy distillation).
 
-  - The Manifold-Constrained Hyper-Connections (mHC) to strengthen conventional residual connections.
-  - A hybrid attention architecture, which greatly improves long-context efficiency through Compress-4-Attention and Compress-128-Attention. For the Mixture-of-Experts (MoE) components, it still adopts the DeepSeekMoE architecture, with only minor adjustments.
-
-  DeepSeek-V4-Flash is the lightweight variant of the DeepSeek-V4 family, suitable for high-throughput and low-latency serving scenarios.
+  Checkpoint is **W8A8 mixed**: MoE expert weights are stored in W8A8 while the
+  remaining (attention / norm / router) params stay in W8A8.
 
   This document will show the main verification steps of the model, including supported features, feature configuration, environment preparation, single-node and multi-node deployment, accuracy and performance evaluation.
 

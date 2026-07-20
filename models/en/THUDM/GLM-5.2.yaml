@@ -1,15 +1,23 @@
-hf_id: zai-org/GLM-5.2
-title: GLM-5.2
-provider: THUDM
-description: GLM-5.2 is a Mixture-of-Experts (MoE) model from Zhipu AI with 753B total parameters, targeting
-  complex systems engineering and long-horizon agentic tasks. It supports MTP speculative decoding with up to 5
-  speculative tokens, async scheduling, and PD disaggregation on Ascend NPUs.
-architecture: moe
-parameters: 753B
-active_parameters: null
-context_length: 131072
-modality: text
-updated: '2026-07-13'
+meta:
+  title: "GLM-5.2"
+  slug: "glm-5.2"
+  provider: "THUDM"
+  description: "GLM-5.2 is a Mixture-of-Experts (MoE) model from Zhipu AI with 753B total parameters, targeting complex systems engineering and long-horizon agentic tasks. It supports MTP speculative decoding with up to 5 speculative tokens, async scheduling, and PD disaggregation on Ascend NPUs."
+  date_added: 2026-07-13
+  performance_headline: "Multi-node deployment on Atlas 800 A3 (128G × 8) with W8A8 precision"
+  hardware:
+    atlas_800_a3: verified
+    atlas_800_a2: verified
+
+model:
+  model_id: "zai-org/GLM-5.2"
+  min_vllm_version: "0.22.1rc"
+  architecture: moe
+  parameter_count: "753B"
+  active_parameters: null
+  context_length: 131072
+  modality: text
+
 overview: |-
   GLM-5.2 is a Mixture-of-Experts (MoE) model from Zhipu AI (THUDM) with 753B total parameters, targeting complex systems engineering and long-horizon agentic tasks. It supports Multi-Token Prediction (MTP) speculative decoding with up to 5 speculative tokens, async scheduling, dynamic EPLB, and Prefill-Decode disaggregation on Ascend NPUs.
 

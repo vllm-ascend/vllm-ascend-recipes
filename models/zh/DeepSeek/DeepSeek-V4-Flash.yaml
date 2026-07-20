@@ -1,13 +1,23 @@
-hf_id: deepseek-ai/DeepSeek-V4-Flash
-title: DeepSeek-V4-Flash
-provider: DeepSeek
-description: DeepSeek-V4-Flash 是 DeepSeek-V4 系列的轻量级变体，适用于高吞吐量和低延迟的服务场景。
-architecture: moe
-parameters: "-"
-active_parameters: "-"
-context_length: 1048576
-modality: text
-updated: '2026-07-07'
+meta:
+  title: "DeepSeek-V4-Flash"
+  slug: "deepseek-v4-flash"
+  provider: "DeepSeek"
+  description: "DeepSeek V4 MoE 模型，采用混合 CSA+HCA 注意力机制、流形约束超连接，支持三种推理模式（Non-think / Think High / Think Max）。"
+  date_added: 2026-07-07
+  performance_headline: "紧凑型 284B/13B V4 变体 — 单节点 1M 上下文服务，支持 W8A8 权重和 MTP"
+  hardware:
+    atlas_800_a3: verified
+    atlas_800_a2: verified
+
+model:
+  model_id: "deepseek-ai/DeepSeek-V4-Flash"
+  min_vllm_version: "0.8.4rc2"
+  architecture: moe
+  parameter_count: "284B"
+  active_parameters: "13B"
+  context_length: 1048576
+  modality: text
+
 overview: |-
   DeepSeek-V4 相比 DeepSeek-V3 引入了多项关键升级：
 
