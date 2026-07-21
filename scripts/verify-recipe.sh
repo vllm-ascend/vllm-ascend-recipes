@@ -141,7 +141,15 @@ else
   else
     uv pip install vllm-ascend || pip install vllm-ascend
   fi
-  log_info "vllm-ascend installed successfully"
+  hash -r 2>/dev/null || true
+  # Ensure common install paths are in PATH
+  export PATH="/usr/local/bin:/root/.local/bin:$PATH"
+  if command -v vllm &>/dev/null; then
+    log_info "vllm installed: $(which vllm)"
+  else
+    VLLM_PY=$(python3 -c "import vllm; print(vllm.__file__)" 2>/dev/null || echo "")
+    log_info "vllm importable at: $VLLM_PY"
+  fi
 fi
 
 if [[ -n "$PIP_SETUP" ]]; then
@@ -185,8 +193,12 @@ for i, s in enumerate(info.get('scenarios',[])):
 
   # Write command to temp script to handle multiline/quotes properly
   VLLM_SCRIPT="/tmp/vllm_serve_${idx}.sh"
-  echo "#!/usr/bin/env bash" > "$VLLM_SCRIPT"
-  echo "set -euo pipefail" >> "$VLLM_SCRIPT"
+  cat > "$VLLM_SCRIPT" <<'SCRIPT_HEREDOC'
+#!/usr/bin/env bash
+set -euo pipefail
+. /usr/local/Ascend/ascend-toolkit/set_env.sh 2>/dev/null || true
+export PATH="/usr/local/bin:/root/.local/bin:$PATH"
+SCRIPT_HEREDOC
   echo "$cmd" >> "$VLLM_SCRIPT"
   chmod +x "$VLLM_SCRIPT"
 
