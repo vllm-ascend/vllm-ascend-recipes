@@ -87,8 +87,10 @@ jobs:
           path: ./recipes
 
       - name: Write recipe file list
+        env:
+          RECIPES: ${{ inputs.recipe_files }}
         run: |
-          echo "${{ inputs.recipe_files }}" > /tmp/recipe_list.txt
+          echo "$RECIPES" | python3 -c "import sys,json; [print(f) for f in json.loads(sys.stdin.read())]" > /tmp/recipe_list.txt
           echo "=== Recipes to verify ==="
           cat /tmp/recipe_list.txt
 
