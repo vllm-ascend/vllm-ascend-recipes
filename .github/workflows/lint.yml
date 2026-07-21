@@ -9,7 +9,37 @@ permissions:
   contents: read
 
 jobs:
-  lint:
+  detect:
+    runs-on: ubuntu-latest
+    outputs:
+      models: ${{ steps.filter.outputs.models }}
+      src: ${{ steps.filter.outputs.src }}
+      workflows: ${{ steps.filter.outputs.workflows }}
+      config: ${{ steps.filter.outputs.config }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Detect changed paths
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            models:
+              - 'models/**'
+            src:
+              - 'src/**'
+            workflows:
+              - '.github/workflows/**'
+            config:
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'astro.config.*'
+              - 'tsconfig.*'
+              - 'eslint.config.*'
+              - '.prettierrc.*'
+
+  yaml:
+    needs: detect
+    if: needs.detect.outputs.models == 'true' || needs.detect.outputs.config == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -30,6 +60,26 @@ jobs:
       - name: Validate model YAML
         run: pnpm validate
 
+  frontend:
+    needs: detect
+    if: needs.detect.outputs.src == 'true' || needs.detect.outputs.config == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
       - name: Type check
         run: pnpm typecheck
 
@@ -38,3 +88,14 @@ jobs:
 
       - name: Prettier check
         run: pnpm format:check
+
+  workflow-lint:
+    needs: detect
+    if: needs.detect.outputs.workflows == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run actionlint
+        uses: devops-actions/actionlint@v0

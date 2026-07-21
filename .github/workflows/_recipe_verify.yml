@@ -1,0 +1,152 @@
+#
+# Copyright (c) 2025 Huawei Technologies Co., Ltd. All Rights Reserved.
+# This file is a part of the vllm-ascend-recipes project.
+#
+
+name: 'Recipe Deployment Verification'
+
+on:
+  workflow_call:
+    inputs:
+      runner:
+        required: true
+        type: string
+        description: 'Self-hosted runner label (e.g. linux-aarch64-a2b4-8)'
+      image:
+        required: false
+        type: string
+        default: 'swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/cann:9.0.1-910b-ubuntu22.04-py3.12'
+      recipe_files:
+        required: true
+        type: string
+        description: 'Newline-separated list of model YAML paths relative to repo root'
+      trigger_type:
+        required: false
+        type: string
+        default: 'pr'
+        description: 'pr or nightly'
+      continue_on_error:
+        required: false
+        type: boolean
+        default: false
+        description: 'Continue running even if a recipe fails'
+    secrets:
+      obs_ak:
+        required: false
+      obs_sk:
+        required: false
+
+defaults:
+  run:
+    shell: bash -el {0}
+
+concurrency:
+  group: recipe-verify-${{ github.workflow_ref }}-${{ github.ref }}-${{ inputs.trigger_type }}
+  cancel-in-progress: ${{ inputs.trigger_type == 'pr' }}
+
+jobs:
+  recipe-verify:
+    name: ${{ inputs.trigger_type == 'nightly' && 'Nightly' || 'PR' }} recipe verify
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 240
+    container:
+      image: ${{ inputs.image }}
+      env:
+        VLLM_LOGGING_LEVEL: ERROR
+        VLLM_USE_MODELSCOPE: True
+        HF_HUB_OFFLINE: 1
+        UV_INDEX_URL: http://cache-service.nginx-pypi-cache.svc.cluster.local/pypi/simple
+        UV_EXTRA_INDEX_URL: 'https://repo.huaweicloud.com/ascend/repos/pypi'
+        UV_INDEX_STRATEGY: unsafe-best-match
+        UV_INSECURE_HOST: cache-service.nginx-pypi-cache.svc.cluster.local
+        UV_HTTP_TIMEOUT: 120
+        UV_NO_CACHE: 1
+        UV_SYSTEM_PYTHON: 1
+    steps:
+      - name: Check NPU and CANN info
+        run: |
+          npu-smi info
+          cat /usr/local/Ascend/ascend-toolkit/latest/"$(uname -i)"-linux/ascend_toolkit_install.info
+
+      - name: Install system packages
+        run: |
+          sed -Ei 's@(ports|archive).ubuntu.com@cache-service.nginx-pypi-cache.svc.cluster.local:8081@g' /etc/apt/sources.list
+          pip config set global.index-url http://cache-service.nginx-pypi-cache.svc.cluster.local/pypi/simple
+          pip config set global.trusted-host cache-service.nginx-pypi-cache.svc.cluster.local
+          apt-get update -y
+          apt-get install -y python3-pip git vim wget net-tools gcc g++ cmake libnuma-dev curl gnupg2 zstd
+          pip install uv pyyaml requests
+
+      - name: Source ascend-toolkit env
+        run: |
+          . /usr/local/Ascend/ascend-toolkit/set_env.sh
+
+      - name: Checkout recipes repo
+        uses: actions/checkout@v4
+        with:
+          path: ./recipes
+
+      - name: Write recipe file list
+        run: |
+          echo "${{ inputs.recipe_files }}" > /tmp/recipe_list.txt
+          echo "=== Recipes to verify ==="
+          cat /tmp/recipe_list.txt
+
+      - name: Verify recipes
+        id: verify
+        continue-on-error: ${{ inputs.continue_on_error }}
+        working-directory: ./recipes
+        run: |
+          mkdir -p /tmp/verify-logs /tmp/verify-results
+          PASSED=0
+          FAILED=0
+          SKIPPED=0
+          while IFS= read -r recipe; do
+            [ -z "$recipe" ] && continue
+            echo ""
+            echo "============================================================"
+            echo "  Verifying recipe: $recipe"
+            echo "============================================================"
+            bash scripts/verify-recipe.sh "$recipe" \
+              2>&1 | tee "/tmp/verify-logs/$(basename "$recipe" .yaml).log"
+            rc=${PIPESTATUS[0]}
+            if [ "$rc" -eq 0 ]; then
+              PASSED=$((PASSED + 1))
+              echo "PASS" > "/tmp/verify-results/$(basename "$recipe" .yaml).result"
+            elif [ "$rc" -eq 2 ]; then
+              SKIPPED=$((SKIPPED + 1))
+              echo "SKIP" > "/tmp/verify-results/$(basename "$recipe" .yaml).result"
+            else
+              FAILED=$((FAILED + 1))
+              echo "FAIL" > "/tmp/verify-results/$(basename "$recipe" .yaml).result"
+            fi
+          done < /tmp/recipe_list.txt
+
+          echo ""
+          echo "============================================================"
+          echo "  SUMMARY: $PASSED passed, $FAILED failed, $SKIPPED skipped"
+          echo "============================================================"
+
+          if [ "$FAILED" -gt 0 ]; then
+            exit 1
+          fi
+
+      - name: Upload verification logs (PR)
+        if: ${{ always() && inputs.trigger_type == 'pr' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: recipe-verify-logs-${{ github.run_id }}
+          path: /tmp/verify-logs/
+          retention-days: 7
+          if-no-files-found: warn
+
+      - name: Upload verification results (Nightly to OBS)
+        if: ${{ always() && inputs.trigger_type == 'nightly' }}
+        uses: ascend-gha-runners/artifact/upload@v0.3
+        with:
+          access_key: ${{ secrets.obs_ak }}
+          secret_key: ${{ secrets.obs_sk }}
+          name: recipe-verify-results-${{ github.run_id }}
+          path: /tmp/verify-results/
+          retention-days: 90
+          if-no-files-found: warn
