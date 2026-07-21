@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# verify-recipe.sh — Run a recipe's vllm serve commands and verify the service.
+# verify-recipe.sh �?Run a recipe's vllm serve commands and verify the service.
 #
 # Usage:
 #   ./scripts/verify-recipe.sh models/en/Qwen/Qwen3-30B-A3B.yaml
 #
 # Exit codes:
-#   0 — all scenarios verified successfully
-#   1 — one or more scenario failed
-#   2 — recipe skipped (no compatible hardware / unsupported)
+#   0 �?all scenarios verified successfully
+#   1 �?one or more scenario failed
+#   2 �?recipe skipped (no compatible hardware / unsupported)
 set -euo pipefail
 
 RECIPE="$1"
@@ -28,6 +28,9 @@ if [[ ! -f "$RECIPE" ]]; then
   exit 1
 fi
 
+# Determine Python to use (container may have multiple versions)
+PYTHON=$(command -v python3.12 || command -v python3)
+log_info "Using Python: $PYTHON ($($PYTHON --version 2>&1))"
 log_info "=== Verifying recipe: $RECIPE ==="
 
 # Determine which NPU hardware is available on this runner
@@ -43,7 +46,7 @@ npu-smi info 2>/dev/null > /dev/null || {
 
 # Parse YAML with Python helper
 parse_recipe() {
-  python3 - "$RECIPE" "$HW_KEY" <<'PYEOF'
+  $PYTHON - "$RECIPE" "$HW_KEY" <<'PYEOF'
 import sys
 import yaml
 import json
@@ -79,6 +82,8 @@ for s in scenarios:
         # Extract bash code block content
         m = re.search(r'```bash\s*\n(.*?)```', content, re.DOTALL)
         if not m:
+            import sys
+            print(f"DEBUG: No bash block found in step '{step.get('title','')}', content[:200]={content[:200]}", file=sys.stderr)
             continue
         bash_content = m.group(1)
         # Remove %%CONFIG:...%% markers
@@ -116,21 +121,21 @@ PYEOF
 
 RECIPE_INFO=$(parse_recipe 2>/dev/null || echo '{"action":"skip","reason":"parse error"}')
 
-ACTION=$(echo "$RECIPE_INFO" | python3 -c "import sys,json; print(json.loads(sys.stdin.read()).get('action','skip'))" 2>/dev/null || echo "skip")
+ACTION=$(echo "$RECIPE_INFO" | $PYTHON -c "import sys,json; print(json.loads(sys.stdin.read()).get('action','skip'))" 2>/dev/null || echo "skip")
 
 if [[ "$ACTION" == "skip" ]]; then
-  REASON=$(echo "$RECIPE_INFO" | python3 -c "import sys,json; print(json.loads(sys.stdin.read()).get('reason','unknown'))" 2>/dev/null || echo "unknown")
+  REASON=$(echo "$RECIPE_INFO" | $PYTHON -c "import sys,json; print(json.loads(sys.stdin.read()).get('reason','unknown'))" 2>/dev/null || echo "unknown")
   log_warn "Skipping recipe: $REASON"
   exit 2
 fi
 
-MODEL_ID=$(echo "$RECIPE_INFO" | python3 -c "import sys,json; print(json.loads(sys.stdin.read()).get('model_id',''))")
+MODEL_ID=$(echo "$RECIPE_INFO" | $PYTHON -c "import sys,json; print(json.loads(sys.stdin.read()).get('model_id',''))")
 log_info "Model: $MODEL_ID"
-log_info "Hardware: $(echo "$RECIPE_INFO" | python3 -c "import sys,json; print(json.loads(sys.stdin.read()).get('hw_key',''))")"
+log_info "Hardware: $(echo "$RECIPE_INFO" | $PYTHON -c "import sys,json; print(json.loads(sys.stdin.read()).get('hw_key',''))")"
 
 # Install vllm-ascend
-PIP_SETUP=$(echo "$RECIPE_INFO" | python3 -c "import sys,json; print(json.loads(sys.stdin.read()).get('pip_setup',''))")
-MIN_VERSION=$(echo "$RECIPE_INFO" | python3 -c "import sys,json; print(json.loads(sys.stdin.read()).get('min_vllm_version',''))")
+PIP_SETUP=$(echo "$RECIPE_INFO" | $PYTHON -c "import sys,json; print(json.loads(sys.stdin.read()).get('pip_setup',''))")
+MIN_VERSION=$(echo "$RECIPE_INFO" | $PYTHON -c "import sys,json; print(json.loads(sys.stdin.read()).get('min_vllm_version',''))")
 
 if command -v vllm &>/dev/null; then
   log_info "vllm already installed"
@@ -147,8 +152,8 @@ else
   if command -v vllm &>/dev/null; then
     log_info "vllm installed: $(which vllm)"
   else
-    VLLM_PY=$(python3 -c "import vllm; print(vllm.__file__)" 2>/dev/null || echo "")
-    log_info "vllm importable at: $VLLM_PY"
+    VLLM_PY=$($PYTHON -c "import vllm; print(vllm.__file__)" 2>&1 || echo "IMPORT_FAILED")
+    log_info "vllm check: $VLLM_PY"
   fi
 fi
 
@@ -162,7 +167,7 @@ if [[ -n "$PIP_SETUP" ]]; then
 fi
 
 # Verify each scenario
-SCENARIO_COUNT=$(echo "$RECIPE_INFO" | python3 -c "
+SCENARIO_COUNT=$(echo "$RECIPE_INFO" | $PYTHON -c "
 import sys,json
 print(len(json.loads(sys.stdin.read()).get('scenarios',[])))
 ")
@@ -173,7 +178,7 @@ if [[ "${CI_RUNNER_SMOKE:-0}" == "1" ]]; then
   log_info "SMOKE MODE: verifying first scenario only"
 fi
 
-echo "$RECIPE_INFO" | python3 -c "
+echo "$RECIPE_INFO" | $PYTHON -c "
 import sys,json
 info = json.loads(sys.stdin.read())
 for i, s in enumerate(info.get('scenarios',[])):
