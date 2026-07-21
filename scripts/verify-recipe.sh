@@ -32,12 +32,14 @@ log_info "=== Verifying recipe: $RECIPE ==="
 
 # Determine which NPU hardware is available on this runner
 DETECTED_NPU=""
-if npu-smi info 2>/dev/null | grep -qi "910B"; then
+if npu-smi info 2>/dev/null | grep -qi "910"; then
   DETECTED_NPU="910b"
 fi
 
 if [[ -z "$DETECTED_NPU" ]]; then
   log_error "Could not detect NPU type. Skipping."
+  log_error "npu-smi info output:"
+  npu-smi info 2>&1 || true
   exit 2
 fi
 log_info "Detected NPU: $DETECTED_NPU"
