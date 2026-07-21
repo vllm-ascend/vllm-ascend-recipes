@@ -58,7 +58,8 @@ jobs:
         id: recipes
         if: steps.filter.outputs.models == 'true'
         run: |
-          CHANGED=$(git diff --name-only origin/main...HEAD -- models/ | grep '\.yaml$\|\.yml$' | grep '^models/en/' || true)
+          git fetch origin "${{ github.base_ref }}" --depth=1
+          CHANGED=$(git diff --name-only FETCH_HEAD...HEAD -- models/ | grep '\.yaml$\|\.yml$' | grep '^models/en/' || true)
           if [ -n "$CHANGED" ]; then
             COUNT=$(echo "$CHANGED" | wc -l)
             echo "count=$COUNT" >> "$GITHUB_OUTPUT"
