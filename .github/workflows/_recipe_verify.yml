@@ -94,6 +94,8 @@ jobs:
         id: verify
         continue-on-error: ${{ inputs.continue_on_error }}
         working-directory: ./recipes
+        env:
+          RECIPE_HW_KEY: atlas_800_a2
         run: |
           . /usr/local/Ascend/ascend-toolkit/set_env.sh
           mkdir -p /tmp/verify-logs /tmp/verify-results

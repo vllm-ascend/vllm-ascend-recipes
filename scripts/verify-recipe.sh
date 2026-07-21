@@ -31,42 +31,30 @@ fi
 log_info "=== Verifying recipe: $RECIPE ==="
 
 # Determine which NPU hardware is available on this runner
-DETECTED_NPU=""
-if npu-smi info 2>/dev/null | grep -qi "910"; then
-  DETECTED_NPU="910b"
-fi
+# Use RECIPE_HW_KEY env var if set, otherwise default to atlas_800_a2
+HW_KEY="${RECIPE_HW_KEY:-atlas_800_a2}"
+log_info "Hardware key: $HW_KEY"
 
-if [[ -z "$DETECTED_NPU" ]]; then
-  log_error "Could not detect NPU type. Skipping."
-  log_error "npu-smi info output:"
-  npu-smi info 2>&1 || true
+# Quick check that NPU is accessible
+npu-smi info 2>/dev/null > /dev/null || {
+  log_error "npu-smi not accessible. Is ascend-toolkit sourced?"
   exit 2
-fi
-log_info "Detected NPU: $DETECTED_NPU"
+}
 
 # Parse YAML with Python helper
 parse_recipe() {
-  python3 - "$RECIPE" "$DETECTED_NPU" <<'PYEOF'
+  python3 - "$RECIPE" "$HW_KEY" <<'PYEOF'
 import sys
 import yaml
 import json
 
-recipe_path, npu_type = sys.argv[1], sys.argv[2]
+recipe_path, hw_key = sys.argv[1], sys.argv[2]
 
 with open(recipe_path, 'r') as f:
     data = yaml.safe_load(f)
 
 meta = data.get('meta', {})
 hardware = meta.get('hardware', {})
-
-# Map detected NPU to hardware keys
-npu_to_key = {
-    '910b': 'atlas_800_a2',
-}
-hw_key = npu_to_key.get(npu_type)
-if not hw_key:
-    print(json.dumps({'action': 'skip', 'reason': f'Unknown NPU type: {npu_type}'}))
-    sys.exit(0)
 
 # Check if recipe supports this hardware
 hw_status = hardware.get(hw_key, None)
@@ -77,7 +65,8 @@ if hw_status == 'unsupported':
 # Extract env_setup (pip install)
 env_setup = data.get('env_setup', {})
 pip_content = env_setup.get('pip', {}).get('content', '')
-container_content = env_setup.get('container', {}).get('A2', {}).get('content', '')
+hw_to_container = {'atlas_800_a2': 'A2', 'atlas_800_a3': 'A3'}
+container_content = env_setup.get('container', {}).get(hw_to_container.get(hw_key, 'A2'), {}).get('content', '')
 
 # Extract scenarios
 scenarios = data.get('scenarios', [])
