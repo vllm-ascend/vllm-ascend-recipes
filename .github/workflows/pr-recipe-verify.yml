@@ -39,6 +39,7 @@ jobs:
         id: filter
         uses: dorny/paths-filter@v3
         with:
+          list-files: csv
           filters: |
             models:
               - 'models/**'
@@ -58,16 +59,19 @@ jobs:
         id: recipes
         if: steps.filter.outputs.models == 'true'
         run: |
-          git fetch origin "${{ github.base_ref }}" --depth=1
-          CHANGED=$(git diff --name-only FETCH_HEAD...HEAD -- models/ | grep '\.yaml$\|\.yml$' | grep '^models/en/' || true)
-          if [ -n "$CHANGED" ]; then
-            COUNT=$(echo "$CHANGED" | wc -l)
+          MODEL_FILES="${{ steps.filter.outputs.models_files }}"
+          echo "All changed model files: $MODEL_FILES"
+          EN_RECIPES=$(echo "$MODEL_FILES" | tr ',' '\n' | grep '^models/en/.*\.\(yaml\|yml\)$' || true)
+          if [ -n "$EN_RECIPES" ]; then
+            COUNT=$(echo "$EN_RECIPES" | wc -l)
             echo "count=$COUNT" >> "$GITHUB_OUTPUT"
-            FILES=$(echo "$CHANGED" | jq -R -s -c 'split("\n") | map(select(length > 0))')
+            FILES=$(echo "$EN_RECIPES" | jq -R -s -c 'split("\n") | map(select(length > 0))')
             echo "files=$FILES" >> "$GITHUB_OUTPUT"
+            echo "EN recipes ($COUNT): $EN_RECIPES"
           else
             echo "count=0" >> "$GITHUB_OUTPUT"
             echo "files=[]" >> "$GITHUB_OUTPUT"
+            echo "No models/en/ recipe files changed"
           fi
 
   # ============================================================
