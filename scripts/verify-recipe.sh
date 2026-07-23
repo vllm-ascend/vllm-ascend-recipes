@@ -237,7 +237,7 @@ set -eo pipefail
 . /usr/local/Ascend/ascend-toolkit/set_env.sh 2>/dev/null || true
 export PATH="/usr/local/bin:/root/.local/bin:$PATH"
 SCRIPT_HEREDOC
-  echo "$SERVE_CMD" >> "$VLLM_SCRIPT"
+  cat "/tmp/scenario_${idx}_serve.sh" >> "$VLLM_SCRIPT"
   chmod +x "$VLLM_SCRIPT"
 
   log_info "  Starting vllm serve..."
