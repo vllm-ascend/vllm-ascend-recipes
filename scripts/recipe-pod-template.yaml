@@ -1,0 +1,161 @@
+# Generated from vllm-ascend-recipes DeepSeek-V4-Flash A2 container config
+apiVersion: v1
+kind: Pod
+metadata:
+  name: recipe-verify-{{ JOB_ID }}
+  namespace: vllm-project
+  labels:
+    app: recipe-verify
+    model: deepseek-v4-flash
+    scenario: "{{ SCENARIO_INDEX }}"
+spec:
+  restartPolicy: Never
+  hostNetwork: true
+  containers:
+    - name: vllm-ascend
+      image: quay.io/ascend/vllm-ascend:v0.22.1rc1
+      imagePullPolicy: IfNotPresent
+      command:
+        - bash
+        - -c
+        - |
+          # Recipe verification entrypoint
+          set -euo pipefail
+          . /usr/local/Ascend/ascend-toolkit/set_env.sh
+
+          # === Install vllm-ascend if not pre-installed ===
+          if ! command -v vllm &>/dev/null; then
+            pip install vllm-ascend
+          fi
+
+          # === Run the vllm serve command ===
+          {{ VLLM_SERVE_COMMAND }}
+
+          # Keep the container alive for log collection
+          sleep infinity
+      env:
+        - name: VLLM_USE_MODELSCOPE
+          value: "True"
+        - name: HF_HUB_OFFLINE
+          value: "1"
+      securityContext:
+        privileged: true
+      resources:
+        limits:
+          huawei.com/Ascend910B: 8
+        requests:
+          huawei.com/Ascend910B: 8
+      volumeMounts:
+        - name: davinci0
+          mountPath: /dev/davinci0
+        - name: davinci1
+          mountPath: /dev/davinci1
+        - name: davinci2
+          mountPath: /dev/davinci2
+        - name: davinci3
+          mountPath: /dev/davinci3
+        - name: davinci4
+          mountPath: /dev/davinci4
+        - name: davinci5
+          mountPath: /dev/davinci5
+        - name: davinci6
+          mountPath: /dev/davinci6
+        - name: davinci7
+          mountPath: /dev/davinci7
+        - name: davinci-manager
+          mountPath: /dev/davinci_manager
+        - name: devmm-svm
+          mountPath: /dev/devmm_svm
+        - name: hisi-hdc
+          mountPath: /dev/hisi_hdc
+        - name: dcmi
+          mountPath: /usr/local/dcmi
+        - name: hccn-tool
+          mountPath: /usr/local/Ascend/driver/tools/hccn_tool
+        - name: npu-smi
+          mountPath: /usr/local/bin/npu-smi
+        - name: driver-lib64
+          mountPath: /usr/local/Ascend/driver/lib64
+        - name: driver-version
+          mountPath: /usr/local/Ascend/driver/version.info
+        - name: ascend-install-info
+          mountPath: /etc/ascend_install.info
+        - name: hccn-conf
+          mountPath: /etc/hccn.conf
+        - name: model-cache
+          mountPath: /root/.cache/modelscope
+        - name: shm
+          mountPath: /dev/shm
+  volumes:
+    - name: davinci0
+      hostPath:
+        path: /dev/davinci0
+        type: CharDevice
+    - name: davinci1
+      hostPath:
+        path: /dev/davinci1
+        type: CharDevice
+    - name: davinci2
+      hostPath:
+        path: /dev/davinci2
+        type: CharDevice
+    - name: davinci3
+      hostPath:
+        path: /dev/davinci3
+        type: CharDevice
+    - name: davinci4
+      hostPath:
+        path: /dev/davinci4
+        type: CharDevice
+    - name: davinci5
+      hostPath:
+        path: /dev/davinci5
+        type: CharDevice
+    - name: davinci6
+      hostPath:
+        path: /dev/davinci6
+        type: CharDevice
+    - name: davinci7
+      hostPath:
+        path: /dev/davinci7
+        type: CharDevice
+    - name: davinci-manager
+      hostPath:
+        path: /dev/davinci_manager
+        type: CharDevice
+    - name: devmm-svm
+      hostPath:
+        path: /dev/devmm_svm
+        type: CharDevice
+    - name: hisi-hdc
+      hostPath:
+        path: /dev/hisi_hdc
+        type: CharDevice
+    - name: dcmi
+      hostPath:
+        path: /usr/local/dcmi
+    - name: hccn-tool
+      hostPath:
+        path: /usr/local/Ascend/driver/tools/hccn_tool
+    - name: npu-smi
+      hostPath:
+        path: /usr/local/bin/npu-smi
+    - name: driver-lib64
+      hostPath:
+        path: /usr/local/Ascend/driver/lib64
+    - name: driver-version
+      hostPath:
+        path: /usr/local/Ascend/driver/version.info
+    - name: ascend-install-info
+      hostPath:
+        path: /etc/ascend_install.info
+    - name: hccn-conf
+      hostPath:
+        path: /etc/hccn.conf
+    - name: model-cache
+      hostPath:
+        path: /root/.cache/modelscope
+    - name: shm
+      emptyDir:
+        medium: Memory
+        sizeLimit: 512Gi
