@@ -140,22 +140,21 @@ PIP_SETUP=$(echo "$RECIPE_INFO" | $PYTHON -c "import sys,json; print(json.loads(
 MIN_VERSION=$(echo "$RECIPE_INFO" | $PYTHON -c "import sys,json; print(json.loads(sys.stdin.read()).get('min_vllm_version',''))")
 
 if command -v vllm &>/dev/null; then
-  log_info "vllm already installed"
+  log_info "vllm already installed: $(vllm --version 2>&1 || true)"
 else
-  log_info "Installing vllm-ascend..."
+  log_info "Installing vllm + vllm-ascend..."
   if [[ -n "$MIN_VERSION" ]]; then
     uv pip install "vllm-ascend>=$MIN_VERSION" || pip install "vllm-ascend>=$MIN_VERSION"
   else
-    uv pip install vllm-ascend || pip install vllm-ascend
+    uv pip install vllm vllm-ascend || pip install vllm vllm-ascend
   fi
   hash -r 2>/dev/null || true
-  # Ensure common install paths are in PATH
   export PATH="/usr/local/bin:/root/.local/bin:$PATH"
   if command -v vllm &>/dev/null; then
-    log_info "vllm installed: $(which vllm)"
+    log_info "vllm installed: $(vllm --version 2>&1 || true)"
   else
-    VLLM_PY=$($PYTHON -c "import vllm; print(vllm.__file__)" 2>&1 || echo "IMPORT_FAILED")
-    log_info "vllm check: $VLLM_PY"
+    log_error "vllm installation failed"
+    exit 1
   fi
 fi
 

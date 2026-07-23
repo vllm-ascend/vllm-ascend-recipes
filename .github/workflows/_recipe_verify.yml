@@ -15,7 +15,7 @@ on:
       image:
         required: false
         type: string
-        default: 'swr.cn-east-3.myhuaweicloud.com/upupup/ascend-ci/vllm-ascend/vllm-ascend:latest'
+        default: 'swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/cann:9.0.1-910b-ubuntu22.04-py3.12'
       recipe_files:
         required: true
         type: string
