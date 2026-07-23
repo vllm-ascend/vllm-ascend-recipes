@@ -79,8 +79,8 @@ for s in scenarios:
     for step in steps:
         content = step.get('content', '')
         import re
-        # Extract bash code block content
-        m = re.search(r'```bash\s*\n(.*?)```', content, re.DOTALL)
+        # Extract bash/shell code block content
+        m = re.search(r'```(?:bash|shell)\s*\n(.*?)```', content, re.DOTALL)
         if not m:
             import sys
             print(f"DEBUG: No bash block found in step '{step.get('title','')}', content[:200]={content[:200]}", file=sys.stderr)
@@ -119,7 +119,7 @@ print(json.dumps(result))
 PYEOF
 }
 
-RECIPE_INFO=$(parse_recipe 2>/dev/null || echo '{"action":"skip","reason":"parse error"}')
+RECIPE_INFO=$(parse_recipe 2>/tmp/recipe-parse-debug.log || echo '{"action":"skip","reason":"parse error"}')
 
 ACTION=$(echo "$RECIPE_INFO" | $PYTHON -c "import sys,json; print(json.loads(sys.stdin.read()).get('action','skip'))" 2>/dev/null || echo "skip")
 
