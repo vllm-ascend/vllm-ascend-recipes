@@ -140,31 +140,10 @@ PIP_SETUP=$(echo "$RECIPE_INFO" | $PYTHON -c "import sys,json; print(json.loads(
 MIN_VERSION=$(echo "$RECIPE_INFO" | $PYTHON -c "import sys,json; print(json.loads(sys.stdin.read()).get('min_vllm_version',''))")
 
 if command -v vllm &>/dev/null; then
-  log_info "vllm already installed: $(vllm --version 2>&1 || true)"
+  log_info "vllm ready: $(vllm --version 2>&1 | head -1 || true)"
 else
-  log_info "Installing vllm + vllm-ascend..."
-  uv pip install vllm vllm-ascend || pip install vllm vllm-ascend
-  hash -r 2>/dev/null || true
-  export PATH="/usr/local/bin:/root/.local/bin:$PATH"
-  # Debug: check what's available
-  log_info "vllm binary: $(which vllm 2>&1 || echo 'not in PATH')"
-  log_info "Python vllm: $($PYTHON -c 'import vllm; print(vllm.__version__)' 2>&1 || echo 'import failed')"
-  if ! command -v vllm &>/dev/null; then
-    log_error "vllm CLI not found after install, trying python3 -m vllm..."
-    if $PYTHON -m vllm --version 2>/dev/null; then
-      log_info "Creating vllm wrapper script"
-      echo '#!/usr/bin/env bash' > /usr/local/bin/vllm
-      echo 'exec '"$PYTHON"' -m vllm "$@"' >> /usr/local/bin/vllm
-      chmod +x /usr/local/bin/vllm
-      hash -r
-    fi
-  fi
-  if command -v vllm &>/dev/null; then
-    log_info "vllm installed: $(vllm --version 2>&1 || true)"
-  else
-    log_error "vllm installation failed"
-    exit 1
-  fi
+  log_error "vllm not found in image, cannot proceed"
+  exit 1
 fi
 
 if [[ -n "$PIP_SETUP" ]]; then
