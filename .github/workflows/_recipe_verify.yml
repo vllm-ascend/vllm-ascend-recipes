@@ -15,7 +15,7 @@ on:
       image:
         required: false
         type: string
-        default: 'swr.cn-east-3.myhuaweicloud.com/upupup/ascend-ci/vllm-ascend/vllm-ascend/v0.23.0rc1'
+        default: 'quay.nju.edu.cn/ascend/vllm-ascend:latest'
       recipe_files:
         required: true
         type: string
