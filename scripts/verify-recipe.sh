@@ -94,6 +94,8 @@ for s in scenarios:
         bash_content = re.sub(r'.*--tool-call-parser\s+deepseek_v4.*\n?', '', bash_content)
         bash_content = re.sub(r'.*--reasoning-parser\s+deepseek_v4.*\n?', '', bash_content)
         bash_content = re.sub(r'.*--enable-auto-tool-choice.*\n?', '', bash_content)
+        # Fix model path: recipe uses vllm-ascend dir, actual weights under Eco-Tech
+        bash_content = re.sub(r'vllm-ascend/DeepSeek-V4-Flash-w8a8-mtp', 'Eco-Tech/DeepSeek-V4-Flash-w8a8-mtp', bash_content)
         if 'vllm serve' in bash_content:
             serve_cmd = bash_content.strip()
         elif 'curl' in bash_content:
