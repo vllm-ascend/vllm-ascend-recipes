@@ -140,8 +140,7 @@ PIP_SETUP=$(echo "$RECIPE_INFO" | $PYTHON -c "import sys,json; print(json.loads(
 MIN_VERSION=$(echo "$RECIPE_INFO" | $PYTHON -c "import sys,json; print(json.loads(sys.stdin.read()).get('min_vllm_version',''))")
 
 if command -v vllm &>/dev/null; then
-  log_info "vllm already installed, upgrading to latest..."
-  uv pip install --upgrade vllm-ascend 2>&1 | tail -3 || pip install --upgrade vllm-ascend 2>&1 | tail -3
+  log_info "vllm already installed"
 else
   log_info "Installing vllm-ascend..."
   if [[ -n "$MIN_VERSION" ]]; then
