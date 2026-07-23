@@ -89,11 +89,11 @@ for s in scenarios:
         # Remove %%CONFIG:...%% markers
         bash_content = re.sub(r'%%CONFIG:\w+%%', '', bash_content)
         bash_content = re.sub(r'%%/CONFIG:\w+%%', '', bash_content)
-        # Remove deepseek_v4 args not supported by older vllm images
-        bash_content = re.sub(r'--tokenizer-mode\s+deepseek_v4\s*\\?\s*', '', bash_content)
-        bash_content = re.sub(r'--tool-call-parser\s+deepseek_v4\s*\\?\s*', '', bash_content)
-        bash_content = re.sub(r'--reasoning-parser\s+deepseek_v4\s*\\?\s*', '', bash_content)
-        bash_content = re.sub(r'--enable-auto-tool-choice\s*\\?\s*', '', bash_content)
+        # Remove deepseek_v4 args not supported by older vllm versions
+        bash_content = re.sub(r'.*--tokenizer-mode\s+deepseek_v4.*\n?', '', bash_content)
+        bash_content = re.sub(r'.*--tool-call-parser\s+deepseek_v4.*\n?', '', bash_content)
+        bash_content = re.sub(r'.*--reasoning-parser\s+deepseek_v4.*\n?', '', bash_content)
+        bash_content = re.sub(r'.*--enable-auto-tool-choice.*\n?', '', bash_content)
         if 'vllm serve' in bash_content:
             serve_cmd = bash_content.strip()
         elif 'curl' in bash_content:
