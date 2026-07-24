@@ -279,19 +279,20 @@ SCRIPT_HEREDOC
   # Run recipe curl verification commands
   if [[ -n "$VERIFY_CMD" ]]; then
     log_info "  Running recipe verification commands..."
-    echo "$VERIFY_CMD" | while IFS= read -r curl_cmd; do
-      [ -z "$curl_cmd" ] && continue
-      # Replace <node0_ip> with localhost, remove backslash continuations
-      curl_cmd=$(echo "$curl_cmd" | sed 's/<node0_ip>/localhost/g' | sed 's/\\$//' | tr '\n' ' ')
-      log_info "  Running: $curl_cmd"
-      RESP=$(eval "$curl_cmd" 2>&1 || echo "CURL_FAILED")
-      if echo "$RESP" | grep -qi "CURL_FAILED\|error"; then
-        log_error "  Recipe curl verification FAILED"
-        STATUS=1
-      else
-        log_info "  Recipe curl verification PASSED"
-      fi
-    done || true
+    # Write curl command to temp script and execute
+    CURL_SCRIPT="/tmp/curl_verify_${idx}.sh"
+    echo "#!/usr/bin/env bash" > "$CURL_SCRIPT"
+    echo "set -eo pipefail" >> "$CURL_SCRIPT"
+    echo "$VERIFY_CMD" >> "$CURL_SCRIPT"
+    chmod +x "$CURL_SCRIPT"
+    RESP=$(bash "$CURL_SCRIPT" 2>&1 || echo "CURL_FAILED")
+    if echo "$RESP" | grep -qi "CURL_FAILED"; then
+      log_error "  Recipe curl verification FAILED"
+      STATUS=1
+    else
+      log_info "  Recipe curl verification PASSED"
+      log_info "  Response: $(echo "$RESP" | head -3)"
+    fi
   fi
 
   # Kill the server
