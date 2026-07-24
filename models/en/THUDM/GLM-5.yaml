@@ -553,6 +553,60 @@ performance:
     |----------|--------------|--------------|---------------|------------|
     | High Throughput | dp=4, tp=8 | dp=8, tp=4 | P:133120, D:150000 | 3 |
     | Low Latency | dp=4, tp=8 | dp=4, tp=8 | P:133120, D:150000 | 3 |
+
+    #### Table 3: GLM-5.1 Feature Matrix (A3, 32-card PD Disaggregation)
+
+    | Scenario | Topology / Config | Cards | P Cards | D Cards | Sequence Length | Prefix Cache | Card TPOT | Avg Input | Avg Output |
+    |----------|-------------------|-------|---------|---------|-----------------|--------------|-----------|-----------|------------|
+    | High Throughput | PD disaggregation 1P1D | 32 | 16 | 16 | 3.5k/1.5k | 0 | 50 | 3500 | 1500 |
+    | High Throughput | PD disaggregation 1P1D | 32 | 16 | 16 | 16k/1k | 0 | 50 | 16384 | 1024 |
+    | High Throughput | PD disaggregation 1P1D | 32 | 16 | 16 | 64k/1k | 0 | 50 | 65536 | 1024 |
+    | High Throughput | PD disaggregation 1P1D | 32 | 16 | 16 | 64k/1k | 50 | 50 | 65536 | 1024 |
+    | High Throughput | PD disaggregation 1P1D | 32 | 16 | 16 | 64k/1k | 90 | 50 | 65536 | 1024 |
+    | High Throughput | PD disaggregation 1P1D | 32 | 16 | 16 | 128k/1k | 50 | 50 | 131072 | 1024 |
+    | High Throughput | PD disaggregation 1P1D | 32 | 16 | 16 | 128k/1k | 90 | 50 | 131072 | 1024 |
+    | High Throughput | PD disaggregation 1P1D | 32 | 16 | 16 | 190k/1k | 50 | 50 | 194560 | 1024 |
+    | High Throughput | PD disaggregation 1P1D | 32 | 16 | 16 | 190k/1k | 90 | 50 | 194560 | 1024 |
+    | Low Latency | PD disaggregation 1P1D | 32 | 16 | 16 | 3.5k/1.5k | 0 | 20 | 3500 | 1500 |
+    | Low Latency | C8 operator disabled | 32 | - | - | 3.5k/1.5k | 0 | 20 | - | - |
+    | Low Latency | New config | 32 | - | - | 3.5k/1.5k | 0 | 20 | - | - |
+    | Low Latency | PD disaggregation 1P1D | 32 | 16 | 16 | 16k/1k | 0 | 20 | 16384 | 1024 |
+    | Low Latency | C8 operator disabled | 32 | - | - | 16k/1k | 0 | 20 | - | - |
+    | Low Latency | New config | 32 | - | - | 16k/1k | 0 | 20 | - | - |
+    | Low Latency | PD disaggregation 1P1D | 32 | 16 | 16 | 64k/1k | 0 | 20 | 65536 | 1024 |
+    | Low Latency | PD disaggregation 1P1D | 32 | 16 | 16 | 64k/1k | 50 | 20 | 65536 | 1024 |
+    | Low Latency | PD disaggregation 1P1D | 32 | 16 | 16 | 64k/1k | 90 | 20 | 65536 | 1024 |
+    | Low Latency | PD disaggregation 1P1D | 32 | 16 | 16 | 128k/1k | 50 | 20 | 131072 | 1024 |
+    | Low Latency | PD disaggregation 1P1D | 32 | 16 | 16 | 128k/1k | 90 | 20 | 131072 | 1024 |
+    | Low Latency | PD disaggregation 1P1D | 32 | 16 | 16 | 190k/1k | 50 | 20 | 194560 | 1024 |
+    | Low Latency | PD disaggregation 1P1D | 32 | 16 | 16 | 190k/1k | 90 | 20 | 194560 | 1024 |
+    | Longest Sequence | PD disaggregation 1P1D | 32 | 16 | 16 | Longest sequence | 99 | 20 | - | - |
+
+    #### Table 4: GLM-5.1 Feature Matrix (A3, 16-card Two-machine Co-location)
+
+    | Scenario | Topology / Config | Cards | P Cards | D Cards | Sequence Length | Prefix Cache | Card TPOT | Avg Input | Avg Output |
+    |----------|-------------------|-------|---------|---------|-----------------|--------------|-----------|-----------|------------|
+    | High Throughput | Two-machine co-location, 16 cards | 16 | - | - | 3.5k/1.5k | 0 | 50 | 3500 | 1500 |
+    | High Throughput | Two-machine co-location, 16 cards | 16 | - | - | 16k/1k | 0 | 50 | 16384 | 1024 |
+    | High Throughput | Two-machine co-location, 16 cards | 16 | - | - | 64k/1k | 0 | 50 | 65536 | 1024 |
+    | High Throughput | Two-machine co-location, 16 cards | 16 | - | - | 64k/1k | 50 | 50 | 65536 | 1024 |
+    | High Throughput | Two-machine co-location, 16 cards | 16 | - | - | 64k/1k | 90 | 50 | 65536 | 1024 |
+    | High Throughput | Two-machine co-location, 16 cards | 16 | - | - | 128k/1k | 50 | 50 | 131072 | 1024 |
+    | High Throughput | Two-machine co-location, 16 cards | 16 | - | - | 128k/1k | 90 | 50 | 131072 | 1024 |
+    | High Throughput | Two-machine co-location, 16 cards | 16 | - | - | 190k/1k | 50 | 50 | - | - |
+    | High Throughput | Two-machine co-location, 16 cards | 16 | - | - | 190k/1k | 90 | 50 | - | - |
+    | Low Latency | Two-machine co-location, 16 cards | 16 | - | - | 3.5k/1.5k | 0 | 20 | 3500 | 1500 |
+    | Low Latency | Two-machine co-location, 16 cards | 16 | - | - | 16k/1k | 0 | 20 | - | - |
+    | Low Latency | Two-machine co-location, 16 cards | 16 | - | - | 64k/1k | 0 | 20 | - | - |
+    | Low Latency | Two-machine co-location, 16 cards | 16 | - | - | 64k/1k | 50 | 20 | 65536 | 1024 |
+    | Low Latency | Two-machine co-location, 16 cards | 16 | - | - | 64k/1k | 90 | 20 | 65536 | 1024 |
+    | Low Latency | Two-machine co-location, 16 cards | 16 | - | - | 128k/1k | 50 | 20 | 131072 | 1024 |
+    | Low Latency | Two-machine co-location, 16 cards | 16 | - | - | 128k/1k | 90 | 20 | 131072 | 1024 |
+    | Low Latency | Two-machine co-location, 16 cards | 16 | - | - | 190k/1k | 50 | 20 | - | - |
+    | Low Latency | Two-machine co-location, 16 cards | 16 | - | - | 190k/1k | 90 | 20 | - | - |
+    | Longest Sequence | Two-machine co-location, 16 cards | 16 | - | - | 198k/1 | 99 | 20 | - | - |
+
+    > `Prefix Cache` indicates the prefix cache hit rate. `Card TPOT` is the per-card TPOT target. `-` means the original feature table did not provide that field.
 tuning: |-
   ### Tuning Guidelines
 
