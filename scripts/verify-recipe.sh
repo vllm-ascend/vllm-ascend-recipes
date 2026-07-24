@@ -255,6 +255,9 @@ SCRIPT_HEREDOC
       log_info "  Server ready after ${i}s"
       break
     fi
+    if [[ $((i % 30)) -eq 0 ]]; then
+      log_info "  Still waiting... (${i}s elapsed)"
+    fi
     sleep 2
   done
 
@@ -291,7 +294,9 @@ SCRIPT_HEREDOC
       STATUS=1
     else
       log_info "  Recipe curl verification PASSED"
-      log_info "  Response: $(echo "$RESP" | head -3)"
+      log_info "  ====== CURL RESPONSE ======"
+      echo "$RESP" | while IFS= read -r rline; do log_info "  | $rline"; done
+      log_info "  ====== END ======"
     fi
   fi
 
