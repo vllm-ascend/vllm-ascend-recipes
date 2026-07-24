@@ -2,7 +2,7 @@ meta:
   title: "GLM-5"
   slug: "glm-5"
   provider: "THUDM"
-  description: "GLM-5 and GLM-5.1 are Mixture-of-Experts (MoE) models from Zhipu AI, targeting complex systems engineering and long-horizon agentic tasks. GLM-5 features 754B total parameters, with support for MTP speculative decoding, expert parallelism, and PD disaggregation on Ascend NPUs."
+  description: "GLM-5 and GLM-5.1 are Mixture-of-Experts (MoE) models from Zhipu AI, targeting complex systems engineering and long-horizon agentic tasks. GLM-5 features 744B total parameters, with support for MTP speculative decoding, expert parallelism, and PD disaggregation on Ascend NPUs."
   date_added: 2026-07-13
   performance_headline: "Multi-node deployment on Atlas 800 A3 (128G × 8) with W4A8/W8A8 precision"
   hardware:
@@ -13,13 +13,13 @@ model:
   model_id: "zai-org/GLM-5"
   min_vllm_version: "0.17.0rc1"
   architecture: moe
-  parameter_count: "754B"
+  parameter_count: "744B"
   active_parameters: null
   context_length: 131072
   modality: text
 
 overview: |-
-  GLM-5 and GLM-5.1 are Mixture-of-Experts (MoE) models from Zhipu AI (THUDM), targeting complex systems engineering and long-horizon agentic tasks. With 754B total parameters, these models support Multi-Token Prediction (MTP) speculative decoding, expert parallelism, data parallelism, and Prefill-Decode disaggregation on Ascend NPUs.
+  GLM-5 and GLM-5.1 are Mixture-of-Experts (MoE) models from Zhipu AI (THUDM), targeting complex systems engineering and long-horizon agentic tasks. With 744B total parameters, these models support Multi-Token Prediction (MTP) speculative decoding, expert parallelism, data parallelism, and Prefill-Decode disaggregation on Ascend NPUs.
 
   This document demonstrates the main validation steps for GLM-5/GLM-5.1 in the vLLM-Ascend environment, including supported features, environment preparation, single-node and multi-node deployment, as well as accuracy and performance evaluation.
 

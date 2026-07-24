@@ -2,7 +2,7 @@ meta:
   title: "GLM-5"
   slug: "glm-5"
   provider: "THUDM"
-  description: "GLM-5 和 GLM-5.1 是智谱 AI 推出的混合专家（MoE）模型，面向复杂系统工程和长周期智能体任务。GLM-5 拥有 754B 总参数量，支持 MTP 投机解码、专家并行和 PD 分离部署于昇腾 NPU。"
+  description: "GLM-5 和 GLM-5.1 是智谱 AI 推出的混合专家（MoE）模型，面向复杂系统工程和长周期智能体任务。GLM-5 拥有 744B 总参数量，支持 MTP 投机解码、专家并行和 PD 分离部署于昇腾 NPU。"
   date_added: 2026-07-13
   performance_headline: "Atlas 800 A3（128G × 8）多节点部署，支持 W4A8/W8A8 精度"
   hardware:
@@ -13,13 +13,13 @@ model:
   model_id: "zai-org/GLM-5"
   min_vllm_version: "0.17.0rc1"
   architecture: moe
-  parameter_count: "754B"
+  parameter_count: "744B"
   active_parameters: null
   context_length: 131072
   modality: text
 
 overview: |-
-  GLM-5 和 GLM-5.1 是智谱 AI（THUDM）推出的混合专家（MoE）模型，面向复杂系统工程和长周期智能体任务。模型总参数量 754B，支持多 Token 预测（MTP）投机解码、专家并行、数据并行和 Prefill-Decode 分离部署于昇腾 NPU。
+  GLM-5 和 GLM-5.1 是智谱 AI（THUDM）推出的混合专家（MoE）模型，面向复杂系统工程和长周期智能体任务。模型总参数量 744B，支持多 Token 预测（MTP）投机解码、专家并行、数据并行和 Prefill-Decode 分离部署于昇腾 NPU。
 
   本文档将演示 GLM-5/GLM-5.1 在 vLLM-Ascend 环境中的主要验证步骤，包括支持的特性、环境准备、单节点和多节点部署，以及精度和性能评估。
 
