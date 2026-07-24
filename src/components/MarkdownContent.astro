@@ -86,16 +86,21 @@ function renderMarkdown(md: string): string {
     const rows = match.trim().split('\n');
     let tableHtml =
       '<div class="overflow-x-auto rounded-lg border border-ink-800/60 mb-4"><table class="w-full text-sm">';
-    let headerDone = false;
+    let headerRendered = false;
+    let bodyOpen = false;
     for (const row of rows) {
       const cells = row.split('|').filter((c) => c.trim() !== '');
       if (cells.every((c) => /^:?-{3,}:?$/.test(c.trim()))) {
-        headerDone = true;
+        if (!bodyOpen) {
+          tableHtml += '<tbody>';
+          bodyOpen = true;
+        }
         continue;
       }
+      const isHeader = !headerRendered;
       const cellHtml = cells
-        .map((c, i) => {
-          const tag = !headerDone && i === 0 ? 'th' : 'td';
+        .map((c) => {
+          const tag = isHeader ? 'th' : 'td';
           const cls =
             tag === 'th'
               ? 'text-left py-2.5 px-4 font-mono text-xs font-medium text-ink-300 uppercase tracking-wider'
@@ -103,12 +108,19 @@ function renderMarkdown(md: string): string {
           return `<${tag} class="${cls}">${c.trim()}</${tag}>`;
         })
         .join('');
-      if (!headerDone) {
+      if (isHeader) {
         tableHtml += `<thead><tr class="border-b border-ink-800/60 bg-ink-900/40">${cellHtml}</tr></thead>`;
-        headerDone = true;
+        headerRendered = true;
       } else {
-        tableHtml += `<tbody><tr class="border-b border-ink-800/40 last:border-0 hover:bg-ink-900/30 transition-colors">${cellHtml}</tr></tbody>`;
+        if (!bodyOpen) {
+          tableHtml += '<tbody>';
+          bodyOpen = true;
+        }
+        tableHtml += `<tr class="border-b border-ink-800/40 last:border-0 hover:bg-ink-900/30 transition-colors">${cellHtml}</tr>`;
       }
+    }
+    if (bodyOpen) {
+      tableHtml += '</tbody>';
     }
     tableHtml += '</table></div>';
     return tableHtml;
