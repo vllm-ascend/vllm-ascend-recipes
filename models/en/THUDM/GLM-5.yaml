@@ -263,7 +263,7 @@ env_setup:
 
       > **Note**: If deploying a multi-node environment, set up the environment on each node.
 
-      For more details, please refer to the [Installation Guide](../../installation.md).
+      For more details, please refer to the [Installation Guide](https://docs.vllm.ai/projects/ascend/en/latest/installation.html).
 scenarios:
 - npu: Atlas 800I A3
   precision: W4A8
@@ -315,8 +315,8 @@ scenarios:
       For parameter details, refer to:
 
       - [vLLM CLI documentation](https://docs.vllm.ai/en/stable/cli/) — standard serve parameters
-      - [Environment Variables](../../user_guide/configuration/env_vars.md) — Ascend-specific environment variables
-      - [Additional Configuration](../../user_guide/configuration/additional_config.md) — `--additional-config` format and options
+      - [Environment Variables](https://docs.vllm.ai/projects/ascend/en/latest/user_guide/configuration/env_vars.html) — Ascend-specific environment variables
+      - [Additional Configuration](https://docs.vllm.ai/projects/ascend/en/latest/user_guide/configuration/additional_config.html) — `--additional-config` format and options
   - title: Service Verification
     content: |-
       After the service is started, verify it is running by sending a prompt. Refer to the verification section below for a usage example.
@@ -556,8 +556,8 @@ performance:
 tuning: |-
   ### Tuning Guidelines
 
-  Please refer to the [Public Performance Tuning Documentation](../../developer_guide/performance_and_debug/optimization_and_tuning.md) for tuning methods.
-  Please refer to the [Feature Guide](../../user_guide/support_matrix/feature_matrix.md) for detailed feature descriptions.
+  Please refer to the [Public Performance Tuning Documentation](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/performance_and_debug/optimization_and_tuning.html) for tuning methods.
+  Please refer to the [Feature Guide](https://docs.vllm.ai/projects/ascend/en/latest/user_guide/support_matrix/feature_matrix.html) for detailed feature descriptions.
 
   **Key tuning notes for GLM-5:**
 

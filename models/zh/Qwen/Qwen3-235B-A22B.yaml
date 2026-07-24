@@ -125,7 +125,7 @@ prerequisites:
     参考上方量化章节。
 - title: 验证多节点通信
   content: |-
-    如需部署多节点环境，请参考 [验证多节点通信环境](../../installation.md#verify-multi-node-communication) 验证多节点通信。
+    如需部署多节点环境，请参考 [验证多节点通信环境](https://docs.vllm.ai/projects/ascend/zh-cn/latest/installation.html#verify-multi-node-communication) 验证多节点通信。
 env_setup:
   container:
     A3:
@@ -239,7 +239,7 @@ env_setup:
         预期结果：显示版本信息，与拉取的镜像版本一致。
   pip:
     content: |-
-      如果不想使用 Docker 镜像，而是从源码构建，请按照 [安装指南](../../installation.md) 安装 vLLM-Ascend。
+      如果不想使用 Docker 镜像，而是从源码构建，请按照 [安装指南](https://docs.vllm.ai/projects/ascend/zh-cn/latest/installation.html) 安装 vLLM-Ascend。
 
       验证源码安装：
 
@@ -291,7 +291,7 @@ scenarios:
       ```
 
       > - [vLLM Serving Arguments 文档](https://docs.vllm.com.cn/en/latest/cli/serve/?h=block+size#arguments) — vLLM serve 命令的更多参数详情。
-      > - [环境变量](../../user_guide/configuration/env_vars.md) — Ascend 特定环境变量（`HCCL_*` 等）。
+      > - [环境变量](https://docs.vllm.ai/projects/ascend/zh-cn/latest/user_guide/configuration/env_vars.html) — Ascend 特定环境变量（`HCCL_*` 等）。
   - title: 服务验证
     content: |-
       服务启动成功后，将显示以下启动日志：
@@ -341,7 +341,7 @@ scenarios:
       ```
 
       > - [vLLM Serving Arguments 文档](https://docs.vllm.com.cn/en/latest/cli/serve/?h=block+size#arguments) — vLLM serve 命令的更多参数详情。
-      > - [环境变量](../../user_guide/configuration/env_vars.md) — Ascend 特定环境变量（`HCCL_*` 等）。
+      > - [环境变量](https://docs.vllm.ai/projects/ascend/zh-cn/latest/user_guide/configuration/env_vars.html) — Ascend 特定环境变量（`HCCL_*` 等）。
   - title: 服务验证
     content: |-
       服务启动成功后，将显示以下启动日志：
@@ -360,7 +360,7 @@ scenarios:
     content: |-
       PD（Prefill-Decode）分离将 Prefill 和 Decode 阶段拆分到不同节点以获得更好的吞吐量。以下示例展示了三节点 A3 PD 分离场景（1 个 Prefill 节点 + 2 个 Decode 节点）的参数配置。
 
-      详细部署指南请参考 [Prefill-Decode Disaggregation Mooncake 验证](../features/pd_disaggregation_mooncake_multi_node.md)。
+      详细部署指南请参考 [Prefill-Decode Disaggregation Mooncake 验证](https://docs.vllm.ai/projects/ascend/zh-cn/latest/tutorials/features/pd_disaggregation_mooncake_multi_node.html)。
 
       **硬件**：3 × Atlas 800 A3 (64G × 16)，1 个用于 Prefill，2 个用于 Decode。
   - title: 准备 launch_online_dp.py
@@ -848,7 +848,7 @@ evaluation:
     content: |-
       ### 使用 AISBench
 
-      关于安装、数据集下载和配置的详细信息，请参考 [使用 AISBench](../../developer_guide/evaluation/using_ais_bench.md)。
+      关于安装、数据集下载和配置的详细信息，请参考 [使用 AISBench](https://docs.vllm.ai/projects/ascend/zh-cn/latest/developer_guide/evaluation/using_ais_bench.html)。
 
       以下是精度评估配置文件的示例：
 
@@ -894,7 +894,7 @@ evaluation:
     content: |-
       ### 使用 AISBench
 
-      关于安装、数据集下载和配置的详细信息，请参考 [使用 AISBench](../../developer_guide/evaluation/using_ais_bench.md#execute-performance-evaluation)。
+      关于安装、数据集下载和配置的详细信息，请参考 [使用 AISBench](https://docs.vllm.ai/projects/ascend/zh-cn/latest/developer_guide/evaluation/using_ais_bench.html#execute-performance-evaluation)。
 
       以下是性能评估配置文件的示例：
 
@@ -988,10 +988,10 @@ tuning: |-
 
   #### 通用调优参考
 
-  关于调优方法，请参考 [公开性能调优文档](../../developer_guide/performance_and_debug/optimization_and_tuning.md)。
-  关于特性详细描述，请参考 [特性指南](../../user_guide/support_matrix/feature_matrix.md)。
+  关于调优方法，请参考 [公开性能调优文档](https://docs.vllm.ai/projects/ascend/zh-cn/latest/developer_guide/performance_and_debug/optimization_and_tuning.html)。
+  关于特性详细描述，请参考 [特性指南](https://docs.vllm.ai/projects/ascend/zh-cn/latest/user_guide/support_matrix/feature_matrix.html)。
 faq: |-
-  关于常见的环境、安装和通用参数问题，请参考 [vLLM-Ascend FAQ](https://docs.vllm.ai/projects/ascend/en/latest/faqs.html)。本节仅涵盖 Qwen3-235B-A22B 特有的问题。
+  关于常见的环境、安装和通用参数问题，请参考 [vLLM-Ascend FAQ](https://docs.vllm.ai/projects/ascend/zh-cn/latest/faqs.html)。本节仅涵盖 Qwen3-235B-A22B 特有的问题。
 
   ### Q: Qwen3-235B-A22B 需要什么硬件？
 
@@ -1018,11 +1018,11 @@ faq: |-
   Context Parallelism (CP) 将单个请求的 KV 缓存拆分到多个 NPU 上，适用于单节点长上下文场景。PD Disaggregation 将 Prefill 和 Decode 分离到不同节点，适用于高并发请求的高吞吐服务。
 references:
 - title: vllm-ascend 文档
-  url: https://docs.vllm.ai/projects/ascend/en/latest/tutorials/models/Qwen3-235B-A22B.html
+  url: https://docs.vllm.ai/projects/ascend/zh-cn/latest/tutorials/models/Qwen3-235B-A22B.html
 - title: ModelScope 模型下载
   url: https://www.modelscope.cn/models/Qwen/Qwen3-235B-A22B
 - title: PD 分离指南 (Mooncake)
-  url: https://docs.vllm.ai/projects/ascend/en/latest/tutorials/features/pd_disaggregation_mooncake_multi_node.html
+  url: https://docs.vllm.ai/projects/ascend/zh-cn/latest/tutorials/features/pd_disaggregation_mooncake_multi_node.html
 - title: Proxy 脚本
   url: https://github.com/vllm-project/vllm-ascend/blob/main/examples/disaggregated_prefill_v1/load_balance_proxy_server_example.py
 - title: vllm-ascend GitHub

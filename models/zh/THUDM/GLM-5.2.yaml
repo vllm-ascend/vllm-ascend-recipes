@@ -63,7 +63,7 @@ prerequisites:
     以上为推荐卡数，可根据实际情况调整。
 - title: 验证多节点通信
   content: |-
-    如需部署多节点环境，请按照 [验证多节点通信环境](../../installation.md#verify-multi-node-communication) 进行验证。
+    如需部署多节点环境，请按照 [验证多节点通信环境](https://docs.vllm.ai/projects/ascend/zh-cn/latest/installation.html#verify-multi-node-communication) 进行验证。
 env_setup:
   container:
     A3:
@@ -208,7 +208,7 @@ env_setup:
 
       > **注意**：如果部署多节点环境，需要在每个节点上设置环境。
 
-      更多详情请参考 [安装指南](../../installation.md)。
+      更多详情请参考 [安装指南](https://docs.vllm.ai/projects/ascend/zh-cn/latest/installation.html)。
 scenarios:
 - npu: Atlas 800I A3
   precision: W8A8
@@ -256,8 +256,8 @@ scenarios:
       参数详情请参考：
 
       - [vLLM CLI 文档](https://docs.vllm.ai/en/stable/cli/) — 标准服务参数
-      - [环境变量](../../user_guide/configuration/env_vars.md) — 昇腾专用环境变量
-      - [附加配置](../../user_guide/configuration/additional_config.md) — `--additional-config` 格式和选项
+      - [环境变量](https://docs.vllm.ai/projects/ascend/zh-cn/latest/user_guide/configuration/env_vars.html) — 昇腾专用环境变量
+      - [附加配置](https://docs.vllm.ai/projects/ascend/zh-cn/latest/user_guide/configuration/additional_config.html) — `--additional-config` 格式和选项
   - title: 服务验证
     content: |-
       服务启动后，通过发送提示词验证服务是否正常运行。请参考下方的验证示例。
@@ -511,8 +511,8 @@ performance:
 tuning: |-
   ### 调优指南
 
-  请参考 [公开性能调优文档](../../developer_guide/performance_and_debug/optimization_and_tuning.md) 了解调优方法。
-  请参考 [功能指南](../../user_guide/support_matrix/feature_matrix.md) 了解详细功能描述。
+  请参考 [公开性能调优文档](https://docs.vllm.ai/projects/ascend/zh-cn/latest/developer_guide/performance_and_debug/optimization_and_tuning.html) 了解调优方法。
+  请参考 [功能指南](https://docs.vllm.ai/projects/ascend/zh-cn/latest/user_guide/support_matrix/feature_matrix.html) 了解详细功能描述。
 
   **GLM-5.2 关键调优说明：**
 
@@ -522,7 +522,7 @@ tuning: |-
   - `DYNAMIC_EPLB=1` 在 Decode 节点启用动态专家并行负载均衡。
   - 200k 上下文窗口请使用共置 4 节点配置，dp4 tp8。
 faq: |-
-  常见环境、安装和通用参数问题请参考 [公开 FAQ](https://docs.vllm.ai/projects/ascend/en/latest/faqs.html)。本章仅涵盖模型特定问题。
+  常见环境、安装和通用参数问题请参考 [公开 FAQ](https://docs.vllm.ai/projects/ascend/zh-cn/latest/faqs.html)。本章仅涵盖模型特定问题。
 
   **Q：如何启用函数调用？**
 
@@ -541,7 +541,7 @@ faq: |-
   使用共置 4 节点配置，dp4 tp8，`--max-model-len 200000`。
 references:
 - title: vllm-ascend 文档
-  url: https://docs.vllm.ai/projects/ascend/en/latest/tutorials/models/GLM5.2.html
+  url: https://docs.vllm.ai/projects/ascend/zh-cn/latest/tutorials/models/GLM5.2.html
 - title: ModelScope 模型下载（GLM-5.2 BF16）
   url: https://www.modelscope.cn/models/ZhipuAI/GLM-5.2
 - title: ModelScope 模型下载（GLM-5.2 W8A8）

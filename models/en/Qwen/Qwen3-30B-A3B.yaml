@@ -99,7 +99,7 @@ quantization:
     - **MoE routing gate** (mlp.gate): BF16
     - **MoE expert projections** (gate/up/down_proj): Dynamic W8A8 where input scales are computed on-the-fly during inference
 
-    If the W8A8 quantized weights are not available for direct download, you can obtain them by quantizing the BF16 model using **msmodelslim**. Refer to the [Quantization Guide](../../user_guide/feature_guide/quantization.md) for details. All model paths in this document should be adjusted to your actual local paths.
+    If the W8A8 quantized weights are not available for direct download, you can obtain them by quantizing the BF16 model using **msmodelslim**. Refer to the [Quantization Guide](https://docs.vllm.ai/projects/ascend/en/latest/user_guide/feature_guide/quantization.html) for details. All model paths in this document should be adjusted to your actual local paths.
 prerequisites:
 - title: Model Weight
   content: |-
@@ -265,7 +265,7 @@ env_setup:
 
       > **Note**: If deploying a multi-node environment, set up the environment on each node.
 
-      For more details, please refer to the [Installation Guide](../../installation.md).
+      For more details, please refer to the [Installation Guide](https://docs.vllm.ai/projects/ascend/en/latest/installation.html).
 scenarios:
 - npu: Atlas 800I A3
   precision: W8A8
@@ -315,8 +315,8 @@ scenarios:
       For parameter details, refer to:
 
       - [vLLM CLI documentation](https://docs.vllm.ai/en/stable/cli/) — standard serve parameters (`--host`, `--port`, `--max-model-len`, etc.)
-      - [Environment Variables](../../user_guide/configuration/env_vars.md) — Ascend-specific environment variables (`HCCL_*`, etc.)
-      - [Additional Configuration](../../user_guide/configuration/additional_config.md) — `--additional-config` format and options
+      - [Environment Variables](https://docs.vllm.ai/projects/ascend/en/latest/user_guide/configuration/env_vars.html) — Ascend-specific environment variables (`HCCL_*`, etc.)
+      - [Additional Configuration](https://docs.vllm.ai/projects/ascend/en/latest/user_guide/configuration/additional_config.html) — `--additional-config` format and options
   - title: Service Verification
     content: |-
       After the service is started, verify it is running by sending a prompt. Refer to the verification section below for a usage example.
@@ -367,8 +367,8 @@ scenarios:
       For parameter details, refer to:
 
       - [vLLM CLI documentation](https://docs.vllm.ai/en/stable/cli/) — standard serve parameters (`--host`, `--port`, `--max-model-len`, etc.)
-      - [Environment Variables](../../user_guide/configuration/env_vars.md) — Ascend-specific environment variables (`HCCL_*`, etc.)
-      - [Additional Configuration](../../user_guide/configuration/additional_config.md) — `--additional-config` format and options
+      - [Environment Variables](https://docs.vllm.ai/projects/ascend/en/latest/user_guide/configuration/env_vars.html) — Ascend-specific environment variables (`HCCL_*`, etc.)
+      - [Additional Configuration](https://docs.vllm.ai/projects/ascend/en/latest/user_guide/configuration/additional_config.html) — `--additional-config` format and options
   - title: Service Verification
     content: |-
       After the service is started, verify it is running by sending a prompt. Refer to the verification section below for a usage example.
@@ -401,7 +401,7 @@ evaluation:
     content: |-
       ### Using AISBench
 
-      For setup details, including installation, dataset download, and configuration, please refer to [Using AISBench](../../developer_guide/evaluation/using_ais_bench.md).
+      For setup details, including installation, dataset download, and configuration, please refer to [Using AISBench](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/evaluation/using_ais_bench.html).
 
       The following is an example configuration for the accuracy evaluation config file, demonstrated using the GSM8K dataset:
 
@@ -453,9 +453,9 @@ evaluation:
 
       vLLM-Ascend also supports the following evaluation tools:
 
-      - [lm_eval](../../developer_guide/evaluation/using_lm_eval.md)
-      - [OpenCompass](../../developer_guide/evaluation/using_opencompass.md)
-      - [EvalScope](../../developer_guide/evaluation/using_evalscope.md)
+      - [lm_eval](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/evaluation/using_lm_eval.html)
+      - [OpenCompass](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/evaluation/using_opencompass.html)
+      - [EvalScope](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/evaluation/using_evalscope.html)
 
       **Accuracy Results (Atlas 800I A3, vLLM-Ascend v0.22.1rc, W8A8):**
 
@@ -469,7 +469,7 @@ evaluation:
     content: |-
       ### Using AISBench
 
-      For setup details, please refer to [Using AISBench for performance evaluation](../../developer_guide/evaluation/using_ais_bench.md#execute-performance-evaluation).
+      For setup details, please refer to [Using AISBench for performance evaluation](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/evaluation/using_ais_bench.html#execute-performance-evaluation).
 
       First, configure the model for streaming performance testing (`ais_bench/benchmark/configs/models/vllm_api/vllm_api_stream_chat.py`):
 
@@ -682,8 +682,8 @@ performance:
 tuning: |-
   ### Tuning Guidelines
 
-  Please refer to the [Public Performance Tuning Documentation](../../developer_guide/performance_and_debug/optimization_and_tuning.md) for tuning methods.
-  Please refer to the [Feature Guide](../../user_guide/support_matrix/feature_matrix.md) for detailed feature descriptions.
+  Please refer to the [Public Performance Tuning Documentation](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/performance_and_debug/optimization_and_tuning.html) for tuning methods.
+  Please refer to the [Feature Guide](https://docs.vllm.ai/projects/ascend/en/latest/user_guide/support_matrix/feature_matrix.html) for detailed feature descriptions.
 faq: |-
   For common environment, installation, and general parameter issues, please refer to the [Public FAQ](https://docs.vllm.ai/projects/ascend/en/latest/faqs.html). This chapter only covers model-specific issues.
 references:

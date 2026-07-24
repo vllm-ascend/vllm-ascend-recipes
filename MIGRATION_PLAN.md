@@ -80,6 +80,15 @@
 1. **Sphinx 语法转换**：`{code-block} bash :substitutions:` → ` ```bash `, `:::{note}` → 保留（MarkdownContent.astro 已支持）
 2. **替换变量**：`|vllm_ascend_version|` 保留（渲染器自动替换为 `v0.22.1rc1`）
 3. **交叉引用**：`[text](../../path/to/doc.md)` → 改为绝对 URL (https://docs.vllm.ai/...)
+(源文档的绝对路径对应：
+./ 对应 https://docs.vllm.ai/projects/ascend/zh-cn/latest/tutorials/models/
+同时区分中英文绝对路径，例如：
+../../installation.md 对应：
+多节点通信（中文）
+https://docs.vllm.ai/projects/ascend/zh-cn/latest/installation.html
+多节点通信（英文）
+https://docs.vllm.ai/projects/ascend/en/latest/installation.html
+)
 4. **表格**：保留 markdown table 格式
 5. **中英同步**：每个模型需要 en/zh 两份 YAML，内容结构一致
 6. **section 编号不完整的文档**：部分文档没有统一的 10-section 编号，需要根据实际内容映射

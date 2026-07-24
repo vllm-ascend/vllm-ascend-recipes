@@ -125,7 +125,7 @@ prerequisites:
     Refer to the quantization section above.
 - title: Verify Multi-node Communication
   content: |-
-    If you need to deploy a multi-node environment, verify the multi-node communication according to [Verify Multi-node Communication Environment](../../installation.md#verify-multi-node-communication).
+    If you need to deploy a multi-node environment, verify the multi-node communication according to [Verify Multi-node Communication Environment](https://docs.vllm.ai/projects/ascend/en/latest/installation.html#verify-multi-node-communication).
 env_setup:
   container:
     A3:
@@ -239,7 +239,7 @@ env_setup:
         Expected result: The version information is displayed, matching the pulled image version.
   pip:
     content: |-
-      If you prefer to build from source instead of using the Docker image, install vLLM-Ascend following the [Installation Guide](../../installation.md).
+      If you prefer to build from source instead of using the Docker image, install vLLM-Ascend following the [Installation Guide](https://docs.vllm.ai/projects/ascend/en/latest/installation.html).
 
       To verify the source installation:
 
@@ -291,7 +291,7 @@ scenarios:
       ```
 
       > - [vLLM Serving Arguments documentation](https://docs.vllm.com.cn/en/latest/cli/serve/?h=block+size#arguments) — Additional parameter details for vLLM serve commands.
-      > - [Environment Variables](../../user_guide/configuration/env_vars.md) — Ascend-specific environment variables (`HCCL_*`, etc.).
+      > - [Environment Variables](https://docs.vllm.ai/projects/ascend/en/latest/user_guide/configuration/env_vars.html) — Ascend-specific environment variables (`HCCL_*`, etc.).
   - title: Service Verification
     content: |-
       If the service starts successfully, the following startup log will be displayed:
@@ -341,7 +341,7 @@ scenarios:
       ```
 
       > - [vLLM Serving Arguments documentation](https://docs.vllm.com.cn/en/latest/cli/serve/?h=block+size#arguments) — Additional parameter details for vLLM serve commands.
-      > - [Environment Variables](../../user_guide/configuration/env_vars.md) — Ascend-specific environment variables (`HCCL_*`, etc.).
+      > - [Environment Variables](https://docs.vllm.ai/projects/ascend/en/latest/user_guide/configuration/env_vars.html) — Ascend-specific environment variables (`HCCL_*`, etc.).
   - title: Service Verification
     content: |-
       If the service starts successfully, the following startup log will be displayed:
@@ -360,7 +360,7 @@ scenarios:
     content: |-
       PD (Prefill-Decode) separation splits the Prefill and Decode phases across different nodes for better throughput. The following example shows the parameter configuration for a three-node A3 PD disaggregation scenario (one Prefill node + two Decode nodes):
 
-      For the detailed deployment guide, please refer to [Prefill-Decode Disaggregation Mooncake Verification](../features/pd_disaggregation_mooncake_multi_node.md).
+      For the detailed deployment guide, please refer to [Prefill-Decode Disaggregation Mooncake Verification](https://docs.vllm.ai/projects/ascend/en/latest/tutorials/features/pd_disaggregation_mooncake_multi_node.html).
 
       **Hardware**: 3 × Atlas 800 A3 (64G × 16), one for Prefill, two for Decode.
   - title: Prepare launch_online_dp.py
@@ -848,7 +848,7 @@ evaluation:
     content: |-
       ### Using AISBench
 
-      For setup details, including installation, dataset download, and configuration, please refer to [Using AISBench](../../developer_guide/evaluation/using_ais_bench.md).
+      For setup details, including installation, dataset download, and configuration, please refer to [Using AISBench](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/evaluation/using_ais_bench.html).
 
       The following is an example configuration for the accuracy evaluation config file:
 
@@ -894,7 +894,7 @@ evaluation:
     content: |-
       ### Using AISBench
 
-      For setup details, including installation, dataset download, and configuration, please refer to [Using AISBench](../../developer_guide/evaluation/using_ais_bench.md#execute-performance-evaluation) for details.
+      For setup details, including installation, dataset download, and configuration, please refer to [Using AISBench](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/evaluation/using_ais_bench.html#execute-performance-evaluation) for details.
 
       The following is an example configuration for the performance evaluation config file:
 
@@ -988,8 +988,8 @@ tuning: |-
 
   #### General Tuning Reference
 
-  Please refer to the [Public Performance Tuning Documentation](../../developer_guide/performance_and_debug/optimization_and_tuning.md) for tuning methods.
-  Please refer to the [Feature Guide](../../user_guide/support_matrix/feature_matrix.md) for detailed feature descriptions.
+  Please refer to the [Public Performance Tuning Documentation](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/performance_and_debug/optimization_and_tuning.html) for tuning methods.
+  Please refer to the [Feature Guide](https://docs.vllm.ai/projects/ascend/en/latest/user_guide/support_matrix/feature_matrix.html) for detailed feature descriptions.
 faq: |-
   For common environment, installation, and general parameter issues, please refer to the [vLLM-Ascend FAQs](https://docs.vllm.ai/projects/ascend/en/latest/faqs.html). This section only covers issues specific to Qwen3-235B-A22B.
 
