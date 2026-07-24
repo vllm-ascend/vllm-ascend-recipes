@@ -1,0 +1,113 @@
+#
+# Copyright (c) 2025 Huawei Technologies Co., Ltd. All Rights Reserved.
+# This file is a part of the vllm-ascend-recipes project.
+#
+
+name: 'Nightly Recipe Verify'
+
+on:
+  schedule:
+    - cron: '0 18 * * *'
+  push:
+    branches: [main]
+    paths:
+      - 'models/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+  workflow_dispatch:
+    inputs:
+      full_run:
+        type: boolean
+        description: 'Run all recipes (ignores change detection)'
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      a2_recipes: ${{ steps.recipes.outputs.a2_recipes }}
+      a2_count: ${{ steps.recipes.outputs.a2_count }}
+      should_run: ${{ steps.decide.outputs.should_run }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Detect changed files (push trigger only)
+        id: changed
+        if: github.event_name == 'push'
+        run: |
+          CHANGED=$(git diff --name-only HEAD~1 HEAD -- models/ | grep '\.yaml$\|\.yml$' || echo "")
+          echo "changed_files=$CHANGED" >> $GITHUB_OUTPUT
+
+      - name: Determine whether to run
+        id: decide
+        run: |
+          if [[ "${{ github.event_name }}" == "schedule" ]] || [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "should_run=true" >> $GITHUB_OUTPUT
+          elif [[ -n "${{ steps.changed.outputs.changed_files }}" ]]; then
+            echo "should_run=true" >> $GITHUB_OUTPUT
+          else
+            echo "should_run=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Classify recipes by hardware
+        id: recipes
+        if: steps.decide.outputs.should_run == 'true'
+        run: |
+          pip install pyyaml
+
+          A2_LIST=""
+          A2_COUNT=0
+
+          if [[ "${{ github.event.inputs.full_run }}" == "true" ]] || [[ "${{ github.event_name }}" == "schedule" ]]; then
+            RECIPE_FILES=$(find models/en -name '*.yaml' -o -name '*.yml' | sort)
+          elif [[ -n "${{ steps.changed.outputs.changed_files }}" ]]; then
+            RECIPE_FILES="${{ steps.changed.outputs.changed_files }}"
+          else
+            RECIPE_FILES=""
+          fi
+
+          for file in $RECIPE_FILES; do
+            HW=$(python3 -c "import yaml, sys; d=yaml.safe_load(open('$file')); hw=d.get('meta',{}).get('hardware',{}); print(hw.get('atlas_800_a2',''))" 2>/dev/null || echo "")
+
+            [ "$HW" = "unsupported" ] && continue
+
+            A2_LIST="$A2_LIST$file"$'\n'
+            A2_COUNT=$((A2_COUNT + 1))
+          done
+
+          echo "a2_recipes<<EOF" >> $GITHUB_OUTPUT
+          echo "$A2_LIST" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          echo "a2_count=$A2_COUNT" >> $GITHUB_OUTPUT
+
+          echo "A2 recipes: $A2_COUNT"
+
+  verify-a2:
+    needs: prepare
+    if: needs.prepare.outputs.should_run == 'true' && needs.prepare.outputs.a2_count != '0'
+    uses: ./.github/workflows/_recipe_verify.yml
+    with:
+      runner: linux-aarch64-a2b4-8
+      recipe_files: ${{ needs.prepare.outputs.a2_recipes }}
+      trigger_type: nightly
+    secrets:
+      obs_ak: ${{ secrets.obs_ak }}
+      obs_sk: ${{ secrets.obs_sk }}
+
+  summary:
+    needs: [prepare, verify-a2]
+    if: always() && needs.prepare.outputs.should_run == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Nightly summary
+        run: |
+          echo "=========================================="
+          echo "  Nightly Recipe Verification Summary"
+          echo "=========================================="
+          echo "A2 recipes submitted: ${{ needs.prepare.outputs.a2_count }}"
+          echo "A2 result: ${{ needs.verify-a2.result }}"
+          echo "Trigger: ${{ github.event_name == 'schedule' && 'cron' || github.event_name == 'workflow_dispatch' && 'manual' || 'push' }}"

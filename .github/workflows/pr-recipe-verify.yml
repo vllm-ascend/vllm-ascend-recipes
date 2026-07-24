@@ -1,0 +1,182 @@
+#
+# Copyright (c) 2025 Huawei Technologies Co., Ltd. All Rights Reserved.
+# This file is a part of the vllm-ascend-recipes project.
+#
+
+name: 'PR Recipe Verify'
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: pr-recipe-verify-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  # ============================================================
+  # Step 1: Detect what changed
+  # ============================================================
+  detect:
+    runs-on: ubuntu-latest
+    outputs:
+      has_model_changes: ${{ steps.filter.outputs.models }}
+      has_src_changes: ${{ steps.filter.outputs.src }}
+      has_workflow_changes: ${{ steps.filter.outputs.workflows }}
+      has_config_changes: ${{ steps.filter.outputs.config }}
+      recipe_files: ${{ steps.recipes.outputs.files }}
+      recipe_count: ${{ steps.recipes.outputs.count }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Detect changed paths
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          list-files: csv
+          filters: |
+            models:
+              - 'models/**'
+            src:
+              - 'src/**'
+            workflows:
+              - '.github/workflows/**'
+            config:
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'astro.config.*'
+              - 'tsconfig.*'
+              - 'eslint.config.*'
+              - '.prettierrc.*'
+
+      - name: List changed recipes
+        id: recipes
+        if: steps.filter.outputs.models == 'true'
+        run: |
+          MODEL_FILES="${{ steps.filter.outputs.models_files }}"
+          echo "All changed model files: $MODEL_FILES"
+          EN_RECIPES=$(echo "$MODEL_FILES" | tr ',' '\n' | grep '^models/en/.*\.\(yaml\|yml\)$' || true)
+          if [ -n "$EN_RECIPES" ]; then
+            COUNT=$(echo "$EN_RECIPES" | wc -l)
+            echo "count=$COUNT" >> "$GITHUB_OUTPUT"
+            FILES=$(echo "$EN_RECIPES" | jq -R -s -c 'split("\n") | map(select(length > 0))')
+            echo "files=$FILES" >> "$GITHUB_OUTPUT"
+            echo "EN recipes ($COUNT): $EN_RECIPES"
+          else
+            echo "count=0" >> "$GITHUB_OUTPUT"
+            echo "files=[]" >> "$GITHUB_OUTPUT"
+            echo "No models/en/ recipe files changed"
+          fi
+
+  # ============================================================
+  # Step 2: YAML validation + site build (always)
+  # ============================================================
+  validate:
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate YAML
+        run: pnpm validate
+
+      - name: Check i18n pairing
+        run: |
+          echo "=== Checking en/zh recipe pairing ==="
+          MISSING_ZH=""
+          for en_file in models/en/**/*.yaml; do
+            zh_file="${en_file/en/zh}"
+            if [ ! -f "$zh_file" ]; then
+              MISSING_ZH="$MISSING_ZH  $zh_file"
+            fi
+          done
+          if [ -n "$MISSING_ZH" ]; then
+            echo "WARNING: Missing zh translations:"
+            echo "$MISSING_ZH"
+          fi
+          echo "i18n pairing check done."
+
+      - name: Build site
+        run: pnpm build
+
+  # ============================================================
+  # Step 3: Frontend checks (src changes only)
+  # ============================================================
+  frontend:
+    needs: detect
+    if: needs.detect.outputs.has_src_changes == 'true' || needs.detect.outputs.has_config_changes == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Type check
+        run: pnpm typecheck
+
+      - name: ESLint
+        run: pnpm lint
+
+      - name: Prettier check
+        run: pnpm format:check
+
+  # ============================================================
+  # Step 4: Workflow validation (workflow changes only)
+  # ============================================================
+  workflows:
+    needs: detect
+    if: needs.detect.outputs.has_workflow_changes == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run actionlint
+        uses: reviewdog/action-actionlint@v1
+
+  # ============================================================
+  # Step 5: Recipe deployment verification (models changes only)
+  # Uses the reusable _recipe_verify workflow
+  # ============================================================
+  verify-deploy:
+    needs: [detect, validate]
+    if: |
+      needs.detect.outputs.has_model_changes == 'true' &&
+      needs.detect.outputs.recipe_count != '0' &&
+      needs.validate.result == 'success'
+    uses: ./.github/workflows/_recipe_verify.yml
+    with:
+      runner: linux-aarch64-a2b4-8
+      recipe_files: ${{ needs.detect.outputs.recipe_files }}
+      trigger_type: pr
+
