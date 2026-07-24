@@ -1032,12 +1032,43 @@ performance:
 
     #### Table 2: Detailed Node Configuration
 
-    |Scenario|Configuration|NPUs|TP|DP|Max Num Seqs|Max Num Batched Tokens|Max Model Len|MTP Speculation Num|
-    |--------|-------------|-----|--|--|------------|----------------------|--------------|--------------------|
-    |High Throughput (A3)|Server / Single Machine|8|4|4|64|10240|1048576|1|
-    |Long Context (1M, A3)|Server / Single Machine|8|4|4|64|10240|1048576|1|
-    |PD Separation (A3)|Server-P Node|8|4|4|16|8192|1048576|1|
-    |PD Separation (A3)|Server-D Node|8|1|16|60|120|1048576|1|
+    **A3 Configurations**
+
+    |Model|Product Combo|Scenario|Device|Networking|Total NPUs|Data Format|Context Length|Average Input|Average Output|
+    |-----|-------------|--------|------|----------|----------|-----------|--------------|-------------|--------------|
+    |deepseek V4 flash|A3 PD separation|High Throughput|Atlas 800I A3 560T|3*1P + 1*1D (EP16)<br>4 machines|32|W8A8C16|1M|8K|1K|
+    |deepseek V4 flash|A3 PD separation|Low Latency|Atlas 800I A3 560T|3*1P + 1*1D (EP16)<br>4 machines|32|W8A8C16|1M|8K|1K|
+    |deepseek V4 flash|A3 PD separation|High Throughput|Atlas 800I A3 560T|3*1P + 1*1D (EP16)<br>4 machines|32|W8A8C16|1M|32K|1K|
+    |deepseek V4 flash|A3 PD separation|Low Latency|Atlas 800I A3 560T|3*1P + 1*1D (EP16)<br>4 machines|32|W8A8C16|1M|32K|1K|
+    |deepseek V4 flash|A3 PD separation|High Throughput|Atlas 800I A3 560T|3*1P + 1*1D (EP16)<br>4 machines|32|W8A8C16|1M|128K|1K|
+    |deepseek V4 flash|A3 PD separation|Low Latency|Atlas 800I A3 560T|3*1P + 1*1D (EP16)<br>4 machines|32|W8A8C16|1M|128K|1K|
+    |deepseek V4 flash|A3 PD separation|Long Context|Atlas 800I A3 560T|3*1P + 1*1D (EP16)<br>4 machines|32|W8A8C16|1M|1M|1K|
+    |deepseek V4 flash|A3 single-node mixed|High Throughput|Atlas 800I A3 560T|Single-node mixed EP16<br>1 machine|8|W8A8C16|1M|8K|1K|
+    |deepseek V4 flash|A3 single-node mixed|Low Latency|Atlas 800I A3 560T|Single-node mixed EP16<br>1 machine|8|W8A8C16|1M|8K|1K|
+    |deepseek V4 flash|A3 single-node mixed|High Throughput|Atlas 800I A3 560T|Single-node mixed EP16<br>1 machine|8|W8A8C16|1M|32K|1K|
+    |deepseek V4 flash|A3 single-node mixed|Low Latency|Atlas 800I A3 560T|Single-node mixed EP16<br>1 machine|8|W8A8C16|1M|32K|1K|
+    |deepseek V4 flash|A3 single-node mixed|High Throughput|Atlas 800I A3 560T|Single-node mixed EP16<br>1 machine|8|W8A8C16|1M|128K|1K|
+    |deepseek V4 flash|A3 single-node mixed|Low Latency|Atlas 800I A3 560T|Single-node mixed EP16<br>1 machine|8|W8A8C16|1M|128K|1K|
+    |deepseek V4 flash|A3 single-node mixed|Long Context|Atlas 800I A3 560T|Single-node mixed EP16<br>1 machine|8|W8A8C16|1M|1M|1K|
+
+    **A2 Configurations**
+
+    |Model|Product Combo|Scenario|Device|Networking|Total NPUs|Data Format|Context Length|Average Input|Average Output|
+    |-----|-------------|--------|------|----------|----------|-----------|--------------|-------------|--------------|
+    |deepseek V4 flash|A2 single-node mixed|High Throughput|Atlas 800I A2 280T|A2 single-node mixed|8|W8A8C16|133072|8K|1K|
+    |deepseek V4 flash|A2 single-node mixed|Low Latency|Atlas 800I A2 280T|A2 single-node mixed|8|W8A8C16|133072|8K|1K|
+    |deepseek V4 flash|A2 single-node mixed|High Throughput|Atlas 800I A2 280T|A2 single-node mixed|8|W8A8C16|133072|32K|1K|
+    |deepseek V4 flash|A2 single-node mixed|Low Latency|Atlas 800I A2 280T|A2 single-node mixed|8|W8A8C16|133072|32K|1K|
+    |deepseek V4 flash|A2 single-node mixed|High Throughput|Atlas 800I A2 280T|A2 single-node mixed|8|W8A8C16|133072|128K|1K|
+    |deepseek V4 flash|A2 single-node mixed|Low Latency|Atlas 800I A2 280T|A2 single-node mixed|8|W8A8C16|133072|128K|1K|
+    |deepseek V4 flash|A2 single-node mixed|Long Context|Atlas 800I A2 280T|A2 single-node mixed|8|W8A8C16|1M|1020K|1K|
+    |deepseek V4 flash|A2 8-machine PD separation|High Throughput|Atlas 800I A2 280T|4*1P + 1*4D<br>8 machines|64|W8A8C16|133072|8K|1K|
+    |deepseek V4 flash|A2 8-machine PD separation|Low Latency|Atlas 800I A2 280T|4*1P + 1*4D<br>8 machines|64|W8A8C16|133072|8K|1K|
+    |deepseek V4 flash|A2 8-machine PD separation|High Throughput|Atlas 800I A2 280T|4*1P + 1*4D<br>8 machines|64|W8A8C16|133072|32K|1K|
+    |deepseek V4 flash|A2 8-machine PD separation|Low Latency|Atlas 800I A2 280T|4*1P + 1*4D<br>8 machines|64|W8A8C16|133072|32K|1K|
+    |deepseek V4 flash|A2 8-machine PD separation|High Throughput|Atlas 800I A2 280T|4*1P + 1*4D<br>8 machines|64|W8A8C16|133072|128K|1K|
+    |deepseek V4 flash|A2 8-machine PD separation|Low Latency|Atlas 800I A2 280T|4*1P + 1*4D<br>8 machines|64|W8A8C16|133072|128K|1K|
+    |deepseek V4 flash|A2 8-machine PD separation|Long Context|Atlas 800I A2 280T|4*1P + 1*4D<br>8 machines|64|W8A8C16|1M|1M|1K|
 
     > For complete startup commands and parameter descriptions, please refer to the deployment examples in [Chapter 5](#5-online-service-deployment).
 

@@ -1008,12 +1008,43 @@ performance:
 
     #### 表 2：详细节点配置
 
-    |场景|配置|NPU 数|TP|DP|最大序列数|最大批处理 token 数|最大模型长度|MTP 推测数|
-    |--------|-------------|-----|--|--|------------|----------------------|--------------|--------------------|
-    |高吞吐量（A3）|服务端 / 单机|8|4|4|64|10240|1048576|1|
-    |长上下文（1M, A3）|服务端 / 单机|8|4|4|64|10240|1048576|1|
-    |PD 分离（A3）|服务端-P 节点|8|4|4|16|8192|1048576|1|
-    |PD 分离（A3）|服务端-D 节点|8|1|16|60|120|1048576|1|
+    **A3 配置**
+
+    |模型名称|产品组合|场景|设备信息|组网形态|总卡数|数据格式|上下文长度|平均输入|平均输出|
+    |--------|--------|----|--------|--------|------|--------|----------|--------|--------|
+    |deepseek V4 flash|A3PD分离|高吞吐|Atlas 800I A3 560T|3*1P + 1*1D(EP16)<br>共4机|32|W8A8C16|1M|8K|1K|
+    |deepseek V4 flash|A3PD分离|低时延|Atlas 800I A3 560T|3*1P + 1*1D(EP16)<br>共4机|32|W8A8C16|1M|8K|1K|
+    |deepseek V4 flash|A3PD分离|高吞吐|Atlas 800I A3 560T|3*1P + 1*1D(EP16)<br>共4机|32|W8A8C16|1M|32K|1K|
+    |deepseek V4 flash|A3PD分离|低时延|Atlas 800I A3 560T|3*1P + 1*1D(EP16)<br>共4机|32|W8A8C16|1M|32K|1K|
+    |deepseek V4 flash|A3PD分离|高吞吐|Atlas 800I A3 560T|3*1P + 1*1D(EP16)<br>共4机|32|W8A8C16|1M|128K|1K|
+    |deepseek V4 flash|A3PD分离|低时延|Atlas 800I A3 560T|3*1P + 1*1D(EP16)<br>共4机|32|W8A8C16|1M|128K|1K|
+    |deepseek V4 flash|A3PD分离|超长序列|Atlas 800I A3 560T|3*1P + 1*1D(EP16)<br>共4机|32|W8A8C16|1M|1M|1K|
+    |deepseek V4 flash|A3单机混部|高吞吐|Atlas 800I A3 560T|单机混部EP16<br>共1机|8|W8A8C16|1M|8K|1K|
+    |deepseek V4 flash|A3单机混部|低时延|Atlas 800I A3 560T|单机混部EP16<br>共1机|8|W8A8C16|1M|8K|1K|
+    |deepseek V4 flash|A3单机混部|高吞吐|Atlas 800I A3 560T|单机混部EP16<br>共1机|8|W8A8C16|1M|32K|1K|
+    |deepseek V4 flash|A3单机混部|低时延|Atlas 800I A3 560T|单机混部EP16<br>共1机|8|W8A8C16|1M|32K|1K|
+    |deepseek V4 flash|A3单机混部|高吞吐|Atlas 800I A3 560T|单机混部EP16<br>共1机|8|W8A8C16|1M|128K|1K|
+    |deepseek V4 flash|A3单机混部|低时延|Atlas 800I A3 560T|单机混部EP16<br>共1机|8|W8A8C16|1M|128K|1K|
+    |deepseek V4 flash|A3单机混部|超长序列|Atlas 800I A3 560T|单机混部EP16<br>共1机|8|W8A8C16|1M|1M|1K|
+
+    **A2 配置**
+
+    |模型名称|产品组合|场景|设备信息|组网形态|总卡数|数据格式|上下文长度|平均输入|平均输出|
+    |--------|--------|----|--------|--------|------|--------|----------|--------|--------|
+    |deepseek V4 flash|A2 单机混部|高吞吐|Atlas 800I A2 280T|A2 单机混部|8|W8A8C16|133072|8K|1K|
+    |deepseek V4 flash|A2 单机混部|低时延|Atlas 800I A2 280T|A2 单机混部|8|W8A8C16|133072|8K|1K|
+    |deepseek V4 flash|A2 单机混部|高吞吐|Atlas 800I A2 280T|A2 单机混部|8|W8A8C16|133072|32K|1K|
+    |deepseek V4 flash|A2 单机混部|低时延|Atlas 800I A2 280T|A2 单机混部|8|W8A8C16|133072|32K|1K|
+    |deepseek V4 flash|A2 单机混部|高吞吐|Atlas 800I A2 280T|A2 单机混部|8|W8A8C16|133072|128K|1K|
+    |deepseek V4 flash|A2 单机混部|低时延|Atlas 800I A2 280T|A2 单机混部|8|W8A8C16|133072|128K|1K|
+    |deepseek V4 flash|A2 单机混部|超长序列|Atlas 800I A2 280T|A2 单机混部|8|W8A8C16|1M|1020K|1K|
+    |deepseek V4 flash|A2 8机PD分离|高吞吐|Atlas 800I A2 280T|4*1P + 1*4D<br>共8机|64|W8A8C16|133072|8K|1K|
+    |deepseek V4 flash|A2 8机PD分离|低时延|Atlas 800I A2 280T|4*1P + 1*4D<br>共8机|64|W8A8C16|133072|8K|1K|
+    |deepseek V4 flash|A2 8机PD分离|高吞吐|Atlas 800I A2 280T|4*1P + 1*4D<br>共8机|64|W8A8C16|133072|32K|1K|
+    |deepseek V4 flash|A2 8机PD分离|低时延|Atlas 800I A2 280T|4*1P + 1*4D<br>共8机|64|W8A8C16|133072|32K|1K|
+    |deepseek V4 flash|A2 8机PD分离|高吞吐|Atlas 800I A2 280T|4*1P + 1*4D<br>共8机|64|W8A8C16|133072|128K|1K|
+    |deepseek V4 flash|A2 8机PD分离|低时延|Atlas 800I A2 280T|4*1P + 1*4D<br>共8机|64|W8A8C16|133072|128K|1K|
+    |deepseek V4 flash|A2 8机PD分离|超长序列|Atlas 800I A2 280T|4*1P + 1*4D<br>共8机|64|W8A8C16|1M|1M|1K|
 
     > 完整的启动命令和参数说明，请参考[第 5 章](#5-online-service-deployment)中的部署示例。
 
