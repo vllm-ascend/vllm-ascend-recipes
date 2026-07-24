@@ -78,6 +78,12 @@ import re
 for s in scenarios:
     serve_cmd = ''
     verify_cmds = []
+        # Skip A3 scenarios on A2 hardware
+        if hw_key == 'atlas_800_a2' and 'A3' in s.get('npu', ''):
+            import sys
+            print(f"DEBUG: Skipping A3 scenario '{s.get('npu','')}/{s.get('precision','')}' on A2 hardware", file=sys.stderr)
+            continue
+
     for step in s.get('steps', []):
         content = step.get('content', '')
         m = re.search(r'```(?:bash|shell)\s*\n(.*?)```', content, re.DOTALL)
@@ -89,6 +95,8 @@ for s in scenarios:
         # Remove %%CONFIG:...%% markers (key may contain hyphens)
         bash_content = re.sub(r'%%CONFIG:[^%]+%%', '', bash_content)
         bash_content = re.sub(r'%%/CONFIG:[^%]+%%', '', bash_content)
+        # Replace placeholder model paths with actual weights
+        bash_content = re.sub(r'your_model_path', '/root/.cache/modelscope/hub/models/Qwen/Qwen3-30B-A3B', bash_content)
         if 'vllm serve' in bash_content:
             serve_cmd = bash_content.strip()
         elif 'curl' in bash_content:
