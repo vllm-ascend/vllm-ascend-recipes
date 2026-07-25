@@ -75,13 +75,13 @@ jobs:
 
             [ "$HW" = "unsupported" ] && continue
 
-            A2_LIST="$A2_LIST$file"$'\n'
+            A2_LIST="${A2_LIST}${file}"$'\n'
             A2_COUNT=$((A2_COUNT + 1))
           done
 
-          echo "a2_recipes<<EOF" >> $GITHUB_OUTPUT
-          echo "$A2_LIST" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          # Output as JSON array (same format as pr-recipe-verify)
+          FILES=$(echo "$A2_LIST" | sed '/^$/d' | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          echo "a2_recipes=$FILES" >> $GITHUB_OUTPUT
           echo "a2_count=$A2_COUNT" >> $GITHUB_OUTPUT
 
           echo "A2 recipes: $A2_COUNT"
