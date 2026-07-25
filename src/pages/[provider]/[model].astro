@@ -6,6 +6,7 @@ import MarkdownContent from '../../components/MarkdownContent.astro';
 import CascadeSelector from '../../components/CascadeSelector.tsx';
 import PrepareTabs from '../../components/PrepareTabs.tsx';
 import ReferenceTabs from '../../components/ReferenceTabs.tsx';
+import VerifyBadge from '../../components/VerifyBadge.astro';
 import { getAllModels, formatContextLength, formatParameters } from '../../lib/models';
 import type { Model } from '../../lib/types';
 
@@ -134,6 +135,7 @@ addToc('reference', 'sectionMoreInfo');
 
           <h1 class="font-display text-3xl font-bold text-ink-50 tracking-tight mb-2">
             {model.meta.title}
+            <VerifyBadge modelId={model.model.model_id} />
           </h1>
           <div class="text-sm text-ink-400 max-w-2xl leading-relaxed mb-4">
             <MarkdownContent markdown={modelEn.meta.description} lang="en" />
