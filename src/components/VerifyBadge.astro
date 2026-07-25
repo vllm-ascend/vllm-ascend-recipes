@@ -1,12 +1,7 @@
 ---
-// VerifyBadge.astro �?display CI verification status for a model
-// Reads from public/verify-status.json at build time
-
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 interface Props {
   modelId: string;
@@ -15,11 +10,13 @@ interface Props {
 
 const { modelId, compact = false } = Astro.props;
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const verifyPath = path.join(__dirname, '..', '..', 'public', 'verify-status.json');
+
 let status: string | null = null;
 let runUrl: string | null = null;
 
 try {
-  const verifyPath = path.join(__dirname, '..', '..', 'public', 'verify-status.json');
   if (fs.existsSync(verifyPath)) {
     const data = JSON.parse(fs.readFileSync(verifyPath, 'utf-8'));
     const model = data.models?.[modelId];
@@ -29,7 +26,7 @@ try {
     }
   }
 } catch {
-  // verify-status.json not found or invalid, silently skip
+  // silently skip if verify-status.json not found or invalid
 }
 
 if (!status) return null;
@@ -41,13 +38,18 @@ const colors: Record<string, string> = {
 };
 
 const labels: Record<string, string> = {
-  PASS: '�?CI Verified',
-  FAIL: '�?CI Failed',
-  SKIP: '�?Skipped',
+  PASS: '✓ CI Verified',
+  FAIL: '✗ CI Failed',
+  SKIP: '⊘ Skipped',
 };
 
-const badgeClass = [
-  'text-[10px] font-mono px-1.5 py-0.5 rounded border',
+const classList = [
+  'text-[10px]',
+  'font-mono',
+  'px-1.5',
+  'py-0.5',
+  'rounded',
+  'border',
   colors[status] || '',
   compact ? '' : 'ml-1',
 ]
@@ -57,15 +59,19 @@ const badgeClass = [
 
 {
   runUrl ? (
-    <a href={runUrl} target="_blank" rel="noopener noreferrer" class="inline-flex">
-      <span class={badgeClass}>
+    <a
+      href={runUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      class="inline-flex"
+    >
+      <span class={classList}>
         {labels[status] || status}
       </span>
     </a>
   ) : (
-    <span class={badgeClass}>
+    <span class={classList}>
       {labels[status] || status}
     </span>
   )
 }
-
