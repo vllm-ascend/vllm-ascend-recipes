@@ -1,7 +1,5 @@
 ---
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { readFileSync, existsSync } from 'node:fs';
 
 interface Props {
   modelId: string;
@@ -10,15 +8,13 @@ interface Props {
 
 const { modelId, compact = false } = Astro.props;
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const verifyPath = path.join(__dirname, '..', '..', 'public', 'verify-status.json');
-
 let status: string | null = null;
 let runUrl: string | null = null;
 
 try {
-  if (fs.existsSync(verifyPath)) {
-    const data = JSON.parse(fs.readFileSync(verifyPath, 'utf-8'));
+  const verifyPath = new URL('../../../public/verify-status.json', import.meta.url).pathname;
+  if (existsSync(verifyPath)) {
+    const data = JSON.parse(readFileSync(verifyPath, 'utf-8'));
     const model = data.models?.[modelId];
     if (model) {
       status = model.status;
@@ -26,7 +22,7 @@ try {
     }
   }
 } catch {
-  // silently skip if verify-status.json not found or invalid
+  // silently skip
 }
 
 if (!status) return null;
@@ -38,9 +34,9 @@ const colors: Record<string, string> = {
 };
 
 const labels: Record<string, string> = {
-  PASS: '鉁?CI Verified',
-  FAIL: '鉁?CI Failed',
-  SKIP: '鈯?Skipped',
+  PASS: '✓ CI Verified',
+  FAIL: '✗ CI Failed',
+  SKIP: '⊘ Skipped',
 };
 
 const classList = [
