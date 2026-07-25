@@ -301,11 +301,12 @@ SCRIPT_HEREDOC
   # Run aisbench performance evaluation (Section 8 of tutorial)
   if command -v ais_bench &>/dev/null; then
     log_info "  Running aisbench performance evaluation..."
-    # Patch the installed model config to set model path
+    # Patch the installed model config to set model path and port
     AIS_CFG="/usr/local/python3.12.13/lib/python3.12/site-packages/ais_bench/benchmark/configs/models/vllm_api/vllm_api_stream_chat.py"
     if [[ -f "$AIS_CFG" ]]; then
       sed -i 's|path=".*"|path="/root/.cache/modelscope/hub/models/Eco-Tech/Qwen3-30B-A3B-w8a8"|' "$AIS_CFG"
-      log_info "  Patched ais_bench model config path"
+      sed -i 's|host_port=8080|host_port=8000|' "$AIS_CFG"
+      log_info "  Patched ais_bench model config (path + port)"
     fi
     BENCH_OUTPUT=$(ais_bench --models vllm_api_stream_chat --datasets synthetic_gen --mode perf --debug --num-prompts 50 2>&1 || echo "AISBENCH_FAILED")
     echo "$BENCH_OUTPUT" | tail -30
