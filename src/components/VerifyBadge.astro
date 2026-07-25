@@ -31,42 +31,37 @@ try {
 
 if (!status) return null;
 
-const colorMap: Record<string, string> = {
+const colors: Record<string, string> = {
   PASS: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
   FAIL: 'bg-red-500/10 text-red-400 border-red-500/20',
   SKIP: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
 };
 
-const labelMap: Record<string, string> = {
+const labels: Record<string, string> = {
   PASS: '✓ CI Verified',
   FAIL: '✗ CI Failed',
   SKIP: '⊘ Skipped',
 };
+
+const badgeClass = [
+  'text-[10px] font-mono px-1.5 py-0.5 rounded border',
+  colors[status] || '',
+  compact ? '' : 'ml-1',
+]
+  .filter(Boolean)
+  .join(' ');
 ---
 
 {
   runUrl ? (
-    <a
-      href={runUrl}
-      target="_blank"
-      rel="noopener noreferrer"
-      class="inline-flex"
-    >
-      <span
-        class={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${
-          colorMap[status] || ''
-        } ${compact ? '' : 'ml-1'}`}
-      >
-        {labelMap[status] || status}
+    <a href={runUrl} target="_blank" rel="noopener noreferrer" class="inline-flex">
+      <span class={badgeClass}>
+        {labels[status] || status}
       </span>
     </a>
   ) : (
-    <span
-      class={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${
-        colorMap[status] || ''
-      } ${compact ? '' : 'ml-1'}`}
-    >
-      {labelMap[status] || status}
+    <span class={badgeClass}>
+      {labels[status] || status}
     </span>
   )
 }
