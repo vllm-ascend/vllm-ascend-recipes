@@ -1,9 +1,12 @@
 ---
-// VerifyBadge.astro â€?display CI verification status for a model
+// VerifyBadge.astro ï¿½?display CI verification status for a model
 // Reads from public/verify-status.json at build time
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 interface Props {
   modelId: string;
@@ -16,7 +19,7 @@ let status: string | null = null;
 let runUrl: string | null = null;
 
 try {
-  const verifyPath = path.join(import.meta.dirname, '..', '..', 'public', 'verify-status.json');
+  const verifyPath = path.join(__dirname, '..', '..', 'public', 'verify-status.json');
   if (fs.existsSync(verifyPath)) {
     const data = JSON.parse(fs.readFileSync(verifyPath, 'utf-8'));
     const model = data.models?.[modelId];
@@ -38,9 +41,9 @@ const colors: Record<string, string> = {
 };
 
 const labels: Record<string, string> = {
-  PASS: 'âœ?CI Verified',
-  FAIL: 'âœ?CI Failed',
-  SKIP: 'âŠ?Skipped',
+  PASS: 'ï¿½?CI Verified',
+  FAIL: 'ï¿½?CI Failed',
+  SKIP: 'ï¿½?Skipped',
 };
 
 const badgeClass = [
