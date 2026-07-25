@@ -46,13 +46,26 @@ const labelMap: Record<string, string> = {
 
 {
   runUrl ? (
-    <a href={runUrl} target="_blank" rel="noopener noreferrer" class="inline-flex">
-      <span class={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${colorMap[status] || ''} ${compact ? '' : 'ml-1'}`}>
+    <a
+      href={runUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      class="inline-flex"
+    >
+      <span
+        class={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${
+          colorMap[status] || ''
+        } ${compact ? '' : 'ml-1'}`}
+      >
         {labelMap[status] || status}
       </span>
     </a>
   ) : (
-    <span class={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${colorMap[status] || ''} ${compact ? '' : 'ml-1'}`}>
+    <span
+      class={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${
+        colorMap[status] || ''
+      } ${compact ? '' : 'ml-1'}`}
+    >
       {labelMap[status] || status}
     </span>
   )
