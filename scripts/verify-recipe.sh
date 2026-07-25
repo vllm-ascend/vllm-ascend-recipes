@@ -326,8 +326,10 @@ SCRIPT_HEREDOC
     kill -TERM -- -$SERVE_PID 2>/dev/null || kill $SERVE_PID 2>/dev/null || true
     sleep 2
     kill -KILL -- -$SERVE_PID 2>/dev/null || kill -9 $SERVE_PID 2>/dev/null || true
-    wait $SERVE_PID 2>/dev/null || true
+    timeout 30 wait $SERVE_PID 2>/dev/null || true
   fi
+  # Force cleanup any remaining vllm processes
+  pkill -f "vllm serve" 2>/dev/null || true
   log_info "  Server stopped."
 
   if [[ "$STATUS" -ne 0 ]]; then
