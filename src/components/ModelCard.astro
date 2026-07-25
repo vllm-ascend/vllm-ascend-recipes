@@ -1,6 +1,7 @@
 ---
 import type { ModelListItem } from '../lib/types';
 import { formatContextLength, formatParameters } from '../lib/models';
+import VerifyBadge from './VerifyBadge.astro';
 
 interface Props {
   model: ModelListItem;
@@ -23,6 +24,7 @@ const { model } = Astro.props;
       class="font-display font-semibold text-sm text-ink-100 group-hover:text-accent-300 transition-colors tracking-tight"
     >
       {model.title}
+      <VerifyBadge modelId={model.model_id} compact />
     </h3>
     <span
       class="text-[10px] font-mono uppercase tracking-wider text-ink-500 px-1.5 py-0.5 rounded border border-ink-700/50"

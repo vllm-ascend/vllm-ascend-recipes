@@ -1,0 +1,58 @@
+---
+// VerifyBadge.astro — display CI verification status for a model
+// Reads from public/verify-status.json at build time
+
+interface Props {
+  modelId: string;
+  compact?: boolean;
+}
+
+const { modelId, compact = false } = Astro.props;
+
+let status: string | null = null;
+let runUrl: string | null = null;
+
+try {
+  const fs = await import('node:fs');
+  const path = await import('node:path');
+  const verifyPath = path.join(process.cwd(), 'public', 'verify-status.json');
+  if (fs.existsSync(verifyPath)) {
+    const data = JSON.parse(fs.readFileSync(verifyPath, 'utf-8'));
+    const model = data.models?.[modelId];
+    if (model) {
+      status = model.status;
+      runUrl = model.run_url || null;
+    }
+  }
+} catch {
+  // verify-status.json not found or invalid, silently skip
+}
+
+if (!status) return null;
+
+const colorMap: Record<string, string> = {
+  PASS: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+  FAIL: 'bg-red-500/10 text-red-400 border-red-500/20',
+  SKIP: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+};
+
+const labelMap: Record<string, string> = {
+  PASS: '✓ CI Verified',
+  FAIL: '✗ CI Failed',
+  SKIP: '⊘ Skipped',
+};
+---
+
+{
+  runUrl ? (
+    <a href={runUrl} target="_blank" rel="noopener noreferrer" class="inline-flex">
+      <span class={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${colorMap[status] || ''} ${compact ? '' : 'ml-1'}`}>
+        {labelMap[status] || status}
+      </span>
+    </a>
+  ) : (
+    <span class={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${colorMap[status] || ''} ${compact ? '' : 'ml-1'}`}>
+      {labelMap[status] || status}
+    </span>
+  )
+}

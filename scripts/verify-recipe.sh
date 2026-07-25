@@ -339,6 +339,31 @@ SCRIPT_HEREDOC
   fi
 done < /tmp/scenario_list.txt
 
+# Generate verify-status.json
+if [[ "$STATUS" -eq 0 ]]; then
+  VERIFY_STATUS="PASS"
+elif [[ "$SKIPPED" -gt 0 ]]; then
+  VERIFY_STATUS="SKIP"
+else
+  VERIFY_STATUS="FAIL"
+fi
+VERIFY_JSON="/tmp/verify-results/verify-status.json"
+cat > "$VERIFY_JSON" <<JSONEOF
+{
+  "updated_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "models": {
+    "$MODEL_ID": {
+      "status": "$VERIFY_STATUS",
+      "verified_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+      "hardware": "$HW_KEY",
+      "run_id": "${GITHUB_RUN_ID:-local}",
+      "run_url": "${GITHUB_SERVER_URL:-https://github.com}/${GITHUB_REPOSITORY:-}/actions/runs/${GITHUB_RUN_ID:-local}"
+    }
+  }
+}
+JSONEOF
+log_info "  Verify status: $VERIFY_STATUS"
+
 if [[ "$SKIPPED" -gt 0 ]]; then
   exit 2
 fi

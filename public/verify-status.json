@@ -1,0 +1,11 @@
+{
+  "updated_at": "2026-07-25T02:30:00Z",
+  "models": {
+    "Qwen/Qwen3-30B-A3B": {
+      "status": "PASS",
+      "verified_at": "2026-07-25T02:30:00Z",
+      "hardware": "atlas_800_a2",
+      "run_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/actions/runs/30141291803"
+    }
+  }
+}
