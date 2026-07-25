@@ -1,5 +1,5 @@
 ---
-// VerifyBadge.astro â€” display CI verification status for a model
+// VerifyBadge.astro â€?display CI verification status for a model
 // Reads from public/verify-status.json at build time
 
 import fs from 'node:fs';
@@ -38,9 +38,9 @@ const colors: Record<string, string> = {
 };
 
 const labels: Record<string, string> = {
-  PASS: 'âœ“ CI Verified',
-  FAIL: 'âœ— CI Failed',
-  SKIP: 'âŠ˜ Skipped',
+  PASS: 'âœ?CI Verified',
+  FAIL: 'âœ?CI Failed',
+  SKIP: 'âŠ?Skipped',
 };
 
 const badgeClass = [
@@ -65,3 +65,4 @@ const badgeClass = [
     </span>
   )
 }
+
