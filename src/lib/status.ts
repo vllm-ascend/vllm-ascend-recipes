@@ -52,13 +52,13 @@ export interface StatusIndex {
 // configured BASE_URL (matches astro.config.mjs `base:`) so it resolves
 // against `localhost:4321/<BASE_URL>/status/<slug>.json` and picks up the
 // mock fixtures under `public/status/` for an instant visual preview.
-export const STATUS_ORIGIN =
-  'https://vllm-ascend.github.io/vllm-ascend-recipes';
+export const STATUS_ORIGIN = 'https://vllm-ascend.github.io/vllm-ascend-recipes';
 
-const env =
-  typeof import.meta !== 'undefined'
-    ? ((import.meta as any).env ?? {})
-    : ({} as Record<string, string>);
+interface ImportMetaWithEnv {
+  readonly env?: Record<string, unknown>;
+}
+const metaEnv = (import.meta as unknown as ImportMetaWithEnv).env ?? {};
+const env = metaEnv as Record<string, string | boolean | undefined>;
 const isDev = !!env.DEV;
 const baseUrl = (env.BASE_URL as string | undefined) ?? '/';
 

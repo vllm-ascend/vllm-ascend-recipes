@@ -8,9 +8,7 @@ export const GET: APIRoute = async () => {
   // page (including /browse where many cards live) works without guessing.
   const items = models.map((m) => ({
     ...m,
-    _status_url: m._status_url
-      ? `${STATUS_ORIGIN}${m._status_url}`
-      : undefined,
+    _status_url: m._status_url ? `${STATUS_ORIGIN}${m._status_url}` : undefined,
   }));
   return new Response(JSON.stringify(items, null, 2), {
     headers: {

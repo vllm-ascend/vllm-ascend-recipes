@@ -64,12 +64,14 @@ jobs:
             *"PR Recipe Verify"*) TRIGGER="pr" ;;
             *) TRIGGER="nightly" ;;
           esac
-          echo "trigger=$TRIGGER" >> "$GITHUB_OUTPUT"
-          echo "head_sha=$RW_HEAD_SHA" >> "$GITHUB_OUTPUT"
-          echo "conclusion=$RW_CONCLUSION" >> "$GITHUB_OUTPUT"
-          echo "run_url=$RW_API_URL" >> "$GITHUB_OUTPUT"
-          echo "run_id=$RW_RUN_ID" >> "$GITHUB_OUTPUT"
-          echo "repo=$RW_REPO" >> "$GITHUB_OUTPUT"
+          {
+            echo "trigger=$TRIGGER"
+            echo "head_sha=$RW_HEAD_SHA"
+            echo "conclusion=$RW_CONCLUSION"
+            echo "run_url=$RW_API_URL"
+            echo "run_id=$RW_RUN_ID"
+            echo "repo=$RW_REPO"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Try to extract PR metadata
         id: pr
@@ -83,20 +85,24 @@ jobs:
           pr_json=$(gh api "repos/${REPO}/commits/${SHA}/pulls" \
             -H 'Accept: application/vnd.github.gambit+json' 2>/dev/null)
           if [ -z "$pr_json" ] || [ "$pr_json" = "[]" ]; then
-            echo "pr_number=" >> "$GITHUB_OUTPUT"
-            echo "pr_url=" >> "$GITHUB_OUTPUT"
-            echo "pr_title=" >> "$GITHUB_OUTPUT"
-            echo "pr_author=" >> "$GITHUB_OUTPUT"
+            {
+              echo "pr_number="
+              echo "pr_url="
+              echo "pr_title="
+              echo "pr_author="
+            } >> "$GITHUB_OUTPUT"
             exit 0
           fi
           pr_number=$(echo "$pr_json" | jq -r '.[0].number // empty')
           pr_url=$(echo "$pr_json" | jq -r '.[0].html_url // empty')
           pr_title=$(echo "$pr_json" | jq -r '.[0].title // empty')
           pr_author=$(echo "$pr_json" | jq -r '.[0].user.login // empty')
-          echo "pr_number=$pr_number" >> "$GITHUB_OUTPUT"
-          echo "pr_url=$pr_url" >> "$GITHUB_OUTPUT"
-          echo "pr_title=$pr_title" >> "$GITHUB_OUTPUT"
-          echo "pr_author=$pr_author" >> "$GITHUB_OUTPUT"
+          {
+            echo "pr_number=$pr_number"
+            echo "pr_url=$pr_url"
+            echo "pr_title=$pr_title"
+            echo "pr_author=$pr_author"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Install jq
         run: sudo apt-get install -y jq || apt-get install -y jq
@@ -115,10 +121,10 @@ jobs:
           REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
-          mkdir -p status runs/${HEAD_SHA}
+          mkdir -p status "runs/${HEAD_SHA}"
 
           # 1) Mirror params.json files verbatim to runs/<sha>/  (frontend link target)
-          if ls results/*.params.json 1>/dev/null 2>&1; then
+          if compgen -G "results/*.params.json" > /dev/null; then
             for f in results/*.params.json; do
               base="$(basename "$f")"
               cp "$f" "runs/${HEAD_SHA}/${base}"
@@ -127,7 +133,8 @@ jobs:
                 "runs/${HEAD_SHA}/${base}" > "$f.tmp" \
                 && mv "$f.tmp" "runs/${HEAD_SHA}/${base}"
             done
-            echo "Mirrored $(ls results/*.params.json | wc -l) params files to runs/${HEAD_SHA}/"
+            mirrored=$(find results -maxdepth 1 -name '*.params.json' | wc -l)
+            echo "Mirrored ${mirrored} params files to runs/${HEAD_SHA}/"
           else
             echo "No params.json artifacts found, skipping runs mirror"
           fi
@@ -141,11 +148,11 @@ jobs:
             recipe_file="results/${slug}.recipe"
             status="unknown"
             if [ -f "$stat_file" ]; then
-              status=$(cat "$stat_file" | tr -d ' \n\r')
+              status=$(tr -d ' \n\r' < "$stat_file")
             fi
             recipe_path=""
             if [ -f "$recipe_file" ]; then
-              recipe_path=$(cat "$recipe_file" | tr -d ' \n\r')
+              recipe_path=$(tr -d ' \n\r' < "$recipe_file")
             fi
             params_url="https://${REPO%/*}.github.io/${REPO##*/}/runs/${HEAD_SHA}/${slug}.params.json"
             head_sha_url="https://github.com/${REPO}/commit/${HEAD_SHA}"
@@ -219,7 +226,8 @@ jobs:
           done | jq -s '.')
           jq -n --argjson items "$index_items" \
             '{ updated_at: (now|todate), models: $items }' > status/index.json
-          echo "Built $(ls status/*.json 2>/dev/null | wc -l) status files + index.json"
+          built=$(find status -maxdepth 1 -name '*.json' | wc -l)
+          echo "Built ${built} status files + index.json"
 
       - name: Checkout gh-pages branch
         uses: actions/checkout@v4
@@ -231,20 +239,19 @@ jobs:
       - name: Apply updates to gh-pages
         run: |
           set -euo pipefail
-          mkdir -p status runs/${HEAD_SHA}
+          mkdir -p status "runs/${HEAD_SHA}"
           # Copy status/ entries (overwrite if newer)
           cp -f status/*.json status/ 2>/dev/null || true
           # Mirror runs/<sha>/ params files (don't clobber existing)
-          if ls status/*.params.json 1>/dev/null 2>&1; then :; fi
           for f in /tmp/runs-mirror/*.params.json; do
             [ -f "$f" ] || continue
             cp -n "$f" "runs/${HEAD_SHA}/" 2>/dev/null || cp -f "$f" "runs/${HEAD_SHA}/"
           done
           echo "Workspace contents after copy:"
-          ls status | head -20
+          find status -maxdepth 1 -type f | sort | head -20
           echo "..."
           echo "runs/${HEAD_SHA}/:"
-          ls "runs/${HEAD_SHA}/" | head
+          find "runs/${HEAD_SHA}" -maxdepth 1 -type f | sort | head
 
       # The publish-status workflow ONLY pulls files into the workspace; the
       # actual commit + push happens here. We deliberately avoid forcing a

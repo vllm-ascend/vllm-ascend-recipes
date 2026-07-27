@@ -36,8 +36,7 @@ const slug = model._model_slug ?? '';
       {model.architecture}
       <span
         class="status-dot hidden w-1.5 h-1.5 rounded-full bg-zinc-500 ring-1 ring-zinc-700"
-        aria-hidden="true"
-      ></span>
+        aria-hidden="true"></span>
     </span>
   </div>
 
@@ -104,9 +103,7 @@ const slug = model._model_slug ?? '';
   }
 
   function init() {
-    document
-      .querySelectorAll<HTMLElement>('[data-status-url]')
-      .forEach((el) => paintDot(el));
+    document.querySelectorAll<HTMLElement>('[data-status-url]').forEach((el) => paintDot(el));
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);

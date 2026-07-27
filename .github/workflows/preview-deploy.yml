@@ -40,7 +40,7 @@ jobs:
             echo "Failed to get PR number from workflow run"
             exit 1
           fi
-          echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+          echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
 
       - name: Download build artifact
         uses: actions/download-artifact@v4
@@ -174,7 +174,7 @@ jobs:
             echo "Failed to get PR number from workflow run"
             exit 1
           fi
-          echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+          echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
 
       - name: Comment build failure on PR
         uses: actions/github-script@v7

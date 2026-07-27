@@ -21,19 +21,20 @@ const basePrefix = base.endsWith('/') ? base.slice(0, -1) : base;
 ---
 
 <BaseLayout title="Run params · vLLM-Ascend Recipes">
-<script define:vars={{ basePrefix, STATUS_ORIGIN }}>
-  // In dev, status files live at <basePrefix>/runs/...; in prod, they're
-  // served from STATUS_ORIGIN. badge-provided params_url is already absolute
-  // in production JSON, so this only matters for dev fixtures.
-  window.__STATUS_BASE__ = basePrefix;
-  window.__STATUS_ORIGIN__ = STATUS_ORIGIN;
-</script>
+  <script define:vars={{ basePrefix, STATUS_ORIGIN }}>
+    // In dev, status files live at <basePrefix>/runs/...; in prod, they're
+    // served from STATUS_ORIGIN. badge-provided params_url is already absolute
+    // in production JSON, so this only matters for dev fixtures.
+    window.__STATUS_BASE__ = basePrefix;
+    window.__STATUS_ORIGIN__ = STATUS_ORIGIN;
+  </script>
   <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
     <p class="text-[10px] font-mono uppercase tracking-widest text-ink-600 mb-2">
       vllm-ascend run report
     </p>
     <h1 class="font-display text-2xl font-bold text-ink-50 tracking-tight mb-1">
-      <span data-recipe>—</span> <span class="text-ink-500">·</span>
+      <span data-recipe>—</span>
+      <span class="text-ink-500">·</span>
       <code class="text-accent-400" data-sha>—</code>
     </h1>
     <p class="text-xs text-ink-500 mb-6 font-mono">
@@ -42,17 +43,12 @@ const basePrefix = base.endsWith('/') ? base.slice(0, -1) : base;
 
     <div id="status-banner" class="text-xs text-ink-500 mb-6">loading…</div>
 
-    <section
-      id="report"
-      class="hidden prose prose-invert max-w-none text-sm text-ink-200"
-    >
+    <section id="report" class="hidden prose prose-invert max-w-none text-sm text-ink-200">
       <h2 class="text-base font-semibold text-ink-100 mt-0">Run metadata</h2>
       <dl class="grid grid-cols-1 sm:grid-cols-[max-content_1fr] gap-y-1 gap-x-3">
         <dt class="text-ink-500 text-xs">Recipe</dt>
         <dd>
-          <a id="recipe-yaml" target="_blank" rel="noopener" class="text-accent-400"
-            >—</a
-          >
+          <a id="recipe-yaml" target="_blank" rel="noopener" class="text-accent-400">—</a>
           <span id="recipe-path" class="text-ink-500 text-xs ml-2">—</span>
         </dd>
         <dt class="text-ink-500 text-xs">Commit</dt>
@@ -89,6 +85,12 @@ const basePrefix = base.endsWith('/') ? base.slice(0, -1) : base;
 </BaseLayout>
 
 <script>
+  // Custom globals injected by the inline <script define:vars> block above.
+  interface StatusGlobals {
+    __STATUS_BASE__?: string;
+    __STATUS_ORIGIN__?: string;
+  }
+
   const $ = <T extends HTMLElement = HTMLElement>(id: string): T | null =>
     document.getElementById(id) as T | null;
 
@@ -111,10 +113,7 @@ const basePrefix = base.endsWith('/') ? base.slice(0, -1) : base;
   }
 
   function showRecipe(cmd: string) {
-    const safe = cmd
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;');
+    const safe = cmd.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     const pre = document.createElement('pre');
     pre.className =
       'mt-2 bg-ink-950 border border-ink-800/80 rounded-md p-3 overflow-x-auto text-[12px] text-ink-100 leading-relaxed';
@@ -135,8 +134,7 @@ const basePrefix = base.endsWith('/') ? base.slice(0, -1) : base;
     const sha = q.sha ?? '';
     let recipe = q.recipe ?? '';
     if (!sha) {
-      $('status-banner')!.textContent =
-        'Missing ?sha=<commit-sha> query parameter.';
+      $('status-banner')!.textContent = 'Missing ?sha=<commit-sha> query parameter.';
       $('not-found')!.classList.remove('hidden');
       return;
     }
@@ -157,12 +155,12 @@ const basePrefix = base.endsWith('/') ? base.slice(0, -1) : base;
             );
             if (r.ok) {
               recipe = slug;
-              await render(slug, sha, await r.json());
+              await render(slug, sha, (await r.json()) as RunParams);
               return;
             }
           }
         }
-      } catch (e) {
+      } catch {
         /* swallow */
       }
       $('status-banner')!.textContent = 'Could not locate a params file.';
@@ -178,30 +176,41 @@ const basePrefix = base.endsWith('/') ? base.slice(0, -1) : base;
         $('not-found')!.classList.remove('hidden');
         return;
       }
-      const data = await resp.json();
+      const data = (await resp.json()) as RunParams;
       await render(recipe, sha, data);
-    } catch (e) {
+    } catch {
       $('status-banner')!.textContent = 'fetch error';
       $('not-found')!.classList.remove('hidden');
     }
   }
 
-  async function render(recipe: string, sha: string, data: any) {
+  interface ScenarioParams {
+    npu?: string;
+    precision?: string;
+    deployment?: string;
+    case?: string;
+    serve_cmd?: string;
+    serveCmd?: string;
+  }
+  interface RunParams {
+    recipe_path?: string;
+    image?: string;
+    started_at?: string;
+    trigger_type?: 'pr' | 'nightly';
+    workflow_run_url?: string;
+    conclusion?: string;
+    scenarios?: ScenarioParams[];
+  }
+
+  async function render(recipe: string, sha: string, data: RunParams) {
     document.title = `${recipe} @ ${sha.slice(0, 7)} · vLLM-Ascend Recipes`;
     setText('recipe', recipe);
     setText('sha', sha.slice(0, 7));
     setText('origin', `${document.body.dataset.statusOrigin ?? ''}/runs/${sha}/`);
-    const repoSlug =
-      document.body.dataset.repo ?? 'vllm-ascend/vllm-ascend-recipes';
-    setHref(
-      'recipe-yaml',
-      `https://github.com/${repoSlug}/blob/${sha}/${data.recipe_path ?? ''}`,
-    );
+    const repoSlug = document.body.dataset.repo ?? 'vllm-ascend/vllm-ascend-recipes';
+    setHref('recipe-yaml', `https://github.com/${repoSlug}/blob/${sha}/${data.recipe_path ?? ''}`);
     setText('recipe-path', data.recipe_path ?? '');
-    setHref(
-      'head-sha-link',
-      `https://github.com/${repoSlug}/commit/${sha}`,
-    );
+    setHref('head-sha-link', `https://github.com/${repoSlug}/commit/${sha}`);
     setText('image', data.image ?? '—');
     setText(
       'trigger',
@@ -213,10 +222,7 @@ const basePrefix = base.endsWith('/') ? base.slice(0, -1) : base;
     // like workflow_run_url, conclusion, finished_at. Use them when present.
     if (data.workflow_run_url) {
       setHref('run-link', data.workflow_run_url);
-      setText(
-        'conclusion',
-        data.conclusion ?? '—',
-      );
+      setText('conclusion', data.conclusion ?? '—');
     } else {
       setHref('run-link', null);
       setText('conclusion', '—');
@@ -230,12 +236,11 @@ const basePrefix = base.endsWith('/') ? base.slice(0, -1) : base;
       if (list.length === 0) {
         wrap.textContent = 'no scenarios captured';
       }
-      list.forEach((s: any, i: number) => {
+      list.forEach((s: ScenarioParams, i: number) => {
         const card = document.createElement('div');
         card.className = 'border border-ink-800/80 rounded-md p-4 bg-ink-900/40';
         const title = document.createElement('p');
-        title.className =
-          'text-xs font-mono text-ink-400 mb-2 flex flex-wrap items-center gap-2';
+        title.className = 'text-xs font-mono text-ink-400 mb-2 flex flex-wrap items-center gap-2';
         title.innerHTML = `
           <span class="text-accent-400">scenario ${i}</span>
           <span class="text-ink-600">·</span>
@@ -282,9 +287,10 @@ const basePrefix = base.endsWith('/') ? base.slice(0, -1) : base;
   // Resolve the right base for fetch calls.
   // - In production, status files live at STATUS_ORIGIN/<...>.
   // - In dev, the fixtures live under <basePrefix>/<...>.
+  const statusWin = window as unknown as StatusGlobals;
   document.body.dataset.statusOrigin =
     document.body.dataset.statusOrigin ??
-    ((window as any).__STATUS_BASE__ || (window as any).__STATUS_ORIGIN__ || '');
+    (statusWin.__STATUS_BASE__ || statusWin.__STATUS_ORIGIN__ || '');
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', main);
   } else {

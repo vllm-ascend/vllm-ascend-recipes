@@ -144,12 +144,7 @@ const { modelSlug, title } = Astro.props;
   // expandable details panel. Pure ESM so it works on a static SSG build.
   import type { ModelStatus, RunStatus } from '../lib/status';
 
-
-
-  function pickFreshest(
-    a: RunStatus | null,
-    b: RunStatus | null,
-  ): RunStatus | null {
+  function pickFreshest(a: RunStatus | null, b: RunStatus | null): RunStatus | null {
     if (!a) return b;
     if (!b) return a;
     return Date.parse(a.finished_at) >= Date.parse(b.finished_at) ? a : b;
@@ -184,11 +179,7 @@ const { modelSlug, title } = Astro.props;
     if (!freshest) return;
     const duration = fmtDuration(freshest.started_at, freshest.finished_at);
     const pillClass =
-      freshest.status === 'pass'
-        ? 'pass'
-        : freshest.status === 'fail'
-          ? 'fail'
-          : 'skip';
+      freshest.status === 'pass' ? 'pass' : freshest.status === 'fail' ? 'fail' : 'skip';
 
     const pill = document.createElement('a');
     pill.className = `pill ${pillClass}`;
@@ -197,11 +188,7 @@ const { modelSlug, title } = Astro.props;
     pill.rel = 'noopener';
     pill.innerHTML = `
       <span class="dot"></span>
-      ${
-        freshest.kind === 'pr' && freshest.pr_number
-          ? `PR #${freshest.pr_number}`
-          : 'Nightly'
-      }
+      ${freshest.kind === 'pr' && freshest.pr_number ? `PR #${freshest.pr_number}` : 'Nightly'}
       <span>${freshest.status}</span>
       <small>· ${duration}</small>
     `;
@@ -296,10 +283,9 @@ const { modelSlug, title } = Astro.props;
       }
       const data = (await resp.json()) as ModelStatus;
       render(root, data);
-    } catch (e) {
+    } catch (err) {
       render(root, null, 'failed to fetch CI status');
-      // eslint-disable-next-line no-console
-      console.warn('[VerifyBadge] fetch failed', url, e);
+      console.warn('[VerifyBadge] fetch failed', url, err);
     }
   }
 

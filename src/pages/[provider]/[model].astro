@@ -254,18 +254,17 @@ addToc('reference', 'sectionMoreInfo');
             </a>
           </div>
 
-          {/*
-           * CI verification badge: PR/nightly result + duration + commit link,
-           * with expandable "view execution details" panel linking to params.json.
-           * Status data is fetched client-side from the gh-pages branch;
-           * publishing never modifies the recipe YAML in main, so the
-           * main pipeline is not re-triggered.
-           */}
+          {
+            /*
+             * CI verification badge: PR/nightly result + duration + commit link,
+             * with expandable "view execution details" panel linking to params.json.
+             * Status data is fetched client-side from the gh-pages branch;
+             * publishing never modifies the recipe YAML in main, so the
+             * main pipeline is not re-triggered.
+             */
+          }
           <div class="mt-4">
-            <VerifyBadge
-              modelSlug={model._model_slug}
-              title={model.meta.title}
-            />
+            <VerifyBadge modelSlug={model._model_slug} title={model.meta.title} />
           </div>
         </div>
 
