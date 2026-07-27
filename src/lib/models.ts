@@ -87,6 +87,8 @@ export async function getModelList(lang: 'en' | 'zh' = 'en'): Promise<ModelListI
       updated: m.meta.date_added,
       url: `/${m._provider_slug}/${m._model_slug}`,
       json: `/${m._provider_slug}/${m._model_slug}.json`,
+      _model_slug: m._model_slug,
+      _status_url: `/status/${m._model_slug}.json`, // resolved to absolute URL by JSON endpoint
       npus,
       precisions,
       deployments,

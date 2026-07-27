@@ -40,17 +40,17 @@ jobs:
         if: github.event_name == 'push'
         run: |
           CHANGED=$(git diff --name-only HEAD~1 HEAD -- models/ | grep '\.yaml$\|\.yml$' || echo "")
-          echo "changed_files=$CHANGED" >> $GITHUB_OUTPUT
+          echo "changed_files=$CHANGED" >> "$GITHUB_OUTPUT"
 
       - name: Determine whether to run
         id: decide
         run: |
           if [[ "${{ github.event_name }}" == "schedule" ]] || [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            echo "should_run=true" >> $GITHUB_OUTPUT
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
           elif [[ -n "${{ steps.changed.outputs.changed_files }}" ]]; then
-            echo "should_run=true" >> $GITHUB_OUTPUT
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
           else
-            echo "should_run=false" >> $GITHUB_OUTPUT
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Classify recipes by hardware
@@ -84,8 +84,8 @@ jobs:
 
           # Output as JSON array (same format as pr-recipe-verify)
           FILES=$(echo "$A2_LIST" | sed '/^$/d' | jq -R -s -c 'split("\n") | map(select(length > 0))')
-          echo "a2_recipes=$FILES" >> $GITHUB_OUTPUT
-          echo "a2_count=$A2_COUNT" >> $GITHUB_OUTPUT
+          echo "a2_recipes=$FILES" >> "$GITHUB_OUTPUT"
+          echo "a2_count=$A2_COUNT" >> "$GITHUB_OUTPUT"
 
           echo "A2 recipes: $A2_COUNT"
 
@@ -97,6 +97,8 @@ jobs:
       runner: linux-aarch64-a2b4-8
       recipe_files: ${{ needs.prepare.outputs.a2_recipes }}
       trigger_type: nightly
+      head_sha: ${{ github.sha }}
+      started_at_iso: ${{ github.event.repository.updated_at }}
     secrets:
       obs_ak: ${{ secrets.obs_ak }}
       obs_sk: ${{ secrets.obs_sk }}

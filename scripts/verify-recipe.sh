@@ -202,6 +202,45 @@ with open('/tmp/scenario_list.txt', 'w') as flist:
         with open(f'/tmp/scenario_{i}_verify.sh', 'w') as f:
             f.write(verify)
         flist.write(f'{i}|{s[\"npu\"]}|{s[\"precision\"]}|{s[\"deployment\"]}|{s[\"case\"]}\n')
+
+# === Dump execution params (consumed by publish-status workflow) ===
+PARAMS_DIR = os.environ.get('RUN_PARAMS_DIR', '/tmp/verify-results')
+HEAD_SHA = os.environ.get('HEAD_SHA', '')
+TRIGGER_TYPE = os.environ.get('TRIGGER_TYPE', 'pr')
+VLLM_IMAGE = os.environ.get('VLLM_ASCEND_IMAGE', '')
+RECIPE_PATH_IN = os.environ.get('RECIPE_YAML_PATH', '')
+
+out_scenarios = []
+for i, s in enumerate(info.get('scenarios', [])):
+    out_scenarios.append({
+        'index': i,
+        'npu': s.get('npu', ''),
+        'precision': s.get('precision', ''),
+        'deployment': s.get('deployment', ''),
+        'case': s.get('case', ''),
+        'serve_cmd': s.get('serve_cmd', ''),
+    })
+
+params_doc = {
+    'recipe_path': RECIPE_PATH_IN,
+    'model_id': info.get('model_id', ''),
+    'hw_key': info.get('hw_key', ''),
+    'head_sha': HEAD_SHA,
+    'trigger_type': TRIGGER_TYPE,
+    'image': VLLM_IMAGE,
+    'started_at': os.environ.get('STARTED_AT_ISO', ''),
+    'scenarios': out_scenarios,
+}
+
+import os as _os
+_os.makedirs(PARAMS_DIR, exist_ok=True)
+recipe_slug = _os.path.basename(info.get('_recipe_path', '')).replace('.yaml', '') or 'recipe'
+if not recipe_slug or recipe_slug == 'recipe':
+    recipe_slug = _os.environ.get('RECIPE_YAML_PATH', 'recipe').split('/')[-1].replace('.yaml', '')
+out_path = _os.path.join(PARAMS_DIR, f'{recipe_slug}.params.json')
+with open(out_path, 'w') as fp:
+    json.dump(params_doc, fp, indent=2, ensure_ascii=False)
+print(f'[PARAMS] wrote {out_path}', file=sys.stderr)
 "
 while IFS='|' read -r idx npu precision deployment case_name; do
   [ -z "$idx" ] && continue

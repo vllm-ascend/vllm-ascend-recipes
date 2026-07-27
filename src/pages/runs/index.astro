@@ -1,0 +1,299 @@
+---
+/**
+ * /runs?sha=<sha>&recipe=<recipe-slug>
+ *
+ * Static SSG page that fetches the params.json for a CI run from the
+ * gh-pages branch on the client and renders it as a traceable, human
+ * readable report (run link, PR link, recipe yaml permalink, image, full
+ * vllm serve command, env, scenarios).
+ *
+ * The data lives at:
+ *   https://<org>.github.io/<repo>/runs/<sha>/<recipe>.params.json
+ */
+
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { STATUS_ORIGIN } from '../../lib/status';
+
+// Use configured BASE_URL so dev-mode fetches resolve correctly
+// (e.g. /vllm-ascend-recipes/runs/<sha>/<slug>.params.json).
+const base = import.meta.env.BASE_URL;
+const basePrefix = base.endsWith('/') ? base.slice(0, -1) : base;
+---
+
+<BaseLayout title="Run params · vLLM-Ascend Recipes">
+  <script define:vars={{ basePrefix, STATUS_ORIGIN }}>
+    // In dev, status files live at <basePrefix>/runs/...; in prod, they're
+    // served from STATUS_ORIGIN. badge-provided params_url is already absolute
+    // in production JSON, so this only matters for dev fixtures.
+    window.__STATUS_BASE__ = basePrefix;
+    window.__STATUS_ORIGIN__ = STATUS_ORIGIN;
+  </script>
+  <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <p class="text-[10px] font-mono uppercase tracking-widest text-ink-600 mb-2">
+      vllm-ascend run report
+    </p>
+    <h1 class="font-display text-2xl font-bold text-ink-50 tracking-tight mb-1">
+      <span data-recipe>—</span>
+      <span class="text-ink-500">·</span>
+      <code class="text-accent-400" data-sha>—</code>
+    </h1>
+    <p class="text-xs text-ink-500 mb-6 font-mono">
+      data fetched from <code data-origin>{STATUS_ORIGIN}</code>
+    </p>
+
+    <div id="status-banner" class="text-xs text-ink-500 mb-6">loading…</div>
+
+    <section id="report" class="hidden prose prose-invert max-w-none text-sm text-ink-200">
+      <h2 class="text-base font-semibold text-ink-100 mt-0">Run metadata</h2>
+      <dl class="grid grid-cols-1 sm:grid-cols-[max-content_1fr] gap-y-1 gap-x-3">
+        <dt class="text-ink-500 text-xs">Recipe</dt>
+        <dd>
+          <a id="recipe-yaml" target="_blank" rel="noopener" class="text-accent-400">—</a>
+          <span id="recipe-path" class="text-ink-500 text-xs ml-2">—</span>
+        </dd>
+        <dt class="text-ink-500 text-xs">Commit</dt>
+        <dd><a id="head-sha-link" target="_blank" rel="noopener" class="text-accent-400">—</a></dd>
+        <dt class="text-ink-500 text-xs">Image</dt>
+        <dd><code id="image" class="text-ink-100">—</code></dd>
+        <dt class="text-ink-500 text-xs">Trigger</dt>
+        <dd id="trigger" class="text-ink-300">—</dd>
+        <dt class="text-ink-500 text-xs">PR</dt>
+        <dd>
+          <a id="pr-link" target="_blank" rel="noopener" class="text-accent-400">—</a>
+          <span id="pr-author" class="text-ink-500 text-xs ml-2"></span>
+        </dd>
+        <dt class="text-ink-500 text-xs">Started · Finished</dt>
+        <dd><code id="started" class="text-ink-100">—</code></dd>
+        <dt class="text-ink-500 text-xs">Duration</dt>
+        <dd id="duration" class="text-ink-100">—</dd>
+        <dt class="text-ink-500 text-xs">Actions run</dt>
+        <dd>
+          <a id="run-link" target="_blank" rel="noopener" class="text-accent-400">—</a>
+          (<span id="conclusion">—</span>)
+        </dd>
+      </dl>
+
+      <h2 class="text-base font-semibold text-ink-100 mt-8">vllm-ascend commands</h2>
+      <div id="scenarios" class="space-y-4"></div>
+    </section>
+
+    <p id="not-found" class="hidden text-xs text-ink-500 mt-8">
+      Run params not found. Check that publish-status.yml has finished writing
+      <code>runs/&lt;sha&gt;/</code> to the gh-pages branch.
+    </p>
+  </div>
+</BaseLayout>
+
+<script>
+  // Custom globals injected by the inline <script define:vars> block above.
+  interface StatusGlobals {
+    __STATUS_BASE__?: string;
+    __STATUS_ORIGIN__?: string;
+  }
+
+  const $ = <T extends HTMLElement = HTMLElement>(id: string): T | null =>
+    document.getElementById(id) as T | null;
+
+  function setText(id: string, text: string) {
+    const el = $(id);
+    if (el) el.textContent = text;
+  }
+
+  function setHref(id: string, href: string | null) {
+    const el = $<HTMLAnchorElement>(id);
+    if (!el) return;
+    if (href) {
+      el.setAttribute('href', href);
+      el.removeAttribute('aria-disabled');
+    } else {
+      el.removeAttribute('href');
+      el.setAttribute('aria-disabled', 'true');
+      el.style.opacity = '0.4';
+    }
+  }
+
+  function showRecipe(cmd: string) {
+    const safe = cmd.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const pre = document.createElement('pre');
+    pre.className =
+      'mt-2 bg-ink-950 border border-ink-800/80 rounded-md p-3 overflow-x-auto text-[12px] text-ink-100 leading-relaxed';
+    pre.innerHTML = `<code>${safe}</code>`;
+    return pre;
+  }
+
+  function getQuery(): Record<string, string> {
+    const out: Record<string, string> = {};
+    new URLSearchParams(window.location.search).forEach((v, k) => {
+      out[k] = v;
+    });
+    return out;
+  }
+
+  async function main() {
+    const q = getQuery();
+    const sha = q.sha ?? '';
+    let recipe = q.recipe ?? '';
+    if (!sha) {
+      $('status-banner')!.textContent = 'Missing ?sha=<commit-sha> query parameter.';
+      $('not-found')!.classList.remove('hidden');
+      return;
+    }
+    if (!recipe) {
+      // fall back to status/<model>.json index to discover the recipe slug
+      try {
+        const idxResp = await fetch(
+          `${document.body.dataset.statusOrigin ?? ''}/status/index.json`,
+          { cache: 'no-cache' },
+        );
+        if (idxResp.ok) {
+          const idx = (await idxResp.json()) as { models: { slug: string }[] };
+          const slugs = idx.models.map((m) => m.slug);
+          for (const slug of slugs) {
+            const r = await fetch(
+              `${document.body.dataset.statusOrigin ?? ''}/runs/${sha}/${slug}.params.json`,
+              { cache: 'no-cache' },
+            );
+            if (r.ok) {
+              recipe = slug;
+              await render(slug, sha, (await r.json()) as RunParams);
+              return;
+            }
+          }
+        }
+      } catch {
+        /* swallow */
+      }
+      $('status-banner')!.textContent = 'Could not locate a params file.';
+      $('not-found')!.classList.remove('hidden');
+      return;
+    }
+
+    const url = `${document.body.dataset.statusOrigin ?? ''}/runs/${sha}/${recipe}.params.json`;
+    try {
+      const resp = await fetch(url, { cache: 'no-cache' });
+      if (!resp.ok) {
+        $('status-banner')!.textContent = `HTTP ${resp.status}`;
+        $('not-found')!.classList.remove('hidden');
+        return;
+      }
+      const data = (await resp.json()) as RunParams;
+      await render(recipe, sha, data);
+    } catch {
+      $('status-banner')!.textContent = 'fetch error';
+      $('not-found')!.classList.remove('hidden');
+    }
+  }
+
+  interface ScenarioParams {
+    npu?: string;
+    precision?: string;
+    deployment?: string;
+    case?: string;
+    serve_cmd?: string;
+    serveCmd?: string;
+  }
+  interface RunParams {
+    recipe_path?: string;
+    image?: string;
+    started_at?: string;
+    trigger_type?: 'pr' | 'nightly';
+    workflow_run_url?: string;
+    conclusion?: string;
+    scenarios?: ScenarioParams[];
+  }
+
+  async function render(recipe: string, sha: string, data: RunParams) {
+    document.title = `${recipe} @ ${sha.slice(0, 7)} · vLLM-Ascend Recipes`;
+    setText('recipe', recipe);
+    setText('sha', sha.slice(0, 7));
+    setText('origin', `${document.body.dataset.statusOrigin ?? ''}/runs/${sha}/`);
+    const repoSlug = document.body.dataset.repo ?? 'vllm-ascend/vllm-ascend-recipes';
+    setHref('recipe-yaml', `https://github.com/${repoSlug}/blob/${sha}/${data.recipe_path ?? ''}`);
+    setText('recipe-path', data.recipe_path ?? '');
+    setHref('head-sha-link', `https://github.com/${repoSlug}/commit/${sha}`);
+    setText('image', data.image ?? '—');
+    setText(
+      'trigger',
+      data.trigger_type === 'pr' ? 'Pull Request verification' : 'Scheduled nightly',
+    );
+    setText('started', `${data.started_at ?? '—'}`);
+    setText('duration', data.started_at ? `(started ${data.started_at})` : '');
+    // Optional: when status/<slug>.json is also fetched, we get richer fields
+    // like workflow_run_url, conclusion, finished_at. Use them when present.
+    if (data.workflow_run_url) {
+      setHref('run-link', data.workflow_run_url);
+      setText('conclusion', data.conclusion ?? '—');
+    } else {
+      setHref('run-link', null);
+      setText('conclusion', '—');
+    }
+
+    // Scenarios
+    const wrap = $('scenarios');
+    if (wrap) {
+      wrap.innerHTML = '';
+      const list = Array.isArray(data.scenarios) ? data.scenarios : [];
+      if (list.length === 0) {
+        wrap.textContent = 'no scenarios captured';
+      }
+      list.forEach((s: ScenarioParams, i: number) => {
+        const card = document.createElement('div');
+        card.className = 'border border-ink-800/80 rounded-md p-4 bg-ink-900/40';
+        const title = document.createElement('p');
+        title.className = 'text-xs font-mono text-ink-400 mb-2 flex flex-wrap items-center gap-2';
+        title.innerHTML = `
+          <span class="text-accent-400">scenario ${i}</span>
+          <span class="text-ink-600">·</span>
+          <span>${s.npu ?? '?'}</span>
+          <span class="text-ink-600">·</span>
+          <span>${s.precision ?? '?'}</span>
+          <span class="text-ink-600">·</span>
+          <span>${s.deployment ?? '?'}</span>
+          <span class="text-ink-600">·</span>
+          <span class="text-ink-300">${s.case ?? ''}</span>
+        `;
+        card.appendChild(title);
+        const cmd = s.serve_cmd ?? s.serveCmd ?? '';
+        if (cmd) {
+          card.appendChild(showRecipe(cmd));
+          const copy = document.createElement('button');
+          copy.className =
+            'mt-2 text-[10px] font-mono text-ink-500 hover:text-accent-400 transition-colors';
+          copy.textContent = 'copy command';
+          copy.onclick = async () => {
+            try {
+              await navigator.clipboard.writeText(cmd);
+              copy.textContent = 'copied ✓';
+              setTimeout(() => (copy.textContent = 'copy command'), 1500);
+            } catch {
+              copy.textContent = 'copy failed';
+            }
+          };
+          card.appendChild(copy);
+        } else {
+          const empty = document.createElement('p');
+          empty.className = 'text-xs text-ink-500 italic';
+          empty.textContent = 'no serve_cmd captured';
+          card.appendChild(empty);
+        }
+        wrap.appendChild(card);
+      });
+    }
+
+    $('status-banner')!.textContent = '';
+    $('report')!.classList.remove('hidden');
+  }
+
+  // Resolve the right base for fetch calls.
+  // - In production, status files live at STATUS_ORIGIN/<...>.
+  // - In dev, the fixtures live under <basePrefix>/<...>.
+  const statusWin = window as unknown as StatusGlobals;
+  document.body.dataset.statusOrigin =
+    document.body.dataset.statusOrigin ??
+    (statusWin.__STATUS_BASE__ || statusWin.__STATUS_ORIGIN__ || '');
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', main);
+  } else {
+    main();
+  }
+</script>

@@ -1,0 +1,39 @@
+{
+  "model": "Qwen3-30B-A3B",
+  "last_pr_run": {
+    "kind": "pr",
+    "status": "pass",
+    "conclusion": "success",
+    "head_sha": "abc1234f9e8d7c6b5a493827160f1e2d3c4b5a697",
+    "head_sha_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/commit/abc1234f9e8d7c6b5a493827160f1e2d3c4b5a697",
+    "workflow_run_id": 987654321,
+    "workflow_run_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/actions/runs/987654321",
+    "recipe_path": "models/en/Qwen/Qwen3-30B-A3B.yaml",
+    "recipe_yaml_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/blob/abc1234f9e8d7c6b5a493827160f1e2d3c4b5a697/models/en/Qwen/Qwen3-30B-A3B.yaml",
+    "params_url": "/vllm-ascend-recipes/runs/abc1234f9e8d7c6b5a493827160f1e2d3c4b5a697/Qwen3-30B-A3B.params.json",
+    "started_at": "2026-07-25T03:11:42Z",
+    "finished_at": "2026-07-25T03:42:16Z",
+    "pr_number": 482,
+    "pr_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/pull/482",
+    "pr_title": "feat: verify Qwen3-30B-A3B with W8A8 on Atlas 800 A2",
+    "pr_author": "alice"
+  },
+  "last_nightly_run": {
+    "kind": "nightly",
+    "status": "pass",
+    "conclusion": "success",
+    "head_sha": "d34db33f8c7a6e5d4b3c2b1a0987654321fedcba",
+    "head_sha_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/commit/d34db33f8c7a6e5d4b3c2b1a0987654321fedcba",
+    "workflow_run_id": 987600000,
+    "workflow_run_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/actions/runs/987600000",
+    "recipe_path": "models/en/Qwen/Qwen3-30B-A3B.yaml",
+    "recipe_yaml_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/blob/d34db33f8c7a6e5d4b3c2b1a0987654321fedcba/models/en/Qwen/Qwen3-30B-A3B.yaml",
+    "params_url": "/vllm-ascend-recipes/runs/d34db33f8c7a6e5d4b3c2b1a0987654321fedcba/Qwen3-30B-A3B.params.json",
+    "started_at": "2026-07-24T20:00:00Z",
+    "finished_at": "2026-07-24T20:43:27Z",
+    "pr_number": null,
+    "pr_url": null,
+    "pr_title": null,
+    "pr_author": null
+  }
+}

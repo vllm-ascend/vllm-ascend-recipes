@@ -1,0 +1,304 @@
+#
+# Copyright (c) 2025 Huawei Technologies Co., Ltd. All Rights Reserved.
+# This file is a part of the vllm-ascend-recipes project.
+#
+# Publish CI verification status + run-params to the gh-pages branch so the
+# static frontend can show fully traceable "Last PR pass / Last nightly pass"
+# badges WITHOUT modifying any model YAML in main.
+#
+# Triggered by `workflow_run` → reacts to PR Recipe Verify / Nightly Recipe
+# Verify completions. Writing to `gh-pages` branch:
+#   - does NOT trigger any of the main-branch workflows (filtered by branch)
+#   - does NOT invalidate the static site on GitHub Pages until the next
+#     Astro build & deploy (handled by deploy.yml / preview-deploy.yml)
+#   - gh-pages also serves as the publishable mirror for `runs/<sha>/params.json`
+#
+# Outputs:
+#   status/<model-slug>.json     per-recipe latest PR+nightly summary
+#   status/index.json            aggregate index for /browse page
+#   runs/<sha>/<recipe>.params.json  exact vllm-ascend command snapshot
+#
+
+name: 'Publish Verification Status'
+
+on:
+  workflow_run:
+    workflows: ['PR Recipe Verify', 'Nightly Recipe Verify']
+    types: [completed]
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: publish-status
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    if: >
+      github.event.workflow_run.conclusion == 'success' ||
+      github.event.workflow_run.conclusion == 'failure'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download run-params artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: recipe-verify-results-${{ github.event.workflow_run.id }}
+          path: results/
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+
+      - name: Resolve trigger metadata
+        id: meta
+        env:
+          RW_API_URL: ${{ github.event.workflow_run.html_url }}
+          RW_NAME: ${{ github.event.workflow_run.name }}
+          RW_RUN_ID: ${{ github.event.workflow_run.id }}
+          RW_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          RW_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          RW_REPO: ${{ github.repository }}
+        run: |
+          case "$RW_NAME" in
+            *"PR Recipe Verify"*) TRIGGER="pr" ;;
+            *) TRIGGER="nightly" ;;
+          esac
+          {
+            echo "trigger=$TRIGGER"
+            echo "head_sha=$RW_HEAD_SHA"
+            echo "conclusion=$RW_CONCLUSION"
+            echo "run_url=$RW_API_URL"
+            echo "run_id=$RW_RUN_ID"
+            echo "repo=$RW_REPO"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Try to extract PR metadata
+        id: pr
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ steps.meta.outputs.head_sha }}
+        run: |
+          # gh API: find the PR that contains this SHA (works for PR-head runs and merges into main)
+          set +e
+          pr_json=$(gh api "repos/${REPO}/commits/${SHA}/pulls" \
+            -H 'Accept: application/vnd.github.gambit+json' 2>/dev/null)
+          if [ -z "$pr_json" ] || [ "$pr_json" = "[]" ]; then
+            {
+              echo "pr_number="
+              echo "pr_url="
+              echo "pr_title="
+              echo "pr_author="
+            } >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          pr_number=$(echo "$pr_json" | jq -r '.[0].number // empty')
+          pr_url=$(echo "$pr_json" | jq -r '.[0].html_url // empty')
+          pr_title=$(echo "$pr_json" | jq -r '.[0].title // empty')
+          pr_author=$(echo "$pr_json" | jq -r '.[0].user.login // empty')
+          {
+            echo "pr_number=$pr_number"
+            echo "pr_url=$pr_url"
+            echo "pr_title=$pr_title"
+            echo "pr_author=$pr_author"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Install jq
+        run: sudo apt-get install -y jq || apt-get install -y jq
+
+      - name: Build status JSON files
+        env:
+          TRIGGER: ${{ steps.meta.outputs.trigger }}
+          HEAD_SHA: ${{ steps.meta.outputs.head_sha }}
+          RUN_URL: ${{ steps.meta.outputs.run_url }}
+          RUN_ID: ${{ steps.meta.outputs.run_id }}
+          CONCLUSION: ${{ steps.meta.outputs.conclusion }}
+          PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
+          PR_URL: ${{ steps.pr.outputs.pr_url }}
+          PR_TITLE: ${{ steps.pr.outputs.pr_title }}
+          PR_AUTHOR: ${{ steps.pr.outputs.pr_author }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          mkdir -p status "runs/${HEAD_SHA}"
+
+          # 1) Mirror params.json files verbatim to runs/<sha>/  (frontend link target)
+          if compgen -G "results/*.params.json" > /dev/null; then
+            for f in results/*.params.json; do
+              base="$(basename "$f")"
+              cp "$f" "runs/${HEAD_SHA}/${base}"
+              # Patch head_sha on the fly in case the inner dump missed it
+              jq --arg sha "${HEAD_SHA}" '.head_sha = $sha' \
+                "runs/${HEAD_SHA}/${base}" > "$f.tmp" \
+                && mv "$f.tmp" "runs/${HEAD_SHA}/${base}"
+            done
+            mirrored=$(find results -maxdepth 1 -name '*.params.json' | wc -l)
+            echo "Mirrored ${mirrored} params files to runs/${HEAD_SHA}/"
+          else
+            echo "No params.json artifacts found, skipping runs mirror"
+          fi
+
+          # 2) Build per-recipe status JSON.
+          #    Recipe slug = stem name of *.params.json (e.g. Qwen3-30B-A3B).
+          for f in results/*.params.json; do
+            [ -f "$f" ] || continue
+            slug="$(basename "$f" .params.json)"
+            stat_file="results/${slug}.status"
+            recipe_file="results/${slug}.recipe"
+            status="unknown"
+            if [ -f "$stat_file" ]; then
+              status=$(tr -d ' \n\r' < "$stat_file")
+            fi
+            recipe_path=""
+            if [ -f "$recipe_file" ]; then
+              recipe_path=$(tr -d ' \n\r' < "$recipe_file")
+            fi
+            params_url="https://${REPO%/*}.github.io/${REPO##*/}/runs/${HEAD_SHA}/${slug}.params.json"
+            head_sha_url="https://github.com/${REPO}/commit/${HEAD_SHA}"
+            recipe_yaml_url="https://github.com/${REPO}/blob/${HEAD_SHA}/${recipe_path}"
+
+            # duration_sec we'll compute from a sibling .started_at file or
+            # omit; front-end uses finished_at - started_at when both present.
+            started_at=$(jq -r '.started_at // empty' "$f")
+            concluded_iso=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+            status_block=$(jq -n \
+              --arg kind "${TRIGGER}" \
+              --arg status "${status}" \
+              --arg conclusion "${CONCLUSION}" \
+              --arg head_sha "${HEAD_SHA}" \
+              --arg head_sha_url "${head_sha_url}" \
+              --arg run_id   "${RUN_ID}" \
+              --arg run_url  "${RUN_URL}" \
+              --arg recipe_path "${recipe_path}" \
+              --arg recipe_yaml_url "${recipe_yaml_url}" \
+              --arg params_url "${params_url}" \
+              --arg started_at "${started_at}" \
+              --arg finished_at "${concluded_iso}" \
+              --arg pr_number "${PR_NUMBER}" \
+              --arg pr_url    "${PR_URL}" \
+              --arg pr_title  "${PR_TITLE}" \
+              --arg pr_author "${PR_AUTHOR}" \
+              '{
+                kind: $kind,
+                status: $status,
+                conclusion: $conclusion,
+                head_sha: $head_sha,
+                head_sha_url: $head_sha_url,
+                workflow_run_id: ($run_id|tonumber),
+                workflow_run_url: $run_url,
+                recipe_path: $recipe_path,
+                recipe_yaml_url: $recipe_yaml_url,
+                params_url: $params_url,
+                started_at: $started_at,
+                finished_at: $finished_at,
+                pr_number: (if $pr_number != "" then ($pr_number|tonumber) else null end),
+                pr_url: (if $pr_url != "" then $pr_url else null end),
+                pr_title: (if $pr_title != "" then $pr_title else null end),
+                pr_author: (if $pr_author != "" then $pr_author else null end)
+              }')
+
+            # Read previous status file if it exists, then merge: keep last_pr_run
+            # from prior unless this is a PR run; keep last_nightly_run likewise.
+            prev="status/${slug}.json"
+            last_pr=$(jq -c '.last_pr_run // null' "$prev" 2>/dev/null || true)
+            last_nightly=$(jq -c '.last_nightly_run // null' "$prev" 2>/dev/null || true)
+            if [ "${TRIGGER}" = "pr" ]; then
+              last_pr="$status_block"
+            else
+              last_nightly="$status_block"
+            fi
+            jq -n \
+              --arg slug "${slug}" \
+              --argjson last_pr "${last_pr:-null}" \
+              --argjson last_nightly "${last_nightly:-null}" \
+              '{
+                 model: $slug,
+                 last_pr_run: $last_pr,
+                 last_nightly_run: $last_nightly
+               }' > "status/${slug}.json"
+          done
+
+          # 3) Build status/index.json (used by /browse & home cards)
+          index_items=$(for f in status/*.json; do
+            [ -f "$f" ] || continue
+            jq -c '{slug: .model}' "$f"
+          done | jq -s '.')
+          jq -n --argjson items "$index_items" \
+            '{ updated_at: (now|todate), models: $items }' > status/index.json
+          built=$(find status -maxdepth 1 -name '*.json' | wc -l)
+          echo "Built ${built} status files + index.json"
+
+      - name: Checkout gh-pages branch
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+        # First-ever publish: gh-pages doesn't exist yet. Don't fail the job;
+        # the "Apply updates" step below initializes an empty branch instead.
+        continue-on-error: true
+
+      - name: Ensure gh-pages branch exists
+        run: |
+          set -euo pipefail
+          if git rev-parse --verify origin/gh-pages >/dev/null 2>&1; then
+            echo "origin/gh-pages exists, nothing to do"
+            exit 0
+          fi
+          echo "origin/gh-pages missing — initializing an empty branch"
+          git checkout --orphan gh-pages
+          git rm -rfq . || true
+          git commit --allow-empty -m "ci: initialize gh-pages branch"
+          # Push the empty branch so subsequent runs see origin/gh-pages.
+          git push origin gh-pages
+          git fetch origin gh-pages
+
+      - name: Apply updates to gh-pages
+        run: |
+          set -euo pipefail
+          mkdir -p status "runs/${HEAD_SHA}"
+          # Copy status/ entries (overwrite if newer)
+          cp -f status/*.json status/ 2>/dev/null || true
+          # Mirror runs/<sha>/ params files (don't clobber existing)
+          for f in /tmp/runs-mirror/*.params.json; do
+            [ -f "$f" ] || continue
+            cp -n "$f" "runs/${HEAD_SHA}/" 2>/dev/null || cp -f "$f" "runs/${HEAD_SHA}/"
+          done
+          echo "Workspace contents after copy:"
+          find status -maxdepth 1 -type f | sort | head -20
+          echo "..."
+          echo "runs/${HEAD_SHA}/:"
+          find "runs/${HEAD_SHA}" -maxdepth 1 -type f | sort | head
+
+      # The publish-status workflow ONLY pulls files into the workspace; the
+      # actual commit + push happens here. We deliberately avoid forcing a
+      # rebuild — GitHub Pages will pick up files on the next natural push.
+
+      - name: Commit and push to gh-pages
+        env:
+          HEAD_SHA: ${{ steps.meta.outputs.head_sha }}
+          REPO: ${{ github.repository }}
+          RUN_URL: ${{ steps.meta.outputs.run_url }}
+        run: |
+          set -euo pipefail
+          git config user.name "vllm-ascend-ci"
+          git config user.email "vllm-ascend-ci@users.noreply.github.com"
+          git add status runs
+          if git diff --cached --quiet; then
+            echo "No changes to publish."
+            exit 0
+          fi
+          # Squash prior gh-pages history into a single commit so the branch
+          # doesn't accumulate a commit per CI run (nightly + every PR merge).
+          # gh-pages is a published-state mirror, not an audit log.
+          base="$(git rev-parse origin/gh-pages 2>/dev/null || git rev-list --max-parents=0 HEAD | tail -1)"
+          git reset --soft "${base}"
+          git commit -m "ci: status update from ${HEAD_SHA}" \
+            -m "Triggered by: ${RUN_URL}" \
+            -m "Repo: ${REPO} [skip ci]"
+          # --force-with-lease refuses the push if remote has moved beyond our
+          # last-known state (e.g. a concurrent publish we hadn't fetched yet).
+          # The `concurrency: cancel-in-progress: true` group above normally
+          # serializes publishes, this is just belt-and-suspenders.
+          git push --force-with-lease origin gh-pages

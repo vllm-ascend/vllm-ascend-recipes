@@ -1,81 +1,302 @@
 ---
-import { readFileSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
+/**
+ * <VerifyBadge modelSlug="glm-5.2" />
+ *
+ * Fetches `status/<slug>.json` from the gh-pages branch on the client side
+ * (static SSG cannot know CI state at build time). Renders:
+ *  - a compact badge with the latest run kind, status, and duration
+ *  - an expandable panel with PR/commit links and a hyperlink to the
+ *    params.json "view execution details" target
+ *
+ * Rendered as a regular Astro component (no client directive) — the inner
+ * <script> hydrates the component client-side.
+ */
+import { statusUrlForSlug } from '../lib/status';
 
 interface Props {
-  modelId: string;
-  compact?: boolean;
+  modelSlug: string;
+  /** Optional model display title for the alt text. */
+  title?: string;
 }
 
-const { modelId, compact = false } = Astro.props;
-
-// Try multiple possible paths since build env varies
-const paths = [
-  'public/verify-status.json',
-  './public/verify-status.json',
-  join(process.cwd(), 'public', 'verify-status.json'),
-];
-
-let status: string | null = null;
-let runUrl: string | null = null;
-
-for (const p of paths) {
-  try {
-    if (existsSync(p)) {
-      const data = JSON.parse(readFileSync(p, 'utf-8'));
-      const model = data.models?.[modelId];
-      if (model) {
-        status = model.status;
-        runUrl = model.run_url || null;
-        break;
-      }
-    }
-  } catch {
-    continue;
-  }
-}
-
-if (!status) return null;
-
-const colors: Record<string, string> = {
-  PASS: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-  FAIL: 'bg-red-500/10 text-red-400 border-red-500/20',
-  SKIP: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
-};
-
-const labels: Record<string, string> = {
-  PASS: '✓ CI Verified',
-  FAIL: '✗ CI Failed',
-  SKIP: '⊘ Skipped',
-};
-
-const classList = [
-  'text-[10px]',
-  'font-mono',
-  'px-1.5',
-  'py-0.5',
-  'rounded',
-  'border',
-  colors[status] || '',
-  compact ? '' : 'ml-1',
-].filter(Boolean).join(' ');
+const { modelSlug, title } = Astro.props;
 ---
 
-{
-  runUrl ? (
-    <a
-      href={runUrl}
-      target="_blank"
-      rel="noopener noreferrer"
-      class="inline-flex"
-    >
-      <span class={classList}>
-        {labels[status] || status}
-      </span>
-    </a>
-  ) : (
-    <span class={classList}>
-      {labels[status] || status}
-    </span>
-  )
-}
+<div
+  class="vbadge"
+  data-status-url={statusUrlForSlug(modelSlug)}
+  data-model-slug={modelSlug}
+  data-model-title={title ?? modelSlug}
+>
+  <div class="vbadge-slot">
+    <span class="vbadge-loading">checking CI status…</span>
+  </div>
+</div>
+
+<style>
+  .vbadge {
+    margin: 0;
+    font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
+  }
+  .vbadge-slot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .vbadge-loading {
+    font-size: 11px;
+    color: rgb(113 113 122);
+  }
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.2rem 0.55rem;
+    font-size: 11px;
+    border-radius: 9999px;
+    border: 1px solid;
+    line-height: 1.4;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .pill.pass {
+    color: rgb(34 197 94);
+    border-color: rgba(34, 197, 94, 0.3);
+    background: rgba(34, 197, 94, 0.08);
+  }
+  .pill.fail {
+    color: rgb(248 113 113);
+    border-color: rgba(248, 113, 113, 0.3);
+    background: rgba(248, 113, 113, 0.08);
+  }
+  .pill.skip {
+    color: rgb(161 161 170);
+    border-color: rgba(161, 161, 170, 0.3);
+    background: rgba(161, 161, 170, 0.08);
+  }
+  .pill .dot {
+    width: 0.4rem;
+    height: 0.4rem;
+    border-radius: 9999px;
+    background: currentColor;
+  }
+  .pill small {
+    font-size: 10px;
+    color: rgb(113 113 122);
+    font-family: inherit;
+  }
+  details.vpanel {
+    margin-top: 0.5rem;
+    width: 100%;
+    border: 1px solid rgba(63, 63, 70, 0.4);
+    border-radius: 0.5rem;
+    padding: 0.6rem 0.8rem;
+    background: rgba(24, 24, 27, 0.4);
+    font-size: 12px;
+  }
+  details.vpanel > summary {
+    cursor: pointer;
+    color: rgb(161 161 170);
+    user-select: none;
+    list-style: none;
+  }
+  details.vpanel > summary::-webkit-details-marker {
+    display: none;
+  }
+  details.vpanel > summary::after {
+    content: ' ▸';
+    font-size: 10px;
+  }
+  details.vpanel[open] > summary::after {
+    content: ' ▾';
+  }
+  .vpanel dl {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 0.3rem 0.75rem;
+    margin: 0.6rem 0 0 0;
+  }
+  .vpanel dt {
+    color: rgb(113 113 122);
+    font-size: 11px;
+  }
+  .vpanel dd {
+    margin: 0;
+  }
+  .vpanel a {
+    color: rgb(94 234 212);
+    text-decoration: none;
+  }
+  .vpanel a:hover {
+    text-decoration: underline;
+  }
+  .vpanel code {
+    font-size: 11px;
+    background: rgba(63, 63, 70, 0.5);
+    padding: 0.05rem 0.3rem;
+    border-radius: 0.25rem;
+  }
+</style>
+
+<script>
+  // Client-side hydration: fetch the per-slug status JSON and paint a badge +
+  // expandable details panel. Pure ESM so it works on a static SSG build.
+  import type { ModelStatus, RunStatus } from '../lib/status';
+
+  function pickFreshest(a: RunStatus | null, b: RunStatus | null): RunStatus | null {
+    if (!a) return b;
+    if (!b) return a;
+    return Date.parse(a.finished_at) >= Date.parse(b.finished_at) ? a : b;
+  }
+
+  function fmtDuration(start: string, end: string): string {
+    if (!start || !end) return '';
+    const s = Date.parse(start);
+    const e = Date.parse(end);
+    if (Number.isNaN(s) || Number.isNaN(e)) return '';
+    const sec = Math.max(0, Math.floor((e - s) / 1000));
+    if (sec < 60) return `${sec}s`;
+    if (sec < 3600) return `${Math.floor(sec / 60)}m ${sec % 60}s`;
+    return `${Math.floor(sec / 3600)}h ${Math.floor((sec % 3600) / 60)}m`;
+  }
+
+  function render(root: HTMLElement, data: ModelStatus | null, err?: string) {
+    const slot = root.querySelector('.vbadge-slot');
+    if (!slot) return;
+    slot.innerHTML = '';
+
+    if (err) {
+      slot.innerHTML = `<span class="vbadge-loading">${err}</span>`;
+      return;
+    }
+    if (!data || (!data.last_pr_run && !data.last_nightly_run)) {
+      slot.innerHTML = `<span class="vbadge-loading">no CI runs recorded yet</span>`;
+      return;
+    }
+
+    const freshest = pickFreshest(data.last_pr_run, data.last_nightly_run);
+    if (!freshest) return;
+    const duration = fmtDuration(freshest.started_at, freshest.finished_at);
+    const pillClass =
+      freshest.status === 'pass' ? 'pass' : freshest.status === 'fail' ? 'fail' : 'skip';
+
+    const pill = document.createElement('a');
+    pill.className = `pill ${pillClass}`;
+    pill.href = freshest.workflow_run_url;
+    pill.target = '_blank';
+    pill.rel = 'noopener';
+    pill.innerHTML = `
+      <span class="dot"></span>
+      ${freshest.kind === 'pr' && freshest.pr_number ? `PR #${freshest.pr_number}` : 'Nightly'}
+      <span>${freshest.status}</span>
+      <small>· ${duration}</small>
+    `;
+    slot.appendChild(pill);
+
+    // Expandable trace panel
+    const details = document.createElement('details');
+    details.className = 'vpanel';
+    const summary = document.createElement('summary');
+    summary.textContent = 'view execution details';
+    details.appendChild(summary);
+
+    const dl = document.createElement('dl');
+    const rows: [string, string | null | undefined][] = [
+      ['Trigger', freshest.kind === 'pr' ? 'Pull Request' : 'Scheduled nightly'],
+      [
+        'Source',
+        freshest.kind === 'pr' && freshest.pr_number
+          ? `<a href="${freshest.pr_url}" target="_blank" rel="noopener">PR #${freshest.pr_number} · ${escapeHtml(freshest.pr_title ?? '')}</a><br><span style="color:#71717a">by @${escapeHtml(freshest.pr_author ?? '')}</span>`
+          : `scheduled nightly run`,
+      ],
+      [
+        'Commit',
+        `<a href="${freshest.head_sha_url}" target="_blank" rel="noopener"><code>${escapeHtml(freshest.head_sha.slice(0, 7))}</code></a>`,
+      ],
+      [
+        'Run logs',
+        `<a href="${freshest.workflow_run_url}" target="_blank" rel="noopener">open Actions run</a> (conclusion: ${escapeHtml(freshest.conclusion)})`,
+      ],
+      [
+        'Recipe (locked)',
+        freshest.recipe_yaml_url
+          ? `<a href="${freshest.recipe_yaml_url}" target="_blank" rel="noopener"><code>${escapeHtml(shortPath(freshest.recipe_path))}</code></a>`
+          : '<span style="color:#71717a">—</span>',
+      ],
+      [
+        'Started · Finished',
+        `${escapeHtml(freshest.started_at)} → ${escapeHtml(freshest.finished_at)}`,
+      ],
+      [
+        'vllm-ascend params',
+        `<a href="${freshest.params_url}" target="_blank" rel="noopener">view params.json</a>
+         <span style="color:#71717a"> · image <code>${escapeHtml(extractImage(freshest.params_url))}</code></span>`,
+      ],
+    ];
+    for (const [dt, html] of rows) {
+      const dtEl = document.createElement('dt');
+      dtEl.textContent = dt;
+      const ddEl = document.createElement('dd');
+      ddEl.innerHTML = html ?? '—';
+      dl.appendChild(dtEl);
+      dl.appendChild(ddEl);
+    }
+    details.appendChild(dl);
+    slot.appendChild(details);
+  }
+
+  function escapeHtml(s: string): string {
+    return s.replace(/[&<>"']/g, (c) =>
+      c === '&'
+        ? '&amp;'
+        : c === '<'
+          ? '&lt;'
+          : c === '>'
+            ? '&gt;'
+            : c === '"'
+              ? '&quot;'
+              : '&#39;',
+    );
+  }
+
+  function shortPath(p: string): string {
+    const parts = p.split('/');
+    if (parts.length <= 3) return p;
+    return parts.slice(-3).join('/');
+  }
+
+  function extractImage(_url: string): string {
+    // Placeholder; the real image name lives in runs/<sha>/params.json.
+    // We render a query-parameter hint pointing users there.
+    return 'see params.json';
+  }
+
+  async function hydrateOne(root: HTMLElement) {
+    const url = root.dataset.statusUrl;
+    if (!url) return;
+    try {
+      const resp = await fetch(url, { cache: 'no-cache' });
+      if (!resp.ok) {
+        render(root, null, `no status yet (HTTP ${resp.status})`);
+        return;
+      }
+      const data = (await resp.json()) as ModelStatus;
+      render(root, data);
+    } catch (err) {
+      render(root, null, 'failed to fetch CI status');
+      console.warn('[VerifyBadge] fetch failed', url, err);
+    }
+  }
+
+  function init() {
+    const nodes = document.querySelectorAll<HTMLElement>('.vbadge');
+    nodes.forEach((n) => hydrateOne(n));
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+</script>

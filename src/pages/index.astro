@@ -126,6 +126,8 @@ const basePrefix = base.endsWith('/') ? base : base + '/';
             updated: model.meta.date_added,
             url: `${basePrefix}${model._provider_slug}/${model._model_slug}`,
             json: '',
+            _model_slug: model._model_slug,
+            _status_url: `/status/${model._model_slug}.json`,
             npus: [...new Set(model.scenarios.map((s) => s.npu))],
             precisions: [],
             deployments: [],

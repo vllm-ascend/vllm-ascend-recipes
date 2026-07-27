@@ -8,6 +8,7 @@ import PrepareTabs from '../../components/PrepareTabs.tsx';
 import ReferenceTabs from '../../components/ReferenceTabs.tsx';
 import VerifyBadge from '../../components/VerifyBadge.astro';
 import { getAllModels, formatContextLength, formatParameters } from '../../lib/models';
+import VerifyBadge from '../../components/VerifyBadge.astro';
 import type { Model } from '../../lib/types';
 
 export const getStaticPaths = (async () => {
@@ -253,6 +254,19 @@ addToc('reference', 'sectionMoreInfo');
             >
               [ edit ]
             </a>
+          </div>
+
+          {
+            /*
+             * CI verification badge: PR/nightly result + duration + commit link,
+             * with expandable "view execution details" panel linking to params.json.
+             * Status data is fetched client-side from the gh-pages branch;
+             * publishing never modifies the recipe YAML in main, so the
+             * main pipeline is not re-triggered.
+             */
+          }
+          <div class="mt-4">
+            <VerifyBadge modelSlug={model._model_slug} title={model.meta.title} />
           </div>
         </div>
 

@@ -1,18 +1,23 @@
 ---
 import type { ModelListItem } from '../lib/types';
 import { formatContextLength, formatParameters } from '../lib/models';
-import VerifyBadge from './VerifyBadge.astro';
+import { statusUrlForSlug } from '../lib/status';
 
 interface Props {
-  model: ModelListItem;
+  model: ModelListItem & {
+    /** Optional slug used by VerifyBadge to fetch status. */
+    _model_slug?: string;
+  };
 }
 
 const { model } = Astro.props;
+const slug = model._model_slug ?? '';
 ---
 
 <a
   href={model.url}
   class="group relative block p-5 rounded-lg border border-ink-800/60 hover:border-accent-500/30 bg-ink-900/40 hover:bg-ink-900/60 transition-all duration-200 overflow-hidden"
+  data-status-url={slug ? statusUrlForSlug(slug) : undefined}
 >
   <div
     class="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-accent-500/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"
@@ -24,12 +29,14 @@ const { model } = Astro.props;
       class="font-display font-semibold text-sm text-ink-100 group-hover:text-accent-300 transition-colors tracking-tight"
     >
       {model.title}
-      <VerifyBadge modelId={model.hf_id} compact />
     </h3>
     <span
-      class="text-[10px] font-mono uppercase tracking-wider text-ink-500 px-1.5 py-0.5 rounded border border-ink-700/50"
+      class="text-[10px] font-mono uppercase tracking-wider text-ink-500 px-1.5 py-0.5 rounded border border-ink-700/50 flex items-center gap-1"
     >
       {model.architecture}
+      <span
+        class="status-dot hidden w-1.5 h-1.5 rounded-full bg-zinc-500 ring-1 ring-zinc-700"
+        aria-hidden="true"></span>
     </span>
   </div>
 
@@ -64,3 +71,43 @@ const { model } = Astro.props;
     }
   </div>
 </a>
+
+<script>
+  // Tiny status dot: hydrates a green/red/grey pip on each card by
+  // fetching the per-slug status JSON. Failure is silent — the card
+  // renders fine without it.
+  import type { ModelStatus } from '../lib/status';
+
+  async function paintDot(card: HTMLElement) {
+    const url = card.dataset.statusUrl;
+    if (!url) return;
+    try {
+      const r = await fetch(url, { cache: 'no-cache' });
+      if (!r.ok) return;
+      const data = (await r.json()) as ModelStatus;
+      const run = data.last_pr_run ?? data.last_nightly_run;
+      const dot = card.querySelector<HTMLElement>('.status-dot');
+      if (!dot || !run) return;
+      dot.classList.remove('hidden', 'bg-zinc-500');
+      dot.title = `Last ${run.kind === 'pr' ? `PR #${run.pr_number ?? ''}` : 'nightly'} — ${run.status} ${run.started_at?.slice(0, 10) ?? ''}`;
+      const color =
+        run.status === 'pass'
+          ? 'bg-emerald-400'
+          : run.status === 'fail'
+            ? 'bg-rose-400'
+            : 'bg-zinc-400';
+      dot.classList.add(color);
+    } catch {
+      /* silent */
+    }
+  }
+
+  function init() {
+    document.querySelectorAll<HTMLElement>('[data-status-url]').forEach((el) => paintDot(el));
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+</script>

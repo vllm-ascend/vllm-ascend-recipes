@@ -39,6 +39,42 @@ jobs:
       - name: Build
         run: pnpm build
 
+      # Pull latest status JSON + run-params from the gh-pages branch into
+      # dist/ so GitHub Pages serves them at the same origin as the static
+      # site. publish-status.yml writes those paths to gh-pages; without this
+      # merge step, the artifact-based deploy would never see them.
+      #
+      # gh-pages may not exist on a brand-new repo (first publish-status run
+      # creates it), so we use continue-on-error and tolerate a missing
+      # checkout — the site just deploys without status data in that case.
+      - name: Merge status data from gh-pages
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          fetch-depth: 1
+          path: gh-pages-data
+          token: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+
+      - name: Copy status + runs into dist
+        run: |
+          set -euo pipefail
+          copied=0
+          if [ -d gh-pages-data/status ]; then
+            mkdir -p dist/status
+            # -n: never overwrite — publish-status always writes the latest,
+            # and a stale snapshot from an older gh-pages commit is preferable
+            # to a torn write from a concurrent publish.
+            cp -rn gh-pages-data/status/* dist/status/ 2>/dev/null || true
+            copied=$((copied + $(find dist/status -maxdepth 1 -name '*.json' | wc -l)))
+          fi
+          if [ -d gh-pages-data/runs ]; then
+            mkdir -p dist/runs
+            cp -rn gh-pages-data/runs/* dist/runs/ 2>/dev/null || true
+            copied=$((copied + $(find dist/runs -type f | wc -l)))
+          fi
+          echo "Status payload merged into dist/ (${copied} files)."
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:

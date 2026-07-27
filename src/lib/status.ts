@@ -1,0 +1,92 @@
+/**
+ * Verification status types & helpers.
+ *
+ * `status/*.json` files live in the `gh-pages` branch (published by
+ * .github/workflows/publish-status.yml). The Astro site is SSG, so we don't
+ * know the status at build time — it is loaded client-side by <VerifyBadge>.
+ *
+ * Schema mirrors what publish-status.yml emits.
+ */
+
+export type RunKind = 'pr' | 'nightly';
+export type RunConclusion = 'success' | 'failure' | 'cancelled' | 'skipped';
+
+export interface RunStatus {
+  kind: RunKind;
+  /** "pass" | "fail" | "skip" | "unknown" — one-word status file content. */
+  status: 'pass' | 'fail' | 'skip' | 'unknown' | string;
+  /** Workflow conclusion — "success" / "failure" / "cancelled" / "skipped". */
+  conclusion: RunConclusion | string;
+  head_sha: string;
+  head_sha_url: string;
+  workflow_run_id: number;
+  workflow_run_url: string;
+  recipe_path: string;
+  recipe_yaml_url: string;
+  /** Hyperlink target: the human-readable params.json in gh-pages. */
+  params_url: string;
+  started_at: string;
+  finished_at: string;
+
+  // PR-specific (null for nightly)
+  pr_number: number | null;
+  pr_url: string | null;
+  pr_title: string | null;
+  pr_author: string | null;
+}
+
+export interface ModelStatus {
+  model: string;
+  last_pr_run: RunStatus | null;
+  last_nightly_run: RunStatus | null;
+}
+
+export interface StatusIndex {
+  updated_at: string;
+  models: { slug: string }[];
+}
+
+// Status files are served at the GitHub Pages origin in production. We
+// hard-code the site origin (matches astro.config.mjs `site:`) so the badge
+// works from any page. In dev mode we use a relative URL prefixed with the
+// configured BASE_URL (matches astro.config.mjs `base:`) so it resolves
+// against `localhost:4321/<BASE_URL>/status/<slug>.json` and picks up the
+// mock fixtures under `public/status/` for an instant visual preview.
+export const STATUS_ORIGIN = 'https://vllm-ascend.github.io/vllm-ascend-recipes';
+
+interface ImportMetaWithEnv {
+  readonly env?: Record<string, unknown>;
+}
+const metaEnv = (import.meta as unknown as ImportMetaWithEnv).env ?? {};
+const env = metaEnv as Record<string, string | boolean | undefined>;
+const baseUrl = (env.BASE_URL as string | undefined) ?? '/';
+
+// Always include the site's BASE_URL prefix. Astro copies `public/status/`
+// verbatim into the build output, so this resolves correctly in:
+//   - dev:        localhost:4321/<base>/status/<slug>.json  (mock in public/)
+//   - PR preview: <hash>.netlify.app/<base>/status/<slug>.json  (mock copied to dist/)
+//   - production: <site>/<base>/status/<slug>.json  (real status published to gh-pages branch)
+// baseUrl ends with a slash already (e.g. "/vllm-ascend-recipes/"); strip it
+// so the URL starts with "/<base>" without a double slash.
+function basePath(): string {
+  return baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+}
+
+export function statusUrlForSlug(slug: string): string {
+  return `${basePath()}/status/${slug}.json`;
+}
+
+export function statusIndexUrl(): string {
+  return `${basePath()}/status/index.json`;
+}
+
+export function durationHuman(start: string, end: string): string {
+  if (!start || !end) return '';
+  const s = Date.parse(start);
+  const e = Date.parse(end);
+  if (Number.isNaN(s) || Number.isNaN(e)) return '';
+  const sec = Math.max(0, Math.floor((e - s) / 1000));
+  if (sec < 60) return `${sec}s`;
+  if (sec < 3600) return `${Math.floor(sec / 60)}m ${sec % 60}s`;
+  return `${Math.floor(sec / 3600)}h ${Math.floor((sec % 3600) / 60)}m`;
+}

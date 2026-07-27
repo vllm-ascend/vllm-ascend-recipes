@@ -125,6 +125,10 @@ export interface ModelListItem {
   npus: string[];
   precisions: string[];
   deployments: string[];
+  /** Optional internal slug used by VerifyBadge / status hydration. */
+  _model_slug?: string;
+  /** Optional absolute URL to `status/<slug>.json` (filled at JSON endpoint build time). */
+  _status_url?: string;
 }
 
 export interface ProviderInfo {

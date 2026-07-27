@@ -185,4 +185,6 @@ jobs:
       runner: linux-aarch64-a2b4-8
       recipe_files: ${{ needs.detect.outputs.recipe_files }}
       trigger_type: pr
+      head_sha: ${{ github.event.pull_request.head.sha }}
+      started_at_iso: ${{ github.event.pull_request.updated_at }}
 

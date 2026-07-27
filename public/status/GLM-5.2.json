@@ -1,0 +1,22 @@
+{
+  "model": "GLM-5.2",
+  "last_pr_run": {
+    "kind": "pr",
+    "status": "fail",
+    "conclusion": "failure",
+    "head_sha": "f0e1d2c3b4a59687786958473625140316273849",
+    "head_sha_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/commit/f0e1d2c3b4a59687786958473625140316273849",
+    "workflow_run_id": 987654999,
+    "workflow_run_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/actions/runs/987654999",
+    "recipe_path": "models/en/THUDM/GLM-5.2.yaml",
+    "recipe_yaml_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/blob/f0e1d2c3b4a59687786958473625140316273849/models/en/THUDM/GLM-5.2.yaml",
+    "params_url": "/vllm-ascend-recipes/runs/f0e1d2c3b4a59687786958473625140316273849/GLM-5.2.params.json",
+    "started_at": "2026-07-26T14:05:11Z",
+    "finished_at": "2026-07-26T14:08:42Z",
+    "pr_number": 491,
+    "pr_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/pull/491",
+    "pr_title": "fix: MTP speculative decoding on 8x A2",
+    "pr_author": "bob"
+  },
+  "last_nightly_run": null
+}

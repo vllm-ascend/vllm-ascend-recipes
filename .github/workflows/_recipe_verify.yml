@@ -30,6 +30,16 @@ on:
         type: boolean
         default: false
         description: 'Continue running even if a recipe fails'
+      head_sha:
+        required: false
+        type: string
+        default: ''
+        description: 'Commit SHA being verified (used to key run params and link back to PR/commit)'
+      started_at_iso:
+        required: false
+        type: string
+        default: ''
+        description: 'ISO8601 timestamp the run started, propagated into params.json'
     secrets:
       obs_ak:
         required: false
@@ -93,6 +103,12 @@ jobs:
         working-directory: ./recipes
         env:
           RECIPE_HW_KEY: atlas_800_a2
+          # === params.json capture (consumed by publish-status.yml) ===
+          RUN_PARAMS_DIR: /tmp/verify-results
+          HEAD_SHA: ${{ inputs.head_sha }}
+          TRIGGER_TYPE: ${{ inputs.trigger_type }}
+          VLLM_ASCEND_IMAGE: ${{ inputs.image }}
+          STARTED_AT_ISO: ${{ inputs.started_at_iso }}
         run: |
           . /usr/local/Ascend/ascend-toolkit/set_env.sh
           mkdir -p /tmp/verify-logs /tmp/verify-results
@@ -105,19 +121,24 @@ jobs:
             echo "============================================================"
             echo "  Verifying recipe: $recipe"
             echo "============================================================"
-            bash scripts/verify-recipe.sh "$recipe" \
+            RECIPE_YAML_PATH="$recipe" bash scripts/verify-recipe.sh "$recipe" \
               2>&1 | tee "/tmp/verify-logs/$(basename "$recipe" .yaml).log"
             rc=${PIPESTATUS[0]}
             if [ "$rc" -eq 0 ]; then
               PASSED=$((PASSED + 1))
               echo "PASS" > "/tmp/verify-results/$(basename "$recipe" .yaml).result"
+              echo "pass" > "/tmp/verify-results/$(basename "$recipe" .yaml).status"
             elif [ "$rc" -eq 2 ]; then
               SKIPPED=$((SKIPPED + 1))
               echo "SKIP" > "/tmp/verify-results/$(basename "$recipe" .yaml).result"
+              echo "skip" > "/tmp/verify-results/$(basename "$recipe" .yaml).status"
             else
               FAILED=$((FAILED + 1))
               echo "FAIL" > "/tmp/verify-results/$(basename "$recipe" .yaml).result"
+              echo "fail" > "/tmp/verify-results/$(basename "$recipe" .yaml).status"
             fi
+            # Stamp recipe path so publish-status knows which model this is
+            echo "$recipe" > "/tmp/verify-results/$(basename "$recipe" .yaml).recipe"
           done < /tmp/recipe_list.txt
 
           echo ""
@@ -136,6 +157,18 @@ jobs:
           name: recipe-verify-logs-${{ github.run_id }}
           path: /tmp/verify-logs/
           retention-days: 7
+          if-no-files-found: warn
+
+      # === Always upload verify-results/ as a GitHub artifact, even on PR. ===
+      # publish-status.yml (workflow_run triggered) consumes this to build
+      # status/*.json + runs/<sha>/params.json on the gh-pages branch.
+      - name: Upload run-params for publish-status
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: recipe-verify-results-${{ github.run_id }}
+          path: /tmp/verify-results/
+          retention-days: 14
           if-no-files-found: warn
 
       - name: Upload verification results to OBS (Nightly only)

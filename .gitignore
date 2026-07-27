@@ -25,3 +25,9 @@ pnpm-debug.log*
 
 .vscode/
 .codegraph/
+
+# NOTE: public/status/ and public/runs/ are intentionally NOT ignored.
+# They hold mock CI status fixtures used by local dev and PR preview
+# (Netlify) so the badge UI renders before the first real
+# publish-status.yml run on the gh-pages branch. In production these
+# files are produced and overwritten by publish-status.yml.

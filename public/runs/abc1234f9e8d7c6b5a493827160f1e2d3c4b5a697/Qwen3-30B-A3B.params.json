@@ -1,0 +1,27 @@
+{
+  "recipe_path": "models/en/Qwen/Qwen3-30B-A3B.yaml",
+  "model_id": "Qwen/Qwen3-30B-A3B",
+  "hw_key": "atlas_800_a2",
+  "head_sha": "abc1234f9e8d7c6b5a493827160f1e2d3c4b5a697",
+  "trigger_type": "pr",
+  "image": "quay.io/ascend/vllm-ascend:0.22.1rc-a2",
+  "started_at": "2026-07-25T03:11:42Z",
+  "scenarios": [
+    {
+      "index": 0,
+      "npu": "Atlas 800 A2",
+      "precision": "W8A8",
+      "deployment": "single-node",
+      "case": "vllm serve smoke test",
+      "serve_cmd": "vllm serve Qwen/Qwen3-30B-A3B \\\n  --tensor-parallel-size 8 \\\n  --enable-expert-parallel \\\n  --quantization compressed-tensors \\\n  --max-model-len 32768 \\\n  --host 0.0.0.0 \\\n  --port 8000"
+    },
+    {
+      "index": 1,
+      "npu": "Atlas 800 A2",
+      "precision": "BF16",
+      "deployment": "single-node",
+      "case": "vllm serve baseline",
+      "serve_cmd": "vllm serve Qwen/Qwen3-30B-A3B \\\n  --tensor-parallel-size 8 \\\n  --max-model-len 32768 \\\n  --host 0.0.0.0 \\\n  --port 8000"
+    }
+  ]
+}
