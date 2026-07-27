@@ -284,7 +284,15 @@ jobs:
 
           git commit -m "ci: ${TRIGGER} status update from ${HEAD_SHA}" \
             -m "Triggered by: ${RUN_URL}" \
-            -m "Repo: ${REPO} [skip ci]"
+            -m "Repo: ${REPO}"
+
+          # NOTE: no [skip ci] here — we WANT deploy.yml to fire on this push
+          # so the new status JSON ships to GitHub Pages immediately. Other
+          # workflows are unaffected:
+          #   - nightly-recipe-verify: paths-filter excludes public/**
+          #   - pr-recipe-verify:      pull_request trigger, not push
+          #   - lint:                  dorny/paths-filter makes all sub-jobs
+          #                             skip on public/**-only commits
 
           git push origin HEAD:main
           echo "Published status data to main."
