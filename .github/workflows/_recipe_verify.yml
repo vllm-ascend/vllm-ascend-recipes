@@ -161,7 +161,7 @@ jobs:
 
       # === Always upload verify-results/ as a GitHub artifact, even on PR. ===
       # publish-status.yml (workflow_run triggered) consumes this to build
-      # status/*.json + runs/<sha>/params.json on the gh-pages branch.
+      # public/status/*.json + public/runs/<sha>/params.json on main.
       - name: Upload run-params for publish-status
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
