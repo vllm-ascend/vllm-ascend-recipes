@@ -1,0 +1,681 @@
+meta:
+  title: "Qwen3.5-27B/Qwen3.6-27B"
+  slug: "qwen3.5-27b-qwen3.6-27b"
+  provider: "Qwen"
+  description: "Qwen3.5-27B 与 Qwen3.6-27B 是 Qwen3.5/Qwen3.6 系列的稠密混合 Mamba-Transformer 语言模型，在架构效率、强化学习规模和全球可访问性方面均有突破。两者共享相同的混合注意力设计（GDN + 全注意力）和 MTP 头设计，在昇腾 NPU 上的部署方式一致，适用于对话、内容创作、代码生成等通用文本生成任务。"
+  date_added: 2026-07-27
+  tasks:
+    - text
+  performance_headline: "Atlas 800 A2/A3 单节点部署，采用 TP=2 + DP=8 的 DP-first 并行策略"
+  hardware:
+    atlas_800_a3: verified
+    atlas_800_a2: verified
+
+model:
+  model_id: "Qwen/Qwen3.6-27B"
+  min_vllm_version: "0.18.0rc1"
+  architecture: dense
+  parameter_count: "27B"
+  active_parameters: null
+  context_length: 262144
+  modality: text
+
+overview: |-
+  Qwen3.5-27B 与 Qwen3.6-27B 是 Qwen3.5/Qwen3.6 系列的稠密混合 Mamba-Transformer 语言模型。两者共享相同的混合注意力设计（GDN + 全注意力）和 MTP 头设计，在昇腾 NPU 上的部署方式完全一致，适用于对话、内容创作、代码生成等通用文本生成任务。
+
+  本文档涵盖：
+    - 支持的特性与特性配置
+    - 环境准备（Docker 镜像 / 源码安装）
+    - Atlas 800 A2 / A3 单节点部署
+    - Atlas 800 A3 多节点 PD 分离部署（基于 Mooncake）
+    - 功能、精度与性能评估
+    - 性能调优建议
+
+  硬件支持：
+    - Atlas 800 A3 (64G × 16)：单节点 + 多节点 PD 分离
+    - Atlas 800 A2 (64G × 8)：仅支持单节点（推理型 A2 包括 300I / 800I 同样**不支持**多节点 PD 分离）
+    - **最低版本要求**（参考 vllm-ascend release notes）：
+      - `Qwen3.5-27B`：`vllm-ascend:v0.17.0rc1` 起支持
+      - `Qwen3.6-27B`：`vllm-ascend:v0.18.0rc1` 起支持
+      - 推理型昇腾产品（A2 300I 推理等）：`vllm-ascend:v0.23.0rc1` 起支持
+      - 在 Atlas 800 A3 上跑 Qwen3.6-27B，请使用对应的 `v0.18.0rc1-a3`（或更新的 `-a3`）镜像
+      - 在推理型昇腾产品上，请使用 `vllm-ascend:v0.23.0rc1-310p`（或更新的 `-310p`）镜像
+
+  本文档基于 `vllm-ascend:v0.23.0rc1` 验证。**强烈建议使用最新的 rc 或正式版本**以获得最佳兼容性和最新特性。
+
+  > **说明**：本文档中部署命令以 `Qwen3.5-27B-w8a8-mtp`（及等价的 `Qwen3.6-27B-w8a8`）为例。BF16 部署请移除 `--quantization ascend`；跑 Qwen3.6-27B 时，将模型路径替换为 `Eco-Tech/Qwen3.6-27B-w8a8`、`--served-model-name` 替换为 `qwen3.6`。
+
+weight_download:
+# ---- Qwen3.5-27B BF16 ----
+- weight_version: Qwen3.5-27B BF16
+  sources:
+  - source: ModelScope
+    url: https://modelscope.cn/models/Qwen/Qwen3.5-27B
+    command: |-
+      ```bash
+      pip install modelscope
+      modelscope download --model Qwen/Qwen3.5-27B
+      ```
+  - source: HuggingFace
+    url: https://huggingface.co/Qwen/Qwen3.5-27B
+    command: |-
+      ```bash
+      pip install -U huggingface_hub
+      huggingface-cli download Qwen/Qwen3.5-27B
+      ```
+  - source: 魔乐社区
+    url: ''
+    command: |-
+      ```bash
+      pip install modelers
+      modelers download --model Qwen/Qwen3.5-27B
+      ```
+  - source: GitCode
+    url: ''
+    command: |-
+      ```bash
+      git clone https://gitcode.com/Qwen/Qwen3.5-27B.git
+      ```
+
+# ---- Qwen3.5-27B W8A8（带 MTP） ----
+- weight_version: Qwen3.5-27B-w8a8-mtp
+  sources:
+  - source: ModelScope
+    url: https://www.modelscope.cn/models/Eco-Tech/Qwen3.5-27B-w8a8-mtp
+    command: |-
+      ```bash
+      pip install modelscope
+      modelscope download --model Eco-Tech/Qwen3.5-27B-w8a8-mtp
+      ```
+  - source: HuggingFace
+    url: ''
+    command: |-
+      ```bash
+      pip install -U huggingface_hub
+      huggingface-cli download Eco-Tech/Qwen3.5-27B-w8a8-mtp
+      ```
+  - source: 魔乐社区
+    url: ''
+    command: |-
+      ```bash
+      pip install modelers
+      modelers download --model Eco-Tech/Qwen3.5-27B-w8a8-mtp
+      ```
+  - source: GitCode
+    url: ''
+    command: |-
+      ```bash
+      git clone https://gitcode.com/Eco-Tech/Qwen3.5-27B-w8a8-mtp.git
+      ```
+
+# ---- Qwen3.6-27B BF16 ----
+- weight_version: Qwen3.6-27B BF16
+  sources:
+  - source: ModelScope
+    url: https://modelscope.cn/models/Qwen/Qwen3.6-27B
+    command: |-
+      ```bash
+      pip install modelscope
+      modelscope download --model Qwen/Qwen3.6-27B
+      ```
+  - source: HuggingFace
+    url: https://huggingface.co/Qwen/Qwen3.6-27B
+    command: |-
+      ```bash
+      pip install -U huggingface_hub
+      huggingface-cli download Qwen/Qwen3.6-27B
+      ```
+  - source: 魔乐社区
+    url: ''
+    command: |-
+      ```bash
+      pip install modelers
+      modelers download --model Qwen/Qwen3.6-27B
+      ```
+  - source: GitCode
+    url: ''
+    command: |-
+      ```bash
+      git clone https://gitcode.com/Qwen/Qwen3.6-27B.git
+      ```
+
+# ---- Qwen3.6-27B W8A8 ----
+- weight_version: Qwen3.6-27B-w8a8
+  sources:
+  - source: ModelScope
+    url: https://www.modelscope.cn/models/Eco-Tech/Qwen3.6-27B-w8a8
+    command: |-
+      ```bash
+      pip install modelscope
+      modelscope download --model Eco-Tech/Qwen3.6-27B-w8a8
+      ```
+  - source: HuggingFace
+    url: ''
+    command: |-
+      ```bash
+      pip install -U huggingface_hub
+      huggingface-cli download Eco-Tech/Qwen3.6-27B-w8a8
+      ```
+  - source: 魔乐社区
+    url: ''
+    command: |-
+      ```bash
+      pip install modelers
+      modelers download --model Eco-Tech/Qwen3.6-27B-w8a8
+      ```
+  - source: GitCode
+    url: ''
+    command: |-
+      ```bash
+      git clone https://gitcode.com/Eco-Tech/Qwen3.6-27B-w8a8.git
+      ```
+
+quantization:
+  content: |-
+    两个模型均提供预量化的 W8A8 版本（带 MTP 投机解码头），发布于 ModelScope 的 `Eco-Tech/` 命名空间下。W8A8 版本启动时**必须**带 `--quantization ascend`，关闭量化请移除该参数。
+
+    BF16 版本（位于 `Qwen/` 命名空间下）无需 `--quantization ascend`。
+
+prerequisites:
+- title: 硬件要求
+  content: |-
+    - **Atlas 800 A3** (64G × 16)：单节点部署至少 1 个节点；多节点 PD 分离至少 2 个节点。
+    - **Atlas 800 A2** (64G × 8)：单节点部署至少 1 个节点；该平台不支持多节点 PD 分离。
+    - **推理型昇腾产品**（A2 300I 推理等）：至少 2 个设备；仅支持 TP 模式（TP=2 或 TP=4）。
+
+- title: 多节点通信（仅在使用 PD 分离时需要）
+  content: |-
+    在部署 Prefill/Decode 节点对之前，请按照 vllm-ascend 安装指南验证多节点通信。
+
+env_setup:
+  pip:
+    content: |-
+      ```bash
+      git clone https://github.com/vllm-project/vllm-ascend.git
+      cd vllm-ascend
+      pip install -e .
+      ```
+
+      验证：
+      ```bash
+      pip show vllm-ascend
+      ```
+
+      > **在推理型昇腾产品上**，可能需要卸载 `triton-ascend` 和 `triton` 以避免依赖冲突：
+      > ```bash
+      > pip uninstall -y triton-ascend triton
+      > ```
+
+  container:
+    "Atlas 800 A3":
+      content: |-
+        ```bash
+        export IMAGE=m.daocloud.io/quay.io/ascend/vllm-ascend:v0.23.0rc1-a3
+        docker run --rm \
+            --name vllm-ascend \
+            --shm-size=1g \
+            --net=host \
+            --device /dev/davinci0 --device /dev/davinci1 --device /dev/davinci2 --device /dev/davinci3 \
+            --device /dev/davinci4 --device /dev/davinci5 --device /dev/davinci6 --device /dev/davinci7 \
+            --device /dev/davinci8 --device /dev/davinci9 --device /dev/davinci10 --device /dev/davinci11 \
+            --device /dev/davinci12 --device /dev/davinci13 --device /dev/davinci14 --device /dev/davinci15 \
+            --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc \
+            -v /usr/local/dcmi:/usr/local/dcmi \
+            -v /usr/local/Ascend/driver/tools/hccn_tool:/usr/local/Ascend/driver/tools/hccn_tool \
+            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+            -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \
+            -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
+            -v /etc/ascend_install.info:/etc/ascend_install.info \
+            -v /root/.cache:/root/.cache \
+            -it $IMAGE bash
+        ```
+    "Atlas 800 A2":
+      content: |-
+        ```bash
+        export IMAGE=m.daocloud.io/quay.io/ascend/vllm-ascend:v0.23.0rc1
+        docker run --rm \
+            --name vllm-ascend \
+            --shm-size=1g \
+            --net=host \
+            --device /dev/davinci0 --device /dev/davinci1 --device /dev/davinci2 --device /dev/davinci3 \
+            --device /dev/davinci4 --device /dev/davinci5 --device /dev/davinci6 --device /dev/davinci7 \
+            --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc \
+            -v /usr/local/dcmi:/usr/local/dcmi \
+            -v /usr/local/Ascend/driver/tools/hccn_tool:/usr/local/Ascend/driver/tools/hccn_tool \
+            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+            -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \
+            -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
+            -v /etc/ascend_install.info:/etc/ascend_install.info \
+            -v /root/.cache:/root/.cache \
+            -it $IMAGE bash
+        ```
+    "推理型昇腾产品":
+      content: |-
+        ```bash
+        export IMAGE=m.daocloud.io/quay.io/ascend/vllm-ascend:v0.23.0rc1-310p
+        docker run --rm \
+            --name vllm-ascend \
+            --shm-size=1g \
+            --device /dev/davinci0 --device /dev/davinci1 --device /dev/davinci2 --device /dev/davinci3 \
+            --device /dev/davinci4 --device /dev/davinci5 --device /dev/davinci6 --device /dev/davinci7 \
+            --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc \
+            -v /usr/local/dcmi:/usr/local/dcmi \
+            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+            -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \
+            -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
+            -v /etc/ascend_install.info:/etc/ascend_install.info \
+            -v /root/.cache:/root/.cache \
+            -p 8080:8080 \
+            -it $IMAGE bash
+        ```
+
+scenarios:
+# ===== Atlas 800 A2 单节点 W8A8 =====
+- npu: Atlas 800I A2
+  precision: W8A8
+  deployment: 单节点
+  case: 多卡
+  steps:
+  - title: 启动服务（Qwen3.5-27B-w8a8）
+    content: |-
+      在 Atlas 800 A2 上单节点部署 `Qwen3.5-27B-w8a8-mtp`（TP=2）。`Qwen3.6-27B-w8a8` 同样适用 —— 替换模型 id 和 `--served-model-name` 即可。
+
+      ```bash
+      #!/bin/sh
+      export VLLM_USE_MODELSCOPE=True
+      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+      export HCCL_BUFFSIZE=512
+      export OMP_PROC_BIND=false
+      export OMP_NUM_THREADS=1
+      export TASK_QUEUE_ENABLE=1
+
+      vllm serve Eco-Tech/Qwen3.5-27B-w8a8-mtp \
+      --host 0.0.0.0 \
+      --port 8000 \
+      --data-parallel-size 1 \
+      --tensor-parallel-size 2 \
+      --seed 1024 \
+      --quantization ascend \
+      --served-model-name qwen3.5 \
+      --max-num-seqs 32 \
+      --max-model-len 133000 \
+      --max-num-batched-tokens 8096 \
+      --trust-remote-code \
+      --gpu-memory-utilization 0.90 \
+      --no-enable-prefix-caching \
+      --speculative-config '{"method": "qwen3_5_mtp", "num_speculative_tokens": 3, "enforce_eager": true}' \
+      --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY"}' \
+      --additional-config '{"enable_cpu_binding":true}' \
+      --async-scheduling
+      ```
+
+      Qwen3.6-27B-w8a8：模型 id 替换为 `Eco-Tech/Qwen3.6-27B-w8a8`，`--served-model-name qwen3.6`，如需更长上下文可提高 `--max-model-len 262144`。
+  - title: 服务验证
+    content: |-
+      参见下方 `verification` 部分 —— 日志打印 `Application startup complete.` 即服务就绪。
+
+# ===== Atlas 800 A3 单节点 W8A8 =====
+- npu: Atlas 800I A3
+  precision: W8A8
+  deployment: 单节点
+  case: 多卡
+  steps:
+  - title: 启动服务（Qwen3.5-27B-w8a8，满配 16 NPU）
+    content: |-
+      与 A2 命令相同的环境变量，但 `--data-parallel-size` 设为 4（用满 Atlas 800 A2 的 8 NPU）或 8（用满 Atlas 800 A3 的 16 NPU）。TP=2 是推荐默认值；TP=8 仅在超长上下文（256K+）场景下需要。
+
+      ```bash
+      #!/bin/sh
+      export VLLM_USE_MODELSCOPE=True
+      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+      export HCCL_BUFFSIZE=512
+      export OMP_PROC_BIND=false
+      export OMP_NUM_THREADS=1
+      export TASK_QUEUE_ENABLE=1
+
+      vllm serve Eco-Tech/Qwen3.5-27B-w8a8-mtp \
+      --host 0.0.0.0 \
+      --port 8000 \
+      --data-parallel-size 8 \
+      --tensor-parallel-size 2 \
+      --seed 1024 \
+      --quantization ascend \
+      --served-model-name qwen3.5 \
+      --max-num-seqs 32 \
+      --max-model-len 133000 \
+      --max-num-batched-tokens 16384 \
+      --trust-remote-code \
+      --gpu-memory-utilization 0.90 \
+      --no-enable-prefix-caching \
+      --speculative-config '{"method": "qwen3_5_mtp", "num_speculative_tokens": 3, "enforce_eager": true}' \
+      --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY"}' \
+      --additional-config '{"enable_cpu_binding":true}' \
+      --async-scheduling
+      ```
+  - title: 服务验证
+    content: |-
+      参见下方 `verification` 部分。
+
+# ===== Atlas 800 A3 单节点 BF16 =====
+- npu: Atlas 800I A3
+  precision: BF16
+  deployment: 单节点
+  case: 多卡
+  steps:
+  - title: 启动服务（Qwen3.5-27B BF16）
+    content: |-
+      去掉 `--quantization ascend`，使用 `weight_download` 中的 BF16 模型 id：
+
+      ```bash
+      vllm serve Qwen/Qwen3.5-27B \
+      --host 0.0.0.0 \
+      --port 8000 \
+      --data-parallel-size 8 \
+      --tensor-parallel-size 2 \
+      --served-model-name qwen3.5 \
+      --max-num-seqs 32 \
+      --max-model-len 133000 \
+      --max-num-batched-tokens 16384 \
+      --trust-remote-code \
+      --gpu-memory-utilization 0.90 \
+      --no-enable-prefix-caching \
+      --speculative-config '{"method": "qwen3_5_mtp", "num_speculative_tokens": 3, "enforce_eager": true}' \
+      --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY"}' \
+      --async-scheduling
+      ```
+  - title: 服务验证
+    content: |-
+      参见下方 `verification` 部分。
+
+# ===== Atlas 800 A3 多节点 PD 分离 =====
+- npu: Atlas 800I A3
+  precision: W8A8
+  deployment: 多节点 PD 分离
+  case: 1P1D（1 个 Prefill 节点 + 1 个 Decode 节点）
+  steps:
+  - title: 拓扑（1P1D，每节点 TP=2 + DP=8）
+    content: |-
+      使用 **2 台 Atlas 800 A3 (64G × 16)** —— 一台 Prefill 节点，一台 Decode 节点。每节点运行 `TP=2 + DP=8`，充分利用全部 16 个 NPU。推理型昇腾产品**不支持**多节点 PD 分离。
+
+      > **为什么是 TP=2 + DP=8（DP-first）？** 模型仅 ~30 GB，单卡 64 GB HBM 即可放下。TP > 1 仅用于放不下的模型。最大化 DP 让 16 个 NPU 各自处理独立的请求 batch —— 这是小稠密模型的标准模式。
+  - title: Prefill 节点 —— `run_dp_template.sh`
+    content: |-
+      ```shell
+      nic_name="xxx"
+      local_ip="141.xx.xx.1"
+
+      export HCCL_IF_IP=$local_ip
+      export GLOO_SOCKET_IFNAME=$nic_name
+      export TP_SOCKET_IFNAME=$nic_name
+      export HCCL_SOCKET_IFNAME=$nic_name
+      export HCCL_OP_EXPANSION_MODE="AIV"
+      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+      export OMP_PROC_BIND=false
+      export OMP_NUM_THREADS=1
+      export TASK_QUEUE_ENABLE=1
+      export LD_LIBRARY_PATH=/usr/local/Ascend/ascend-toolkit/latest/python/site-packages/mooncake:$LD_LIBRARY_PATH
+      export HCCL_BUFFSIZE=1024
+      export VLLM_ASCEND_ENABLE_FLASHCOMM1=1
+      export ASCEND_RT_VISIBLE_DEVICES=$1
+
+      vllm serve Eco-Tech/Qwen3.5-27B-w8a8-mtp \
+        --host 0.0.0.0 \
+        --port $2 \
+        --data-parallel-size $3 \
+        --data-parallel-rank $4 \
+        --data-parallel-address $5 \
+        --data-parallel-rpc-port $6 \
+        --tensor-parallel-size $7 \
+        --seed 1024 \
+        --quantization ascend \
+        --served-model-name qwen3.5 \
+        --trust-remote-code \
+        --max-num-seqs 4 \
+        --max-model-len 32768 \
+        --max-num-batched-tokens 16384 \
+        --no-enable-prefix-caching \
+        --gpu-memory-utilization 0.95 \
+        --enforce-eager \
+        --speculative-config '{"method": "qwen3_5_mtp", "num_speculative_tokens": 3, "enforce_eager": true}' \
+        --additional-config '{"enable_cpu_binding":true}' \
+        --kv-transfer-config \
+        '{"kv_connector": "MooncakeConnectorV1",
+        "kv_role": "kv_producer",
+        "kv_port": "30000",
+        "engine_id": "0",
+        "kv_connector_extra_config": {
+                  "prefill": {"dp_size": 8, "tp_size": 2},
+                  "decode":  {"dp_size": 8, "tp_size": 2}
+              }
+            }'
+      ```
+  - title: Decode 节点 —— `run_dp_template.sh`
+    content: |-
+      环境变量与 Prefill 节点相同，仅 `local_ip="141.xx.xx.2"`（decode 节点 IP）。vllm serve 命令不同：
+
+      ```shell
+      vllm serve Eco-Tech/Qwen3.5-27B-w8a8-mtp \
+        --host 0.0.0.0 \
+        --port $2 \
+        --data-parallel-size $3 \
+        --data-parallel-rank $4 \
+        --data-parallel-address $5 \
+        --data-parallel-rpc-port $6 \
+        --tensor-parallel-size $7 \
+        --seed 1024 \
+        --quantization ascend \
+        --served-model-name qwen3.5 \
+        --trust-remote-code \
+        --max-num-seqs 16 \
+        --max-model-len 32768 \
+        --max-num-batched-tokens 2048 \
+        --no-enable-prefix-caching \
+        --gpu-memory-utilization 0.91 \
+        --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY"}' \
+        --additional-config '{"recompute_scheduler_enable":true,"enable_cpu_binding":true}' \
+        --async-scheduling \
+        --speculative-config '{"method": "qwen3_5_mtp", "num_speculative_tokens": 3, "enforce_eager": true}' \
+        --kv-transfer-config \
+        '{"kv_connector": "MooncakeConnectorV1",
+        "kv_role": "kv_consumer",
+        "kv_port": "30200",
+        "engine_id": "1",
+        "kv_connector_extra_config": {
+                  "prefill": {"dp_size": 8, "tp_size": 2},
+                  "decode":  {"dp_size": 8, "tp_size": 2}
+              }
+            }'
+      ```
+  - title: 在每节点启动 DP engine
+    content: |-
+      ```shell
+      # p0 (Prefill 节点 0)
+      python launch_online_dp.py --dp-size 8 --tp-size 2 --dp-size-local 8 --dp-rank-start 0 \
+        --dp-address 141.xx.xx.1 --dp-rpc-port 12321 --vllm-start-port 7100
+      # d0 (Decode 节点 0)
+      python launch_online_dp.py --dp-size 8 --tp-size 2 --dp-size-local 8 --dp-rank-start 0 \
+        --dp-address 141.xx.xx.2 --dp-rpc-port 12321 --vllm-start-port 7100
+      ```
+  - title: 在 Prefill 主节点上启动 proxy
+    content: |-
+      ```shell
+      python load_balance_proxy_server_example.py \
+        --port 1999 \
+        --host 141.xx.xx.1 \
+        --prefiller-hosts 141.xx.xx.1 141.xx.xx.1 141.xx.xx.1 141.xx.xx.1 \
+                          141.xx.xx.1 141.xx.xx.1 141.xx.xx.1 141.xx.xx.1 \
+        --prefiller-ports  7100 7101 7102 7103 7104 7105 7106 7107 \
+        --decoder-hosts    141.xx.xx.2 141.xx.xx.2 141.xx.xx.2 141.xx.xx.2 \
+                            141.xx.xx.2 141.xx.xx.2 141.xx.xx.2 141.xx.xx.2 \
+        --decoder-ports    7100 7101 7102 7103 7104 7105 7106 7107
+      ```
+  - title: 验证 PD 服务
+    content: |-
+      ```bash
+      curl http://<proxy_node0_ip>:1999/v1/chat/completions \
+          -H "Content-Type: application/json" \
+          -d '{
+              "model": "qwen3.5",
+              "messages": [{"role": "user", "content": "The future of AI is"}],
+              "max_tokens": 1024,
+              "temperature": 1.0,
+              "top_p": 0.95
+          }'
+      ```
+
+      预期：HTTP 200 OK，包含 `choices` 字段 —— Prefill 与 Decode 节点协作正常。
+
+verification: |-
+  服务启动后，日志应显示：
+  ```text
+  (APIServer pid=<pid>) INFO:     Started server process [<pid>]
+  (APIServer pid=<pid>) INFO:     Waiting for application startup.
+  (APIServer pid=<pid>) INFO:     Application startup complete.
+  ```
+
+  用 **Completions API** 做冒烟测试：
+  ```bash
+  curl http://localhost:8000/v1/completions \
+      -H "Content-Type: application/json" \
+      -d '{
+          "model": "qwen3.5",
+          "prompt": "The future of AI is",
+          "max_tokens": 50,
+          "temperature": 0
+      }'
+  ```
+
+  或用 **Chat Completions API**：
+  ```bash
+  curl http://localhost:8000/v1/chat/completions \
+      -H "Content-Type: application/json" \
+      -d '{
+          "model": "qwen3.5",
+          "messages": [{"role": "user", "content": "The future of AI is"}],
+          "max_completion_tokens": 1024,
+          "temperature": 0.7,
+          "top_p": 0.95
+      }'
+  ```
+
+  > **跑 Qwen3.6-27B 时**，请求体中的 `"model"` 设为 `qwen3.6`（服务端 `--served-model-name` 也对应设为 `qwen3.6`）。
+
+  预期：HTTP 200 OK，`choices` 字段包含生成的文本。
+
+performance:
+  accuracy: "Qwen3.5-27B-w8a8 在 vllm-ascend:v0.17.0rc1 上跑 gsm8k（AISBench）准确率为 96.74。Qwen3.6-27B-w8a8 采用相同评估方法 —— 结果未在此列出，请通过 AISBench 自行获取。"
+
+evaluation:
+  accuracy:
+    content: |-
+      ### 使用 AISBench（推荐）
+
+      参考 vllm-ascend AISBench 指南。运行后 AISBench 会输出各数据集准确率。`Qwen3.5-27B-w8a8` 在 `gsm8k` 上的示例：
+
+      | dataset | version | metric | mode | vllm-api-general-chat |
+      |---------|---------|--------|------|-----------------------|
+      | gsm8k   | -       | accuracy | gen | 96.74 |
+
+      ### 使用 Language Model Evaluation Harness（lm_eval）
+
+      在已启动的服务上跑 `gsm8k`：
+
+      ```shell
+      export VLLM_USE_MODELSCOPE=True
+      vllm serve Eco-Tech/Qwen3.5-27B-w8a8-mtp \
+          --served-model-name qwen3.5 \
+          --trust-remote-code \
+          --quantization ascend \
+          --tensor-parallel-size 2 \
+          --max-model-len 133000 \
+          --max-num-seqs 32 \
+          --gpu-memory-utilization 0.90 \
+          --no-enable-prefix-caching
+
+      # 在另一个终端跑 lm_eval
+      lm_eval \
+        --model local-completions \
+        --model_args model=qwen3.5,base_url=http://127.0.0.1:8000/v1/completions,tokenized_requests=False,trust_remote_code=True \
+        --tasks gsm8k \
+        --output_path ./
+      ```
+  performance:
+    content: |-
+      ### 使用 AISBench
+
+      参考 vllm-ascend AISBench 性能评估指南。
+
+      ### 使用 vllm bench serve
+
+      vllm bench 有三个子命令：`latency`（单 batch 延迟）、`serve`（在线吞吐）、`throughput`（离线吞吐）。`serve` 示例：
+
+      ```bash
+      export VLLM_USE_MODELSCOPE=True
+      # Qwen3.5-27B-w8a8：
+      vllm bench serve --model Eco-Tech/Qwen3.5-27B-w8a8-mtp \
+        --dataset-name random --random-input 200 --num-prompts 200 \
+        --request-rate 1 --save-result --result-dir ./
+      # Qwen3.6-27B-w8a8：
+      vllm bench serve --model Eco-Tech/Qwen3.6-27B-w8a8 \
+        --dataset-name random --random-input 200 --num-prompts 200 \
+        --request-rate 1 --save-result --result-dir ./
+      ```
+
+tuning: |-
+  ### 推荐配置（已验证；请根据实际负载调优）
+
+  **并行策略**：`Qwen3.5-27B-w8a8` 和 `Qwen3.6-27B-w8a8` 约 30 GB，单卡 64 GB HBM 即可放下。按 **DP-first** 原则，**TP=2 是大多数场景的推荐默认值**；剩余 NPU 走 DP 处理并行请求 batch。**TP=8 仅推荐用于超长上下文（256K+）场景**，将 KV cache 分片到 8 个 NPU 以扩大上下文窗口。
+
+  **推理型昇腾产品**：仅支持 TP —— 选择 **TP=2** 或 **TP=4**。**TP=4** 时 `--max-model-len` 可支持 **128K** 与 **256K** 长序列场景。
+
+  | 场景 | 部署 | *NPU 数 | 权重 | 说明 |
+  |----------|------------|-------|--------|-------|
+  | 高吞吐（128K 上下文） | 单节点（A2） | 8 | Qwen3.x-27B-w8a8 | TP=2 + DP=4 —— 8 NPU 全部用于并行请求 batch |
+  | 高吞吐（128K 上下文） | 单节点（A3） | 16 | Qwen3.x-27B-w8a8 | TP=2 + DP=8 —— 16 NPU 全部用于并行请求 batch |
+  | 低延迟（128K 上下文） | 单节点（A3） | 16 | Qwen3.x-27B-w8a8 | TP=2 + DP=8 —— 减少小交互 batch 的逐层 Allreduce 开销 |
+  | 长上下文（256K+） | 单节点（A3） | 16 | Qwen3.x-27B-w8a8 | TP=8 + DP=2 —— KV cache 分片到 8 NPU，最大化上下文窗口 |
+
+  *总 NPU 数 = 1 台 Atlas 800 A3 = 16 NPU，1 台 Atlas 800 A2 = 8 NPU。
+
+  | 场景 | 配置 | TP | DP | Max Num Seqs | Max Num Batched Tokens | Max Model Len | MTP Num | Async Scheduling |
+  |----------|--------|----|----|--------------|------------------------|---------------|---------|-------------------|
+  | 高吞吐（128K） | 单节点 A2 | 2 | 4 | 32 | 16384 | 133000 | 3 | 开 |
+  | 高吞吐（128K） | 单节点 A3 | 2 | 8 | 32 | 16384 | 133000 | 3 | 开 |
+  | 低延迟（128K） | 单节点 A3 | 2 | 8 | 4 | 4096 | 133000 | 3 | 开 |
+  | 长上下文（256K+） | 单节点 A3 | 8 | 2 | 8 | 8192 | 266000 | 3 | 开 |
+
+  ### 调优指南
+
+  详细特性说明参考 vllm-ascend 性能调优文档与 feature matrix。关键调优旋钮：
+    - `--gpu-memory-utilization`：调高分配更多 KV cache；**过高有 OOM 风险**（warm-up 峰值 HBM 可能超过均值）
+    - `--max-num-batched-tokens`：越大延迟越低，但 HBM 激活内存压力更大
+    - `--no-enable-prefix-caching`：混合 Qwen3.5/3.6 KV cache 必须开启（block_size 会涨到 2048，短前缀不会被缓存）
+    - `--speculative-config`：Qwen3.5 与 Qwen3.6 共用 `qwen3_5_mtp` 头；推理型昇腾产品设 `num_speculative_tokens: 1`
+    - `--compilation-config cudagraph_mode=FULL_DECODE_ONLY`：推荐；PIECEWISE 是另一选项
+    - 在 **PD 分离**上，开启 `VLLM_ASCEND_ENABLE_FLASHCOMM1=1`，decode 节点上开启 `recompute_scheduler_enable:true`
+
+faq: |-
+  常见环境、安装、参数问题收录在 vLLM-Ascend 公开 FAQ 中：
+  https://docs.vllm.ai/projects/ascend/en/latest/faqs.html
+
+references:
+- title: Qwen3.5-27B ModelScope
+  url: https://modelscope.cn/models/Qwen/Qwen3.5-27B
+- title: Qwen3.5-27B-w8a8-mtp（Eco-Tech）
+  url: https://www.modelscope.cn/models/Eco-Tech/Qwen3.5-27B-w8a8-mtp
+- title: Qwen3.6-27B ModelScope
+  url: https://modelscope.cn/models/Qwen/Qwen3.6-27B
+- title: Qwen3.6-27B-w8a8（Eco-Tech）
+  url: https://www.modelscope.cn/models/Eco-Tech/Qwen3.6-27B-w8a8
+- title: vllm-ascend 文档（release v0.23.0）
+  url: https://github.com/vllm-project/vllm-ascend/tree/releases/v0.23.0/docs/source/tutorials/models/Qwen3.5-27B-Qwen3.6-27B.md
+- title: Mooncake 多节点 PD 分离部署指南
+  url: https://github.com/vllm-project/vllm-ascend/blob/main/docs/source/features/pd_disaggregation_mooncake_multi_node.md
+- title: launch_online_dp.py（vllm-ascend 示例）
+  url: https://github.com/vllm-project/vllm-ascend/blob/main/examples/external_online_dp/launch_online_dp.py
+- title: run_dp_template.sh（vllm-ascend 示例）
+  url: https://github.com/vllm-project/vllm-ascend/blob/main/examples/external_online_dp/run_dp_template.sh
+- title: load_balance_proxy_server_example.py（vllm-ascend 示例）
+  url: https://github.com/vllm-project/vllm-ascend/blob/main/examples/disaggregated_prefill_v1/load_balance_proxy_server_example.py
+- title: vLLM-Ascend 公开 FAQ
+  url: https://docs.vllm.ai/projects/ascend/en/latest/faqs.html

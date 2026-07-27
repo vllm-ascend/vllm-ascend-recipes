@@ -26,7 +26,9 @@ on:
           Comma-separated recipe paths to run. Overrides both auto-detection
           and full_run. Leave blank to use the default allowlist (Qwen3-30B-A3B).
           Example: models/en/Qwen/Qwen3-30B-A3B.yaml,models/en/Qwen/Qwen3-235B-A22B.yaml
-        default: 'models/en/Qwen/Qwen3-30B-A3B.yaml'
+        default: >-
+          models/en/Qwen/Qwen3-30B-A3B.yaml,
+          models/en/Qwen/Qwen3.5-27B-Qwen3.6-27B.yaml
 
 permissions:
   contents: read

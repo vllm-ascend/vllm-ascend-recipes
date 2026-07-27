@@ -1,0 +1,681 @@
+meta:
+  title: "Qwen3.5-27B/Qwen3.6-27B"
+  slug: "qwen3.5-27b-qwen3.6-27b"
+  provider: "Qwen"
+  description: "Qwen3.5-27B and Qwen3.6-27B are dense hybrid Mamba-Transformer language models in the Qwen3.5/Qwen3.6 family, integrating breakthroughs in architectural efficiency, reinforcement learning scale, and global accessibility. They share the same hybrid attention design (GDN + full attention) and the same deployment pattern on Ascend NPUs, suitable for general-purpose text generation tasks such as dialogue, content creation, and code generation."
+  date_added: 2026-07-27
+  tasks:
+    - text
+  performance_headline: "Single-node deployment on Atlas 800 A2/A3 with TP=2 + DP=8 DP-first parallelism"
+  hardware:
+    atlas_800_a3: verified
+    atlas_800_a2: verified
+
+model:
+  model_id: "Qwen/Qwen3.6-27B"
+  min_vllm_version: "0.18.0rc1"
+  architecture: dense
+  parameter_count: "27B"
+  active_parameters: null
+  context_length: 262144
+  modality: text
+
+overview: |-
+  Qwen3.5-27B and Qwen3.6-27B are dense hybrid Mamba-Transformer language models in the Qwen3.5/Qwen3.6 family. Both share the same hybrid attention design (GDN + full attention) and the same MTP head design, so deployment on Ascend NPUs follows the same pattern for both models. They are suitable for general-purpose text generation tasks such as dialogue, content creation, and code generation running on Ascend NPUs.
+
+  This document covers:
+    - Supported features and feature configuration
+    - Environment preparation (Docker / source install)
+    - Single-node deployment on Atlas 800 A2 / A3
+    - Multi-node PD separation deployment on Atlas 800 A3 (via Mooncake)
+    - Functional, accuracy, and performance evaluation
+    - Performance tuning recommendations
+
+  Hardware support:
+    - Atlas 800 A3 (64G × 16): single-node + multi-node PD separation
+    - Atlas 800 A2 (64G × 8): single-node only (multi-node PD separation is **not** supported on Atlas inference products — including 300I / 800I A2 inference variants that share the same path)
+    - **Minimum versions** (per vllm-ascend release notes):
+      - `Qwen3.5-27B`: first supported in `vllm-ascend:v0.17.0rc1`
+      - `Qwen3.6-27B`: first supported in `vllm-ascend:v0.18.0rc1`
+      - Atlas inference products (A2 300I inference / etc.): supported starting `vllm-ascend:v0.23.0rc1`
+      - For Qwen3.6-27B on Atlas 800 A3, use the matching `v0.18.0rc1-a3` (or later `-a3`) image
+      - For Atlas inference products, use `vllm-ascend:v0.23.0rc1-310p` (or later `-310p`) image
+
+  This document is validated against `vllm-ascend:v0.23.0rc1`. It is **strongly recommended to use the latest release candidate (rc) or official version** of `vllm-ascend` for best compatibility and access to the latest features.
+
+  > **Note**: Throughout this document, deployment commands are shown for `Qwen3.5-27B-w8a8-mtp` (and the equivalent Qwen3.6-27B-w8a8). For BF16 deployments, remove the `--quantization ascend` flag. For Qwen3.6-27B, replace `Eco-Tech/Qwen3.5-27B-w8a8-mtp` with `Eco-Tech/Qwen3.6-27B-w8a8` and `--served-model-name qwen3.5` with `qwen3.6`.
+
+weight_download:
+# ---- Qwen3.5-27B BF16 ----
+- weight_version: Qwen3.5-27B BF16
+  sources:
+  - source: ModelScope
+    url: https://modelscope.cn/models/Qwen/Qwen3.5-27B
+    command: |-
+      ```bash
+      pip install modelscope
+      modelscope download --model Qwen/Qwen3.5-27B
+      ```
+  - source: HuggingFace
+    url: https://huggingface.co/Qwen/Qwen3.5-27B
+    command: |-
+      ```bash
+      pip install -U huggingface_hub
+      huggingface-cli download Qwen/Qwen3.5-27B
+      ```
+  - source: 魔乐社区
+    url: ''
+    command: |-
+      ```bash
+      pip install modelers
+      modelers download --model Qwen/Qwen3.5-27B
+      ```
+  - source: GitCode
+    url: ''
+    command: |-
+      ```bash
+      git clone https://gitcode.com/Qwen/Qwen3.5-27B.git
+      ```
+
+# ---- Qwen3.5-27B W8A8 (with MTP) ----
+- weight_version: Qwen3.5-27B-w8a8-mtp
+  sources:
+  - source: ModelScope
+    url: https://www.modelscope.cn/models/Eco-Tech/Qwen3.5-27B-w8a8-mtp
+    command: |-
+      ```bash
+      pip install modelscope
+      modelscope download --model Eco-Tech/Qwen3.5-27B-w8a8-mtp
+      ```
+  - source: HuggingFace
+    url: ''
+    command: |-
+      ```bash
+      pip install -U huggingface_hub
+      huggingface-cli download Eco-Tech/Qwen3.5-27B-w8a8-mtp
+      ```
+  - source: 魔乐社区
+    url: ''
+    command: |-
+      ```bash
+      pip install modelers
+      modelers download --model Eco-Tech/Qwen3.5-27B-w8a8-mtp
+      ```
+  - source: GitCode
+    url: ''
+    command: |-
+      ```bash
+      git clone https://gitcode.com/Eco-Tech/Qwen3.5-27B-w8a8-mtp.git
+      ```
+
+# ---- Qwen3.6-27B BF16 ----
+- weight_version: Qwen3.6-27B BF16
+  sources:
+  - source: ModelScope
+    url: https://modelscope.cn/models/Qwen/Qwen3.6-27B
+    command: |-
+      ```bash
+      pip install modelscope
+      modelscope download --model Qwen/Qwen3.6-27B
+      ```
+  - source: HuggingFace
+    url: https://huggingface.co/Qwen/Qwen3.6-27B
+    command: |-
+      ```bash
+      pip install -U huggingface_hub
+      huggingface-cli download Qwen/Qwen3.6-27B
+      ```
+  - source: 魔乐社区
+    url: ''
+    command: |-
+      ```bash
+      pip install modelers
+      modelers download --model Qwen/Qwen3.6-27B
+      ```
+  - source: GitCode
+    url: ''
+    command: |-
+      ```bash
+      git clone https://gitcode.com/Qwen/Qwen3.6-27B.git
+      ```
+
+# ---- Qwen3.6-27B W8A8 ----
+- weight_version: Qwen3.6-27B-w8a8
+  sources:
+  - source: ModelScope
+    url: https://www.modelscope.cn/models/Eco-Tech/Qwen3.6-27B-w8a8
+    command: |-
+      ```bash
+      pip install modelscope
+      modelscope download --model Eco-Tech/Qwen3.6-27B-w8a8
+      ```
+  - source: HuggingFace
+    url: ''
+    command: |-
+      ```bash
+      pip install -U huggingface_hub
+      huggingface-cli download Eco-Tech/Qwen3.6-27B-w8a8
+      ```
+  - source: 魔乐社区
+    url: ''
+    command: |-
+      ```bash
+      pip install modelers
+      modelers download --model Eco-Tech/Qwen3.6-27B-w8a8
+      ```
+  - source: GitCode
+    url: ''
+    command: |-
+      ```bash
+      git clone https://gitcode.com/Eco-Tech/Qwen3.6-27B-w8a8.git
+      ```
+
+quantization:
+  content: |-
+    Both models ship with pre-quantized W8A8 versions (with MTP speculative-decoding heads) published under the `Eco-Tech/` namespace on ModelScope. Quantized versions must be started with `--quantization ascend`. To disable quantization, remove the flag.
+
+    BF16 versions (under `Qwen/`) do not require the `--quantization ascend` flag.
+
+prerequisites:
+- title: Hardware
+  content: |-
+    - **Atlas 800 A3** (64G × 16): 1 node minimum for single-node; 2 nodes for multi-node PD separation.
+    - **Atlas 800 A2** (64G × 8): 1 node minimum; multi-node PD separation not supported on this platform.
+    - **Atlas inference products** (A2 300I inference etc.): at least 2 devices; only TP mode supported (TP=2 or TP=4).
+
+- title: Multi-node communication (only if using PD separation)
+  content: |-
+    Verify multi-node communication per the vllm-ascend installation guide before deploying the Prefill/Decode node pair.
+
+env_setup:
+  pip:
+    content: |-
+      ```bash
+      git clone https://github.com/vllm-project/vllm-ascend.git
+      cd vllm-ascend
+      pip install -e .
+      ```
+
+      Verify:
+      ```bash
+      pip show vllm-ascend
+      ```
+
+      > **On Atlas inference products**, you may need to uninstall `triton-ascend` and `triton` to avoid dependency conflicts:
+      > ```bash
+      > pip uninstall -y triton-ascend triton
+      > ```
+
+  container:
+    "Atlas 800 A3":
+      content: |-
+        ```bash
+        export IMAGE=m.daocloud.io/quay.io/ascend/vllm-ascend:v0.23.0rc1-a3
+        docker run --rm \
+            --name vllm-ascend \
+            --shm-size=1g \
+            --net=host \
+            --device /dev/davinci0 --device /dev/davinci1 --device /dev/davinci2 --device /dev/davinci3 \
+            --device /dev/davinci4 --device /dev/davinci5 --device /dev/davinci6 --device /dev/davinci7 \
+            --device /dev/davinci8 --device /dev/davinci9 --device /dev/davinci10 --device /dev/davinci11 \
+            --device /dev/davinci12 --device /dev/davinci13 --device /dev/davinci14 --device /dev/davinci15 \
+            --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc \
+            -v /usr/local/dcmi:/usr/local/dcmi \
+            -v /usr/local/Ascend/driver/tools/hccn_tool:/usr/local/Ascend/driver/tools/hccn_tool \
+            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+            -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \
+            -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
+            -v /etc/ascend_install.info:/etc/ascend_install.info \
+            -v /root/.cache:/root/.cache \
+            -it $IMAGE bash
+        ```
+    "Atlas 800 A2":
+      content: |-
+        ```bash
+        export IMAGE=m.daocloud.io/quay.io/ascend/vllm-ascend:v0.23.0rc1
+        docker run --rm \
+            --name vllm-ascend \
+            --shm-size=1g \
+            --net=host \
+            --device /dev/davinci0 --device /dev/davinci1 --device /dev/davinci2 --device /dev/davinci3 \
+            --device /dev/davinci4 --device /dev/davinci5 --device /dev/davinci6 --device /dev/davinci7 \
+            --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc \
+            -v /usr/local/dcmi:/usr/local/dcmi \
+            -v /usr/local/Ascend/driver/tools/hccn_tool:/usr/local/Ascend/driver/tools/hccn_tool \
+            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+            -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \
+            -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
+            -v /etc/ascend_install.info:/etc/ascend_install.info \
+            -v /root/.cache:/root/.cache \
+            -it $IMAGE bash
+        ```
+    "Atlas inference products":
+      content: |-
+        ```bash
+        export IMAGE=m.daocloud.io/quay.io/ascend/vllm-ascend:v0.23.0rc1-310p
+        docker run --rm \
+            --name vllm-ascend \
+            --shm-size=1g \
+            --device /dev/davinci0 --device /dev/davinci1 --device /dev/davinci2 --device /dev/davinci3 \
+            --device /dev/davinci4 --device /dev/davinci5 --device /dev/davinci6 --device /dev/davinci7 \
+            --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc \
+            -v /usr/local/dcmi:/usr/local/dcmi \
+            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+            -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \
+            -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
+            -v /etc/ascend_install.info:/etc/ascend_install.info \
+            -v /root/.cache:/root/.cache \
+            -p 8080:8080 \
+            -it $IMAGE bash
+        ```
+
+scenarios:
+# ===== Atlas 800 A2 single-node W8A8 =====
+- npu: Atlas 800I A2
+  precision: W8A8
+  deployment: Single-Node
+  case: Multi Card
+  steps:
+  - title: Start the server (Qwen3.5-27B-w8a8)
+    content: |-
+      Single-node deployment of `Qwen3.5-27B-w8a8-mtp` on Atlas 800 A2 (TP=2). Same pattern applies to `Qwen3.6-27B-w8a8` — replace the model id and `--served-model-name`.
+
+      ```bash
+      #!/bin/sh
+      export VLLM_USE_MODELSCOPE=True
+      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+      export HCCL_BUFFSIZE=512
+      export OMP_PROC_BIND=false
+      export OMP_NUM_THREADS=1
+      export TASK_QUEUE_ENABLE=1
+
+      vllm serve Eco-Tech/Qwen3.5-27B-w8a8-mtp \
+      --host 0.0.0.0 \
+      --port 8000 \
+      --data-parallel-size 1 \
+      --tensor-parallel-size 2 \
+      --seed 1024 \
+      --quantization ascend \
+      --served-model-name qwen3.5 \
+      --max-num-seqs 32 \
+      --max-model-len 133000 \
+      --max-num-batched-tokens 8096 \
+      --trust-remote-code \
+      --gpu-memory-utilization 0.90 \
+      --no-enable-prefix-caching \
+      --speculative-config '{"method": "qwen3_5_mtp", "num_speculative_tokens": 3, "enforce_eager": true}' \
+      --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY"}' \
+      --additional-config '{"enable_cpu_binding":true}' \
+      --async-scheduling
+      ```
+
+      For Qwen3.6-27B-w8a8: replace the model id with `Eco-Tech/Qwen3.6-27B-w8a8`, `--served-model-name qwen3.6`, and raise `--max-model-len 262144` if needed.
+  - title: Service verification
+    content: |-
+      See the `verification` section below — the service is up when the log prints `Application startup complete.`
+
+# ===== Atlas 800 A3 single-node W8A8 =====
+- npu: Atlas 800I A3
+  precision: W8A8
+  deployment: Single-Node
+  case: Multi Card
+  steps:
+  - title: Start the server (Qwen3.5-27B-w8a8, full 16 NPUs)
+    content: |-
+      Same shell setup as the A2 case, but use `--data-parallel-size 4` to fill all 8 NPUs of an Atlas A2 or `--data-parallel-size 8` for the 16 NPUs of an Atlas A3. TP=2 is the recommended default; TP=8 is only needed for ultra-long context (256K+) scenarios.
+
+      ```bash
+      #!/bin/sh
+      export VLLM_USE_MODELSCOPE=True
+      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+      export HCCL_BUFFSIZE=512
+      export OMP_PROC_BIND=false
+      export OMP_NUM_THREADS=1
+      export TASK_QUEUE_ENABLE=1
+
+      vllm serve Eco-Tech/Qwen3.5-27B-w8a8-mtp \
+      --host 0.0.0.0 \
+      --port 8000 \
+      --data-parallel-size 8 \
+      --tensor-parallel-size 2 \
+      --seed 1024 \
+      --quantization ascend \
+      --served-model-name qwen3.5 \
+      --max-num-seqs 32 \
+      --max-model-len 133000 \
+      --max-num-batched-tokens 16384 \
+      --trust-remote-code \
+      --gpu-memory-utilization 0.90 \
+      --no-enable-prefix-caching \
+      --speculative-config '{"method": "qwen3_5_mtp", "num_speculative_tokens": 3, "enforce_eager": true}' \
+      --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY"}' \
+      --additional-config '{"enable_cpu_binding":true}' \
+      --async-scheduling
+      ```
+  - title: Service verification
+    content: |-
+      See the `verification` section below.
+
+# ===== Atlas 800 A3 single-node BF16 =====
+- npu: Atlas 800I A3
+  precision: BF16
+  deployment: Single-Node
+  case: Multi Card
+  steps:
+  - title: Start the server (Qwen3.5-27B BF16)
+    content: |-
+      Drop `--quantization ascend` and use the BF16 weight id from `weight_download`:
+
+      ```bash
+      vllm serve Qwen/Qwen3.5-27B \
+      --host 0.0.0.0 \
+      --port 8000 \
+      --data-parallel-size 8 \
+      --tensor-parallel-size 2 \
+      --served-model-name qwen3.5 \
+      --max-num-seqs 32 \
+      --max-model-len 133000 \
+      --max-num-batched-tokens 16384 \
+      --trust-remote-code \
+      --gpu-memory-utilization 0.90 \
+      --no-enable-prefix-caching \
+      --speculative-config '{"method": "qwen3_5_mtp", "num_speculative_tokens": 3, "enforce_eager": true}' \
+      --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY"}' \
+      --async-scheduling
+      ```
+  - title: Service verification
+    content: |-
+      See the `verification` section below.
+
+# ===== Atlas 800 A3 multi-node PD separation =====
+- npu: Atlas 800I A3
+  precision: W8A8
+  deployment: Multi-Node PD Separation
+  case: 1P1D (1 Prefill node + 1 Decode node)
+  steps:
+  - title: Layout (1P1D, TP=2 + DP=8 per node)
+    content: |-
+      Use **2 Atlas 800 A3 (64G × 16)** nodes — one Prefill node, one Decode node. Each node runs `TP=2 + DP=8`, fully utilizing all 16 NPUs. Multi-node PD separation is **not supported on Atlas inference products**.
+
+      > **Why TP=2 + DP=8 (DP-first)?** The model is only ~30 GB and fits in a single NPU. TP > 1 is only needed for models that don't fit in one NPU. Maximizing DP keeps all 16 NPUs busy with independent request batches — this is the standard pattern for small dense models.
+  - title: Prefill node — `run_dp_template.sh`
+    content: |-
+      ```shell
+      nic_name="xxx"
+      local_ip="141.xx.xx.1"
+
+      export HCCL_IF_IP=$local_ip
+      export GLOO_SOCKET_IFNAME=$nic_name
+      export TP_SOCKET_IFNAME=$nic_name
+      export HCCL_SOCKET_IFNAME=$nic_name
+      export HCCL_OP_EXPANSION_MODE="AIV"
+      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+      export OMP_PROC_BIND=false
+      export OMP_NUM_THREADS=1
+      export TASK_QUEUE_ENABLE=1
+      export LD_LIBRARY_PATH=/usr/local/Ascend/ascend-toolkit/latest/python/site-packages/mooncake:$LD_LIBRARY_PATH
+      export HCCL_BUFFSIZE=1024
+      export VLLM_ASCEND_ENABLE_FLASHCOMM1=1
+      export ASCEND_RT_VISIBLE_DEVICES=$1
+
+      vllm serve Eco-Tech/Qwen3.5-27B-w8a8-mtp \
+        --host 0.0.0.0 \
+        --port $2 \
+        --data-parallel-size $3 \
+        --data-parallel-rank $4 \
+        --data-parallel-address $5 \
+        --data-parallel-rpc-port $6 \
+        --tensor-parallel-size $7 \
+        --seed 1024 \
+        --quantization ascend \
+        --served-model-name qwen3.5 \
+        --trust-remote-code \
+        --max-num-seqs 4 \
+        --max-model-len 32768 \
+        --max-num-batched-tokens 16384 \
+        --no-enable-prefix-caching \
+        --gpu-memory-utilization 0.95 \
+        --enforce-eager \
+        --speculative-config '{"method": "qwen3_5_mtp", "num_speculative_tokens": 3, "enforce_eager": true}' \
+        --additional-config '{"enable_cpu_binding":true}' \
+        --kv-transfer-config \
+        '{"kv_connector": "MooncakeConnectorV1",
+        "kv_role": "kv_producer",
+        "kv_port": "30000",
+        "engine_id": "0",
+        "kv_connector_extra_config": {
+                  "prefill": {"dp_size": 8, "tp_size": 2},
+                  "decode":  {"dp_size": 8, "tp_size": 2}
+              }
+            }'
+      ```
+  - title: Decode node — `run_dp_template.sh`
+    content: |-
+      Same shell setup as prefill node, but `local_ip="141.xx.xx.2"` (decode node IP). The vllm serve command differs:
+
+      ```shell
+      vllm serve Eco-Tech/Qwen3.5-27B-w8a8-mtp \
+        --host 0.0.0.0 \
+        --port $2 \
+        --data-parallel-size $3 \
+        --data-parallel-rank $4 \
+        --data-parallel-address $5 \
+        --data-parallel-rpc-port $6 \
+        --tensor-parallel-size $7 \
+        --seed 1024 \
+        --quantization ascend \
+        --served-model-name qwen3.5 \
+        --trust-remote-code \
+        --max-num-seqs 16 \
+        --max-model-len 32768 \
+        --max-num-batched-tokens 2048 \
+        --no-enable-prefix-caching \
+        --gpu-memory-utilization 0.91 \
+        --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY"}' \
+        --additional-config '{"recompute_scheduler_enable":true,"enable_cpu_binding":true}' \
+        --async-scheduling \
+        --speculative-config '{"method": "qwen3_5_mtp", "num_speculative_tokens": 3, "enforce_eager": true}' \
+        --kv-transfer-config \
+        '{"kv_connector": "MooncakeConnectorV1",
+        "kv_role": "kv_consumer",
+        "kv_port": "30200",
+        "engine_id": "1",
+        "kv_connector_extra_config": {
+                  "prefill": {"dp_size": 8, "tp_size": 2},
+                  "decode":  {"dp_size": 8, "tp_size": 2}
+              }
+            }'
+      ```
+  - title: Launch the DP engine on each node
+    content: |-
+      ```shell
+      # p0 (Prefill node 0)
+      python launch_online_dp.py --dp-size 8 --tp-size 2 --dp-size-local 8 --dp-rank-start 0 \
+        --dp-address 141.xx.xx.1 --dp-rpc-port 12321 --vllm-start-port 7100
+      # d0 (Decode node 0)
+      python launch_online_dp.py --dp-size 8 --tp-size 2 --dp-size-local 8 --dp-rank-start 0 \
+        --dp-address 141.xx.xx.2 --dp-rpc-port 12321 --vllm-start-port 7100
+      ```
+  - title: Run the proxy on the prefill master node
+    content: |-
+      ```shell
+      python load_balance_proxy_server_example.py \
+        --port 1999 \
+        --host 141.xx.xx.1 \
+        --prefiller-hosts 141.xx.xx.1 141.xx.xx.1 141.xx.xx.1 141.xx.xx.1 \
+                          141.xx.xx.1 141.xx.xx.1 141.xx.xx.1 141.xx.xx.1 \
+        --prefiller-ports  7100 7101 7102 7103 7104 7105 7106 7107 \
+        --decoder-hosts    141.xx.xx.2 141.xx.xx.2 141.xx.xx.2 141.xx.xx.2 \
+                            141.xx.xx.2 141.xx.xx.2 141.xx.xx.2 141.xx.xx.2 \
+        --decoder-ports    7100 7101 7102 7103 7104 7105 7106 7107
+      ```
+  - title: Verify the PD service
+    content: |-
+      ```bash
+      curl http://<proxy_node0_ip>:1999/v1/chat/completions \
+          -H "Content-Type: application/json" \
+          -d '{
+              "model": "qwen3.5",
+              "messages": [{"role": "user", "content": "The future of AI is"}],
+              "max_tokens": 1024,
+              "temperature": 1.0,
+              "top_p": 0.95
+          }'
+      ```
+
+      Expected: HTTP 200 OK with a `choices` field — prefill and decode nodes are correctly cooperating.
+
+verification: |-
+  After the service starts, the log should show:
+  ```text
+  (APIServer pid=<pid>) INFO:     Started server process [<pid>]
+  (APIServer pid=<pid>) INFO:     Waiting for application startup.
+  (APIServer pid=<pid>) INFO:     Application startup complete.
+  ```
+
+  Smoke-test with the **Completions API**:
+  ```bash
+  curl http://localhost:8000/v1/completions \
+      -H "Content-Type: application/json" \
+      -d '{
+          "model": "qwen3.5",
+          "prompt": "The future of AI is",
+          "max_tokens": 50,
+          "temperature": 0
+      }'
+  ```
+
+  Or with the **Chat Completions API**:
+  ```bash
+  curl http://localhost:8000/v1/chat/completions \
+      -H "Content-Type: application/json" \
+      -d '{
+          "model": "qwen3.5",
+          "messages": [{"role": "user", "content": "The future of AI is"}],
+          "max_completion_tokens": 1024,
+          "temperature": 0.7,
+          "top_p": 0.95
+      }'
+  ```
+
+  > **For Qwen3.6-27B**, set `"model": "qwen3.6"` in the request body (and use `--served-model-name qwen3.6` on the server).
+
+  Expected: HTTP 200 OK with a `choices` field containing generated text.
+
+performance:
+  accuracy: "Qwen3.5-27B-w8a8 in vllm-ascend:v0.17.0rc1 on gsm8k (AISBench): 96.74 accuracy. Qwen3.6-27B-w8a8 follows the same evaluation methodology — results not listed here, run via AISBench to obtain."
+
+evaluation:
+  accuracy:
+    content: |-
+      ### Using AISBench (recommended)
+
+      Refer to the vllm-ascend AISBench guide. After execution, AISBench prints the per-dataset accuracy. Example for `Qwen3.5-27B-w8a8` on `gsm8k`:
+
+      | dataset | version | metric | mode | vllm-api-general-chat |
+      |---------|---------|--------|------|-----------------------|
+      | gsm8k   | -       | accuracy | gen | 96.74 |
+
+      ### Using Language Model Evaluation Harness (lm_eval)
+
+      Run `gsm8k` against the running server:
+
+      ```shell
+      export VLLM_USE_MODELSCOPE=True
+      vllm serve Eco-Tech/Qwen3.5-27B-w8a8-mtp \
+          --served-model-name qwen3.5 \
+          --trust-remote-code \
+          --quantization ascend \
+          --tensor-parallel-size 2 \
+          --max-model-len 133000 \
+          --max-num-seqs 32 \
+          --gpu-memory-utilization 0.90 \
+          --no-enable-prefix-caching
+
+      # Run lm_eval in another terminal
+      lm_eval \
+        --model local-completions \
+        --model_args model=qwen3.5,base_url=http://127.0.0.1:8000/v1/completions,tokenized_requests=False,trust_remote_code=True \
+        --tasks gsm8k \
+        --output_path ./
+      ```
+  performance:
+    content: |-
+      ### Using AISBench
+
+      See the vllm-ascend AISBench performance-evaluation guide.
+
+      ### Using vllm bench serve
+
+      Three `vllm bench` subcommands: `latency` (single-batch latency), `serve` (online throughput), `throughput` (offline throughput). The `serve` example:
+
+      ```bash
+      export VLLM_USE_MODELSCOPE=True
+      # For Qwen3.5-27B-w8a8:
+      vllm bench serve --model Eco-Tech/Qwen3.5-27B-w8a8-mtp \
+        --dataset-name random --random-input 200 --num-prompts 200 \
+        --request-rate 1 --save-result --result-dir ./
+      # For Qwen3.6-27B-w8a8:
+      vllm bench serve --model Eco-Tech/Qwen3.6-27B-w8a8 \
+        --dataset-name random --random-input 200 --num-prompts 200 \
+        --request-rate 1 --save-result --result-dir ./
+      ```
+
+tuning: |-
+  ### Recommended configurations (validated; tune for your workload)
+
+  **Parallelism strategy**: `Qwen3.5-27B-w8a8` and `Qwen3.6-27B-w8a8` are ~30 GB and fit in a single 64 GB HBM NPU. Following the **DP-first** principle, **TP=2 is the recommended default** for most scenarios; remaining NPUs go to DP for parallel request batches. **TP=8 is only recommended for ultra-long context (256K+) scenarios** to shard KV cache across 8 NPUs.
+
+  **Atlas inference products**: only TP is supported — choose **TP=2** or **TP=4**. With **TP=4**, `--max-model-len` can support **128K** and **256K** long-sequence scenarios.
+
+  | Scenario | Deployment | *NPUs | Weight | Notes |
+  |----------|------------|-------|--------|-------|
+  | High Throughput (128K ctx) | Single-Node (A2) | 8 | Qwen3.x-27B-w8a8 | TP=2 + DP=4 — uses all 8 NPUs for parallel request batches |
+  | High Throughput (128K ctx) | Single-Node (A3) | 16 | Qwen3.x-27B-w8a8 | TP=2 + DP=8 — uses all 16 NPUs for parallel request batches |
+  | Low Latency (128K ctx) | Single-Node (A3) | 16 | Qwen3.x-27B-w8a8 | TP=2 + DP=8 — reduces per-layer Allreduce overhead for small interactive batches |
+  | Long Context (256K+ ctx) | Single-Node (A3) | 16 | Qwen3.x-27B-w8a8 | TP=8 + DP=2 — shards KV cache across 8 NPUs to maximize context window |
+
+  *Total NPUs = 1 Atlas 800 A3 = 16 NPUs, 1 Atlas 800 A2 = 8 NPUs.
+
+  | Scenario | Config | TP | DP | Max Num Seqs | Max Num Batched Tokens | Max Model Len | MTP Num | Async Scheduling |
+  |----------|--------|----|----|--------------|------------------------|---------------|---------|-------------------|
+  | High Throughput (128K) | Single-Node A2 | 2 | 4 | 32 | 16384 | 133000 | 3 | On |
+  | High Throughput (128K) | Single-Node A3 | 2 | 8 | 32 | 16384 | 133000 | 3 | On |
+  | Low Latency (128K) | Single-Node A3 | 2 | 8 | 4 | 4096 | 133000 | 3 | On |
+  | Long Context (256K+) | Single-Node A3 | 8 | 2 | 8 | 8192 | 266000 | 3 | On |
+
+  ### Tuning guidelines
+
+  Refer to the vllm-ascend performance tuning documentation and feature matrix for detailed feature descriptions. Key levers:
+    - `--gpu-memory-utilization`: increase to allocate more KV cache; **risk of OOM** if too high (peak HBM during warm-up can exceed average)
+    - `--max-num-batched-tokens`: larger = lower latency but higher HBM activation memory pressure
+    - `--no-enable-prefix-caching`: required for hybrid Qwen3.5/3.6 KV cache (block_size grows to 2048; short prefixes are never cached)
+    - `--speculative-config`: both Qwen3.5 and Qwen3.6 share the `qwen3_5_mtp` head; on Atlas inference products set `num_speculative_tokens: 1`
+    - `--compilation-config cudagraph_mode=FULL_DECODE_ONLY`: recommended; PIECEWISE is the other option
+    - On **PD separation**, enable `VLLM_ASCEND_ENABLE_FLASHCOMM1=1` and `recompute_scheduler_enable:true` on the decode node
+
+faq: |-
+  Common environment, installation, and parameter issues are documented in the vLLM-Ascend Public FAQ:
+  https://docs.vllm.ai/projects/ascend/en/latest/faqs.html
+
+references:
+- title: Qwen3.5-27B ModelScope
+  url: https://modelscope.cn/models/Qwen/Qwen3.5-27B
+- title: Qwen3.5-27B-w8a8-mtp (Eco-Tech)
+  url: https://www.modelscope.cn/models/Eco-Tech/Qwen3.5-27B-w8a8-mtp
+- title: Qwen3.6-27B ModelScope
+  url: https://modelscope.cn/models/Qwen/Qwen3.6-27B
+- title: Qwen3.6-27B-w8a8 (Eco-Tech)
+  url: https://www.modelscope.cn/models/Eco-Tech/Qwen3.6-27B-w8a8
+- title: vllm-ascend docs (release v0.23.0)
+  url: https://github.com/vllm-project/vllm-ascend/tree/releases/v0.23.0/docs/source/tutorials/models/Qwen3.5-27B-Qwen3.6-27B.md
+- title: Mooncake multi-node PD disaggregation guide
+  url: https://github.com/vllm-project/vllm-ascend/blob/main/docs/source/features/pd_disaggregation_mooncake_multi_node.md
+- title: launch_online_dp.py (vllm-ascend examples)
+  url: https://github.com/vllm-project/vllm-ascend/blob/main/examples/external_online_dp/launch_online_dp.py
+- title: run_dp_template.sh (vllm-ascend examples)
+  url: https://github.com/vllm-project/vllm-ascend/blob/main/examples/external_online_dp/run_dp_template.sh
+- title: load_balance_proxy_server_example.py (vllm-ascend examples)
+  url: https://github.com/vllm-project/vllm-ascend/blob/main/examples/disaggregated_prefill_v1/load_balance_proxy_server_example.py
+- title: vLLM-Ascend Public FAQ
+  url: https://docs.vllm.ai/projects/ascend/en/latest/faqs.html
