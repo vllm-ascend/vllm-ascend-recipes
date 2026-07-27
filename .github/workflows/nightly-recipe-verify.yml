@@ -20,6 +20,13 @@ on:
         type: boolean
         description: 'Run all recipes (ignores change detection)'
         default: false
+      recipe_allowlist:
+        type: string
+        description: >-
+          Comma-separated recipe paths to run. Overrides both auto-detection
+          and full_run. Leave blank to use the default allowlist (Qwen3-30B-A3B).
+          Example: models/en/Qwen/Qwen3-30B-A3B.yaml,models/en/Qwen/Qwen3-235B-A22B.yaml
+        default: 'models/en/Qwen/Qwen3-30B-A3B.yaml'
 
 permissions:
   contents: read
@@ -62,7 +69,17 @@ jobs:
           A2_LIST=""
           A2_COUNT=0
 
-          if [[ "${{ github.event.inputs.full_run }}" == "true" ]] || [[ "${{ github.event_name }}" == "schedule" ]]; then
+          # Priority order for selecting which recipes to verify:
+          #   1. workflow_dispatch input `recipe_allowlist` (when set, overrides everything)
+          #   2. full_run=true OR schedule trigger  -> run all A2-compatible recipes
+          #   3. push trigger with model changes    -> only run the changed files
+          ALLOWLIST="${{ github.event.inputs.recipe_allowlist }}"
+          if [ -n "$ALLOWLIST" ]; then
+            echo "Using recipe_allowlist input (overrides full_run and auto-detection)"
+            echo "  -> $ALLOWLIST"
+            # Comma-separated -> newline-separated for the for-loop below
+            RECIPE_FILES=$(echo "$ALLOWLIST" | tr ',' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | sed '/^$/d')
+          elif [[ "${{ github.event.inputs.full_run }}" == "true" ]] || [[ "${{ github.event_name }}" == "schedule" ]]; then
             RECIPE_FILES=$(find models/en -name '*.yaml' -o -name '*.yml' | sort)
           elif [[ -n "${{ steps.changed.outputs.changed_files }}" ]]; then
             RECIPE_FILES="${{ steps.changed.outputs.changed_files }}"
@@ -83,6 +100,11 @@ jobs:
           FILES=$(echo "$A2_LIST" | sed '/^$/d' | jq -R -s -c 'split("\n") | map(select(length > 0))')
           echo "a2_recipes=$FILES" >> "$GITHUB_OUTPUT"
           echo "a2_count=$A2_COUNT" >> "$GITHUB_OUTPUT"
+
+          echo "A2 recipes to verify: $A2_COUNT"
+          if [ "$A2_COUNT" -eq 0 ]; then
+            echo "::warning::No A2-compatible recipes in selection — verify-a2 job will be skipped"
+          fi
 
           echo "A2 recipes: $A2_COUNT"
 
