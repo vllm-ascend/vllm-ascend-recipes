@@ -59,22 +59,25 @@ interface ImportMetaWithEnv {
 }
 const metaEnv = (import.meta as unknown as ImportMetaWithEnv).env ?? {};
 const env = metaEnv as Record<string, string | boolean | undefined>;
-const isDev = !!env.DEV;
 const baseUrl = (env.BASE_URL as string | undefined) ?? '/';
 
-function prefixForDev(): string {
-  if (!isDev) return '';
-  // baseUrl ends with a slash already (e.g. "/vllm-ascend-recipes/");
-  // we want the URL to start with "/<base>" without a double slash.
+// Always include the site's BASE_URL prefix. Astro copies `public/status/`
+// verbatim into the build output, so this resolves correctly in:
+//   - dev:        localhost:4321/<base>/status/<slug>.json  (mock in public/)
+//   - PR preview: <hash>.netlify.app/<base>/status/<slug>.json  (mock copied to dist/)
+//   - production: <site>/<base>/status/<slug>.json  (real status published to gh-pages branch)
+// baseUrl ends with a slash already (e.g. "/vllm-ascend-recipes/"); strip it
+// so the URL starts with "/<base>" without a double slash.
+function basePath(): string {
   return baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
 }
 
 export function statusUrlForSlug(slug: string): string {
-  return `${prefixForDev()}/status/${slug}.json`;
+  return `${basePath()}/status/${slug}.json`;
 }
 
 export function statusIndexUrl(): string {
-  return `${prefixForDev()}/status/index.json`;
+  return `${basePath()}/status/index.json`;
 }
 
 export function durationHuman(start: string, end: string): string {
