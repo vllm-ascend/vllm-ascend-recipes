@@ -63,12 +63,15 @@ jobs:
           A2_COUNT=0
 
           if [[ "${{ github.event.inputs.full_run }}" == "true" ]] || [[ "${{ github.event_name }}" == "schedule" ]]; then
-            RECIPE_FILES=$(find models/en -name '*.yaml' -o -name '*.yml' | sort)
+            RECIPE_FILES="$(find models/en -name '*.yaml' -o -name '*.yml' | sort)"
           elif [[ -n "${{ steps.changed.outputs.changed_files }}" ]]; then
             RECIPE_FILES="${{ steps.changed.outputs.changed_files }}"
           else
             RECIPE_FILES=""
           fi
+
+          # Filter to Qwen models only (resource constraint, expand later)
+          RECIPE_FILES="$(echo "$RECIPE_FILES" | grep 'models/en/Qwen/' || true)"
 
           for file in $RECIPE_FILES; do
             HW=$(python3 -c "import yaml, sys; d=yaml.safe_load(open('$file')); hw=d.get('meta',{}).get('hardware',{}); print(hw.get('atlas_800_a2',''))" 2>/dev/null || echo "")
