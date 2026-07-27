@@ -242,13 +242,31 @@ jobs:
       - name: Ensure gh-pages branch exists
         run: |
           set -euo pipefail
+          # Configure git for any commits/pushes this step may do. The
+          # "Commit and push" step below configures git too, but the init
+          # commit here happens earlier in the job.
+          git config user.name "vllm-ascend-ci"
+          git config user.email "vllm-ascend-ci@users.noreply.github.com"
+
           if git rev-parse --verify origin/gh-pages >/dev/null 2>&1; then
             echo "origin/gh-pages exists, nothing to do"
             exit 0
           fi
           echo "origin/gh-pages missing — initializing an empty branch"
-          git checkout --orphan gh-pages
-          git rm -rfq . || true
+          # actions/checkout@v4 above fails (continue-on-error) when the ref
+          # doesn't exist, leaving the working tree empty. After that failure
+          # we either have an unborn HEAD or a leftover main checkout; handle
+          # both. If a local gh-pages branch already exists from a previous
+          # attempt, just check it out instead of trying to orphan again.
+          if git show-ref --verify --quiet refs/heads/gh-pages; then
+            git checkout gh-pages
+          else
+            git checkout --orphan gh-pages
+          fi
+          # `git rm -rfq .` errors on an empty working tree (the case after a
+          # failed actions/checkout). Suppress that one message; the init
+          # commit below is allowed-empty so no actual removal is required.
+          git rm -rfq --ignore-unmatch . || true
           git commit --allow-empty -m "ci: initialize gh-pages branch"
           # Push the empty branch so subsequent runs see origin/gh-pages.
           git push origin gh-pages
