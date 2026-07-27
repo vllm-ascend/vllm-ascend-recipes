@@ -235,6 +235,24 @@ jobs:
           ref: gh-pages
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
+        # First-ever publish: gh-pages doesn't exist yet. Don't fail the job;
+        # the "Apply updates" step below initializes an empty branch instead.
+        continue-on-error: true
+
+      - name: Ensure gh-pages branch exists
+        run: |
+          set -euo pipefail
+          if git rev-parse --verify origin/gh-pages >/dev/null 2>&1; then
+            echo "origin/gh-pages exists, nothing to do"
+            exit 0
+          fi
+          echo "origin/gh-pages missing — initializing an empty branch"
+          git checkout --orphan gh-pages
+          git rm -rfq . || true
+          git commit --allow-empty -m "ci: initialize gh-pages branch"
+          # Push the empty branch so subsequent runs see origin/gh-pages.
+          git push origin gh-pages
+          git fetch origin gh-pages
 
       - name: Apply updates to gh-pages
         run: |
@@ -271,8 +289,16 @@ jobs:
             echo "No changes to publish."
             exit 0
           fi
-          git commit -m "ci: status update from ${HEAD_SHA} (${REPO}) [skip ci]" \
-            -m "Triggered by: ${RUN_URL}"
-          # Use a force-with-lease-style push to avoid weirdness if remote has
-          # newer commits from a parallel publish job (concurrency allows it).
-          git push origin gh-pages
+          # Squash prior gh-pages history into a single commit so the branch
+          # doesn't accumulate a commit per CI run (nightly + every PR merge).
+          # gh-pages is a published-state mirror, not an audit log.
+          base="$(git rev-parse origin/gh-pages 2>/dev/null || git rev-list --max-parents=0 HEAD | tail -1)"
+          git reset --soft "${base}"
+          git commit -m "ci: status update from ${HEAD_SHA}" \
+            -m "Triggered by: ${RUN_URL}" \
+            -m "Repo: ${REPO} [skip ci]"
+          # --force-with-lease refuses the push if remote has moved beyond our
+          # last-known state (e.g. a concurrent publish we hadn't fetched yet).
+          # The `concurrency: cancel-in-progress: true` group above normally
+          # serializes publishes, this is just belt-and-suspenders.
+          git push --force-with-lease origin gh-pages
