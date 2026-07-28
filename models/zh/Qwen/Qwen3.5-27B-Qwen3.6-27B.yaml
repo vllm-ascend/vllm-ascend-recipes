@@ -289,7 +289,7 @@ scenarios:
       export OMP_NUM_THREADS=1
       export TASK_QUEUE_ENABLE=1
 
-      vllm serve Eco-Tech/Qwen3.5-27B-w8a8-mtp \
+      vllm serve your_model_path \
       --host 0.0.0.0 \
       --port 8000 \
       --data-parallel-size 1 \
@@ -333,7 +333,7 @@ scenarios:
       export OMP_NUM_THREADS=1
       export TASK_QUEUE_ENABLE=1
 
-      vllm serve Eco-Tech/Qwen3.5-27B-w8a8-mtp \
+      vllm serve your_model_path \
       --host 0.0.0.0 \
       --port 8000 \
       --data-parallel-size 8 \
@@ -367,7 +367,7 @@ scenarios:
       去掉 `--quantization ascend`，使用 `weight_download` 中的 BF16 模型 id：
 
       ```bash
-      vllm serve Qwen/Qwen3.5-27B \
+      vllm serve your_model_path \
       --host 0.0.0.0 \
       --port 8000 \
       --data-parallel-size 8 \
@@ -418,7 +418,7 @@ scenarios:
       export VLLM_ASCEND_ENABLE_FLASHCOMM1=1
       export ASCEND_RT_VISIBLE_DEVICES=$1
 
-      vllm serve Eco-Tech/Qwen3.5-27B-w8a8-mtp \
+      vllm serve your_model_path \
         --host 0.0.0.0 \
         --port $2 \
         --data-parallel-size $3 \
@@ -454,7 +454,7 @@ scenarios:
       环境变量与 Prefill 节点相同，仅 `local_ip="141.xx.xx.2"`（decode 节点 IP）。vllm serve 命令不同：
 
       ```shell
-      vllm serve Eco-Tech/Qwen3.5-27B-w8a8-mtp \
+      vllm serve your_model_path \
         --host 0.0.0.0 \
         --port $2 \
         --data-parallel-size $3 \
@@ -582,7 +582,7 @@ evaluation:
 
       ```shell
       export VLLM_USE_MODELSCOPE=True
-      vllm serve Eco-Tech/Qwen3.5-27B-w8a8-mtp \
+      vllm serve your_model_path \
           --served-model-name qwen3.5 \
           --trust-remote-code \
           --quantization ascend \

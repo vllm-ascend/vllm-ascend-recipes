@@ -81,6 +81,20 @@ if m:
     # Replace <node0_ip> etc
     global_verify_cmd = global_verify_cmd.replace('<node0_ip>', 'localhost')
 
+# Select the cached weights path that this recipe's vllm serve command should
+# resolve `your_model_path` to. CI runner images pre-install a fixed set of
+# W8A8 weights under /root/.cache/modelscope/hub/models/; we map each
+# supported recipe's model_id onto the one that exists on the runner.
+# Recipes not in this map fall back to the historical Qwen3-30B-A3B-w8a8
+# path so existing recipes keep working.
+model_id_for_path = data.get('model', {}).get('model_id', 'Qwen/Qwen3-30B-A3B')
+CACHE_PATH_MAP = {
+    'Qwen/Qwen3-30B-A3B': '/root/.cache/modelscope/hub/models/Eco-Tech/Qwen3-30B-A3B-w8a8',
+    'Qwen/Qwen3.6-27B':  '/root/.cache/modelscope/hub/models/Eco-Tech/Qwen3.6-27B-w8a8',
+    'Qwen/Qwen3.5-27B':  '/root/.cache/modelscope/hub/models/Eco-Tech/Qwen3.6-27B-w8a8',  # Qwen3.5 not yet pre-installed on runner; reuse Qwen3.6 cache
+}
+CACHE_PATH = CACHE_PATH_MAP.get(model_id_for_path, '/root/.cache/modelscope/hub/models/Eco-Tech/Qwen3-30B-A3B-w8a8')
+
 # Extract scenarios
 scenarios = data.get('scenarios', [])
 commands = []
@@ -104,8 +118,8 @@ for s in scenarios:
         # Remove %%CONFIG:...%% markers (key may contain hyphens)
         bash_content = re.sub(r'%%CONFIG:[^%]+%%', '', bash_content)
         bash_content = re.sub(r'%%/CONFIG:[^%]+%%', '', bash_content)
-        # Replace placeholder model paths with actual weights
-        bash_content = bash_content.replace('your_model_path', '/root/.cache/modelscope/hub/models/Eco-Tech/Qwen3-30B-A3B-w8a8')
+        # Replace placeholder model paths with actual weights on the runner
+        bash_content = bash_content.replace('your_model_path', CACHE_PATH)
         # Remove speculative-config lines (contain placeholder paths)
         bash_content = re.sub(r'.*--speculative-config.*\n?', '', bash_content)
         if 'vllm serve' in bash_content:
@@ -138,6 +152,7 @@ result = {
     'hw_key': hw_key,
     'pip_setup': pip_content,
     'container_setup': container_content,
+    'cache_path': CACHE_PATH,
     'scenarios': commands,
 }
 print(json.dumps(result))
@@ -155,7 +170,10 @@ if [[ "$ACTION" == "skip" ]]; then
 fi
 
 MODEL_ID=$(echo "$RECIPE_INFO" | $PYTHON -c "import sys,json; print(json.loads(sys.stdin.read()).get('model_id',''))")
+CACHE_PATH=$(echo "$RECIPE_INFO" | $PYTHON -c "import sys,json; print(json.loads(sys.stdin.read()).get('cache_path',''))")
+export CACHE_PATH
 log_info "Model: $MODEL_ID"
+log_info "Cached weights: $CACHE_PATH"
 log_info "Hardware: $(echo "$RECIPE_INFO" | $PYTHON -c "import sys,json; print(json.loads(sys.stdin.read()).get('hw_key',''))")"
 
 # Install vllm-ascend
@@ -343,7 +361,7 @@ SCRIPT_HEREDOC
     # Patch the installed model config to set model path and port
     AIS_CFG="/usr/local/python3.12.13/lib/python3.12/site-packages/ais_bench/benchmark/configs/models/vllm_api/vllm_api_stream_chat.py"
     if [[ -f "$AIS_CFG" ]]; then
-      sed -i 's|path=".*"|path="/root/.cache/modelscope/hub/models/Eco-Tech/Qwen3-30B-A3B-w8a8"|' "$AIS_CFG"
+      sed -i "s|path=\".*\"|path=\"${CACHE_PATH}\"|" "$AIS_CFG"
       sed -i 's|host_port=8080|host_port=8000|' "$AIS_CFG"
       log_info "  Patched ais_bench model config (path + port)"
     fi
