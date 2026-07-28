@@ -1,0 +1,49 @@
+name: 💻 Usage
+description: Ask how to deploy or run a model with vLLM-Ascend using a recipe.
+title: "[Usage]: "
+labels: ["usage"]
+
+body:
+  - type: markdown
+    attributes:
+      value: >
+        #### Before submitting, please search [existing and past issues](https://github.com/vllm-ascend/vllm-ascend-recipes/issues?q=is%3Aissue+sort%3Acreated-desc+) and the [recipes site](https://vllm-ascend.github.io/vllm-ascend-recipes/) to avoid duplicates.
+  - type: input
+    id: recipe
+    attributes:
+      label: Recipe / model you are following
+      description: Link to the recipe page or the model id.
+      placeholder: https://vllm-ascend.github.io/vllm-ascend-recipes/qwen/qwen3-30b-a3b
+    validations:
+      required: true
+  - type: textarea
+    id: env
+    attributes:
+      label: Your current environment
+      description: |
+        Paste the output of the following so we can reproduce your setup.
+        ```sh
+        npu-smi info
+        cat /usr/local/Ascend/ascend-toolkit/latest/"$(uname -i)"-linux/ascend_toolkit_install.info
+        pip show vllm vllm-ascend | grep -E 'Name|Version'
+        ```
+      value: |
+        ```text
+        The output of above commands
+        ```
+    validations:
+      required: true
+  - type: textarea
+    id: goal
+    attributes:
+      label: How would you like to use vLLM-Ascend
+      description: |
+        Describe what you are trying to do and where you are stuck.
+      value: |
+        I want to run inference of a [specific model](put link here) on [NPU SKU] with [precision]. I followed the recipe but ...
+    validations:
+      required: true
+  - type: markdown
+    attributes:
+      value: >
+        Thanks for contributing 🎉!

@@ -1,0 +1,48 @@
+name: 🤗 Request a new model recipe
+description: Propose a new deployment recipe for a model on Ascend NPU.
+title: "[New Recipe]: "
+labels: ["new recipe"]
+
+body:
+  - type: markdown
+    attributes:
+      value: >
+        #### Before submitting, please search [existing and past issues](https://github.com/vllm-ascend/vllm-ascend-recipes/issues?q=is%3Aissue+sort%3Acreated-desc+) and browse the [recipes site](https://vllm-ascend.github.io/vllm-ascend-recipes/) to avoid duplicates.
+
+        #### Tip: you can also open a PR directly. See CONTRIBUTING.md › "Adding a new recipe".
+  - type: input
+    id: model
+    attributes:
+      label: The model to consider
+      description: >
+        A HuggingFace / ModelScope / Modelers URL pointing to the model, e.g. https://huggingface.co/Qwen/Qwen3-30B-A3B
+    validations:
+      required: true
+  - type: dropdown
+    id: npu
+    attributes:
+      label: Target NPU
+      description: Which Ascend NPU SKU do you want this recipe for?
+      options:
+        - Atlas 800I A3
+        - Atlas 800 A2
+        - Other Ascend NPU
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: closest
+    attributes:
+      label: The closest recipe already on the site
+      description: >
+        Which existing recipe is most similar? Link it. See the supported model list at https://docs.vllm.ai/projects/ascend/en/latest/user_guide/supported_models.html .
+  - type: textarea
+    id: difficulty
+    attributes:
+      label: What's the difficulty of adding this recipe?
+      description: >
+        E.g. unsupported architecture, new operators needed, quantization variants, multi-node requirements, etc.
+  - type: markdown
+    attributes:
+      value: >
+        Thanks for contributing 🎉!

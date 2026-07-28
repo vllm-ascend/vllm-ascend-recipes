@@ -1,0 +1,50 @@
+name: 💬 Request for comments (RFC)
+description: Ask for feedback on major architectural changes, site redesign, or new recipe taxonomy.
+title: "[RFC]: "
+labels: ["RFC"]
+
+body:
+  - type: markdown
+    attributes:
+      value: >
+        #### Please take a look at previous [RFCs](https://github.com/vllm-ascend/vllm-ascend-recipes/issues?q=label%3ARFC+sort%3Aupdated-desc) for reference.
+
+        An RFC is for **non-trivial, cross-cutting** changes — e.g. a new YAML schema field, a redesign of the cascade selector, a new i18n strategy, or a change to the recipe taxonomy. Small fixes and normal recipe additions do **not** need an RFC; just open a PR.
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Motivation
+      description: >
+        Why is this change needed? What problem does it solve? Link related issues / discussions.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+      description: >
+        Describe the design in detail. Include affected files / schema fields / UI components, alternatives considered, and migration path for existing recipes.
+    validations:
+      required: true
+  - type: textarea
+    id: feedback
+    attributes:
+      label: Feedback period
+      description: >
+        How long do you want to gather feedback? Usually at least one week. State the start/end dates if possible.
+  - type: textarea
+    id: cc
+    attributes:
+      label: CC list
+      description: >
+        Anyone you specifically want to pull in (@-mention them).
+  - type: textarea
+    id: other
+    attributes:
+      label: Any other things
+      description: >
+        E.g. request for a feature branch, rollout plan, backwards-compatibility notes.
+  - type: markdown
+    attributes:
+      value: >
+        Thanks for contributing 🎉!

@@ -1,0 +1,36 @@
+name: 📚 Documentation
+description: Report an issue with a recipe page or the live site at https://vllm-ascend.github.io/vllm-ascend-recipes/
+title: "[Doc]: "
+labels: ["documentation"]
+
+body:
+  - type: markdown
+    attributes:
+      value: >
+        #### Before submitting, please search [existing and past issues](https://github.com/vllm-ascend/vllm-ascend-recipes/issues?q=is%3Aissue+sort%3Acreated-desc+) to avoid duplicates.
+  - type: input
+    id: page
+    attributes:
+      label: Affected page / URL
+      description: Link to the recipe page or site URL with the problem.
+      placeholder: https://vllm-ascend.github.io/vllm-ascend-recipes/qwen/qwen3-30b-a3b
+    validations:
+      required: true
+  - type: textarea
+    id: issue
+    attributes:
+      label: 📚 The doc issue
+      description: >
+        A clear and concise description of what is wrong or missing (wrong flag, outdated command, broken link, typo, inaccurate performance number, etc.).
+    validations:
+      required: true
+  - type: textarea
+    id: fix
+    attributes:
+      label: Suggest a potential alternative/fix
+      description: >
+        Tell us how we could improve the documentation in this regard. A proposed `vllm serve` command is welcome.
+  - type: markdown
+    attributes:
+      value: >
+        Thanks for contributing 🎉!

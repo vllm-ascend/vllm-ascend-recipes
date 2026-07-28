@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: vLLM Ascend documentation
+    url: https://docs.vllm.ai/projects/ascend/
+    about: Read the official vLLM-Ascend docs before opening an issue.
+  - name: vLLM Ascend issue tracker (engine / runtime bugs)
+    url: https://github.com/vllm-project/vllm-ascend/issues
+    about: Bugs in the vLLM-Ascend engine belong in the upstream repo, not here. This repo only hosts deployment recipes.
+  - name: Discussions / Q&A
+    url: https://github.com/vllm-ascend/vllm-ascend-recipes/discussions
+    about: Ask questions and share ideas in Discussions before opening an issue.

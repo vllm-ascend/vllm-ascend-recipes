@@ -1,0 +1,61 @@
+name: 🐛 Bug report
+description: Raise an issue if the recipes site or a recipe's command is broken.
+title: "[Bug]: "
+labels: ["bug"]
+
+body:
+  - type: markdown
+    attributes:
+      value: >
+        #### Before submitting, please search [existing and past issues](https://github.com/vllm-ascend/vllm-ascend-recipes/issues?q=is%3Aissue+sort%3Acreated-desc+).
+
+        #### Is this really a recipes bug?
+        Bugs in the vLLM-Ascend **engine / runtime** belong in [vllm-project/vllm-ascend](https://github.com/vllm-project/vllm-ascend/issues). This repo only hosts deployment recipes. Use this template for broken pages, wrong `vllm serve` flags, dead links, schema/validation errors, or site UI bugs.
+  - type: input
+    id: recipe
+    attributes:
+      label: Affected recipe / page
+      description: Recipe page URL or YAML path (e.g. models/en/Qwen/Qwen3-30B-A3B.yaml). Leave empty for a general site bug.
+      placeholder: https://vllm-ascend.github.io/vllm-ascend-recipes/qwen/qwen3-30b-a3b
+  - type: textarea
+    id: env
+    attributes:
+      label: Environment
+      description: |
+        If the bug is about a deployment command, paste the relevant environment info.
+        ```sh
+        npu-smi info
+        pip show vllm vllm-ascend | grep -E 'Name|Version'
+        ```
+        For a pure site bug, just note the browser + OS.
+      value: |
+        ```text
+        Output here
+        ```
+  - type: textarea
+    id: bug
+    attributes:
+      label: 🐛 Describe the bug
+      description: |
+        A clear and concise description of what the bug is. Add a minimal reproducible example if possible — the exact `vllm serve` command you ran and the **full** error/traceback. Wrap logs in triple backticks.
+      placeholder: |
+        A clear and concise description of what the bug is.
+
+        ```bash
+        vllm serve ...
+        ```
+
+        ```
+        The error message you got, with the full traceback.
+        ```
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What you expected to happen instead.
+  - type: markdown
+    attributes:
+      value: >
+        Thanks for contributing 🎉!

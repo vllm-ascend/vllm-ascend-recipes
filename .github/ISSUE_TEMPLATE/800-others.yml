@@ -1,0 +1,24 @@
+name: 🎲 Others
+description: General discussion that doesn't fit the other templates. Note that maintainers are busy and we mainly rely on the community to answer these.
+title: "[Misc]: "
+labels: ["misc"]
+
+body:
+  - type: markdown
+    attributes:
+      value: >
+        #### Before submitting, please search [existing and past issues](https://github.com/vllm-ascend/vllm-ascend-recipes/issues?q=is%3Aissue+sort%3Acreated-desc+).
+
+        For open-ended questions you may get a faster response in [Discussions](https://github.com/vllm-ascend/vllm-ascend-recipes/discussions).
+  - type: textarea
+    id: topic
+    attributes:
+      label: Anything you want to discuss about vLLM-Ascend recipes
+      description: >
+        Anything you want to discuss that doesn't fit the other categories.
+    validations:
+      required: true
+  - type: markdown
+    attributes:
+      value: >
+        Thanks for contributing 🎉!
