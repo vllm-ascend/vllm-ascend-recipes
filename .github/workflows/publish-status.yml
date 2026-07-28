@@ -8,8 +8,11 @@
 # any model YAML.
 #
 # Triggered by `workflow_run` → reacts to PR Recipe Verify / Nightly Recipe
-# Verify completions. The commit message contains `[skip ci]` so this push
-# does NOT trigger downstream workflows (Deploy / PR Recipe Verify etc.).
+# Verify completions. The commit message deliberately does NOT carry `[skip ci]`
+# so deploy.yml fires on this push and ships the new status JSON immediately.
+# Other workflows are unaffected (paths-filter excludes public/** on
+# nightly-recipe-verify; pr-recipe-verify only listens to pull_request; lint
+# uses dorny/paths-filter to skip on public/**-only commits).
 #
 # Why main, not a separate `gh-pages` branch?
 #   - Astro's normal `public/` → `dist/` copy during `pnpm build` picks up
@@ -19,6 +22,14 @@
 #   - Concurrency `cancel-in-progress: true` serializes publishes; the
 #     `git pull --rebase` below tolerates the rare case where main moved
 #     under us between fetch and push.
+#
+# Why a skeleton step?
+#   - Every recipe in models/en/ gets a status JSON on first publish. Recipes
+#     with `meta.hardware.atlas_800_a2: unsupported` are seeded with a
+#     `status: "skip"` nightly record so the badge renders a gray "not run"
+#     pill instead of HTTP 404. This replaces the dev-time mock fixtures that
+#     previously shipped in git (commit 693d546) and stopped being overwritten
+#     for hardware-incompatible recipes.
 #
 # Future migration to OBS (Object Storage Service):
 #   When OBS becomes available for status JSON, only two things need to change:
@@ -127,8 +138,27 @@ jobs:
             echo "pr_author=$pr_author"
           } >> "$GITHUB_OUTPUT"
 
-      - name: Install jq
-        run: sudo apt-get install -y jq || apt-get install -y jq
+      - name: Install jq + pyyaml
+        run: |
+          set -euo pipefail
+          sudo apt-get install -y jq || apt-get install -y jq
+          python3 -m pip install --quiet pyyaml
+
+      # Step 0: seed a status JSON for every recipe in models/en/ that does
+      # not have one yet. Existing real records (40-char hex head_sha + real
+      # workflow_run_id) are preserved verbatim; we only fill empty slots
+      # and clear any stale mock fixtures that may have shipped in git.
+      # Script lives in .github/_scripts/ rather than inline because the
+      # heredoc approach (`python3 - <<'PYEOF'`) inside a YAML `run: |`
+      # block confuses the workflow YAML parser — it reads `<<` as a YAML
+      # merge-key marker and the workflow file fails to parse.
+      - name: Seed skeleton status files for unsynced recipes
+        env:
+          HEAD_SHA: ${{ steps.meta.outputs.head_sha }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          python3 .github/_scripts/publish_skeleton.py
 
       - name: Build status JSON files
         env:
@@ -244,13 +274,25 @@ jobs:
                }' > "public/status/${slug}.json"
           done
 
-          # 3) Build public/status/index.json (used by /browse & home cards)
+          # 3) Build public/status/index.json (used by /browse & home cards).
+          #    IMPORTANT: exclude index.json itself — the previous glob matched
+          #    it and emitted `{"slug": null}` entries on every run.
+          #
+          #    Note: we intentionally do NOT include an `updated_at` timestamp
+          #    here. publish-status.yml runs on every Recipe Verify completion
+          #    (via workflow_run), so any timestamp would change on every PR
+          #    CI run and re-dirty the PR's `public/status/index.json`, breaking
+          #    merges in an unbreakable loop. The frontend (src/lib/status.ts)
+          #    does not read `updated_at` either, so dropping it is safe.
           index_items=$(for f in public/status/*.json; do
             [ -f "$f" ] || continue
-            jq -c '{slug: .model}' "$f"
+            [ "$(basename "$f")" = "index.json" ] && continue
+            slug=$(jq -r '.model // empty' "$f")
+            [ -z "$slug" ] && continue
+            jq -nc --arg s "$slug" '{slug: $s}'
           done | jq -s '.')
           jq -n --argjson items "$index_items" \
-            '{ updated_at: (now|todate), models: $items }' > public/status/index.json
+            '{ models: $items }' > public/status/index.json
           built=$(find public/status -maxdepth 1 -name '*.json' | wc -l)
           echo "Built ${built} status files + index.json"
 

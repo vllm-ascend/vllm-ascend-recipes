@@ -42,7 +42,6 @@ export interface ModelStatus {
 }
 
 export interface StatusIndex {
-  updated_at: string;
   models: { slug: string }[];
 }
 
