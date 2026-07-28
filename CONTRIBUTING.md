@@ -48,8 +48,7 @@ You don't need to write code to help. Any of these are welcome:
 Be kind and professional. We follow the same spirit as the upstream
 [vLLM-Ascend community](https://github.com/vllm-project/vllm-ascend). Harassment of any
 kind is not tolerated. If you experience or witness unacceptable behavior, contact the
-maintainers privately by opening a private security advisory or emailing a maintainer
-listed in the CODEOWNERS file.
+maintainers privately via a GitHub security advisory.
 
 ## Before you start
 
@@ -351,7 +350,7 @@ By contributing, you agree that your contributions will be licensed under the
 **Apache License 2.0**. See the [LICENSE](LICENSE) file.
 
 ```text
-Copyright 2025 The vLLM Ascend Authors.
+Copyright 2026 The vLLM Ascend Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
