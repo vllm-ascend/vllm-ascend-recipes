@@ -85,15 +85,27 @@ if m:
 # resolve `your_model_path` to. CI runner images pre-install a fixed set of
 # W8A8 weights under /root/.cache/modelscope/hub/models/; we map each
 # supported recipe's model_id onto the one that exists on the runner.
-# Recipes not in this map fall back to the historical Qwen3-30B-A3B-w8a8
-# path so existing recipes keep working.
+#
+# Recipes whose model_id is NOT in CACHE_PATH_MAP are skipped with a clear
+# reason rather than silently falling back to another recipe's weights —
+# falling back made the runner boot a Qwen tokenizer with GLM flags and
+# produce confusing failures (`max_model_len > derived`, `cudagraph_capture_sizes
+# not multiples of tp_size`, etc.) that took hours to diagnose. To add a new
+# model: bake its W8A8 weights into the runner image and append a mapping
+# below.
 model_id_for_path = data.get('model', {}).get('model_id', 'Qwen/Qwen3-30B-A3B')
 CACHE_PATH_MAP = {
     'Qwen/Qwen3-30B-A3B': '/root/.cache/modelscope/hub/models/Eco-Tech/Qwen3-30B-A3B-w8a8',
     'Qwen/Qwen3.6-27B':  '/root/.cache/modelscope/hub/models/Eco-Tech/Qwen3.6-27B-w8a8',
     'Qwen/Qwen3.5-27B':  '/root/.cache/modelscope/hub/models/Eco-Tech/Qwen3.6-27B-w8a8',  # Qwen3.5 not yet pre-installed on runner; reuse Qwen3.6 cache
 }
-CACHE_PATH = CACHE_PATH_MAP.get(model_id_for_path, '/root/.cache/modelscope/hub/models/Eco-Tech/Qwen3-30B-A3B-w8a8')
+if model_id_for_path not in CACHE_PATH_MAP:
+    print(json.dumps({
+        'action': 'skip',
+        'reason': f'未提前下载权重，请联系maintainer下载权重 (model_id={model_id_for_path})',
+    }))
+    sys.exit(0)
+CACHE_PATH = CACHE_PATH_MAP[model_id_for_path]
 
 # Extract scenarios
 scenarios = data.get('scenarios', [])
@@ -396,8 +408,16 @@ SCRIPT_HEREDOC
   fi
 done < /tmp/scenario_list.txt
 
+# Exit code precedence (matters for the wrapper's .status write):
+#   1 = fail    — at least one scenario actually failed; this MUST win over skip
+#                 so a recipe with mixed fail+skip scenarios doesn't show as gray
+#   2 = skip   — every scenario was auto-skipped (e.g. multi-node on single-node runner)
+#   0 = pass   — every scenario verified
+if [[ "$STATUS" -gt 0 ]]; then
+  exit 1
+fi
 if [[ "$SKIPPED" -gt 0 ]]; then
   exit 2
 fi
 
-exit $STATUS
+exit 0
