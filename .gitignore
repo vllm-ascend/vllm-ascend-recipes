@@ -2,6 +2,9 @@
 dist/
 # generated types
 .astro/
+# python bytecode
+__pycache__/
+*.pyc
 
 # dependencies
 node_modules/

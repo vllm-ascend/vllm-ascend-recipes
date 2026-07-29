@@ -1,0 +1,30 @@
+# models/_cache_paths.yaml
+#
+# Maps a recipe's `model.model_id` to the W8A8 weight directory that ships
+# baked into the runner image under /root/.cache/modelscope/hub/models/.
+# The directory is searched under multiple candidate prefixes (see
+# CACHE_PREFIXES in scripts/verify-recipe.sh); this file only carries the
+# short directory name, not the prefix, so a layout change on the runner
+# image doesn't require editing the alias table.
+#
+# If an alias is missing, the recipe is skipped with reason "未提前下载权重".
+# If an alias exists but none of the candidate prefixes contain the
+# directory on the runner, the recipe is skipped with reason
+# "镜像未预装该权重".
+#
+# Schema:
+#   model_id:  HuggingFace / ModelScope `org/name` as it appears in the
+#              recipe's `model.model_id`.
+#   cache_dir: Subdirectory name under the runner's cache base.
+#
+# To add a new model: bake the W8A8 weights into the runner image (a
+# separate repo coordinates the image build), then append one entry here.
+aliases:
+  - model_id: Qwen/Qwen3-30B-A3B
+    cache_dir: Qwen3-30B-A3B-w8a8
+
+  - model_id: Qwen/Qwen3.6-27B
+    cache_dir: Qwen3.6-27B-w8a8
+
+  - model_id: Qwen/Qwen3.5-27B
+    cache_dir: Qwen3.6-27B-w8a8   # alias to Qwen3.6 cache (Qwen3.5 not yet baked)

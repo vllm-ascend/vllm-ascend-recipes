@@ -28,6 +28,16 @@ if [[ ! -f "$RECIPE" ]]; then
   exit 1
 fi
 
+# Resolve the cache-paths alias file relative to this script's own location
+# so it works in CI (working-directory=./recipes) and locally. Override via
+# CACHE_PATHS_FILE for unusual layouts.
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+export CACHE_PATHS_FILE="${CACHE_PATHS_FILE:-${SCRIPT_DIR}/../models/_cache_paths.yaml}"
+if [[ ! -f "$CACHE_PATHS_FILE" ]]; then
+  log_error "Cache alias file not found: $CACHE_PATHS_FILE"
+  exit 1
+fi
+
 # Determine Python to use (container may have multiple versions)
 PYTHON=$(command -v python3.12 || command -v python3)
 log_info "Using Python: $PYTHON ($($PYTHON --version 2>&1))"
@@ -46,12 +56,13 @@ npu-smi info 2>/dev/null > /dev/null || {
 
 # Parse YAML with Python helper
 parse_recipe() {
-  $PYTHON - "$RECIPE" "$HW_KEY" <<'PYEOF'
+  $PYTHON - "$RECIPE" "$HW_KEY" "$CACHE_PATHS_FILE" <<'PYEOF'
 import sys
+import os
 import yaml
 import json
 
-recipe_path, hw_key = sys.argv[1], sys.argv[2]
+recipe_path, hw_key, cache_paths_file = sys.argv[1], sys.argv[2], sys.argv[3]
 
 with open(recipe_path, 'r') as f:
     data = yaml.safe_load(f)
@@ -82,30 +93,52 @@ if m:
     global_verify_cmd = global_verify_cmd.replace('<node0_ip>', 'localhost')
 
 # Select the cached weights path that this recipe's vllm serve command should
-# resolve `your_model_path` to. CI runner images pre-install a fixed set of
-# W8A8 weights under /root/.cache/modelscope/hub/models/; we map each
-# supported recipe's model_id onto the one that exists on the runner.
+# resolve `your_model_path` to. The alias file `models/_cache_paths.yaml` maps
+# recipe `model.model_id` -> on-runner directory name (no prefix). The
+# runner image is the authoritative source for what is actually baked in;
+# we try a list of candidate prefix directories and use the first one that
+# has the aliased directory on disk. This way a runner image that ships
+# weights under `Eco-Tech/` and one that ships them under `models/` (or
+# any future layout) both work without changing the alias file.
 #
-# Recipes whose model_id is NOT in CACHE_PATH_MAP are skipped with a clear
-# reason rather than silently falling back to another recipe's weights —
-# falling back made the runner boot a Qwen tokenizer with GLM flags and
-# produce confusing failures (`max_model_len > derived`, `cudagraph_capture_sizes
-# not multiples of tp_size`, etc.) that took hours to diagnose. To add a new
-# model: bake its W8A8 weights into the runner image and append a mapping
-# below.
+# Recipes whose model_id is NOT aliased are skipped with reason
+# "未提前下载权重". Recipes whose alias exists but no candidate prefix
+# contains the directory are skipped with reason "镜像未预装该权重". Both
+# used to silently fall back to another recipe's weights, which made the
+# runner boot a Qwen tokenizer with GLM flags and produced confusing
+# failures (`max_model_len > derived`, `cudagraph_capture_sizes not
+# multiples of tp_size`, etc.).
+CACHE_BASE = '/root/.cache/modelscope/hub/models'
+CACHE_PREFIXES = ('Eco-Tech', 'models')   # tried in this order; first hit wins
 model_id_for_path = data.get('model', {}).get('model_id', 'Qwen/Qwen3-30B-A3B')
-CACHE_PATH_MAP = {
-    'Qwen/Qwen3-30B-A3B': '/root/.cache/modelscope/hub/models/Eco-Tech/Qwen3-30B-A3B-w8a8',
-    'Qwen/Qwen3.6-27B':  '/root/.cache/modelscope/hub/models/Eco-Tech/Qwen3.6-27B-w8a8',
-    'Qwen/Qwen3.5-27B':  '/root/.cache/modelscope/hub/models/Eco-Tech/Qwen3.6-27B-w8a8',  # Qwen3.5 not yet pre-installed on runner; reuse Qwen3.6 cache
-}
-if model_id_for_path not in CACHE_PATH_MAP:
+try:
+    with open(cache_paths_file, 'r') as f:
+        aliases = (yaml.safe_load(f) or {}).get('aliases') or []
+except Exception as e:
+    print(json.dumps({'action': 'skip', 'reason': f'cache_paths 文件解析失败: {e}'}))
+    sys.exit(0)
+CACHE_DIR_BY_MODEL = {a['model_id']: a['cache_dir'] for a in aliases}
+if model_id_for_path not in CACHE_DIR_BY_MODEL:
     print(json.dumps({
         'action': 'skip',
         'reason': f'未提前下载权重，请联系maintainer下载权重 (model_id={model_id_for_path})',
     }))
     sys.exit(0)
-CACHE_PATH = CACHE_PATH_MAP[model_id_for_path]
+cache_dir = CACHE_DIR_BY_MODEL[model_id_for_path]
+CACHE_PATH = None
+for prefix in CACHE_PREFIXES:
+    candidate = os.path.join(CACHE_BASE, prefix, cache_dir)
+    if os.path.isdir(candidate):
+        CACHE_PATH = candidate
+        if prefix != CACHE_PREFIXES[0]:
+            print(f"DEBUG: cache resolved under non-default prefix '{prefix}/' for {model_id_for_path}", file=sys.stderr)
+        break
+if CACHE_PATH is None:
+    print(json.dumps({
+        'action': 'skip',
+        'reason': f'镜像未预装该权重 (model_id={model_id_for_path}, 目录={cache_dir}, 已尝试 {list(CACHE_PREFIXES)})',
+    }))
+    sys.exit(0)
 
 # Extract scenarios
 scenarios = data.get('scenarios', [])
