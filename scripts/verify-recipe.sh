@@ -211,6 +211,38 @@ ACTION=$(echo "$RECIPE_INFO" | $PYTHON -c "import sys,json; print(json.loads(sys
 if [[ "$ACTION" == "skip" ]]; then
   REASON=$(echo "$RECIPE_INFO" | $PYTHON -c "import sys,json; print(json.loads(sys.stdin.read()).get('reason','unknown'))" 2>/dev/null || echo "unknown")
   log_warn "Skipping recipe: $REASON"
+
+  # Write a minimal params.json so publish-status.yml can refresh this
+  # recipe's last_nightly_run. Without this, skip recipes (cache miss,
+  # hardware unsupported) stay frozen at whatever the last *verify* run
+  # produced, which can be misleadingly "pass" or stale "fail".
+  # publisher iterates over results/*.params.json — a missing file means
+  # the recipe is invisible to the publisher.
+  RECIPE_SLUG=$(basename "$RECIPE" .yaml)
+  RUN_PARAMS_DIR="${RUN_PARAMS_DIR:-/tmp/verify-results}"
+  mkdir -p "$RUN_PARAMS_DIR"
+  MODEL_ID=$(echo "$RECIPE_INFO" | $PYTHON -c "import sys,json; print(json.loads(sys.stdin.read()).get('model_id',''))" 2>/dev/null || echo "")
+  RECIPE_SLUG="$RECIPE_SLUG" MODEL_ID="$MODEL_ID" REASON="$REASON" RECIPE="$RECIPE" RUN_PARAMS_DIR="$RUN_PARAMS_DIR" \
+  RECIPE_HW_KEY="$HW_KEY" HEAD_SHA="${HEAD_SHA:-}" TRIGGER_TYPE="${TRIGGER_TYPE:-nightly}" \
+  VLLM_ASCEND_IMAGE="${VLLM_ASCEND_IMAGE:-}" STARTED_AT_ISO="${STARTED_AT_ISO:-}" \
+  $PYTHON - <<'PYEOF' || log_warn "  Failed to write minimal params.json for skipped recipe"
+import sys, json, os
+out = os.path.join(os.environ['RUN_PARAMS_DIR'], f"{os.environ['RECIPE_SLUG']}.params.json")
+with open(out, 'w') as f:
+    json.dump({
+        'recipe_path': os.environ['RECIPE'],
+        'model_id': os.environ.get('MODEL_ID', ''),
+        'hw_key': os.environ.get('RECIPE_HW_KEY', 'atlas_800_a2'),
+        'head_sha': os.environ.get('HEAD_SHA', ''),
+        'trigger_type': os.environ.get('TRIGGER_TYPE', 'nightly'),
+        'image': os.environ.get('VLLM_ASCEND_IMAGE', ''),
+        'started_at': os.environ.get('STARTED_AT_ISO', ''),
+        'scenarios': [],
+        'skip_reason': os.environ['REASON'],
+    }, f, indent=2, ensure_ascii=False)
+print(f'[PARAMS] wrote (skip) {out}', file=sys.stderr)
+PYEOF
+
   exit 2
 fi
 
