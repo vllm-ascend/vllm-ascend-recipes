@@ -89,3 +89,24 @@ export function durationHuman(start: string, end: string): string {
   if (sec < 3600) return `${Math.floor(sec / 60)}m ${sec % 60}s`;
   return `${Math.floor(sec / 3600)}h ${Math.floor((sec % 3600) / 60)}m`;
 }
+
+/**
+ * Pick the freshest of two optional run records by `finished_at`. Used by
+ * UI surfaces (homepage status dot, badge) to decide which run drives the
+ * user-visible state. Returning the freshest — rather than preferring
+ * `last_pr_run` whenever it exists — protects against stale `last_pr_run`
+ * mock fixtures that survive `publish_skeleton.py`'s `looks_real()`
+ * heuristic and would otherwise dominate the displayed status forever.
+ */
+export function pickFreshestRun(
+  a: RunStatus | null | undefined,
+  b: RunStatus | null | undefined,
+): RunStatus | null {
+  if (!a) return b ?? null;
+  if (!b) return a;
+  const ta = Date.parse(a.finished_at);
+  const tb = Date.parse(b.finished_at);
+  if (Number.isNaN(ta)) return b;
+  if (Number.isNaN(tb)) return a;
+  return tb >= ta ? b : a;
+}

@@ -11,7 +11,7 @@
  * Rendered as a regular Astro component (no client directive) — the inner
  * <script> hydrates the component client-side.
  */
-import { statusUrlForSlug } from '../lib/status';
+import { pickFreshestRun, statusUrlForSlug } from '../lib/status';
 
 interface Props {
   modelSlug: string;
@@ -142,13 +142,8 @@ const { modelSlug, title } = Astro.props;
 <script>
   // Client-side hydration: fetch the per-slug status JSON and paint a badge +
   // expandable details panel. Pure ESM so it works on a static SSG build.
-  import type { ModelStatus, RunStatus } from '../lib/status';
-
-  function pickFreshest(a: RunStatus | null, b: RunStatus | null): RunStatus | null {
-    if (!a) return b;
-    if (!b) return a;
-    return Date.parse(a.finished_at) >= Date.parse(b.finished_at) ? a : b;
-  }
+  import type { ModelStatus } from '../lib/status';
+  import { pickFreshestRun } from '../lib/status';
 
   function fmtDuration(start: string, end: string): string {
     if (!start || !end) return '';
@@ -175,7 +170,7 @@ const { modelSlug, title } = Astro.props;
       return;
     }
 
-    const freshest = pickFreshest(data.last_pr_run, data.last_nightly_run);
+    const freshest = pickFreshestRun(data.last_pr_run, data.last_nightly_run);
     if (!freshest) return;
     const duration = fmtDuration(freshest.started_at, freshest.finished_at);
     const pillClass =

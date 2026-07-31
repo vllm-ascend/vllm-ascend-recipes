@@ -1,7 +1,7 @@
 ---
 import type { ModelListItem } from '../lib/types';
 import { formatContextLength, formatParameters } from '../lib/models';
-import { statusUrlForSlug } from '../lib/status';
+import { pickFreshestRun, statusUrlForSlug } from '../lib/status';
 
 interface Props {
   model: ModelListItem & {
@@ -85,7 +85,12 @@ const slug = model._model_slug ?? '';
       const r = await fetch(url, { cache: 'no-cache' });
       if (!r.ok) return;
       const data = (await r.json()) as ModelStatus;
-      const run = data.last_pr_run ?? data.last_nightly_run;
+      // Use the freshest of (last_pr_run, last_nightly_run) instead of
+      // preferring PR — see pickFreshestRun comment in lib/status.ts. This
+      // keeps the dot accurate when last_pr_run is a stale mock fixture
+      // (survived publish_skeleton.py's looks_real() heuristic) while a
+      // newer nightly has actually run.
+      const run = pickFreshestRun(data.last_pr_run, data.last_nightly_run);
       const dot = card.querySelector<HTMLElement>('.status-dot');
       if (!dot || !run) return;
       dot.classList.remove('hidden', 'bg-zinc-500');
