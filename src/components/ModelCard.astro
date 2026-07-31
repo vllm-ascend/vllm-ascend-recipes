@@ -1,7 +1,7 @@
 ---
 import type { ModelListItem } from '../lib/types';
 import { formatContextLength, formatParameters } from '../lib/models';
-import { pickFreshestRun, statusUrlForSlug } from '../lib/status';
+import { statusUrlForSlug } from '../lib/status';
 
 interface Props {
   model: ModelListItem & {
@@ -77,6 +77,7 @@ const slug = model._model_slug ?? '';
   // fetching the per-slug status JSON. Failure is silent — the card
   // renders fine without it.
   import type { ModelStatus } from '../lib/status';
+  import { pickFreshestRun } from '../lib/status';
 
   async function paintDot(card: HTMLElement) {
     const url = card.dataset.statusUrl;
