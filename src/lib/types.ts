@@ -4,8 +4,11 @@ export interface Meta {
   provider: string;
   description: string;
   date_added: string;
+  date_updated?: string;
+  difficulty?: 'beginner' | 'intermediate' | 'advanced';
   tasks?: string[];
   performance_headline?: string;
+  related_recipes?: string[];
   hardware?: Record<string, 'verified' | 'unsupported' | 'experimental'>;
 }
 
