@@ -160,9 +160,9 @@ addToc('reference', 'sectionMoreInfo');
               )
             }
             {
-              model.meta.tasks && model.meta.tasks.length > 0 && (
+              model.meta.tasks &&
+                model.meta.tasks.length > 0 &&
                 model.meta.tasks.map((task) => <Tag label={task} color="gray" />)
-              )
             }
           </div>
 
