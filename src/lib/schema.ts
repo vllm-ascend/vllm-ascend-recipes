@@ -7,8 +7,11 @@ export const metaSchema = z.object({
   provider: z.string(),
   description: z.string(),
   date_added: z.string(),
+  date_updated: z.string().optional(),
+  difficulty: z.enum(['beginner', 'intermediate', 'advanced']).optional(),
   tasks: z.array(z.string()).optional(),
   performance_headline: z.string().optional(),
+  related_recipes: z.array(z.string()).optional(),
   hardware: z
     .object({
       atlas_800_a3: z.enum(['verified', 'unsupported', 'experimental']).optional(),
