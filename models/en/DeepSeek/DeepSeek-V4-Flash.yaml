@@ -4,6 +4,10 @@ meta:
   provider: "DeepSeek"
   description: "DeepSeek V4 MoE model with hybrid CSA+HCA attention, manifold-constrained hyper-connections, and three-tier reasoning (Non-think / Think High / Think Max)."
   date_added: 2026-07-07
+  date_updated: 2026-08-03
+  difficulty: advanced
+  tasks:
+    - text
   performance_headline: "Compact 284B/13B V4 sibling — single-node 1M-context serving with W8A8 weights and MTP"
   hardware:
     atlas_800_a3: verified
@@ -11,7 +15,7 @@ meta:
 
 model:
   model_id: "deepseek-ai/DeepSeek-V4-Flash"
-  min_vllm_version: "0.8.4rc2"
+  min_vllm_version: "0.23"
   architecture: moe
   parameter_count: "284B"
   active_parameters: "13B"
