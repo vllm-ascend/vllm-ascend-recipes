@@ -1,0 +1,7 @@
+# actionlint config — declares our self-hosted runner labels so workflows that
+# use a literal `runs-on:` label pass `actionlint` (run by lint.yml's
+# `workflow-lint` job on every .github/workflows/** change).
+self-hosted-runner:
+  labels:
+    - linux-aarch64-a2b4-0
+    - linux-aarch64-a2b4-8

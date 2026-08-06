@@ -13,6 +13,7 @@ set -euo pipefail
 RECIPE="$1"
 STATUS=0
 SKIPPED=0
+VERIFIED=0   # scenarios actually run (not skipped) — distinguishes pass+skip from all-skip
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -364,6 +365,9 @@ while IFS='|' read -r idx npu precision deployment case_name; do
     continue
   fi
 
+  # Reaching here means this scenario is actually being verified.
+  VERIFIED=$((VERIFIED + 1))
+
   VLLM_SCRIPT="/tmp/vllm_serve_${idx}.sh"
   cat > "$VLLM_SCRIPT" <<'SCRIPT_HEREDOC'
 #!/usr/bin/env bash
@@ -476,13 +480,14 @@ done < /tmp/scenario_list.txt
 # Exit code precedence (matters for the wrapper's .status write):
 #   1 = fail    — at least one scenario actually failed; this MUST win over skip
 #                 so a recipe with mixed fail+skip scenarios doesn't show as gray
-#   2 = skip   — every scenario was auto-skipped (e.g. multi-node on single-node runner)
-#   0 = pass   — every scenario verified
+#   0 = pass    — at least one scenario was actually verified (single-node passed,
+#                 even if the multi-node scenarios were skipped)
+#   2 = skip    — every scenario was auto-skipped (e.g. multi-node on single-node runner)
 if [[ "$STATUS" -gt 0 ]]; then
   exit 1
 fi
-if [[ "$SKIPPED" -gt 0 ]]; then
-  exit 2
+if [[ "$VERIFIED" -gt 0 ]]; then
+  exit 0
 fi
 
-exit 0
+exit 2
