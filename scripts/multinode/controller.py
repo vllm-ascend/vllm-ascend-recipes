@@ -322,94 +322,115 @@ def _volume_mounts(npu_per_node: int) -> list[dict]:
     return mounts
 
 
-def _pod_spec(plan: dict, args, entry_cm: str) -> dict:
+def _pod_spec(plan: dict, args, entry_cm: str, role: str = "") -> dict:
     npu = plan.get("npu_per_node") or args.npu_per_node
     lws = plan["lws_name"]
+    labels = {"multinode-lws": lws}
+    if role:
+        labels["role"] = role
     return {
-        "metadata": {"labels": {"multinode-lws": lws}},
-        "hostNetwork": True,
-        # hostNetwork pods default to dnsPolicy: Default (the node's
-        # resolv.conf), which has no cluster search domains -> the LWS headless
-        # service DNS (<pod>.<group>.<ns>.svc.cluster.local) would NOT resolve
-        # and node_entry could not find its peers. ClusterFirstWithHostNet
-        # routes hostNetwork-pod DNS through CoreDNS with the pod's search
-        # domains, fixing peer resolution.
-        "dnsPolicy": "ClusterFirstWithHostNet",
-        # No pod-level restartPolicy: the CCE LWS addon (cceaddon-lws-
-        # controller-manager) creates a StatefulSet per subgroup, and K8s
-        # rejects StatefulSet pod templates with restartPolicy != "Always".
-        # Omitting it leaves the default "Always"; failed-pod diagnosis still
-        # works (CrashLoopBackOff pods are loggable).
-        # SOFT affinity for the NPU chip: the pod already requests
-        # NPU_RESOURCE (huawei.com/ascend-1980), which is what actually pins it
-        # to NPU-capable nodes. A *required* nodeAffinity on the chip label
-        # used to block scheduling entirely when nodes didn't carry
-        # node.kubernetes.io/npu.chip.name={args.chip}; as a preference it
-        # still favors the target chip but lets the pod land on any NPU node.
-        "affinity": {
-            "nodeAffinity": {
-                "preferredDuringSchedulingIgnoredDuringExecution": [{
-                    "weight": 100,
-                    "preference": {
-                        "matchExpressions": [{
-                            "key": "node.kubernetes.io/npu.chip.name",
-                            "operator": "In",
-                            "values": [args.chip],
-                        }]
-                    },
-                }]
+        "metadata": {"labels": labels},
+        "spec": {
+            "hostNetwork": True,
+            # hostNetwork pods default to dnsPolicy: Default (the node's
+            # resolv.conf), which has no cluster search domains -> the LWS
+            # headless service DNS (<pod>.<group>.<ns>.svc.cluster.local)
+            # would NOT resolve and node_entry could not find its peers.
+            # ClusterFirstWithHostNet routes hostNetwork-pod DNS through
+            # CoreDNS with the pod's search domains, fixing peer resolution.
+            "dnsPolicy": "ClusterFirstWithHostNet",
+            # No pod-level restartPolicy: the CCE LWS addon (cceaddon-lws-
+            # controller-manager) creates a StatefulSet per subgroup, and K8s
+            # rejects StatefulSet pod templates with restartPolicy != "Always".
+            # Omitting it leaves the default "Always"; failed-pod diagnosis
+            # still works (CrashLoopBackOff pods are loggable).
+            # NPU nodes carry dedicated=night:NoSchedule; without this
+            # toleration LWS pods stay Pending forever (the proven runner LWS
+            # from PR #34 uses the same toleration).
+            "tolerations": [{
+                "key": "dedicated",
+                "operator": "Equal",
+                "value": "night",
+                "effect": "NoSchedule",
+            }],
+            # SOFT affinity for the NPU chip: the pod already requests
+            # NPU_RESOURCE (huawei.com/ascend-1980), which is what actually
+            # pins it to NPU-capable nodes. A *required* nodeAffinity on the
+            # chip label used to block scheduling entirely when nodes didn't
+            # carry node.kubernetes.io/npu.chip.name={args.chip}; as a
+            # preference it still favors the target chip but lets the pod land
+            # on any NPU node.
+            "affinity": {
+                "nodeAffinity": {
+                    "preferredDuringSchedulingIgnoredDuringExecution": [{
+                        "weight": 100,
+                        "preference": {
+                            "matchExpressions": [{
+                                "key": "node.kubernetes.io/npu.chip.name",
+                                "operator": "In",
+                                "values": [args.chip],
+                            }]
+                        },
+                    }]
+                },
+                # PD separation REQUIRES prefill and decode on different nodes
+                # (they use the same DP RPC port 12321 — co-locating them gives
+                # "Address already in use"). PR #34 pins 1 pod/node via
+                # podAntiAffinity; do the same on a shared LWS label +
+                # kubernetes.io/hostname.
+                "podAntiAffinity": {
+                    "requiredDuringSchedulingIgnoredDuringExecution": [{
+                        "labelSelector": {
+                            "matchLabels": {"multinode-lws": lws},
+                        },
+                        "topologyKey": "kubernetes.io/hostname",
+                    }]
+                },
             },
-            # PD separation REQUIRES prefill and decode on different nodes (they
-            # use the same DP RPC port 12321 — co-locating them gives "Address
-            # already in use"). PR #34 pins 1 pod/node via podAntiAffinity; do
-            # the same on a shared LWS label + kubernetes.io/hostname.
-            "podAntiAffinity": {
-                "requiredDuringSchedulingIgnoredDuringExecution": [{
-                    "labelSelector": {
-                        "matchLabels": {"multinode-lws": lws},
-                    },
-                    "topologyKey": "kubernetes.io/hostname",
-                }]
-            },
+            "containers": [{
+                "name": "vllm-ascend",
+                "image": args.image,
+                "imagePullPolicy": "IfNotPresent",
+                "command": ["python3", "/scripts/node_entry.py"],
+                "env": [
+                    {"name": "MULTINODE_WORKDIR", "value": "/run/recipe-ci"},
+                    {"name": "MULTINODE_PLAN", "value": "/scripts/plan.json"},
+                    {"name": "RUN_ID", "value": args.run_id},
+                    # NOTE: VLLM_USE_MODELSCOPE must NOT be set here. With it,
+                    # vllm passes the model path to modelscope's
+                    # snapshot_download, which treats the absolute path as a
+                    # REMOTE model id and 404s. The weights are pre-downloaded
+                    # as a plain local dir under /root/.cache/modelscope/hub/
+                    # models/Eco-Tech/<model>, which vllm loads directly
+                    # without the flag.
+                    # Mooncake runtime .so lives under site-packages/mooncake;
+                    # the mooncake-enabled image bakes this via ENV too, this
+                    # is insurance.
+                    {"name": "LD_LIBRARY_PATH",
+                     "value": "/usr/local/lib64/python3.12/site-packages/mooncake"},
+                ],
+                "securityContext": {"privileged": True},
+                "resources": {
+                    "limits": {NPU_RESOURCE: npu,
+                               "memory": f"{npu * 64}Gi",
+                               "ephemeral-storage": "20Gi"},
+                    # CPU request scales with NPU count (4/NPU) — a hardcoded
+                    # 125 (and later 8/NPU) made pods Unschedulable on 910B4
+                    # nodes that were short on free CPU; 4/NPU fits 4-card
+                    # nodes (tp*dp=4). Memory also scales (64Gi/NPU): a flat
+                    # 512Gi request was Unschedulable on nodes that don't have
+                    # 512Gi free. Ephemeral storage is capped at 20Gi to match
+                    # the working PR #34 LWS (100Gi was Unschedulable on some
+                    # nodes).
+                    "requests": {NPU_RESOURCE: npu,
+                                 "cpu": str(npu * 4),
+                                 "memory": f"{npu * 64}Gi",
+                                 "ephemeral-storage": "20Gi"},
+                },
+                "volumeMounts": _volume_mounts(npu),
+            }],
+            "volumes": _volumes(npu, entry_cm, getattr(args, "pvc_name", "")),
         },
-        "containers": [{
-            "name": "vllm-ascend",
-            "image": args.image,
-            "imagePullPolicy": "IfNotPresent",
-            "command": ["python3", "/scripts/node_entry.py"],
-            "env": [
-                {"name": "MULTINODE_WORKDIR", "value": "/run/recipe-ci"},
-                {"name": "MULTINODE_PLAN", "value": "/scripts/plan.json"},
-                {"name": "RUN_ID", "value": args.run_id},
-                # NOTE: VLLM_USE_MODELSCOPE must NOT be set here. With it, vllm
-                # passes the model path to modelscope's snapshot_download, which
-                # treats the absolute path as a REMOTE model id and 404s. The
-                # weights are pre-downloaded as a plain local dir under
-                # /root/.cache/modelscope/hub/models/Eco-Tech/<model>, which vllm
-                # loads directly without the flag.
-                # Mooncake runtime .so lives under site-packages/mooncake; the
-                # mooncake-enabled image bakes this via ENV too, this is insurance.
-                {"name": "LD_LIBRARY_PATH",
-                 "value": "/usr/local/lib64/python3.12/site-packages/mooncake"},
-            ],
-            "securityContext": {"privileged": True},
-            "resources": {
-                "limits": {NPU_RESOURCE: npu,
-                           "memory": f"{npu * 64}Gi",
-                           "ephemeral-storage": "100Gi"},
-                # CPU request scales with NPU count (4/NPU) — a hardcoded 125
-                # (and later 8/NPU) made pods Unschedulable on 910B4 nodes that
-                # were short on free CPU; 4/NPU fits 4-card nodes (tp*dp=4).
-                # Memory also scales (64Gi/NPU): a flat 512Gi request was
-                # Unschedulable on nodes that don't have 512Gi free.
-                "requests": {NPU_RESOURCE: npu,
-                             "cpu": str(npu * 4),
-                             "memory": f"{npu * 64}Gi",
-                             "ephemeral-storage": "100Gi"},
-            },
-            "volumeMounts": _volume_mounts(npu),
-        }],
-        "volumes": _volumes(npu, entry_cm, getattr(args, "pvc_name", "")),
     }
 
 
@@ -425,14 +446,23 @@ def render_lws(plan: dict, args) -> str:
     substitution (no jinja2 dependency on the controller runner)."""
     size = plan["topology"]["prefill"] + plan["topology"]["decode"]
     entry_cm = f"recipe-entry-{args.run_id}"
-    pod_spec = yaml.safe_dump(_pod_spec(plan, args, entry_cm), sort_keys=False).rstrip()
+    # _pod_spec returns a full PodTemplateSpec ({metadata, spec}); inject it at
+    # the leaderTemplate / workerTemplate level (indent 6 = child of a key at
+    # 4 spaces). Injecting it under `spec:` instead would nest metadata inside
+    # PodSpec, which the API server rejects with "unknown field metadata".
+    leader_spec = _indent(
+        yaml.safe_dump(_pod_spec(plan, args, entry_cm, role="leader"),
+                       sort_keys=False).rstrip(), 6)
+    worker_spec = _indent(
+        yaml.safe_dump(_pod_spec(plan, args, entry_cm, role="worker"),
+                       sort_keys=False).rstrip(), 6)
     tpl = (SCRIPT_DIR / "lws.yaml.jinja2").read_text(encoding="utf-8")
     values = {
         "LWS_NAME": plan["lws_name"],
         "NAMESPACE": args.namespace,
         "SIZE": str(size),
-        "LEADER_SPEC": _indent(pod_spec, 8),
-        "WORKER_SPEC": _indent(pod_spec, 8),
+        "LEADER_SPEC": leader_spec,
+        "WORKER_SPEC": worker_spec,
     }
     for key, value in values.items():
         tpl = tpl.replace("{{ " + key + " }}", value)
