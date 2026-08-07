@@ -97,19 +97,13 @@ scenarios:
       Prefill node:
 
       ```shell
-      nic_name="xxx" # change to your own nic name
-      local_ip="xx.xx.xx.1" # change to your own ip
-
-      export HCCL_IF_IP=$local_ip
-      export GLOO_SOCKET_IFNAME=$nic_name
-      export TP_SOCKET_IFNAME=$nic_name
-      export HCCL_SOCKET_IFNAME=$nic_name
-      export HCCL_OP_EXPANSION_MODE="AIV"
+      # HCCL auto-discovers the HCCN interfaces. Do NOT force
+      # HCCL_IF_IP / socket ifnames onto the management NIC — that fails with
+      # HCCL "ERR02005 DIST internal error" in the vllm engine.
       export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
       export OMP_PROC_BIND=false
       export OMP_NUM_THREADS=10
       export TASK_QUEUE_ENABLE=1
-      export LD_LIBRARY_PATH=/usr/local/Ascend/ascend-toolkit/latest/python/site-packages/mooncake:$LD_LIBRARY_PATH
       export HCCL_BUFFSIZE=256
       # launch_online_dp.py passes logical device indexes; map them onto the
       # container's assigned physical devices (ASCEND_RT_VISIBLE_DEVICES).
@@ -139,19 +133,13 @@ scenarios:
       Decode node:
 
       ```shell
-      nic_name="xxx" # change to your own nic name
-      local_ip="xx.xx.xx.2" # change to your own ip
-
-      export HCCL_IF_IP=$local_ip
-      export GLOO_SOCKET_IFNAME=$nic_name
-      export TP_SOCKET_IFNAME=$nic_name
-      export HCCL_SOCKET_IFNAME=$nic_name
-      export HCCL_OP_EXPANSION_MODE="AIV"
+      # HCCL auto-discovers the HCCN interfaces. Do NOT force
+      # HCCL_IF_IP / socket ifnames onto the management NIC — that fails with
+      # HCCL "ERR02005 DIST internal error" in the vllm engine.
       export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
       export OMP_PROC_BIND=false
       export OMP_NUM_THREADS=10
       export TASK_QUEUE_ENABLE=1
-      export LD_LIBRARY_PATH=/usr/local/Ascend/ascend-toolkit/latest/python/site-packages/mooncake:$LD_LIBRARY_PATH
       export HCCL_BUFFSIZE=256
       # launch_online_dp.py passes logical device indexes; map them onto the
       # container's assigned physical devices (ASCEND_RT_VISIBLE_DEVICES).

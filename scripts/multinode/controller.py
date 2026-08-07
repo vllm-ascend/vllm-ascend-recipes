@@ -270,21 +270,6 @@ def _parse_launch_topology(plan: dict) -> tuple[dict, int]:
 
 def _volumes(npu_per_node: int, entry_cm: str, pvc_name: str = "") -> list[dict]:
     volumes = []
-    for i in range(npu_per_node):
-        volumes.append({"name": f"davinci{i}",
-                        "hostPath": {"path": f"/dev/davinci{i}", "type": "CharDevice"}})
-    for name, path in (("davinci-manager", "/dev/davinci_manager"),
-                       ("devmm-svm", "/dev/devmm_svm"),
-                       ("hisi-hdc", "/dev/hisi_hdc")):
-        volumes.append({"name": name, "hostPath": {"path": path, "type": "CharDevice"}})
-    for name, path in (("dcmi", "/usr/local/dcmi"),
-                       ("hccn-tool", "/usr/local/Ascend/driver/tools/hccn_tool"),
-                       ("npu-smi", "/usr/local/bin/npu-smi"),
-                       ("driver-lib64", "/usr/local/Ascend/driver/lib64"),
-                       ("driver-version", "/usr/local/Ascend/driver/version.info"),
-                       ("ascend-install-info", "/etc/ascend_install.info"),
-                       ("hccn-conf", "/etc/hccn.conf")):
-        volumes.append({"name": name, "hostPath": {"path": path}})
     # Model weights: a node-local hostPath only works if every schedulable node
     # has them. PR #34 mounts the shared RWX cache PVC at /root/.cache — do the
     # same (pvc_name defaults to the cluster's shared cache volume).
@@ -294,32 +279,29 @@ def _volumes(npu_per_node: int, entry_cm: str, pvc_name: str = "") -> list[dict]
     else:
         volumes.append({"name": "model-cache",
                         "hostPath": {"path": "/root/.cache/modelscope"}})
-    volumes.append({"name": "shm", "emptyDir": {"medium": "Memory", "sizeLimit": "512Gi"}})
+    # Driver + tools (hccn_tool, lib64, version.info...) straight from the
+    # host — same as the proven PR #34 LWS. Do NOT mount /dev/davinciN from
+    # the host: the Ascend device plugin injects the NPU device nodes and
+    # ASCEND_RT_VISIBLE_DEVICES itself; hostPath device mounts conflict with
+    # it and leave the env unset (vllm then targets the wrong devices).
+    volumes.append({"name": "driver-tools",
+                    "hostPath": {"path": "/usr/local/Ascend/driver"}})
+    volumes.append({"name": "worklogs", "emptyDir": {}})
+    volumes.append({"name": "shm", "emptyDir": {"medium": "Memory", "sizeLimit": "16Gi"}})
     volumes.append({"name": "workdir", "emptyDir": {}})
     volumes.append({"name": "entry", "configMap": {"name": entry_cm}})
     return volumes
 
 
 def _volume_mounts(npu_per_node: int) -> list[dict]:
-    mounts = [{"name": f"davinci{i}", "mountPath": f"/dev/davinci{i}"}
-              for i in range(npu_per_node)]
-    mounts += [
-        {"name": "davinci-manager", "mountPath": "/dev/davinci_manager"},
-        {"name": "devmm-svm", "mountPath": "/dev/devmm_svm"},
-        {"name": "hisi-hdc", "mountPath": "/dev/hisi_hdc"},
-        {"name": "dcmi", "mountPath": "/usr/local/dcmi"},
-        {"name": "hccn-tool", "mountPath": "/usr/local/Ascend/driver/tools/hccn_tool"},
-        {"name": "npu-smi", "mountPath": "/usr/local/bin/npu-smi"},
-        {"name": "driver-lib64", "mountPath": "/usr/local/Ascend/driver/lib64"},
-        {"name": "driver-version", "mountPath": "/usr/local/Ascend/driver/version.info"},
-        {"name": "ascend-install-info", "mountPath": "/etc/ascend_install.info"},
-        {"name": "hccn-conf", "mountPath": "/etc/hccn.conf"},
+    return [
+        {"name": "driver-tools", "mountPath": "/usr/local/Ascend/driver"},
         {"name": "model-cache", "mountPath": "/root/.cache"},
+        {"name": "worklogs", "mountPath": "/root/ascend/log"},
         {"name": "shm", "mountPath": "/dev/shm"},
         {"name": "workdir", "mountPath": "/run/recipe-ci"},
         {"name": "entry", "mountPath": "/scripts"},
     ]
-    return mounts
 
 
 def _pod_spec(plan: dict, args, entry_cm: str, role: str = "") -> dict:
