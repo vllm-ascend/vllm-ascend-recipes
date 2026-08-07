@@ -333,15 +333,29 @@ jobs:
             --results-dir /tmp/multinode-results \
             ${{ inputs.run_eval == 'true' && '--run-eval' || '' }}
 
-      - name: Upload multi-node results
+      - name: Upload multi-node results to OBS
         if: always()
-        # upload-artifact@v4 is a node20 action; this runner's Node 24 shim
-        # intermittently hangs it (upload stalls until the step timeout kills
-        # it with "Executing the custom container implementation failed").
-        # v7 is node24-native and matches the proven PR #34 runner config;
-        # compression-level 0 keeps the upload CPU-cheap.
-        uses: actions/upload-artifact@v7
+        continue-on-error: true
+        timeout-minutes: 15
+        uses: ascend-gha-runners/artifact/upload@v0.3
+        with:
+          access_key: ${{ secrets.OBS_AK }}
+          secret_key: ${{ secrets.OBS_SK }}
+          name: multinode-results-${{ github.run_id }}
+          path: /tmp/multinode-results/
+          retention-days: 14
+          if-no-files-found: warn
+
+      - name: Upload multi-node results to GitHub
+        if: always()
+        # The self-hosted runner's upload path to GitHub's results service is
+        # intermittently flaky (v4 under the Node 24 shim and v7 native both
+        # hang at times). Both upload steps are best-effort
+        # (continue-on-error: true) so a flaky upload never turns a green
+        # pipeline red — the same pattern as the proven PR #34 runner config.
+        continue-on-error: true
         timeout-minutes: 5
+        uses: actions/upload-artifact@v7
         with:
           name: multinode-results-${{ github.run_id }}
           path: /tmp/multinode-results/
