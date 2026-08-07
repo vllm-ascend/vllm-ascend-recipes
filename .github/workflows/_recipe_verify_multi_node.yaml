@@ -340,12 +340,13 @@ jobs:
             cp "/tmp/recipe-ci-node${index}.log" \
               "$bundle/pod-logs/node${index}.log" 2>/dev/null || true
           done
+          du -sh "$bundle"
 
       - name: Upload Recipe CI bundle
         id: upload_bundle
         if: always()
-        timeout-minutes: 5
-        uses: actions/upload-artifact@v4
+        timeout-minutes: 15
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ steps.initialize.outputs.artifact_name || format('recipe-ci-diagnostics-{0}', github.run_id) }}
           path: /tmp/recipe-ci-bundle/

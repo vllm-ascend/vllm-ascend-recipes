@@ -222,6 +222,10 @@ class MultiNodeWorkflowTests(unittest.TestCase):
         self.assertIn('kubectl delete leaderworkerset "$LWS_NAME"', workflow)
         self.assertIn("--ignore-not-found=true --wait=false", workflow)
         self.assertIn("deadline=$((SECONDS + 180))", workflow)
+        self.assertIn('du -sh "$bundle"', workflow)
+        self.assertIn("uses: actions/upload-artifact@v7", workflow)
+        self.assertIn("timeout-minutes: 15", workflow)
+        self.assertNotIn("uses: actions/upload-artifact@v4", workflow)
 
     def test_one_run_script_accepts_local_ips_or_lws_dns(self) -> None:
         text = RUN_SCRIPT.read_text(encoding="utf-8")
