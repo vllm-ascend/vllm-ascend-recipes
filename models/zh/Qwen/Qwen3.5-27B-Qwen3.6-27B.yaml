@@ -271,6 +271,123 @@ env_setup:
 
 scenarios:
 # ===== Atlas 800 A2 单节点 W8A8 =====
+- npu: Atlas 800I A2
+  precision: W8A8
+  deployment: 单节点
+  case: 多卡
+  steps:
+  - title: 启动服务（Qwen3.5-27B-w8a8）
+    content: |-
+      在 Atlas 800 A2 上单节点部署 `Qwen3.5-27B-w8a8-mtp`（TP=2）。`Qwen3.6-27B-w8a8` 同样适用 —— 替换模型 id 和 `--served-model-name` 即可。
+
+      ```bash
+      #!/bin/sh
+      export VLLM_USE_MODELSCOPE=True
+      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+      export HCCL_BUFFSIZE=512
+      export OMP_PROC_BIND=false
+      export OMP_NUM_THREADS=1
+      export TASK_QUEUE_ENABLE=1
+
+      vllm serve your_model_path \
+      --host 0.0.0.0 \
+      --port 8000 \
+      --data-parallel-size 1 \
+      --tensor-parallel-size 2 \
+      --seed 1024 \
+      --quantization ascend \
+      --served-model-name qwen3.5 \
+      --max-num-seqs 32 \
+      --max-model-len 133000 \
+      --max-num-batched-tokens 8096 \
+      --trust-remote-code \
+      --gpu-memory-utilization 0.90 \
+      --no-enable-prefix-caching \
+      --speculative-config '{"method": "qwen3_5_mtp", "num_speculative_tokens": 3, "enforce_eager": true}' \
+      --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY"}' \
+      --additional-config '{"enable_cpu_binding":true}' \
+      --async-scheduling
+      ```
+
+      Qwen3.6-27B-w8a8：模型 id 替换为 `Eco-Tech/Qwen3.6-27B-w8a8`，`--served-model-name qwen3.6`，如需更长上下文可提高 `--max-model-len 262144`。
+  - title: 服务验证
+    content: |-
+      参见下方 `verification` 部分 —— 日志打印 `Application startup complete.` 即服务就绪。
+
+# ===== Atlas 800 A3 单节点 W8A8 =====
+- npu: Atlas 800I A3
+  precision: W8A8
+  deployment: 单节点
+  case: 多卡
+  steps:
+  - title: 启动服务（Qwen3.5-27B-w8a8，满配 16 NPU）
+    content: |-
+      与 A2 命令相同的环境变量，但 `--data-parallel-size` 设为 4（用满 Atlas 800 A2 的 8 NPU）或 8（用满 Atlas 800 A3 的 16 NPU）。TP=2 是推荐默认值；TP=8 仅在超长上下文（256K+）场景下需要。
+
+      ```bash
+      #!/bin/sh
+      export VLLM_USE_MODELSCOPE=True
+      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+      export HCCL_BUFFSIZE=512
+      export OMP_PROC_BIND=false
+      export OMP_NUM_THREADS=1
+      export TASK_QUEUE_ENABLE=1
+
+      vllm serve your_model_path \
+      --host 0.0.0.0 \
+      --port 8000 \
+      --data-parallel-size 8 \
+      --tensor-parallel-size 2 \
+      --seed 1024 \
+      --quantization ascend \
+      --served-model-name qwen3.5 \
+      --max-num-seqs 32 \
+      --max-model-len 133000 \
+      --max-num-batched-tokens 16384 \
+      --trust-remote-code \
+      --gpu-memory-utilization 0.90 \
+      --no-enable-prefix-caching \
+      --speculative-config '{"method": "qwen3_5_mtp", "num_speculative_tokens": 3, "enforce_eager": true}' \
+      --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY"}' \
+      --additional-config '{"enable_cpu_binding":true}' \
+      --async-scheduling
+      ```
+  - title: 服务验证
+    content: |-
+      参见下方 `verification` 部分。
+
+# ===== Atlas 800 A3 单节点 BF16 =====
+- npu: Atlas 800I A3
+  precision: BF16
+  deployment: 单节点
+  case: 多卡
+  steps:
+  - title: 启动服务（Qwen3.5-27B BF16）
+    content: |-
+      去掉 `--quantization ascend`，使用 `weight_download` 中的 BF16 模型 id：
+
+      ```bash
+      vllm serve your_model_path \
+      --host 0.0.0.0 \
+      --port 8000 \
+      --data-parallel-size 8 \
+      --tensor-parallel-size 2 \
+      --served-model-name qwen3.5 \
+      --max-num-seqs 32 \
+      --max-model-len 133000 \
+      --max-num-batched-tokens 16384 \
+      --trust-remote-code \
+      --gpu-memory-utilization 0.90 \
+      --no-enable-prefix-caching \
+      --speculative-config '{"method": "qwen3_5_mtp", "num_speculative_tokens": 3, "enforce_eager": true}' \
+      --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY"}' \
+      --async-scheduling
+      ```
+  - title: 服务验证
+    content: |-
+      参见下方 `verification` 部分。
+
+# ===== Atlas 800 A3 多节点 PD 分离 =====
 - npu: Atlas 800I A3
   precision: W8A8
   deployment: 多节点 PD 分离
@@ -284,7 +401,7 @@ scenarios:
   - title: Prefill 节点 —— `run_dp_template.sh`
     content: |-
       ```shell
-      nic_name="xxx" # 例: "enp67s0f0np0" — 用 `ip a` 查绑定本机 IP 的网卡
+      nic_name="xxx"
       local_ip="141.xx.xx.1"
 
       export HCCL_IF_IP=$local_ip
@@ -337,22 +454,6 @@ scenarios:
       环境变量与 Prefill 节点相同，仅 `local_ip="141.xx.xx.2"`（decode 节点 IP）。vllm serve 命令不同：
 
       ```shell
-      nic_name="xxx" # 例: "enp67s0f0np0" — 用 `ip a` 查绑定本机 IP 的网卡
-      local_ip="141.xx.xx.2"
-
-      export HCCL_IF_IP=$local_ip
-      export GLOO_SOCKET_IFNAME=$nic_name
-      export TP_SOCKET_IFNAME=$nic_name
-      export HCCL_SOCKET_IFNAME=$nic_name
-      export HCCL_OP_EXPANSION_MODE="AIV"
-      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
-      export OMP_PROC_BIND=false
-      export OMP_NUM_THREADS=1
-      export TASK_QUEUE_ENABLE=1
-      export LD_LIBRARY_PATH=/usr/local/Ascend/ascend-toolkit/latest/python/site-packages/mooncake:$LD_LIBRARY_PATH
-      export HCCL_BUFFSIZE=1024
-      export ASCEND_RT_VISIBLE_DEVICES=$1
-
       vllm serve your_model_path \
         --host 0.0.0.0 \
         --port $2 \
@@ -415,162 +516,6 @@ scenarios:
           -H "Content-Type: application/json" \
           -d '{
               "model": "qwen3.5",
-              "messages": [{"role": "user", "content": "The future of AI is"}],
-              "max_tokens": 1024,
-              "temperature": 1.0,
-              "top_p": 0.95
-          }'
-      ```
-
-      预期：HTTP 200 OK，包含 `choices` 字段 —— Prefill 与 Decode 节点协作正常。
-- npu: Atlas 800I A2
-  precision: W8A8
-  deployment: Multi-Node PD Separation
-  case: 1P1D（1 个 Prefill 节点 + 1 个 Decode 节点）
-  steps:
-  - title: 拓扑（1P1D，每节点 TP=1 + DP=8）
-    content: |-
-      使用 **2 台 Atlas 800 A2 (64G × 8)** —— 一台 Prefill 节点，一台 Decode 节点。每节点运行 `TP=1 + DP=8`，充分利用全部 8 个 NPU。这是上面 A3 1P1D 拓扑在 A2 上的对应方案：`Qwen3.6-27B-w8a8` 可放入单张 NPU，因此每个 DP rank 只用一张 NPU。
-
-      多节点 PD 分离推荐用于高并发生产场景，推荐使用 Mooncake 部署：[Mooncake 多节点 PD 分离指南](../features/pd_disaggregation_mooncake_multi_node.md)。
-
-      > **注意**：多节点 PD 分离需要镜像内包含 Mooncake 运行时（使用 `-mooncake` 版 vllm-ascend 镜像）。
-  - title: Prefill 节点 —— `run_dp_template.sh`
-    content: |-
-      Prefill 节点运行 `TP=1 + DP=8`（8 张 NPU，每个引擎一张卡）。模板从 `launch_online_dp.py` 接收 `$1..$7`。
-
-      ```shell
-      nic_name="xxx" # 例: "enp67s0f0np0" — 用 `ip a` 查绑定本机 IP 的网卡
-      local_ip="141.xx.xx.1"
-
-      export HCCL_IF_IP=$local_ip
-      export GLOO_SOCKET_IFNAME=$nic_name
-      export TP_SOCKET_IFNAME=$nic_name
-      export HCCL_SOCKET_IFNAME=$nic_name
-      export HCCL_OP_EXPANSION_MODE="AIV"
-      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
-      export OMP_PROC_BIND=false
-      export OMP_NUM_THREADS=1
-      export TASK_QUEUE_ENABLE=1
-      export LD_LIBRARY_PATH=/usr/local/Ascend/ascend-toolkit/latest/python/site-packages/mooncake:$LD_LIBRARY_PATH
-      export HCCL_BUFFSIZE=1024
-      export VLLM_ASCEND_ENABLE_FLASHCOMM1=1
-      export ASCEND_RT_VISIBLE_DEVICES=$1
-
-      vllm serve your_model_path \
-        --host 0.0.0.0 \
-        --port $2 \
-        --data-parallel-size $3 \
-        --data-parallel-rank $4 \
-        --data-parallel-address $5 \
-        --data-parallel-rpc-port $6 \
-        --tensor-parallel-size $7 \
-        --seed 1024 \
-        --quantization ascend \
-        --served-model-name qwen3.6 \
-        --trust-remote-code \
-        --max-num-seqs 4 \
-        --max-model-len 32768 \
-        --max-num-batched-tokens 16384 \
-        --no-enable-prefix-caching \
-        --gpu-memory-utilization 0.95 \
-        --enforce-eager \
-        --speculative-config '{"method": "qwen3_5_mtp", "num_speculative_tokens": 3, "enforce_eager": true}' \
-        --additional-config '{"enable_cpu_binding":true}' \
-        --kv-transfer-config \
-        '{"kv_connector": "MooncakeConnectorV1",
-        "kv_role": "kv_producer",
-        "kv_port": "30000",
-        "engine_id": "0",
-        "kv_connector_extra_config": {
-                  "prefill": {"dp_size": 8, "tp_size": 1},
-                  "decode":  {"dp_size": 8, "tp_size": 1}
-              }
-            }'
-      ```
-  - title: Decode 节点 —— `run_dp_template.sh`
-    content: |-
-      Decode 节点运行 `TP=1 + DP=8`。
-
-      ```shell
-      nic_name="xxx" # 例: "enp67s0f0np0" — 用 `ip a` 查绑定本机 IP 的网卡
-      local_ip="141.xx.xx.2"
-
-      export HCCL_IF_IP=$local_ip
-      export GLOO_SOCKET_IFNAME=$nic_name
-      export TP_SOCKET_IFNAME=$nic_name
-      export HCCL_SOCKET_IFNAME=$nic_name
-      export HCCL_OP_EXPANSION_MODE="AIV"
-      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
-      export OMP_PROC_BIND=false
-      export OMP_NUM_THREADS=1
-      export TASK_QUEUE_ENABLE=1
-      export LD_LIBRARY_PATH=/usr/local/Ascend/ascend-toolkit/latest/python/site-packages/mooncake:$LD_LIBRARY_PATH
-      export HCCL_BUFFSIZE=1024
-      export ASCEND_RT_VISIBLE_DEVICES=$1
-
-      vllm serve your_model_path \
-        --host 0.0.0.0 \
-        --port $2 \
-        --data-parallel-size $3 \
-        --data-parallel-rank $4 \
-        --data-parallel-address $5 \
-        --data-parallel-rpc-port $6 \
-        --tensor-parallel-size $7 \
-        --seed 1024 \
-        --quantization ascend \
-        --served-model-name qwen3.6 \
-        --trust-remote-code \
-        --max-num-seqs 16 \
-        --max-model-len 32768 \
-        --max-num-batched-tokens 2048 \
-        --no-enable-prefix-caching \
-        --gpu-memory-utilization 0.91 \
-        --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY"}' \
-        --additional-config '{"recompute_scheduler_enable":true,"enable_cpu_binding":true}' \
-        --async-scheduling \
-        --speculative-config '{"method": "qwen3_5_mtp", "num_speculative_tokens": 3, "enforce_eager": true}' \
-        --kv-transfer-config \
-        '{"kv_connector": "MooncakeConnectorV1",
-        "kv_role": "kv_consumer",
-        "kv_port": "30200",
-        "engine_id": "1",
-        "kv_connector_extra_config": {
-                  "prefill": {"dp_size": 8, "tp_size": 1},
-                  "decode":  {"dp_size": 8, "tp_size": 1}
-              }
-            }'
-      ```
-  - title: 在每节点启动 DP engine
-    content: |-
-      ```bash
-      # p0 (Prefill 节点 0)
-      python launch_online_dp.py --dp-size 4 --tp-size 1 --dp-size-local 4 --dp-rank-start 0 \
-        --dp-address 141.xx.xx.1 --dp-rpc-port 12321 --vllm-start-port 7100
-      # d0 (Decode 节点 0)
-      python launch_online_dp.py --dp-size 4 --tp-size 1 --dp-size-local 4 --dp-rank-start 0 \
-        --dp-address 141.xx.xx.2 --dp-rpc-port 12321 --vllm-start-port 7100
-      ```
-  - title: 在 Prefill 主节点上启动 proxy
-    content: |-
-      ```shell
-      python load_balance_proxy_server_example.py \
-        --port 1999 \
-        --host 141.xx.xx.1 \
-        --prefiller-hosts 141.xx.xx.1 141.xx.xx.1 141.xx.xx.1 141.xx.xx.1 \
-                          141.xx.xx.1 141.xx.xx.1 141.xx.xx.1 141.xx.xx.1 \
-        --prefiller-ports  7100 7101 7102 7103 7104 7105 7106 7107 \
-        --decoder-hosts    141.xx.xx.2 141.xx.xx.2 141.xx.xx.2 141.xx.xx.2 \
-                          141.xx.xx.2 141.xx.xx.2 141.xx.xx.2 141.xx.xx.2 \
-        --decoder-ports    7100 7101 7102 7103 7104 7105 7106 7107
-      ```
-  - title: 验证 PD 服务
-    content: |-
-      ```bash
-      curl http://<proxy_node0_ip>:1999/v1/chat/completions \
-          -H "Content-Type: application/json" \
-          -d '{
-              "model": "qwen3.6",
               "messages": [{"role": "user", "content": "The future of AI is"}],
               "max_tokens": 1024,
               "temperature": 1.0,

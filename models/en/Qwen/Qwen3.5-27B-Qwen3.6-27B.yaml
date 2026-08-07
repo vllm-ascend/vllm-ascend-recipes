@@ -271,6 +271,123 @@ env_setup:
 
 scenarios:
 # ===== Atlas 800 A2 single-node W8A8 =====
+- npu: Atlas 800I A2
+  precision: W8A8
+  deployment: Single-Node
+  case: Multi Card
+  steps:
+  - title: Start the server (Qwen3.5-27B-w8a8)
+    content: |-
+      Single-node deployment of `Qwen3.5-27B-w8a8-mtp` on Atlas 800 A2 (TP=2). Same pattern applies to `Qwen3.6-27B-w8a8` — replace the model id and `--served-model-name`.
+
+      ```bash
+      #!/bin/sh
+      export VLLM_USE_MODELSCOPE=True
+      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+      export HCCL_BUFFSIZE=512
+      export OMP_PROC_BIND=false
+      export OMP_NUM_THREADS=1
+      export TASK_QUEUE_ENABLE=1
+
+      vllm serve your_model_path \
+      --host 0.0.0.0 \
+      --port 8000 \
+      --data-parallel-size 1 \
+      --tensor-parallel-size 2 \
+      --seed 1024 \
+      --quantization ascend \
+      --served-model-name qwen3.5 \
+      --max-num-seqs 32 \
+      --max-model-len 133000 \
+      --max-num-batched-tokens 8096 \
+      --trust-remote-code \
+      --gpu-memory-utilization 0.90 \
+      --no-enable-prefix-caching \
+      --speculative-config '{"method": "qwen3_5_mtp", "num_speculative_tokens": 3, "enforce_eager": true}' \
+      --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY"}' \
+      --additional-config '{"enable_cpu_binding":true}' \
+      --async-scheduling
+      ```
+
+      For Qwen3.6-27B-w8a8: replace the model id with `Eco-Tech/Qwen3.6-27B-w8a8`, `--served-model-name qwen3.6`, and raise `--max-model-len 262144` if needed.
+  - title: Service verification
+    content: |-
+      See the `verification` section below — the service is up when the log prints `Application startup complete.`
+
+# ===== Atlas 800 A3 single-node W8A8 =====
+- npu: Atlas 800I A3
+  precision: W8A8
+  deployment: Single-Node
+  case: Multi Card
+  steps:
+  - title: Start the server (Qwen3.5-27B-w8a8, full 16 NPUs)
+    content: |-
+      Same shell setup as the A2 case, but use `--data-parallel-size 4` to fill all 8 NPUs of an Atlas A2 or `--data-parallel-size 8` for the 16 NPUs of an Atlas A3. TP=2 is the recommended default; TP=8 is only needed for ultra-long context (256K+) scenarios.
+
+      ```bash
+      #!/bin/sh
+      export VLLM_USE_MODELSCOPE=True
+      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+      export HCCL_BUFFSIZE=512
+      export OMP_PROC_BIND=false
+      export OMP_NUM_THREADS=1
+      export TASK_QUEUE_ENABLE=1
+
+      vllm serve your_model_path \
+      --host 0.0.0.0 \
+      --port 8000 \
+      --data-parallel-size 8 \
+      --tensor-parallel-size 2 \
+      --seed 1024 \
+      --quantization ascend \
+      --served-model-name qwen3.5 \
+      --max-num-seqs 32 \
+      --max-model-len 133000 \
+      --max-num-batched-tokens 16384 \
+      --trust-remote-code \
+      --gpu-memory-utilization 0.90 \
+      --no-enable-prefix-caching \
+      --speculative-config '{"method": "qwen3_5_mtp", "num_speculative_tokens": 3, "enforce_eager": true}' \
+      --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY"}' \
+      --additional-config '{"enable_cpu_binding":true}' \
+      --async-scheduling
+      ```
+  - title: Service verification
+    content: |-
+      See the `verification` section below.
+
+# ===== Atlas 800 A3 single-node BF16 =====
+- npu: Atlas 800I A3
+  precision: BF16
+  deployment: Single-Node
+  case: Multi Card
+  steps:
+  - title: Start the server (Qwen3.5-27B BF16)
+    content: |-
+      Drop `--quantization ascend` and use the BF16 weight id from `weight_download`:
+
+      ```bash
+      vllm serve your_model_path \
+      --host 0.0.0.0 \
+      --port 8000 \
+      --data-parallel-size 8 \
+      --tensor-parallel-size 2 \
+      --served-model-name qwen3.5 \
+      --max-num-seqs 32 \
+      --max-model-len 133000 \
+      --max-num-batched-tokens 16384 \
+      --trust-remote-code \
+      --gpu-memory-utilization 0.90 \
+      --no-enable-prefix-caching \
+      --speculative-config '{"method": "qwen3_5_mtp", "num_speculative_tokens": 3, "enforce_eager": true}' \
+      --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY"}' \
+      --async-scheduling
+      ```
+  - title: Service verification
+    content: |-
+      See the `verification` section below.
+
+# ===== Atlas 800 A3 multi-node PD separation =====
 - npu: Atlas 800I A3
   precision: W8A8
   deployment: Multi-Node PD Separation
@@ -284,7 +401,7 @@ scenarios:
   - title: Prefill node — `run_dp_template.sh`
     content: |-
       ```shell
-      nic_name="xxx" # eg. "enp67s0f0np0" — find the NIC bound to the node IP via `ip a`
+      nic_name="xxx"
       local_ip="141.xx.xx.1"
 
       export HCCL_IF_IP=$local_ip
@@ -337,22 +454,6 @@ scenarios:
       Same shell setup as prefill node, but `local_ip="141.xx.xx.2"` (decode node IP). The vllm serve command differs:
 
       ```shell
-      nic_name="xxx" # eg. "enp67s0f0np0" — find the NIC bound to the node IP via `ip a`
-      local_ip="141.xx.xx.2"
-
-      export HCCL_IF_IP=$local_ip
-      export GLOO_SOCKET_IFNAME=$nic_name
-      export TP_SOCKET_IFNAME=$nic_name
-      export HCCL_SOCKET_IFNAME=$nic_name
-      export HCCL_OP_EXPANSION_MODE="AIV"
-      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
-      export OMP_PROC_BIND=false
-      export OMP_NUM_THREADS=1
-      export TASK_QUEUE_ENABLE=1
-      export LD_LIBRARY_PATH=/usr/local/Ascend/ascend-toolkit/latest/python/site-packages/mooncake:$LD_LIBRARY_PATH
-      export HCCL_BUFFSIZE=1024
-      export ASCEND_RT_VISIBLE_DEVICES=$1
-
       vllm serve your_model_path \
         --host 0.0.0.0 \
         --port $2 \
@@ -415,162 +516,6 @@ scenarios:
           -H "Content-Type: application/json" \
           -d '{
               "model": "qwen3.5",
-              "messages": [{"role": "user", "content": "The future of AI is"}],
-              "max_tokens": 1024,
-              "temperature": 1.0,
-              "top_p": 0.95
-          }'
-      ```
-
-      Expected: HTTP 200 OK with a `choices` field — prefill and decode nodes are correctly cooperating.
-- npu: Atlas 800I A2
-  precision: W8A8
-  deployment: Multi-Node PD Separation
-  case: 1P1D (1 Prefill node + 1 Decode node)
-  steps:
-  - title: Layout (1P1D, TP=1 + DP=8 per node)
-    content: |-
-      Use **2 Atlas 800 A2 (64G × 8)** nodes — one Prefill node, one Decode node. Each node runs `TP=1 + DP=8`, fully utilizing all 8 NPUs. This is the A2 analog of the A3 1P1D layout above: `Qwen3.6-27B-w8a8` fits a single NPU, so each DP rank uses one NPU.
-
-      Multi-node PD separation is recommended for high-concurrency production scenarios. The recommended approach is to use Mooncake for deployment: [Mooncake Multi-Node PD Disaggregation Guide](../features/pd_disaggregation_mooncake_multi_node.md).
-
-      > **Note**: Multi-node PD separation requires the Mooncake runtime in the image (use the `-mooncake` vllm-ascend image).
-  - title: Prefill node — `run_dp_template.sh`
-    content: |-
-      Prefill node runs `TP=1 + DP=8` (8 NPUs, one engine per NPU). The template receives `$1..$7` from `launch_online_dp.py`.
-
-      ```shell
-      nic_name="xxx" # eg. "enp67s0f0np0" — find the NIC bound to the node IP via `ip a`
-      local_ip="141.xx.xx.1"
-
-      export HCCL_IF_IP=$local_ip
-      export GLOO_SOCKET_IFNAME=$nic_name
-      export TP_SOCKET_IFNAME=$nic_name
-      export HCCL_SOCKET_IFNAME=$nic_name
-      export HCCL_OP_EXPANSION_MODE="AIV"
-      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
-      export OMP_PROC_BIND=false
-      export OMP_NUM_THREADS=1
-      export TASK_QUEUE_ENABLE=1
-      export LD_LIBRARY_PATH=/usr/local/Ascend/ascend-toolkit/latest/python/site-packages/mooncake:$LD_LIBRARY_PATH
-      export HCCL_BUFFSIZE=1024
-      export VLLM_ASCEND_ENABLE_FLASHCOMM1=1
-      export ASCEND_RT_VISIBLE_DEVICES=$1
-
-      vllm serve your_model_path \
-        --host 0.0.0.0 \
-        --port $2 \
-        --data-parallel-size $3 \
-        --data-parallel-rank $4 \
-        --data-parallel-address $5 \
-        --data-parallel-rpc-port $6 \
-        --tensor-parallel-size $7 \
-        --seed 1024 \
-        --quantization ascend \
-        --served-model-name qwen3.6 \
-        --trust-remote-code \
-        --max-num-seqs 4 \
-        --max-model-len 32768 \
-        --max-num-batched-tokens 16384 \
-        --no-enable-prefix-caching \
-        --gpu-memory-utilization 0.95 \
-        --enforce-eager \
-        --speculative-config '{"method": "qwen3_5_mtp", "num_speculative_tokens": 3, "enforce_eager": true}' \
-        --additional-config '{"enable_cpu_binding":true}' \
-        --kv-transfer-config \
-        '{"kv_connector": "MooncakeConnectorV1",
-        "kv_role": "kv_producer",
-        "kv_port": "30000",
-        "engine_id": "0",
-        "kv_connector_extra_config": {
-                  "prefill": {"dp_size": 8, "tp_size": 1},
-                  "decode":  {"dp_size": 8, "tp_size": 1}
-              }
-            }'
-      ```
-  - title: Decode node — `run_dp_template.sh`
-    content: |-
-      Decode node runs `TP=1 + DP=8`.
-
-      ```shell
-      nic_name="xxx" # eg. "enp67s0f0np0" — find the NIC bound to the node IP via `ip a`
-      local_ip="141.xx.xx.2"
-
-      export HCCL_IF_IP=$local_ip
-      export GLOO_SOCKET_IFNAME=$nic_name
-      export TP_SOCKET_IFNAME=$nic_name
-      export HCCL_SOCKET_IFNAME=$nic_name
-      export HCCL_OP_EXPANSION_MODE="AIV"
-      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
-      export OMP_PROC_BIND=false
-      export OMP_NUM_THREADS=1
-      export TASK_QUEUE_ENABLE=1
-      export LD_LIBRARY_PATH=/usr/local/Ascend/ascend-toolkit/latest/python/site-packages/mooncake:$LD_LIBRARY_PATH
-      export HCCL_BUFFSIZE=1024
-      export ASCEND_RT_VISIBLE_DEVICES=$1
-
-      vllm serve your_model_path \
-        --host 0.0.0.0 \
-        --port $2 \
-        --data-parallel-size $3 \
-        --data-parallel-rank $4 \
-        --data-parallel-address $5 \
-        --data-parallel-rpc-port $6 \
-        --tensor-parallel-size $7 \
-        --seed 1024 \
-        --quantization ascend \
-        --served-model-name qwen3.6 \
-        --trust-remote-code \
-        --max-num-seqs 16 \
-        --max-model-len 32768 \
-        --max-num-batched-tokens 2048 \
-        --no-enable-prefix-caching \
-        --gpu-memory-utilization 0.91 \
-        --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY"}' \
-        --additional-config '{"recompute_scheduler_enable":true,"enable_cpu_binding":true}' \
-        --async-scheduling \
-        --speculative-config '{"method": "qwen3_5_mtp", "num_speculative_tokens": 3, "enforce_eager": true}' \
-        --kv-transfer-config \
-        '{"kv_connector": "MooncakeConnectorV1",
-        "kv_role": "kv_consumer",
-        "kv_port": "30200",
-        "engine_id": "1",
-        "kv_connector_extra_config": {
-                  "prefill": {"dp_size": 8, "tp_size": 1},
-                  "decode":  {"dp_size": 8, "tp_size": 1}
-              }
-            }'
-      ```
-  - title: Launch the DP engine on each node
-    content: |-
-      ```bash
-      # p0 (Prefill node 0)
-      python launch_online_dp.py --dp-size 4 --tp-size 1 --dp-size-local 4 --dp-rank-start 0 \
-        --dp-address 141.xx.xx.1 --dp-rpc-port 12321 --vllm-start-port 7100
-      # d0 (Decode node 0)
-      python launch_online_dp.py --dp-size 4 --tp-size 1 --dp-size-local 4 --dp-rank-start 0 \
-        --dp-address 141.xx.xx.2 --dp-rpc-port 12321 --vllm-start-port 7100
-      ```
-  - title: Run the proxy on the prefill master node
-    content: |-
-      ```shell
-      python load_balance_proxy_server_example.py \
-        --port 1999 \
-        --host 141.xx.xx.1 \
-        --prefiller-hosts 141.xx.xx.1 141.xx.xx.1 141.xx.xx.1 141.xx.xx.1 \
-                          141.xx.xx.1 141.xx.xx.1 141.xx.xx.1 141.xx.xx.1 \
-        --prefiller-ports  7100 7101 7102 7103 7104 7105 7106 7107 \
-        --decoder-hosts    141.xx.xx.2 141.xx.xx.2 141.xx.xx.2 141.xx.xx.2 \
-                          141.xx.xx.2 141.xx.xx.2 141.xx.xx.2 141.xx.xx.2 \
-        --decoder-ports    7100 7101 7102 7103 7104 7105 7106 7107
-      ```
-  - title: Verify the PD service
-    content: |-
-      ```bash
-      curl http://<proxy_node0_ip>:1999/v1/chat/completions \
-          -H "Content-Type: application/json" \
-          -d '{
-              "model": "qwen3.6",
               "messages": [{"role": "user", "content": "The future of AI is"}],
               "max_tokens": 1024,
               "temperature": 1.0,
