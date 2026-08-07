@@ -1,0 +1,116 @@
+---
+model:
+  model_id: vllm-ascend/DeepSeek-V2-Lite-W8A8
+  min_vllm_version: v0.23.0rc1
+  architecture: moe
+  parameter_count: 16B
+  context_length: 32768
+  modality: text
+
+scenarios:
+- npu: Atlas 800I A2
+  precision: W8A8
+  deployment: Multi-Node PD Separation
+  case: 1P1D (1 Prefill node + 1 Decode node)
+  steps:
+  - title: Overview
+    content: |-
+      Use **2 Atlas 800 A2 nodes** — one Prefill node, one Decode node. Each node runs
+      `TP=1 + DP=2`, using 2 NPUs. This is the lightest PD topology: 1P1D, 2 cards per node,
+      driven by `launch_online_dp.py` external DP (Mooncake KV transfer).
+
+  - title: Prepare run_dp_template.sh – Prefill node
+    content: |-
+      Prefill node:
+
+      ```shell
+      nic_name="xxx" # change to your own nic name
+      local_ip="xx.xx.xx.1" # change to your own ip
+
+      export HCCL_IF_IP=$local_ip
+      export GLOO_SOCKET_IFNAME=$nic_name
+      export TP_SOCKET_IFNAME=$nic_name
+      export HCCL_SOCKET_IFNAME=$nic_name
+      export HCCL_OP_EXPANSION_MODE="AIV"
+      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+      export OMP_PROC_BIND=false
+      export OMP_NUM_THREADS=10
+      export TASK_QUEUE_ENABLE=1
+      export LD_LIBRARY_PATH=/usr/local/Ascend/ascend-toolkit/latest/python/site-packages/mooncake:$LD_LIBRARY_PATH
+      export HCCL_BUFFSIZE=256
+      export ASCEND_RT_VISIBLE_DEVICES=$1
+
+      vllm serve your_model_path \
+          --host 0.0.0.0 \
+          --port $2 \
+          --served-model-name dsv2 \
+          --data-parallel-size $3 \
+          --data-parallel-rank $4 \
+          --data-parallel-address $5 \
+          --data-parallel-rpc-port $6 \
+          --tensor-parallel-size $7 \
+          --trust-remote-code \
+          --quantization ascend \
+          --max-model-len 4096 \
+          --max-num-seqs 8 \
+          --kv-transfer-config '{"kv_connector": "MooncakeConnectorV1", "kv_role": "kv_producer", "kv_port": "30000", "engine_id": "0", "kv_connector_extra_config": {"prefill": {"dp_size": 2, "tp_size": 1}, "decode": {"dp_size": 2, "tp_size": 1}}}'
+      ```
+
+  - title: Prepare run_dp_template.sh – Decode node
+    content: |-
+      Decode node:
+
+      ```shell
+      nic_name="xxx" # change to your own nic name
+      local_ip="xx.xx.xx.2" # change to your own ip
+
+      export HCCL_IF_IP=$local_ip
+      export GLOO_SOCKET_IFNAME=$nic_name
+      export TP_SOCKET_IFNAME=$nic_name
+      export HCCL_SOCKET_IFNAME=$nic_name
+      export HCCL_OP_EXPANSION_MODE="AIV"
+      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+      export OMP_PROC_BIND=false
+      export OMP_NUM_THREADS=10
+      export TASK_QUEUE_ENABLE=1
+      export LD_LIBRARY_PATH=/usr/local/Ascend/ascend-toolkit/latest/python/site-packages/mooncake:$LD_LIBRARY_PATH
+      export HCCL_BUFFSIZE=256
+      export ASCEND_RT_VISIBLE_DEVICES=$1
+
+      vllm serve your_model_path \
+          --host 0.0.0.0 \
+          --port $2 \
+          --served-model-name dsv2 \
+          --data-parallel-size $3 \
+          --data-parallel-rank $4 \
+          --data-parallel-address $5 \
+          --data-parallel-rpc-port $6 \
+          --tensor-parallel-size $7 \
+          --trust-remote-code \
+          --quantization ascend \
+          --max-model-len 4096 \
+          --max-num-seqs 8 \
+          --kv-transfer-config '{"kv_connector": "MooncakeConnectorV1", "kv_role": "kv_consumer", "kv_port": "30000", "engine_id": "0", "kv_connector_extra_config": {"prefill": {"dp_size": 2, "tp_size": 1}, "decode": {"dp_size": 2, "tp_size": 1}}}'
+      ```
+
+  - title: Start the service
+    content: |-
+      ```bash
+      # p0 (Prefill node 0)
+      python launch_online_dp.py --dp-size 2 --tp-size 1 --dp-size-local 2 --dp-rank-start 0 \
+        --dp-address 141.xx.xx.1 --dp-rpc-port 12321 --vllm-start-port 7100
+      # d0 (Decode node 0)
+      python launch_online_dp.py --dp-size 2 --tp-size 1 --dp-size-local 2 --dp-rank-start 0 \
+        --dp-address 141.xx.xx.2 --dp-rpc-port 12321 --vllm-start-port 7100
+      ```
+
+  - title: Service Verification
+    content: |-
+      ```bash
+      # Query the prefill node's OpenAI-compatible endpoint (or the proxy if deployed)
+      curl -s http://<node0_ip>:7100/v1/models
+      # Send a chat completion to confirm prefill/decode are cooperating
+      curl -s http://<node0_ip>:7100/v1/chat/completions \
+        -H 'Content-Type: application/json' \
+        -d '{"model": "dsv2", "messages": [{"role": "user", "content": "hello"}], "max_tokens": 16}'
+      ```

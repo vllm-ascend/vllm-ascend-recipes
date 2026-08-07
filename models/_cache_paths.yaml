@@ -28,3 +28,6 @@ aliases:
 
   - model_id: Qwen/Qwen3.5-27B
     cache_dir: Qwen3.6-27B-w8a8   # alias to Qwen3.6 cache (Qwen3.5 not yet baked)
+
+  - model_id: vllm-ascend/DeepSeek-V2-Lite-W8A8
+    cache_dir: vllm-ascend/DeepSeek-V2-Lite-W8A8
