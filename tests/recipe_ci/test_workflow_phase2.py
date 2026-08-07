@@ -143,6 +143,14 @@ class MultiNodeWorkflowTests(unittest.TestCase):
             "ClusterFirstWithHostNet",
         )
         self.assertEqual(
+            template["leaderTemplate"]["spec"]["terminationGracePeriodSeconds"],
+            30,
+        )
+        self.assertEqual(
+            template["workerTemplate"]["spec"]["terminationGracePeriodSeconds"],
+            30,
+        )
+        self.assertEqual(
             template["leaderTemplate"]["spec"]["nodeSelector"],
             {"node.kubernetes.io/npu.chip.name": "910B4"},
         )
@@ -209,6 +217,11 @@ class MultiNodeWorkflowTests(unittest.TestCase):
         self.assertNotIn("RECIPE_AISBENCH_ACCURACY_DATASET_DIR", env)
         self.assertNotIn("RECIPE_AISBENCH_PERFORMANCE_DATASET_DIR", env)
         self.assertNotIn("RECIPE_CI_INTERFACE", env)
+
+        workflow = REUSABLE_WORKFLOW.read_text(encoding="utf-8")
+        self.assertIn('kubectl delete leaderworkerset "$LWS_NAME"', workflow)
+        self.assertIn("--ignore-not-found=true --wait=false", workflow)
+        self.assertIn("deadline=$((SECONDS + 180))", workflow)
 
     def test_one_run_script_accepts_local_ips_or_lws_dns(self) -> None:
         text = RUN_SCRIPT.read_text(encoding="utf-8")

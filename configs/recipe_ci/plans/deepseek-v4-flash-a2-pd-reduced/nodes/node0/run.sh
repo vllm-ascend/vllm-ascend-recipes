@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Reduced A2 CI topology: one Prefill node, DP8 x TP1 = 8 NPUs.
-exec python3 \
+exec python3 "$RECIPE_REPOSITORY_ROOT/scripts/recipe_ci/run_online_dp.py" \
     "$RECIPE_VLLM_ASCEND_ROOT/examples/external_online_dp/launch_online_dp.py" \
     --dp-size 8 \
     --tp-size 1 \

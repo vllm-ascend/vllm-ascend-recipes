@@ -273,20 +273,25 @@ jobs:
 
       - name: Delete LeaderWorkerSet
         if: always() && steps.prepare.outcome == 'success'
-        timeout-minutes: 6
+        timeout-minutes: 4
         run: |
           exec > >(tee -a "$RECIPE_CI_BUNDLE/controller-logs/delete-lws.log") 2>&1
           if [[ -f "$RECIPE_CI_RUN_ROOT/lws.yaml" ]]; then
-            kubectl delete -f "$RECIPE_CI_RUN_ROOT/lws.yaml" --ignore-not-found=true || true
+            kubectl delete leaderworkerset "$LWS_NAME" -n "$NAMESPACE" \
+              --ignore-not-found=true --wait=false || true
           fi
-          deadline=$((SECONDS + 300))
+          deadline=$((SECONDS + 180))
           while ((SECONDS < deadline)); do
             pods=$(kubectl get pods -n "$NAMESPACE" \
               -o jsonpath='{.items[*].metadata.name}' 2>/dev/null \
               | tr ' ' '\n' | grep "^${LWS_NAME}-" || true)
             [[ -z "$pods" ]] && break
-            sleep 5
+            echo "Waiting for LWS pods to terminate: $pods"
+            sleep 2
           done
+          if [[ -n "${pods:-}" ]]; then
+            echo "LWS deletion is still in progress after 180 seconds: $pods"
+          fi
 
       - name: Build artifact bundle
         if: always()

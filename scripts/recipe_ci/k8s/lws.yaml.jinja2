@@ -18,7 +18,9 @@ spec:
         dnsPolicy: ClusterFirstWithHostNet
         nodeSelector: &recipe-ci-node-selector
           node.kubernetes.io/npu.chip.name: 910B4
-        terminationGracePeriodSeconds: 120
+        # run.sh already stops vLLM and copies plogs before writing the status
+        # file watched by the controller. Keep a short window for cancellation.
+        terminationGracePeriodSeconds: 30
         tolerations: &recipe-ci-tolerations
           - key: dedicated
             operator: Equal
@@ -132,7 +134,7 @@ spec:
         hostNetwork: true
         dnsPolicy: ClusterFirstWithHostNet
         nodeSelector: *recipe-ci-node-selector
-        terminationGracePeriodSeconds: 120
+        terminationGracePeriodSeconds: 30
         tolerations: *recipe-ci-tolerations
         affinity: *recipe-ci-affinity
         containers:
