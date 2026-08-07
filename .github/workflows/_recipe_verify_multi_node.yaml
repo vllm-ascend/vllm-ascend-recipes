@@ -415,7 +415,7 @@ jobs:
           OBS_SECRET_KEY: ${{ secrets.OBS_SK }}
           OBS_BUCKET: mindcluster
           OBS_PREFIX: vllm-ascend-recipe
-          OBS_ENDPOINT: obs.ap-southeast-1.myhuaweicloud.com
+          OBS_ENDPOINT: obs.cn-north-4.myhuaweicloud.com
         run: |
           set -euo pipefail
           exec > >(tee -a "$RECIPE_CI_BUNDLE/controller-logs/upload-obs.log") 2>&1

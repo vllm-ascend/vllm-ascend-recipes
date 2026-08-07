@@ -252,6 +252,7 @@ class MultiNodeWorkflowTests(unittest.TestCase):
         self.assertIn('"$obsutil" cp /tmp/recipe-ci-bundle.tar.gz', workflow)
         self.assertIn("OBS_BUCKET: mindcluster", workflow)
         self.assertIn("OBS_PREFIX: vllm-ascend-recipe", workflow)
+        self.assertIn("OBS_ENDPOINT: obs.cn-north-4.myhuaweicloud.com", workflow)
         self.assertIn("config returned $config_status", workflow)
         self.assertIn("::error title=OBS artifact upload failed", workflow)
         self.assertIn('upload_log="$RECIPE_CI_RUN_ROOT/upload-obs.log"', workflow)
