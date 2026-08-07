@@ -335,15 +335,16 @@ jobs:
 
       - name: Upload multi-node results
         if: always()
-        uses: actions/upload-artifact@v4
-        # The runner's artifact/log upload is flaky and can hang; cap it so a
-        # hang shows up as a step failure instead of silently stalling the job.
-        # 2min proved too tight on a degraded runner (upload hit the cap at
-        # exactly 120s while the healthy run needed only 6s); 5min still bounds
-        # a real hang while giving a slow-but-working upload room to finish.
+        # upload-artifact@v4 is a node20 action; this runner's Node 24 shim
+        # intermittently hangs it (upload stalls until the step timeout kills
+        # it with "Executing the custom container implementation failed").
+        # v7 is node24-native and matches the proven PR #34 runner config;
+        # compression-level 0 keeps the upload CPU-cheap.
+        uses: actions/upload-artifact@v7
         timeout-minutes: 5
         with:
           name: multinode-results-${{ github.run_id }}
           path: /tmp/multinode-results/
           retention-days: 14
           if-no-files-found: warn
+          compression-level: 0
