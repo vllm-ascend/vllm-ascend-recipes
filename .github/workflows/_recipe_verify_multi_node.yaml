@@ -1,0 +1,516 @@
+name: Reusable multi-node Recipe CI
+
+on:
+  workflow_call:
+    inputs:
+      plan:
+        description: Intermediate plan executed by the LWS pods
+        required: true
+        type: string
+    secrets:
+      KUBECONFIG_B64:
+        required: true
+      OBS_AK:
+        required: true
+      OBS_SK:
+        required: true
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    # The ARC container hook otherwise executes run steps with /bin/sh.
+    shell: bash -el {0}
+
+concurrency:
+  group: recipe-ci-a2b4-k8s-multi-node
+  cancel-in-progress: false
+
+jobs:
+  recipe-ci:
+    name: ${{ inputs.plan }}
+    runs-on: linux-aarch64-a2b4-0
+    env:
+      IMAGE: swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/vllm-ascend:v0.23.0rc1
+      STARTUP_TIMEOUT_SECONDS: 3600
+      RUN_TIMEOUT_SECONDS: 14400
+      PVC_NAME: vllm-ascend-vllm-ascend-recipes-gy001
+    # Leave time for Pod scheduling, cleanup, and artifact upload around the
+    # default one-hour startup plus four-hour coordinated run timeout.
+    timeout-minutes: 360
+    container:
+      image: swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/vllm-ascend:nightly-cpu
+      env:
+        KUBECONFIG: /tmp/kubeconfig
+        NAMESPACE: vllm-ascend-vllm-ascend-recipes
+    steps:
+      - name: Initialize diagnostics
+        id: initialize
+        env:
+          PLAN: ${{ inputs.plan }}
+        run: |
+          bundle=/tmp/recipe-ci-bundle
+          mkdir -p "$bundle/controller-logs" "$bundle/pod-logs"
+          printf 'plan=%s\nrun_id=%s\n' "$PLAN" "$GITHUB_RUN_ID" \
+            > "$bundle/controller-logs/bootstrap.log"
+
+          set -euo pipefail
+          exec > >(tee -a "$bundle/controller-logs/initialize.log") 2>&1
+
+          plan_name=$(basename "$(dirname "$PLAN")")
+          suffix=$(printf '%s' "$plan_name" | tr '[:upper:]_' '[:lower:]-' | cut -c1-32)
+          random_suffix=$(tr -d '-' < /proc/sys/kernel/random/uuid | cut -c1-6)
+          lws_name="recipe-${suffix}-${GITHUB_RUN_ID}-${random_suffix}"
+          lws_name=${lws_name:0:63}
+          run_root="/root/.cache/recipe-ci/$lws_name"
+
+          {
+            echo "LWS_NAME=$lws_name"
+            echo "PLAN_NAME=$plan_name"
+            echo "RECIPE_CI_BUNDLE=$bundle"
+            echo "RECIPE_CI_RUN_ROOT=$run_root"
+          } >> "$GITHUB_ENV"
+          echo "artifact_name=recipe-ci-${plan_name}-${GITHUB_RUN_ID}-${random_suffix}" >> "$GITHUB_OUTPUT"
+          echo "Initialized diagnostics for $PLAN"
+
+      - name: Decode kubeconfig
+        env:
+          KUBECONFIG_B64: ${{ secrets.KUBECONFIG_B64 }}
+        run: |
+          set -euo pipefail
+          exec > >(tee -a "$RECIPE_CI_BUNDLE/controller-logs/decode-kubeconfig.log") 2>&1
+          test -n "$KUBECONFIG_B64"
+          printf '%s' "$KUBECONFIG_B64" | base64 -d > "$KUBECONFIG"
+          chmod 600 "$KUBECONFIG"
+
+      - name: Check cluster access
+        id: cluster_access
+        run: |
+          set -euo pipefail
+          exec > >(tee -a "$RECIPE_CI_BUNDLE/controller-logs/check-cluster-access.log") 2>&1
+          kubectl --kubeconfig "$KUBECONFIG" config current-context || true
+          kubectl --kubeconfig "$KUBECONFIG" get pods -n "$NAMESPACE"
+
+      - name: Checkout recipes
+        uses: actions/checkout@v7
+
+      - name: Install controller dependencies
+        run: |
+          set -euo pipefail
+          exec > >(tee -a "$RECIPE_CI_BUNDLE/controller-logs/install-dependencies.log") 2>&1
+          python3 -m pip install pyyaml --quiet
+          python3 -c 'import yaml; print("PyYAML", yaml.__version__)'
+
+      - name: Prepare run identity and stage source
+        id: prepare
+        env:
+          PLAN: ${{ inputs.plan }}
+        run: |
+          set -euo pipefail
+          exec > >(tee -a "$RECIPE_CI_BUNDLE/controller-logs/prepare.log") 2>&1
+          read -r node_count npu_per_node < <(
+            PLAN_PATH="$PLAN" PYTHONPATH=scripts/recipe_ci python3 - <<'PY'
+          import os
+          from pathlib import Path
+
+          from plan import load_plan
+
+          plan = load_plan(Path(os.environ["PLAN_PATH"]))
+          print(len(plan.nodes), plan.resources.npu_per_node)
+          PY
+          )
+          case "$RECIPE_CI_RUN_ROOT" in
+            /root/.cache/recipe-ci/recipe-*) ;;
+            *) echo "Unsafe run root: $RECIPE_CI_RUN_ROOT" >&2; exit 1 ;;
+          esac
+          rm -rf -- "$RECIPE_CI_RUN_ROOT"
+          mkdir -p "$RECIPE_CI_RUN_ROOT/source" "$RECIPE_CI_RUN_ROOT/pod-status"
+          cp -a "$GITHUB_WORKSPACE"/. "$RECIPE_CI_RUN_ROOT/source/"
+
+          : > /tmp/recipe-ci-pods.txt
+          for ((index = 0; index < node_count; index++)); do
+            if [[ $index -eq 0 ]]; then
+              pod="${LWS_NAME}-0"
+            else
+              pod="${LWS_NAME}-0-${index}"
+            fi
+            echo "$pod" >> /tmp/recipe-ci-pods.txt
+          done
+
+          {
+            echo "RECIPE_CI_NODE_COUNT=$node_count"
+            echo "RECIPE_CI_NPU_PER_NODE=$npu_per_node"
+            echo "RECIPE_CI_COMMIT=$(git rev-parse HEAD)"
+          } >> "$GITHUB_ENV"
+
+      - name: Render and launch LeaderWorkerSet
+        env:
+          PLAN: ${{ inputs.plan }}
+        run: |
+          set -euo pipefail
+          exec > >(tee -a "$RECIPE_CI_BUNDLE/controller-logs/render-and-launch.log") 2>&1
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+
+          template = Path("scripts/recipe_ci/k8s/lws.yaml.jinja2").read_text(
+              encoding="utf-8"
+          )
+          values = {
+              "lws_name": os.environ["LWS_NAME"],
+              "namespace": os.environ["NAMESPACE"],
+              "image": os.environ["IMAGE"],
+              "commit": os.environ["RECIPE_CI_COMMIT"],
+              "run_root": os.environ["RECIPE_CI_RUN_ROOT"],
+              "plan": os.environ["PLAN"],
+              "node_count": os.environ["RECIPE_CI_NODE_COUNT"],
+              "npu_per_node": os.environ["RECIPE_CI_NPU_PER_NODE"],
+              "startup_timeout_seconds": os.environ["STARTUP_TIMEOUT_SECONDS"],
+              "run_timeout_seconds": os.environ["RUN_TIMEOUT_SECONDS"],
+              "pvc_name": os.environ["PVC_NAME"],
+          }
+          for name, value in values.items():
+              template = template.replace("{{ " + name + " }}", value)
+          if "{{" in template:
+              raise SystemExit("unresolved LWS template value")
+          (Path(os.environ["RECIPE_CI_RUN_ROOT"]) / "lws.yaml").write_text(
+              template, encoding="utf-8"
+          )
+          PY
+          kubectl apply -f "$RECIPE_CI_RUN_ROOT/lws.yaml"
+
+      - name: Wait for LWS pods to start
+        run: |
+          set -euo pipefail
+          exec > >(tee -a "$RECIPE_CI_BUNDLE/controller-logs/wait-for-pods.log") 2>&1
+          mapfile -t pods < /tmp/recipe-ci-pods.txt
+          deadline=$((SECONDS + 1200))
+          while ((SECONDS < deadline)); do
+            all_started=true
+            for pod in "${pods[@]}"; do
+              phase=$(kubectl get pod "$pod" -n "$NAMESPACE" \
+                -o jsonpath='{.status.phase}' 2>/dev/null || true)
+              echo "$pod phase=${phase:-NotFound}"
+              case "$phase" in
+                Running | Succeeded | Failed) ;;
+                *) all_started=false ;;
+              esac
+            done
+            if [[ "$all_started" == true ]]; then
+              exit 0
+            fi
+            sleep 2
+          done
+          kubectl get pods -n "$NAMESPACE"
+          for pod in "${pods[@]}"; do
+            kubectl describe pod "$pod" -n "$NAMESPACE" || true
+          done
+          exit 1
+
+      - name: Stream logs and wait for Recipe CI
+        id: run_recipe
+        run: |
+          set -euo pipefail
+          exec > >(tee -a "$RECIPE_CI_BUNDLE/controller-logs/recipe-ci.log") 2>&1
+          mapfile -t pods < /tmp/recipe-ci-pods.txt
+          pids=()
+          # shellcheck disable=SC2329  # Invoked by the EXIT trap.
+          stop_streams() {
+            for pid in "${pids[@]}"; do
+              kill "$pid" 2>/dev/null || true
+              wait "$pid" 2>/dev/null || true
+            done
+            pids=()
+          }
+          trap stop_streams EXIT
+
+          for index in "${!pods[@]}"; do
+            pod=${pods[$index]}
+            # Keep kubectl as the tracked background process while presenting a
+            # compact node label instead of its full pod/container prefix.
+            kubectl logs -f "$pod" -n "$NAMESPACE" \
+              > >(sed -u "s/^/[node${index}] /") 2>&1 &
+            pids+=("$!")
+          done
+
+          deadline=$((SECONDS + STARTUP_TIMEOUT_SECONDS + RUN_TIMEOUT_SECONDS))
+          while ((SECONDS < deadline)); do
+            all_finished=true
+            node_failed=false
+            for index in "${!pods[@]}"; do
+              status_file="$RECIPE_CI_RUN_ROOT/pod-status/node${index}.exit"
+              if [[ -f "$status_file" ]]; then
+                exit_code=$(<"$status_file")
+                if [[ "$exit_code" != 0 ]]; then
+                  echo "node${index} failed with exit code $exit_code; stopping the run"
+                  node_failed=true
+                fi
+              else
+                all_finished=false
+              fi
+            done
+            if [[ "$node_failed" == true || "$all_finished" == true ]]; then
+              break
+            fi
+            sleep 5
+          done
+
+          stop_streams
+          trap - EXIT
+          for index in "${!pods[@]}"; do
+            kubectl logs "${pods[$index]}" -n "$NAMESPACE" \
+              > "/tmp/recipe-ci-node${index}.log" 2>&1 || true
+          done
+
+          failed=0
+          for index in "${!pods[@]}"; do
+            status_file="$RECIPE_CI_RUN_ROOT/pod-status/node${index}.exit"
+            if [[ -f "$status_file" ]]; then
+              exit_code=$(<"$status_file")
+            else
+              exit_code=
+            fi
+            echo "Recipe CI node exit code: node${index}=${exit_code:-not-finished}"
+            [[ "$exit_code" == 0 ]] || failed=1
+          done
+          exit "$failed"
+
+      - name: Publish failure diagnostics
+        if: always() && steps.run_recipe.outcome == 'failure'
+        continue-on-error: true
+        env:
+          NODE_COUNT: ${{ env.RECIPE_CI_NODE_COUNT }}
+        run: |
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+
+          def tail(path: Path, lines: int) -> str:
+              if not path.is_file():
+                  return "log file not found"
+              content = path.read_text(encoding="utf-8", errors="replace").splitlines()
+              return "\n".join(content[-lines:])
+
+          sections = [
+              "controller log:\n"
+              + tail(
+                  Path(os.environ["RECIPE_CI_BUNDLE"])
+                  / "controller-logs"
+                  / "recipe-ci.log",
+                  30,
+              )
+          ]
+          for index in range(int(os.environ.get("NODE_COUNT", "0"))):
+              sections.append(
+                  f"node{index} log:\n"
+                  + tail(Path(f"/tmp/recipe-ci-node{index}.log"), 40)
+              )
+
+          message = "\n\n".join(sections)
+          if len(message) > 30000:
+              message = "... diagnostics truncated ...\n" + message[-30000:]
+          diagnostics = (
+              Path(os.environ["RECIPE_CI_BUNDLE"])
+              / "controller-logs"
+              / "failure-diagnostics.log"
+          )
+          diagnostics.write_text(message + "\n", encoding="utf-8")
+          escaped = (
+              message.replace("%", "%25")
+              .replace("\r", "%0D")
+              .replace("\n", "%0A")
+          )
+          print(f"::error title=Recipe CI failure diagnostics::{escaped}")
+
+          with Path(os.environ["GITHUB_STEP_SUMMARY"]).open(
+              "a", encoding="utf-8"
+          ) as summary:
+              summary.write("### Recipe CI failure diagnostics\n\n```text\n")
+              summary.write(message)
+              summary.write("\n```\n")
+          PY
+
+      - name: Delete LeaderWorkerSet
+        if: always() && steps.prepare.outcome == 'success'
+        timeout-minutes: 4
+        run: |
+          exec > >(tee -a "$RECIPE_CI_BUNDLE/controller-logs/delete-lws.log") 2>&1
+          if [[ -f "$RECIPE_CI_RUN_ROOT/lws.yaml" ]]; then
+            kubectl delete leaderworkerset "$LWS_NAME" -n "$NAMESPACE" \
+              --ignore-not-found=true --wait=false || true
+          fi
+          deadline=$((SECONDS + 180))
+          while ((SECONDS < deadline)); do
+            pods=$(kubectl get pods -n "$NAMESPACE" \
+              -o jsonpath='{.items[*].metadata.name}' 2>/dev/null \
+              | tr ' ' '\n' | grep "^${LWS_NAME}-" || true)
+            [[ -z "$pods" ]] && break
+            echo "Waiting for LWS pods to terminate: $pods"
+            sleep 2
+          done
+          if [[ -n "${pods:-}" ]]; then
+            echo "LWS deletion is still in progress after 180 seconds: $pods"
+          fi
+
+      - name: Build artifact bundle
+        if: always()
+        env:
+          PLAN: ${{ inputs.plan }}
+          CLUSTER_ACCESS_OUTCOME: ${{ steps.cluster_access.outcome }}
+          PREPARE_OUTCOME: ${{ steps.prepare.outcome }}
+        run: |
+          set -euo pipefail
+          bundle=${RECIPE_CI_BUNDLE:-/tmp/recipe-ci-bundle}
+          mkdir -p "$bundle/controller-logs" "$bundle/pod-logs"
+          exec > >(tee -a "$bundle/controller-logs/build-artifact.log") 2>&1
+
+          RECIPE_CI_BUNDLE="$bundle" RECIPE_CI_IMAGE="$IMAGE" RECIPE_CI_PLAN="$PLAN" \
+            python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          node_count = os.environ.get("RECIPE_CI_NODE_COUNT")
+          metadata = {
+              "commit": os.environ.get("RECIPE_CI_COMMIT", os.environ.get("GITHUB_SHA")),
+              "image": os.environ["RECIPE_CI_IMAGE"],
+              "plan": os.environ["RECIPE_CI_PLAN"],
+              "node_count": int(node_count) if node_count else None,
+              "lws_name": os.environ.get("LWS_NAME"),
+              "cluster_access": os.environ.get("CLUSTER_ACCESS_OUTCOME"),
+              "prepare": os.environ.get("PREPARE_OUTCOME"),
+          }
+          bundle = Path(os.environ["RECIPE_CI_BUNDLE"])
+          (bundle / "ci-metadata.json").write_text(
+              json.dumps(metadata, indent=2) + "\n", encoding="utf-8"
+          )
+          PY
+
+          if [[ -n "${RECIPE_CI_RUN_ROOT:-}" && -d "$RECIPE_CI_RUN_ROOT/artifacts" ]]; then
+            cp -a "$RECIPE_CI_RUN_ROOT/artifacts" "$bundle/"
+          fi
+          if [[ -n "${RECIPE_CI_RUN_ROOT:-}" && -d "$RECIPE_CI_RUN_ROOT/plogs" ]]; then
+            cp -a "$RECIPE_CI_RUN_ROOT/plogs" "$bundle/"
+          fi
+          if [[ -n "${RECIPE_CI_RUN_ROOT:-}" && -d "$RECIPE_CI_RUN_ROOT/pod-status" ]]; then
+            cp -a "$RECIPE_CI_RUN_ROOT/pod-status" "$bundle/"
+          fi
+          for ((index = 0; index < ${RECIPE_CI_NODE_COUNT:-0}; index++)); do
+            cp "/tmp/recipe-ci-node${index}.log" \
+              "$bundle/pod-logs/node${index}.log" 2>/dev/null || true
+          done
+          du -sh "$bundle"
+          tar -czf /tmp/recipe-ci-bundle.tar.gz -C /tmp recipe-ci-bundle
+          du -sh /tmp/recipe-ci-bundle.tar.gz
+
+      - name: Upload Recipe CI bundle to OBS
+        id: upload_obs
+        if: always()
+        continue-on-error: true
+        timeout-minutes: 15
+        env:
+          ARTIFACT_NAME: ${{ steps.initialize.outputs.artifact_name || format('recipe-ci-diagnostics-{0}', github.run_id) }}
+          OBS_ACCESS_KEY: ${{ secrets.OBS_AK }}
+          OBS_SECRET_KEY: ${{ secrets.OBS_SK }}
+          OBS_BUCKET: mindcluster
+          OBS_PREFIX: vllm-ascend-recipe
+          OBS_ENDPOINT: obs.cn-north-4.myhuaweicloud.com
+        run: |
+          set -euo pipefail
+          exec > >(tee -a "$RECIPE_CI_BUNDLE/controller-logs/upload-obs.log") 2>&1
+          test -s /tmp/recipe-ci-bundle.tar.gz
+          test -n "$OBS_ACCESS_KEY"
+          test -n "$OBS_SECRET_KEY"
+
+          case "$(uname -m)" in
+            aarch64 | arm64) obsutil_arch=arm64 ;;
+            *) obsutil_arch=amd64 ;;
+          esac
+          setup_dir=$(mktemp -d)
+          curl --fail --location --show-error --http1.1 \
+            --retry 3 --retry-delay 2 --connect-timeout 15 --max-time 180 \
+            "https://obs-community.obs.cn-north-1.myhuaweicloud.com/obsutil/current/obsutil_linux_${obsutil_arch}.tar.gz" \
+            --output "$setup_dir/obsutil.tar.gz"
+          tar -xzf "$setup_dir/obsutil.tar.gz" -C "$setup_dir"
+          obsutil=$(find "$setup_dir" -type f -name obsutil -print -quit)
+          test -n "$obsutil"
+          chmod +x "$obsutil"
+
+          set +e
+          "$obsutil" config \
+            -i="$OBS_ACCESS_KEY" \
+            -k="$OBS_SECRET_KEY" \
+            -e="$OBS_ENDPOINT"
+          config_status=$?
+          set -e
+          # obsutil in the ARC job container has been observed to write a valid
+          # config and then return 127. The config file is the useful result;
+          # the following upload is the real connectivity/credential check.
+          if [[ $config_status -ne 0 ]]; then
+            if [[ ! -s /root/.obsutilconfig ]]; then
+              echo "obsutil config failed with exit code $config_status" >&2
+              exit "$config_status"
+            fi
+            echo "obsutil config returned $config_status after writing /root/.obsutilconfig; continuing"
+          fi
+          object_key="${OBS_PREFIX}/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}/${ARTIFACT_NAME}/recipe-ci-bundle.tar.gz"
+          upload_log="$RECIPE_CI_RUN_ROOT/upload-obs.log"
+          set +e
+          "$obsutil" cp /tmp/recipe-ci-bundle.tar.gz \
+            "obs://${OBS_BUCKET}/${object_key}" -f 2>&1 | tee "$upload_log"
+          upload_status=${PIPESTATUS[0]}
+          set -e
+          if [[ $upload_status -ne 0 ]]; then
+            message=$(tail -n 20 "$upload_log")
+            message=${message//'%'/'%25'}
+            message=${message//$'\r'/'%0D'}
+            message=${message//$'\n'/'%0A'}
+            echo "::error title=OBS artifact upload failed::$message"
+            exit "$upload_status"
+          fi
+
+          artifact_url="https://${OBS_BUCKET}.${OBS_ENDPOINT}/${object_key}"
+          echo "artifact-url=$artifact_url" >> "$GITHUB_OUTPUT"
+          echo "Recipe CI bundle uploaded to $artifact_url"
+
+      - name: Upload Recipe CI bundle to GitHub
+        id: upload_bundle
+        if: always()
+        continue-on-error: true
+        timeout-minutes: 5
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.initialize.outputs.artifact_name || format('recipe-ci-diagnostics-{0}', github.run_id) }}
+          path: /tmp/recipe-ci-bundle.tar.gz
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+
+      - name: Publish OBS artifact link
+        if: always() && steps.upload_obs.outcome == 'success'
+        env:
+          OBS_ARTIFACT_URL: ${{ steps.upload_obs.outputs.artifact-url }}
+        run: |
+          printf '### Recipe CI artifacts\n\n- [OBS bundle](%s)\n' \
+            "$OBS_ARTIFACT_URL" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Verify Recipe CI bundle upload
+        if: always()
+        env:
+          OBS_OUTCOME: ${{ steps.upload_obs.outcome }}
+          GITHUB_OUTCOME: ${{ steps.upload_bundle.outcome }}
+        run: |
+          if [[ "$OBS_OUTCOME" != success && "$GITHUB_OUTCOME" != success ]]; then
+            echo "Neither OBS nor GitHub artifact upload succeeded" >&2
+            exit 1
+          fi
+
+      - name: Remove staged PVC data
+        if: always() && (steps.upload_obs.outcome == 'success' || steps.upload_bundle.outcome == 'success')
+        timeout-minutes: 5
+        run: |
+          case "$RECIPE_CI_RUN_ROOT" in
+            /root/.cache/recipe-ci/recipe-*) rm -rf -- "$RECIPE_CI_RUN_ROOT" ;;
+            *) echo "Refusing to remove unsafe path: $RECIPE_CI_RUN_ROOT" >&2; exit 1 ;;
+          esac

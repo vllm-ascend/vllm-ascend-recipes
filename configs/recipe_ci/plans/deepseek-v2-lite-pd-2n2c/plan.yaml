@@ -1,0 +1,47 @@
+api_version: recipe-ci/v1
+kind: MultiNodePlan
+
+metadata:
+  name: deepseek-v2-lite-pd-2n2c
+
+model:
+  id: vllm-ascend/DeepSeek-V2-Lite-W8A8
+  cache_path: vllm-ascend/DeepSeek-V2-Lite-W8A8
+  served_name: deepseek-v2-lite
+
+resources:
+  npu_per_node: 2
+
+nodes:
+  - id: node0
+    role: prefill
+    launch: nodes/node0/run.sh
+    readiness:
+      port_start: 7100
+      count: 2
+
+  - id: node1
+    role: decode
+    launch: nodes/node1/run.sh
+    readiness:
+      port_start: 7100
+      count: 2
+
+gateway:
+  launch: gateway/run.sh
+  port: 38085
+
+checks:
+  - id: completion
+    script: checks/completion.sh
+    timeout_seconds: 300
+
+evaluations:
+  accuracy:
+    - id: gsm8k
+      script: evaluations/accuracy.sh
+      timeout_seconds: 7200
+  performance:
+    - id: gsm8k-perf
+      script: evaluations/performance.sh
+      timeout_seconds: 7200

@@ -1,0 +1,47 @@
+api_version: recipe-ci/v1
+kind: MultiNodePlan
+
+metadata:
+  name: deepseek-v4-flash-a2-pd-reduced
+
+model:
+  id: Eco-Tech/DeepSeek-V4-Flash-w8a8-mtp
+  cache_path: vllm-ascend/DeepSeek-V4-Flash-w8a8-mtp
+  served_name: dsv4
+
+resources:
+  npu_per_node: 8
+
+nodes:
+  - id: node0
+    role: prefill
+    launch: nodes/node0/run.sh
+    readiness:
+      port_start: 7100
+      count: 8
+
+  - id: node1
+    role: decode
+    launch: nodes/node1/run.sh
+    readiness:
+      port_start: 7100
+      count: 8
+
+gateway:
+  launch: gateway/run.sh
+  port: 38085
+
+checks:
+  - id: completion
+    script: checks/completion.sh
+    timeout_seconds: 300
+
+evaluations:
+  accuracy:
+    - id: gsm8k
+      script: evaluations/accuracy.sh
+      timeout_seconds: 7200
+  performance:
+    - id: gsm8k-perf
+      script: evaluations/performance.sh
+      timeout_seconds: 7200

@@ -1,0 +1,27 @@
+name: Multi-node Recipe CI
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  recipe-ci:
+    # pull_request workflows cannot safely expose cluster credentials to forks.
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    strategy:
+      fail-fast: false
+      matrix:
+        plan:
+          - configs/recipe_ci/plans/deepseek-v2-lite-pd-2n2c/plan.yaml
+    uses: ./.github/workflows/_recipe_verify_multi_node.yaml
+    with:
+      plan: ${{ matrix.plan }}
+    secrets:
+      KUBECONFIG_B64: ${{ secrets.KUBECONFIG_B64 }}
+      OBS_AK: ${{ secrets.OBS_AK }}
+      OBS_SK: ${{ secrets.OBS_SK }}

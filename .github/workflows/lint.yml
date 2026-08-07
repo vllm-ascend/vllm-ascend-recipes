@@ -16,6 +16,7 @@ jobs:
       src: ${{ steps.filter.outputs.src }}
       workflows: ${{ steps.filter.outputs.workflows }}
       config: ${{ steps.filter.outputs.config }}
+      recipe_ci: ${{ steps.filter.outputs.recipe_ci }}
     steps:
       - uses: actions/checkout@v4
       - name: Detect changed paths
@@ -29,6 +30,11 @@ jobs:
               - 'src/**'
             workflows:
               - '.github/workflows/**'
+            recipe_ci:
+              - 'configs/recipe_ci/**'
+              - 'scripts/recipe_ci/**'
+              - 'scripts/verify-recipe.sh'
+              - 'tests/recipe_ci/**'
             config:
               - 'package.json'
               - 'pnpm-lock.yaml'
@@ -99,3 +105,41 @@ jobs:
 
       - name: Run actionlint
         uses: reviewdog/action-actionlint@v1
+
+  recipe-ci:
+    needs: detect
+    if: |
+      needs.detect.outputs.models == 'true' ||
+      needs.detect.outputs.recipe_ci == 'true' ||
+      needs.detect.outputs.workflows == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Recipe CI dependencies
+        run: python -m pip install pyyaml
+
+      - name: Run Recipe CI unit tests
+        run: python -m unittest discover -s tests/recipe_ci -v
+
+      - name: Validate multi-node plans
+        run: |
+          find configs/recipe_ci/plans -mindepth 2 -maxdepth 2 -name plan.yaml -print0 |
+            while IFS= read -r -d '' plan; do
+              RECIPE_CI_PLAN="$plan" RECIPE_CI_VALIDATE_ONLY=true \
+                scripts/recipe_ci/run.sh
+            done
+
+      - name: Check shell entrypoints
+        run: |
+          bash -n scripts/recipe_ci/run.sh scripts/verify-recipe.sh
+          find configs/recipe_ci/plans -type f -name '*.sh' -print0 |
+            while IFS= read -r -d '' script; do
+              bash -n "$script"
+            done

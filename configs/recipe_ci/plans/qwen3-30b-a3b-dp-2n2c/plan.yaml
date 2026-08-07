@@ -1,0 +1,39 @@
+api_version: recipe-ci/v1
+kind: MultiNodePlan
+
+metadata:
+  name: qwen3-30b-a3b-dp-2n2c
+
+model:
+  id: Qwen/Qwen3-30B-A3B
+  cache_path: Qwen/Qwen3-30B-A3B
+  served_name: qwen3
+
+resources:
+  npu_per_node: 2
+
+nodes:
+  - id: node0
+    role: api
+    launch: nodes/node0/run.sh
+    readiness:
+      port_start: 7100
+
+  - id: node1
+    role: headless
+    launch: nodes/node1/run.sh
+
+checks:
+  - id: completion
+    script: checks/completion.sh
+    timeout_seconds: 300
+
+evaluations:
+  accuracy:
+    - id: gsm8k
+      script: evaluations/accuracy.sh
+      timeout_seconds: 7200
+  performance:
+    - id: gsm8k-perf
+      script: evaluations/performance.sh
+      timeout_seconds: 7200
