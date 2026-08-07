@@ -58,65 +58,6 @@ Mooncake**。这不是流水线每跑一次能装的（`cmake -DUSE_ASCEND_DIREC
 ```bash
 scripts/multinode/mooncake/build.sh   # 产出 vllm-ascend:v0.23.0rc1-mooncake
 # 推到集群能拉到的 registry，workflow 的 image 输入填这个 tag
-
-## 排障记录（2026-08-07，PR #36 实测）
-
-### 1. LWS 渲染：metadata 不能嵌进 PodSpec
-
-`controller._pod_spec()` 曾返回平铺 dict（`metadata` + spec 字段），模板把它整个塞进
-`spec:` 下，生成 `spec.metadata` —— API server 直接拒绝（`unknown field "metadata"`），
-controller 在 apply 阶段秒挂。正确结构是 PodTemplateSpec：
-
-```yaml
-leaderTemplate:
-  metadata: {labels: {...}}   # 在 spec 外面
-  spec: {containers: [...], volumes: [...]}
-```
-
-### 2. HCCL 不能强绑管理网卡（引擎崩溃根因）
-
-**症状**：引擎 worker 初始化报 `ERR02005 DIST internal error`，随后 glibc
-`corrupted size vs. prev_size`（SIGABRT / exit 134），两个节点一致 —— 表面像堆损坏，
-实际是 HCCL 内部错误。
-
-**原因**：recipe 模板里 `HCCL_IF_IP=<管理网IP>` + `HCCL_SOCKET_IFNAME=<管理网卡>`。
-本集群 HCCN 高速口是 `enp189s0f0..3`（每个 NPU 一个），管理网卡是 `enp67s0f5`。
-强制 HCCL 走管理网 → DIST 内部错误。
-
-**修法**：不设 `HCCL_IF_IP` / socket ifname，让 HCCL 自动发现 HCCN（PR #34 成功版同样不设）。
-
-### 3. davinci 设备不能 hostPath 挂载（和设备插件冲突）
-
-**症状**：`ASCEND_RT_VISIBLE_DEVICES` 为空，vllm 拿到错误的设备。
-
-**原因**：hostPath 挂载 `/dev/davinciN` 与 Ascend device plugin 冲突，插件不再注入设备
-env。**修法**：不挂 `/dev/davinci*`，只挂整个 `/usr/local/Ascend/driver`
-（hccn_tool / lib64 / version.info 一次到位）；设备节点和 `ASCEND_RT_VISIBLE_DEVICES`
-由插件注入。模板里把逻辑设备号映射到实际物理设备：
-
-```bash
-IFS=',' read -r -a selected_devices <<< "${ASCEND_RT_VISIBLE_DEVICES:-0,1}"
-export ASCEND_RT_VISIBLE_DEVICES="${selected_devices[$1]}"
-```
-
-### 4. NPU 节点 taint 与资源申请
-
-- 节点带 `dedicated=night:NoSchedule`，LWS pod 必须加对应 toleration，否则一直 Pending。
-- `ephemeral-storage` 请求 100Gi 在部分节点 Unschedulable，用 20Gi。
-
-### 5. Mooncake 检查误报不要 pip 兜底
-
-node_entry 进程内 `from mooncake.engine import TransferEngine` 在 source set_env 后仍报
-`libascendcl.so` 找不到（进程内 dlopen 环境问题），但 vllm 子进程（launch.sh 里 source）
-实际能加载。之前误判后 pip 重装 `mooncake-transfer-engine-npu`，有覆盖镜像内置包的风险。
-**修法**：只在 mooncake 包目录完全不存在时才 pip 安装。
-
-### 6. 多引擎 pod 环境（对齐 PR #34 成功版）
-
-- `VLLM_WORKER_MULTIPROC_METHOD=spawn`（fork 在 torch/driver 线程启动后易堆损坏）
-- `VLLM_USE_MODELSCOPE=True` + `HF_HUB_OFFLINE=1`（本地已下载路径原样返回）
-- `VLLM_LOGGING_LEVEL=ERROR`、`TORCH_DEVICE_BACKEND_AUTOLOAD=0`
-- 启动命令加 `VLLM_ASCEND_ENABLE_FLASHCOMM1=0`；MoE 模型加 `--enable-expert-parallel`
 ```
 
 `mooncake/Dockerfile` 复用上游 `tools/mooncake_installer.sh -y`（装系统依赖/yalantinglibs/
