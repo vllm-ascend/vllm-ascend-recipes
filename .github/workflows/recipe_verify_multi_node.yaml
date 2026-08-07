@@ -23,3 +23,5 @@ jobs:
       plan: ${{ matrix.plan }}
     secrets:
       KUBECONFIG_B64: ${{ secrets.KUBECONFIG_B64 }}
+      OBS_AK: ${{ secrets.OBS_AK }}
+      OBS_SK: ${{ secrets.OBS_SK }}

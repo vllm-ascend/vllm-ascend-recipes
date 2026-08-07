@@ -10,6 +10,10 @@ on:
     secrets:
       KUBECONFIG_B64:
         required: true
+      OBS_AK:
+        required: true
+      OBS_SK:
+        required: true
 
 permissions:
   contents: read
@@ -89,7 +93,7 @@ jobs:
           kubectl --kubeconfig "$KUBECONFIG" get pods -n "$NAMESPACE"
 
       - name: Checkout recipes
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install controller dependencies
         run: |
@@ -341,20 +345,57 @@ jobs:
               "$bundle/pod-logs/node${index}.log" 2>/dev/null || true
           done
           du -sh "$bundle"
+          tar -czf /tmp/recipe-ci-bundle.tar.gz -C /tmp recipe-ci-bundle
+          du -sh /tmp/recipe-ci-bundle.tar.gz
 
-      - name: Upload Recipe CI bundle
-        id: upload_bundle
+      - name: Upload Recipe CI bundle to OBS
+        id: upload_obs
         if: always()
+        continue-on-error: true
         timeout-minutes: 15
-        uses: actions/upload-artifact@v7
+        uses: ascend-gha-runners/artifact/upload@v0.3
         with:
+          access_key: ${{ secrets.OBS_AK }}
+          secret_key: ${{ secrets.OBS_SK }}
           name: ${{ steps.initialize.outputs.artifact_name || format('recipe-ci-diagnostics-{0}', github.run_id) }}
-          path: /tmp/recipe-ci-bundle/
+          path: /tmp/recipe-ci-bundle.tar.gz
           if-no-files-found: error
           retention-days: 14
 
+      - name: Upload Recipe CI bundle to GitHub
+        id: upload_bundle
+        if: always()
+        continue-on-error: true
+        timeout-minutes: 5
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.initialize.outputs.artifact_name || format('recipe-ci-diagnostics-{0}', github.run_id) }}
+          path: /tmp/recipe-ci-bundle.tar.gz
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+
+      - name: Publish OBS artifact link
+        if: always() && steps.upload_obs.outcome == 'success'
+        env:
+          OBS_ARTIFACT_URL: ${{ steps.upload_obs.outputs.artifact-url }}
+        run: |
+          printf '### Recipe CI artifacts\n\n- [OBS bundle](%s)\n' \
+            "$OBS_ARTIFACT_URL" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Verify Recipe CI bundle upload
+        if: always()
+        env:
+          OBS_OUTCOME: ${{ steps.upload_obs.outcome }}
+          GITHUB_OUTCOME: ${{ steps.upload_bundle.outcome }}
+        run: |
+          if [[ "$OBS_OUTCOME" != success && "$GITHUB_OUTCOME" != success ]]; then
+            echo "Neither OBS nor GitHub artifact upload succeeded" >&2
+            exit 1
+          fi
+
       - name: Remove staged PVC data
-        if: always() && steps.upload_bundle.outcome == 'success'
+        if: always() && (steps.upload_obs.outcome == 'success' || steps.upload_bundle.outcome == 'success')
         timeout-minutes: 5
         run: |
           case "$RECIPE_CI_RUN_ROOT" in

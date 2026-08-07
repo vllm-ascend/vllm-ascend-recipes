@@ -34,6 +34,14 @@ class MultiNodeWorkflowTests(unittest.TestCase):
         self.assertEqual(job["with"], {"plan": "${{ matrix.plan }}"})
         self.assertIn("github.event.pull_request.head.repo.full_name", job["if"])
         self.assertIn("secrets.KUBECONFIG_B64", text)
+        self.assertEqual(
+            job["secrets"],
+            {
+                "KUBECONFIG_B64": "${{ secrets.KUBECONFIG_B64 }}",
+                "OBS_AK": "${{ secrets.OBS_AK }}",
+                "OBS_SK": "${{ secrets.OBS_SK }}",
+            },
+        )
         self.assertNotIn("model_path", text)
         self.assertNotIn("evaluation", text)
         self.assertNotIn("timeout_seconds", text)
@@ -48,6 +56,10 @@ class MultiNodeWorkflowTests(unittest.TestCase):
         self.assertEqual(
             set(value["on"]["workflow_call"]["inputs"]),
             {"plan"},
+        )
+        self.assertEqual(
+            set(value["on"]["workflow_call"]["secrets"]),
+            {"KUBECONFIG_B64", "OBS_AK", "OBS_SK"},
         )
         self.assertEqual(set(value["jobs"]), {"recipe-ci"})
         self.assertIn("kubectl apply", text)
@@ -223,9 +235,17 @@ class MultiNodeWorkflowTests(unittest.TestCase):
         self.assertIn("--ignore-not-found=true --wait=false", workflow)
         self.assertIn("deadline=$((SECONDS + 180))", workflow)
         self.assertIn('du -sh "$bundle"', workflow)
+        self.assertIn("tar -czf /tmp/recipe-ci-bundle.tar.gz", workflow)
+        self.assertIn("uses: actions/checkout@v7", workflow)
+        self.assertNotIn("uses: actions/checkout@v4", workflow)
+        self.assertIn(
+            "uses: ascend-gha-runners/artifact/upload@v0.3", workflow
+        )
         self.assertIn("uses: actions/upload-artifact@v7", workflow)
-        self.assertIn("timeout-minutes: 15", workflow)
         self.assertNotIn("uses: actions/upload-artifact@v4", workflow)
+        self.assertIn("compression-level: 0", workflow)
+        self.assertIn("Neither OBS nor GitHub artifact upload succeeded", workflow)
+        self.assertIn("steps.upload_obs.outcome == 'success'", workflow)
 
     def test_one_run_script_accepts_local_ips_or_lws_dns(self) -> None:
         text = RUN_SCRIPT.read_text(encoding="utf-8")
