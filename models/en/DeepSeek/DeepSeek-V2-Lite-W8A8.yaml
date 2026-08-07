@@ -111,7 +111,11 @@ scenarios:
       export TASK_QUEUE_ENABLE=1
       export LD_LIBRARY_PATH=/usr/local/Ascend/ascend-toolkit/latest/python/site-packages/mooncake:$LD_LIBRARY_PATH
       export HCCL_BUFFSIZE=256
-      export ASCEND_RT_VISIBLE_DEVICES=$1
+      # launch_online_dp.py passes logical device indexes; map them onto the
+      # container's assigned physical devices (ASCEND_RT_VISIBLE_DEVICES).
+      IFS=',' read -r -a selected_devices <<< "${ASCEND_RT_VISIBLE_DEVICES:-0,1}"
+      export ASCEND_RT_VISIBLE_DEVICES="${selected_devices[$1]}"
+      export VLLM_ASCEND_ENABLE_FLASHCOMM1=0
 
       vllm serve your_model_path \
           --host 0.0.0.0 \
@@ -123,6 +127,7 @@ scenarios:
           --data-parallel-rpc-port $6 \
           --tensor-parallel-size $7 \
           --trust-remote-code \
+          --enable-expert-parallel \
           --quantization ascend \
           --max-model-len 4096 \
           --max-num-seqs 8 \
@@ -148,7 +153,11 @@ scenarios:
       export TASK_QUEUE_ENABLE=1
       export LD_LIBRARY_PATH=/usr/local/Ascend/ascend-toolkit/latest/python/site-packages/mooncake:$LD_LIBRARY_PATH
       export HCCL_BUFFSIZE=256
-      export ASCEND_RT_VISIBLE_DEVICES=$1
+      # launch_online_dp.py passes logical device indexes; map them onto the
+      # container's assigned physical devices (ASCEND_RT_VISIBLE_DEVICES).
+      IFS=',' read -r -a selected_devices <<< "${ASCEND_RT_VISIBLE_DEVICES:-0,1}"
+      export ASCEND_RT_VISIBLE_DEVICES="${selected_devices[$1]}"
+      export VLLM_ASCEND_ENABLE_FLASHCOMM1=0
 
       vllm serve your_model_path \
           --host 0.0.0.0 \
@@ -160,6 +169,7 @@ scenarios:
           --data-parallel-rpc-port $6 \
           --tensor-parallel-size $7 \
           --trust-remote-code \
+          --enable-expert-parallel \
           --quantization ascend \
           --max-model-len 4096 \
           --max-num-seqs 8 \

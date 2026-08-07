@@ -299,9 +299,14 @@ def check_mooncake() -> bool:
 
     if _try_import():
         return True
-    # PR #34 pattern (scripts/recipe_ci/install_mooncake.sh): if the baked-in
-    # mooncake is broken, pip-install mooncake-transfer-engine-npu at runtime.
-    # The pod env may set PIP_INDEX_URL to a cluster cache (PR #34 does).
+    # Only pip-install when the mooncake package is genuinely absent. The
+    # baked-in image package must NOT be replaced at runtime: pulling a
+    # different mooncake-transfer-engine-npu build over it has caused glibc
+    # heap corruption ("corrupted size vs. prev_size") in the vllm engine.
+    if hits:
+        log("baked-in mooncake import failed (env issue) — NOT pip-installing; "
+            "vllm serve will report whether the runtime is actually usable")
+        return False
     log("baked-in mooncake import failed — trying pip install "
         "mooncake-transfer-engine-npu")
     try:
@@ -425,6 +430,7 @@ def main() -> int:
         f.write("#!/usr/bin/env bash\n")
         f.write("set -eo pipefail\n")
         f.write(". /usr/local/Ascend/ascend-toolkit/set_env.sh 2>/dev/null || true\n")
+        f.write(". /usr/local/Ascend/nnal/atb/set_env.sh 2>/dev/null || true\n")
         f.write(f"cd {node_dir}\n")
         f.write(f"exec python launch_online_dp.py {launch_args}\n")
     os.chmod(launch_sh, 0o755)

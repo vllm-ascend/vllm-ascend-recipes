@@ -396,13 +396,17 @@ def _pod_spec(plan: dict, args, entry_cm: str, role: str = "") -> dict:
                     {"name": "MULTINODE_WORKDIR", "value": "/run/recipe-ci"},
                     {"name": "MULTINODE_PLAN", "value": "/scripts/plan.json"},
                     {"name": "RUN_ID", "value": args.run_id},
-                    # NOTE: VLLM_USE_MODELSCOPE must NOT be set here. With it,
-                    # vllm passes the model path to modelscope's
-                    # snapshot_download, which treats the absolute path as a
-                    # REMOTE model id and 404s. The weights are pre-downloaded
-                    # as a plain local dir under /root/.cache/modelscope/hub/
-                    # models/Eco-Tech/<model>, which vllm loads directly
-                    # without the flag.
+                    # Same env as the proven PR #34 runner LWS: spawn (fork
+                    # after torch/driver threads have started corrupts the
+                    # heap — "corrupted size vs. prev_size" in engine init),
+                    # ModelScope with HF offline (the pre-downloaded local dir
+                    # is returned as-is by snapshot_download), and reduced
+                    # logging for the multi-engine pods.
+                    {"name": "VLLM_WORKER_MULTIPROC_METHOD", "value": "spawn"},
+                    {"name": "VLLM_USE_MODELSCOPE", "value": "True"},
+                    {"name": "HF_HUB_OFFLINE", "value": "1"},
+                    {"name": "VLLM_LOGGING_LEVEL", "value": "ERROR"},
+                    {"name": "TORCH_DEVICE_BACKEND_AUTOLOAD", "value": "0"},
                     # Mooncake runtime .so lives under site-packages/mooncake;
                     # the mooncake-enabled image bakes this via ENV too, this
                     # is insurance.
