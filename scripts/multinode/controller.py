@@ -324,7 +324,9 @@ def _volume_mounts(npu_per_node: int) -> list[dict]:
 
 def _pod_spec(plan: dict, args, entry_cm: str) -> dict:
     npu = plan.get("npu_per_node") or args.npu_per_node
+    lws = plan["lws_name"]
     return {
+        "metadata": {"labels": {"multinode-lws": lws}},
         "hostNetwork": True,
         # hostNetwork pods default to dnsPolicy: Default (the node's
         # resolv.conf), which has no cluster search domains -> the LWS headless
@@ -356,7 +358,19 @@ def _pod_spec(plan: dict, args, entry_cm: str) -> dict:
                         }]
                     },
                 }]
-            }
+            },
+            # PD separation REQUIRES prefill and decode on different nodes (they
+            # use the same DP RPC port 12321 — co-locating them gives "Address
+            # already in use"). PR #34 pins 1 pod/node via podAntiAffinity; do
+            # the same on a shared LWS label + kubernetes.io/hostname.
+            "podAntiAffinity": {
+                "requiredDuringSchedulingIgnoredDuringExecution": [{
+                    "labelSelector": {
+                        "matchLabels": {"multinode-lws": lws},
+                    },
+                    "topologyKey": "kubernetes.io/hostname",
+                }]
+            },
         },
         "containers": [{
             "name": "vllm-ascend",
