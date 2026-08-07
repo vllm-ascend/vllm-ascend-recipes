@@ -209,6 +209,7 @@ jobs:
           exit 1
 
       - name: Stream logs and wait for Recipe CI
+        id: run_recipe
         run: |
           set -euo pipefail
           exec > >(tee -a "$RECIPE_CI_BUNDLE/controller-logs/recipe-ci.log") 2>&1
@@ -274,6 +275,61 @@ jobs:
             [[ "$exit_code" == 0 ]] || failed=1
           done
           exit "$failed"
+
+      - name: Publish failure diagnostics
+        if: always() && steps.run_recipe.outcome == 'failure'
+        continue-on-error: true
+        env:
+          NODE_COUNT: ${{ env.RECIPE_CI_NODE_COUNT }}
+        run: |
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+
+          def tail(path: Path, lines: int) -> str:
+              if not path.is_file():
+                  return "log file not found"
+              content = path.read_text(encoding="utf-8", errors="replace").splitlines()
+              return "\n".join(content[-lines:])
+
+          sections = [
+              "controller log:\n"
+              + tail(
+                  Path(os.environ["RECIPE_CI_BUNDLE"])
+                  / "controller-logs"
+                  / "recipe-ci.log",
+                  30,
+              )
+          ]
+          for index in range(int(os.environ.get("NODE_COUNT", "0"))):
+              sections.append(
+                  f"node{index} log:\n"
+                  + tail(Path(f"/tmp/recipe-ci-node{index}.log"), 40)
+              )
+
+          message = "\n\n".join(sections)
+          if len(message) > 30000:
+              message = "... diagnostics truncated ...\n" + message[-30000:]
+          diagnostics = (
+              Path(os.environ["RECIPE_CI_BUNDLE"])
+              / "controller-logs"
+              / "failure-diagnostics.log"
+          )
+          diagnostics.write_text(message + "\n", encoding="utf-8")
+          escaped = (
+              message.replace("%", "%25")
+              .replace("\r", "%0D")
+              .replace("\n", "%0A")
+          )
+          print(f"::error title=Recipe CI failure diagnostics::{escaped}")
+
+          with Path(os.environ["GITHUB_STEP_SUMMARY"]).open(
+              "a", encoding="utf-8"
+          ) as summary:
+              summary.write("### Recipe CI failure diagnostics\n\n```text\n")
+              summary.write(message)
+              summary.write("\n```\n")
+          PY
 
       - name: Delete LeaderWorkerSet
         if: always() && steps.prepare.outcome == 'success'
@@ -353,14 +409,70 @@ jobs:
         if: always()
         continue-on-error: true
         timeout-minutes: 15
-        uses: ascend-gha-runners/artifact/upload@v0.3
-        with:
-          access_key: ${{ secrets.OBS_AK }}
-          secret_key: ${{ secrets.OBS_SK }}
-          name: ${{ steps.initialize.outputs.artifact_name || format('recipe-ci-diagnostics-{0}', github.run_id) }}
-          path: /tmp/recipe-ci-bundle.tar.gz
-          if-no-files-found: error
-          retention-days: 14
+        env:
+          ARTIFACT_NAME: ${{ steps.initialize.outputs.artifact_name || format('recipe-ci-diagnostics-{0}', github.run_id) }}
+          OBS_ACCESS_KEY: ${{ secrets.OBS_AK }}
+          OBS_SECRET_KEY: ${{ secrets.OBS_SK }}
+          OBS_BUCKET: mindcluster
+          OBS_PREFIX: vllm-ascend-recipe
+          OBS_ENDPOINT: obs.ap-southeast-1.myhuaweicloud.com
+        run: |
+          set -euo pipefail
+          exec > >(tee -a "$RECIPE_CI_BUNDLE/controller-logs/upload-obs.log") 2>&1
+          test -s /tmp/recipe-ci-bundle.tar.gz
+          test -n "$OBS_ACCESS_KEY"
+          test -n "$OBS_SECRET_KEY"
+
+          case "$(uname -m)" in
+            aarch64 | arm64) obsutil_arch=arm64 ;;
+            *) obsutil_arch=amd64 ;;
+          esac
+          setup_dir=$(mktemp -d)
+          curl --fail --location --show-error --http1.1 \
+            --retry 3 --retry-delay 2 --connect-timeout 15 --max-time 180 \
+            "https://obs-community.obs.cn-north-1.myhuaweicloud.com/obsutil/current/obsutil_linux_${obsutil_arch}.tar.gz" \
+            --output "$setup_dir/obsutil.tar.gz"
+          tar -xzf "$setup_dir/obsutil.tar.gz" -C "$setup_dir"
+          obsutil=$(find "$setup_dir" -type f -name obsutil -print -quit)
+          test -n "$obsutil"
+          chmod +x "$obsutil"
+
+          set +e
+          "$obsutil" config \
+            -i="$OBS_ACCESS_KEY" \
+            -k="$OBS_SECRET_KEY" \
+            -e="$OBS_ENDPOINT"
+          config_status=$?
+          set -e
+          # obsutil in the ARC job container has been observed to write a valid
+          # config and then return 127. The config file is the useful result;
+          # the following upload is the real connectivity/credential check.
+          if [[ $config_status -ne 0 ]]; then
+            if [[ ! -s /root/.obsutilconfig ]]; then
+              echo "obsutil config failed with exit code $config_status" >&2
+              exit "$config_status"
+            fi
+            echo "obsutil config returned $config_status after writing /root/.obsutilconfig; continuing"
+          fi
+          object_key="${OBS_PREFIX}/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}/${ARTIFACT_NAME}/recipe-ci-bundle.tar.gz"
+          upload_log="$RECIPE_CI_RUN_ROOT/upload-obs.log"
+          set +e
+          "$obsutil" cp /tmp/recipe-ci-bundle.tar.gz \
+            "obs://${OBS_BUCKET}/${object_key}" -f 2>&1 | tee "$upload_log"
+          upload_status=${PIPESTATUS[0]}
+          set -e
+          if [[ $upload_status -ne 0 ]]; then
+            message=$(tail -n 20 "$upload_log")
+            message=${message//'%'/'%25'}
+            message=${message//$'\r'/'%0D'}
+            message=${message//$'\n'/'%0A'}
+            echo "::error title=OBS artifact upload failed::$message"
+            exit "$upload_status"
+          fi
+
+          artifact_url="https://${OBS_BUCKET}.${OBS_ENDPOINT}/${object_key}"
+          echo "artifact-url=$artifact_url" >> "$GITHUB_OUTPUT"
+          echo "Recipe CI bundle uploaded to $artifact_url"
 
       - name: Upload Recipe CI bundle to GitHub
         id: upload_bundle

@@ -93,6 +93,40 @@ class AisbenchInstallerTests(unittest.TestCase):
         self.assertIn("already installed", result.stdout)
         self.assertIn(self.commit, result.stdout)
 
+    def test_cached_source_is_reused_when_the_command_needs_installing(self) -> None:
+        command = self.bin_dir / "ais_bench"
+        command.unlink()
+        fake_python = self.bin_dir / "python3"
+        fake_python.write_text(
+            "#!/usr/bin/env bash\n"
+            "printf '#!/usr/bin/env bash\\nexit 0\\n' > \"$FAKE_AISBENCH_COMMAND\"\n"
+            "chmod +x \"$FAKE_AISBENCH_COMMAND\"\n",
+            encoding="utf-8",
+        )
+        fake_python.chmod(0o755)
+        environment = self.environment()
+        environment["FAKE_AISBENCH_COMMAND"] = str(command)
+
+        result = subprocess.run(
+            ["bash", str(INSTALLER)],
+            env=environment,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertIn("Reusing cached AISBench source", result.stdout)
+        self.assertTrue(command.exists())
+
+    def test_clone_uses_http1_and_retries_before_publishing_the_cache(self) -> None:
+        text = INSTALLER.read_text(encoding="utf-8")
+
+        self.assertIn("for attempt in 1 2 3", text)
+        self.assertIn("git -c http.version=HTTP/1.1 clone", text)
+        self.assertIn('clone_root="${AIS_BENCH_ROOT}.clone.$$"', text)
+        self.assertIn('mv "$clone_root" "$AIS_BENCH_ROOT"', text)
+
     def test_wrong_commit_requires_force(self) -> None:
         environment = self.environment()
         environment["AIS_BENCH_EXPECTED_COMMIT"] = "0" * 40

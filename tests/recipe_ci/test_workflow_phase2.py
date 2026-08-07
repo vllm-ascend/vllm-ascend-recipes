@@ -93,6 +93,10 @@ class MultiNodeWorkflowTests(unittest.TestCase):
         self.assertIn('wait "$pid"', text)
         self.assertIn('node_failed=true', text)
         self.assertIn('"$node_failed" == true || "$all_finished" == true', text)
+        self.assertIn("id: run_recipe", text)
+        self.assertIn("Recipe CI failure diagnostics", text)
+        self.assertIn("failure-diagnostics.log", text)
+        self.assertIn("::error title=Recipe CI failure diagnostics", text)
         self.assertNotIn('| sed -u "s/^/[node${index}] /"', text)
 
         # Pod placement, addresses, and visible devices are supplied by LWS/K8s,
@@ -217,6 +221,11 @@ class MultiNodeWorkflowTests(unittest.TestCase):
         self.assertEqual(env["RECIPE_CI_NODE_COUNT"], "4")
         self.assertEqual(env["RECIPE_CI_INSTALL_AISBENCH"], "true")
         self.assertEqual(
+            env["AIS_BENCH_ROOT"],
+            "/root/.cache/recipe-ci/tools/aisbench/benchmark",
+        )
+        self.assertEqual(env["RECIPE_AISBENCH_ROOT"], env["AIS_BENCH_ROOT"])
+        self.assertEqual(
             env["PIP_INDEX_URL"],
             "http://cache-service.nginx-pypi-cache.svc.cluster.local/pypi/simple",
         )
@@ -238,9 +247,14 @@ class MultiNodeWorkflowTests(unittest.TestCase):
         self.assertIn("tar -czf /tmp/recipe-ci-bundle.tar.gz", workflow)
         self.assertIn("uses: actions/checkout@v7", workflow)
         self.assertNotIn("uses: actions/checkout@v4", workflow)
-        self.assertIn(
-            "uses: ascend-gha-runners/artifact/upload@v0.3", workflow
-        )
+        self.assertNotIn("uses: ascend-gha-runners/artifact", workflow)
+        self.assertIn("obsutil_linux_${obsutil_arch}.tar.gz", workflow)
+        self.assertIn('"$obsutil" cp /tmp/recipe-ci-bundle.tar.gz', workflow)
+        self.assertIn("OBS_BUCKET: mindcluster", workflow)
+        self.assertIn("OBS_PREFIX: vllm-ascend-recipe", workflow)
+        self.assertIn("config returned $config_status", workflow)
+        self.assertIn("::error title=OBS artifact upload failed", workflow)
+        self.assertIn('upload_log="$RECIPE_CI_RUN_ROOT/upload-obs.log"', workflow)
         self.assertIn("uses: actions/upload-artifact@v7", workflow)
         self.assertNotIn("uses: actions/upload-artifact@v4", workflow)
         self.assertIn("compression-level: 0", workflow)

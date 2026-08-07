@@ -54,6 +54,12 @@ spec:
                 value: {{ plan }}
               - name: RECIPE_CI_INSTALL_AISBENCH
                 value: "true"
+              # Cache the pinned source on the shared PVC. Each fresh runtime
+              # image can reinstall the command without cloning from GitHub.
+              - name: AIS_BENCH_ROOT
+                value: /root/.cache/recipe-ci/tools/aisbench/benchmark
+              - name: RECIPE_AISBENCH_ROOT
+                value: /root/.cache/recipe-ci/tools/aisbench/benchmark
               - name: RECIPE_CI_INSTALL_MOONCAKE
                 value: "true"
               # Use the cluster cache for runtime installs. /root/.cache/pip is

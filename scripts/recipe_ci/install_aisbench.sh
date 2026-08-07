@@ -10,6 +10,8 @@ AIS_BENCH_ROOT=${AIS_BENCH_ROOT:-$VLLM_ASCEND_ROOT/benchmark}
 AIS_BENCH_PYTHON=python3
 AIS_BENCH_COMMAND=ais_bench
 force_reinstall=false
+source_ready=false
+actual_commit=""
 
 usage() {
     echo "Usage: $0 [--force-reinstall]"
@@ -61,22 +63,22 @@ if [[ -e "$AIS_BENCH_ROOT" ]]; then
             echo "AISBench tracked files are modified: $AIS_BENCH_ROOT" >&2
             exit 1
         fi
-        if ! resolved_command=$(command -v "$AIS_BENCH_COMMAND"); then
-            echo "AISBench source is correct, but command is missing: $AIS_BENCH_COMMAND" >&2
-            echo "Run again with --force-reinstall." >&2
-            exit 1
+        if resolved_command=$(command -v "$AIS_BENCH_COMMAND") && \
+            "$resolved_command" -h >/dev/null; then
+            echo "AISBench is already installed at the expected commit."
+            echo "  tag:        $AIS_BENCH_TAG"
+            echo "  commit:     $current_commit"
+            echo "  repository: $current_url"
+            echo "  source:     $AIS_BENCH_ROOT"
+            echo "  command:    $resolved_command"
+            exit 0
         fi
-        "$resolved_command" -h >/dev/null
-        echo "AISBench is already installed at the expected commit."
-        echo "  tag:        $AIS_BENCH_TAG"
-        echo "  commit:     $current_commit"
-        echo "  repository: $current_url"
-        echo "  source:     $AIS_BENCH_ROOT"
-        echo "  command:    $resolved_command"
-        exit 0
+        echo "Reusing cached AISBench source; installing the command into this image."
+        source_ready=true
+        actual_commit=$current_commit
     fi
 
-    if [[ "$force_reinstall" == false ]]; then
+    if [[ "$source_ready" == false && "$force_reinstall" == false ]]; then
         echo "AISBench source exists at an unexpected version: $AIS_BENCH_ROOT" >&2
         echo "  expected: $AIS_BENCH_EXPECTED_COMMIT" >&2
         echo "  actual:   ${current_commit:-not a git checkout}" >&2
@@ -84,24 +86,46 @@ if [[ -e "$AIS_BENCH_ROOT" ]]; then
         exit 1
     fi
 
-    case "$AIS_BENCH_ROOT" in
-        "" | / | /vllm-workspace | "$VLLM_ASCEND_ROOT")
-            echo "Refusing to remove unsafe AIS_BENCH_ROOT: $AIS_BENCH_ROOT" >&2
-            exit 1
-            ;;
-    esac
-    rm -rf -- "$AIS_BENCH_ROOT"
+    if [[ "$source_ready" == false ]]; then
+        case "$AIS_BENCH_ROOT" in
+            "" | / | /vllm-workspace | "$VLLM_ASCEND_ROOT")
+                echo "Refusing to remove unsafe AIS_BENCH_ROOT: $AIS_BENCH_ROOT" >&2
+                exit 1
+                ;;
+        esac
+        rm -rf -- "$AIS_BENCH_ROOT"
+    fi
 fi
 
-git clone --branch "$AIS_BENCH_TAG" --depth 1 \
-    "$AIS_BENCH_URL" "$AIS_BENCH_ROOT"
+if [[ "$source_ready" == false ]]; then
+    mkdir -p "$(dirname "$AIS_BENCH_ROOT")"
+    clone_root="${AIS_BENCH_ROOT}.clone.$$"
+    cloned=false
+    for attempt in 1 2 3; do
+        echo "Cloning AISBench (attempt $attempt/3)..."
+        if git -c http.version=HTTP/1.1 clone \
+            --branch "$AIS_BENCH_TAG" --depth 1 \
+            "$AIS_BENCH_URL" "$clone_root"; then
+            cloned=true
+            break
+        fi
+        rm -rf -- "$clone_root"
+        sleep $((attempt * 2))
+    done
+    if [[ "$cloned" == false ]]; then
+        echo "Unable to clone AISBench after 3 attempts." >&2
+        exit 1
+    fi
 
-actual_commit=$(git -C "$AIS_BENCH_ROOT" rev-parse HEAD)
-if [[ "$actual_commit" != "$AIS_BENCH_EXPECTED_COMMIT" ]]; then
-    echo "AISBench tag resolved to an unexpected commit." >&2
-    echo "  expected: $AIS_BENCH_EXPECTED_COMMIT" >&2
-    echo "  actual:   $actual_commit" >&2
-    exit 1
+    actual_commit=$(git -C "$clone_root" rev-parse HEAD)
+    if [[ "$actual_commit" != "$AIS_BENCH_EXPECTED_COMMIT" ]]; then
+        rm -rf -- "$clone_root"
+        echo "AISBench tag resolved to an unexpected commit." >&2
+        echo "  expected: $AIS_BENCH_EXPECTED_COMMIT" >&2
+        echo "  actual:   $actual_commit" >&2
+        exit 1
+    fi
+    mv "$clone_root" "$AIS_BENCH_ROOT"
 fi
 
 "$AIS_BENCH_PYTHON" -m pip install \
