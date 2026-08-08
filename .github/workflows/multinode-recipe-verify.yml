@@ -139,7 +139,15 @@ jobs:
   multinode-verify:
     needs: prepare
     if: needs.prepare.outputs.should_run == 'true'
-    runs-on: linux-aarch64-a2b4-0
+    # Run on the a2b4-8 runner pool (same as the nightly single-node verify):
+    # the controller is CPU-only (kubectl + python over the kubeconfig secret)
+    # and does not need the a2b4-0 scheduling node. The a2b4-0 pool's egress
+    # to GitHub's Azure results service is unreliable — artifact uploads hang
+    # and the post-job "Stop containers" teardown stalls on the log flush —
+    # while a2b4-8 runners upload consistently. a2b4-8 job containers reach
+    # the cluster-internal network (API server, pod IPs, PyPI cache), so the
+    # controller's kubectl/HTTP verification works unchanged.
+    runs-on: linux-aarch64-a2b4-8
     # Run the controller in upstream's CPU image (vllm-ascend:nightly-cpu),
     # same as _e2e_nightly_multi_node.yaml: kubectl + python are baked in, and
     # all steps share ONE container so /tmp persists (the bare ARC runner had
