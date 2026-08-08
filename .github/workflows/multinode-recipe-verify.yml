@@ -354,7 +354,10 @@ jobs:
             --run-id "$RUN_ID" \
             --proxy-port "${{ inputs.proxy_port || '8088' }}" \
             --results-dir /tmp/multinode-results \
-            ${{ inputs.run_eval == 'true' && '--run-eval' || '' }}
+            # inputs.* is empty on pull_request triggers, so fall back to the
+            # input default ('true') there — otherwise --run-eval is silently
+            # dropped and the AISBench stage never runs on PRs.
+            ${{ (inputs.run_eval || 'true') == 'true' && '--run-eval' || '' }}
 
       - name: Upload multi-node results to OBS
         if: always()
