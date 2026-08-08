@@ -811,7 +811,7 @@ def run_aisbench(plan: dict, endpoint: str, results_dir: Path, args) -> bool:
                "--dump-eval-details", "--debug"]
     print(f"[controller] aisbench accuracy: {' '.join(acc_cmd)}", flush=True)
     with acc_log.open("w", encoding="utf-8") as logf:
-        rc = subprocess.run(acc_cmd, cwd=results_dir, env=env,
+        rc = subprocess.run(acc_cmd, cwd=out_dir, env=env,
                             stdout=logf, stderr=subprocess.STDOUT).returncode
     if rc != 0:
         raise PipelineError("aisbench",
@@ -833,7 +833,7 @@ def run_aisbench(plan: dict, endpoint: str, results_dir: Path, args) -> bool:
                 "--debug"]
     print(f"[controller] aisbench performance: {' '.join(perf_cmd)}", flush=True)
     with perf_log.open("w", encoding="utf-8") as logf:
-        rc = subprocess.run(perf_cmd, cwd=results_dir, env=env,
+        rc = subprocess.run(perf_cmd, cwd=out_dir, env=env,
                             stdout=logf, stderr=subprocess.STDOUT).returncode
     if rc != 0:
         raise PipelineError("aisbench",
