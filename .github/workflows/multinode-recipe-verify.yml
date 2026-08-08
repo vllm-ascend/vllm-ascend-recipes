@@ -342,6 +342,9 @@ jobs:
           # `inputs.*` is EMPTY, which would make argparse fail on the int args
           # ("invalid int value: ''"). Defaulting here keeps both trigger paths
           # identical.
+          # --run-eval needs the same default: inputs.* is empty on PR
+          # triggers, so fall back to 'true' there — otherwise the AISBench
+          # stage silently never runs on PRs.
           mkdir -p /tmp/multinode-results
           python3 scripts/multinode/controller.py \
             --recipe "${{ needs.prepare.outputs.recipe }}" \
@@ -354,9 +357,6 @@ jobs:
             --run-id "$RUN_ID" \
             --proxy-port "${{ inputs.proxy_port || '8088' }}" \
             --results-dir /tmp/multinode-results \
-            # inputs.* is empty on pull_request triggers, so fall back to the
-            # input default ('true') there — otherwise --run-eval is silently
-            # dropped and the AISBench stage never runs on PRs.
             ${{ (inputs.run_eval || 'true') == 'true' && '--run-eval' || '' }}
 
       - name: Upload multi-node results to OBS
