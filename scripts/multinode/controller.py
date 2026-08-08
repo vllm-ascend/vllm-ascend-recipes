@@ -23,10 +23,12 @@ touching kubectl.
 """
 
 import argparse
+import csv
 import json
 import os
 import re
 import shlex
+import shutil
 import subprocess
 import sys
 import time
@@ -644,20 +646,206 @@ def run_verify(plan: dict, endpoint: str, args) -> None:
             raise PipelineError("verify", f"verify[{i}] failed")
 
 
-def run_eval(plan: dict, endpoint: str, results_dir: Path) -> None:
-    template = plan.get("role_templates", {}).get("prefill", "")
-    model = served_model_name(template)
-    body = json.dumps({"model": model,
-                       "messages": [{"role": "user", "content": "Who are you?"}],
-                       "max_tokens": 32, "temperature": 0})
-    out = results_dir / "eval-response.json"
-    rc = subprocess.run(["curl", "-sf", "-o", str(out), "-w", "%{time_total}",
-                         "-X", "POST", f"{endpoint}/v1/chat/completions",
-                         "-H", "Content-Type: application/json", "-d", body],
-                        capture_output=True, text=True, timeout=300)
-    if rc.returncode != 0:
-        raise PipelineError("eval", f"eval curl failed: {rc.stderr}")
-    print(f"[controller] eval OK in {rc.stdout}s (response saved)", flush=True)
+def endpoint_host_port(endpoint: str) -> tuple[str, int]:
+    """Split an http(s) endpoint into (host, port)."""
+    rest = endpoint.split("://", 1)[1] if "://" in endpoint else endpoint
+    host, _, port = rest.rpartition(":")
+    if not host:
+        return rest, 80
+    return host, int(port.split("/", 1)[0])
+
+
+def aisbench_config(plan: dict, endpoint: str, results_dir: Path) -> Path:
+    """Render AISBench model configs (general chat + stream chat) pointing at
+    the PD service endpoint. Same templates as the proven PR #34 plan."""
+    host, port = endpoint_host_port(endpoint)
+    model_path = plan.get("model_cache_path", "")
+    model = served_model_name(plan.get("role_templates", {}).get("prefill", ""))
+    cfg_dir = results_dir / "aisbench-config" / "models"
+    cfg_dir.mkdir(parents=True, exist_ok=True)
+    tpl_dir = SCRIPT_DIR / "aisbench" / "models"
+    for name in ("vllm_api_general_chat.py", "vllm_api_stream_chat.py"):
+        tpl = (tpl_dir / name).read_text(encoding="utf-8")
+        rendered = (tpl
+                    .replace("__RECIPE_MODEL_PATH__", repr(model_path))
+                    .replace("__RECIPE_SERVED_MODEL_NAME__", repr(model))
+                    .replace("__RECIPE_ENDPOINT_HOST__", repr(host))
+                    .replace("__RECIPE_ENDPOINT_PORT__", str(port))
+                    .replace("__RECIPE_AISBENCH_MAX_OUT_LEN__", "512"))
+        (cfg_dir / name).write_text(rendered, encoding="utf-8")
+    return cfg_dir.parent
+
+
+def aisbench_prepare_dataset(results_dir: Path) -> dict:
+    """Place the vendored gsm8k fixture where AISBench's built-in dataset
+    configs expect it (AIS_BENCH_DATASETS_CACHE/ais_bench/datasets/gsm8k)."""
+    cache_root = results_dir / "aisbench-data"
+    target = cache_root / "ais_bench" / "datasets" / "gsm8k"
+    target.mkdir(parents=True, exist_ok=True)
+    src = SCRIPT_DIR / "aisbench" / "datasets" / "gsm8k"
+    for name in ("train.jsonl", "test.jsonl"):
+        shutil.copyfile(src / name, target / name)
+    return {"AIS_BENCH_DATASETS_CACHE": str(cache_root)}
+
+
+def _aisbench_number(value) -> float | None:
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return float(value)
+    if isinstance(value, str):
+        token = value.strip().split()[0].replace(",", "") if value.strip() else ""
+        try:
+            return float(token)
+        except ValueError:
+            return None
+    return None
+
+
+def _aisbench_flatten(value, prefix: str = ""):
+    if isinstance(value, dict):
+        for key, item in value.items():
+            yield from _aisbench_flatten(item, f"{prefix}.{key}" if prefix else str(key))
+    elif isinstance(value, list):
+        for index, item in enumerate(value):
+            yield from _aisbench_flatten(item, f"{prefix}[{index}]")
+    else:
+        yield prefix, value
+
+
+def aisbench_accuracy_score(directory: Path) -> tuple[float, Path]:
+    standard_columns = {"dataset", "version", "metric", "mode", "total_count"}
+    for path in sorted(directory.rglob("*.csv"),
+                       key=lambda p: p.stat().st_mtime, reverse=True):
+        with path.open(newline="", encoding="utf-8-sig") as f:
+            for row in csv.DictReader(f):
+                if str(row.get("metric", "")).lower() != "accuracy":
+                    continue
+                for column, value in row.items():
+                    if column not in standard_columns and value not in (None, ""):
+                        try:
+                            return float(value), path
+                        except ValueError:
+                            continue
+    raise PipelineError("aisbench", f"no accuracy metric found under {directory}")
+
+
+def aisbench_performance_metrics(directory: Path) -> tuple[dict[str, float], list[Path]]:
+    aliases = {
+        "request throughput": "request_per_second",
+        "output token throughput": "output_token_per_second",
+        "e2e latency": "e2e_latency_ms",
+        "e2el": "e2e_latency_ms",
+        "ttft": "ttft_ms",
+        "tpot": "tpot_ms",
+    }
+    metrics: dict[str, float] = {}
+    sources: list[Path] = []
+    for path in sorted(directory.rglob("*.json"),
+                       key=lambda p: p.stat().st_mtime, reverse=True):
+        try:
+            value = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        found = False
+        for key, raw in _aisbench_flatten(value):
+            lowered = key.lower()
+            for phrase, metric in aliases.items():
+                if phrase in lowered and (parsed := _aisbench_number(raw)) is not None:
+                    metrics.setdefault(metric, parsed)
+                    found = True
+        if found:
+            sources.append(path)
+    for path in sorted(directory.rglob("*.csv"),
+                       key=lambda p: p.stat().st_mtime, reverse=True):
+        try:
+            with path.open(newline="", encoding="utf-8-sig") as f:
+                rows = list(csv.DictReader(f))
+        except (OSError, csv.Error):
+            continue
+        found = False
+        for row in rows:
+            parameter = str(row.get("Performance Parameters", "")).lower()
+            average = _aisbench_number(row.get("Average"))
+            if average is None:
+                continue
+            for phrase, metric in aliases.items():
+                if phrase in parameter:
+                    metrics.setdefault(metric, average)
+                    found = True
+        if found:
+            sources.append(path)
+    required = {"request_per_second", "output_token_per_second",
+                "e2e_latency_ms", "ttft_ms", "tpot_ms"}
+    missing = sorted(required - set(metrics))
+    if missing:
+        raise PipelineError(
+            "aisbench",
+            f"performance metrics missing under {directory}: {', '.join(missing)}")
+    return metrics, list(dict.fromkeys(sources))
+
+
+def run_aisbench(plan: dict, endpoint: str, results_dir: Path, args) -> bool:
+    """Run AISBench accuracy + performance against the PD service endpoint.
+    Mirrors the single-node verify-recipe.sh flow (ais_bench installed on the
+    runner) with the PR #34 multi-node plan configs/dataset. Returns False
+    when ais_bench is not installed (eval skipped, like the single-node flow)."""
+    ais_bin = shutil.which("ais_bench")
+    if not ais_bin:
+        print("[controller] ais_bench not found — skipping AISBench eval "
+              "(add the 'Install AISBench' workflow step to enable it)",
+              flush=True)
+        return False
+    cfg_dir = aisbench_config(plan, endpoint, results_dir)
+    data_env = aisbench_prepare_dataset(results_dir)
+    out_dir = results_dir / "aisbench"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    env = dict(os.environ)
+    env.update(data_env)
+
+    # Accuracy: general chat against gsm8k, mode all.
+    acc_log = out_dir / "accuracy.log"
+    acc_cmd = [ais_bin, "--config-dir", str(cfg_dir),
+               "--models", "vllm_api_general_chat",
+               "--datasets", "gsm8k_gen_0_shot_cot_chat_prompt",
+               "--mode", "all",
+               "--num-prompts", str(args.aisbench_accuracy_prompts),
+               "--dump-eval-details", "--debug"]
+    print(f"[controller] aisbench accuracy: {' '.join(acc_cmd)}", flush=True)
+    with acc_log.open("w", encoding="utf-8") as logf:
+        rc = subprocess.run(acc_cmd, cwd=results_dir, env=env,
+                            stdout=logf, stderr=subprocess.STDOUT).returncode
+    if rc != 0:
+        raise PipelineError("aisbench",
+                            f"ais_bench accuracy failed rc={rc} — see {acc_log}")
+    score, src = aisbench_accuracy_score(out_dir)
+    (out_dir / "accuracy.json").write_text(
+        json.dumps({"accuracy": score, "source": src.name,
+                    "prompts": args.aisbench_accuracy_prompts}, indent=2),
+        encoding="utf-8")
+    print(f"[controller] aisbench accuracy={score} ({src.name})", flush=True)
+
+    # Performance: stream chat against gsm8k perf mode.
+    perf_log = out_dir / "performance.log"
+    perf_cmd = [ais_bin, "--config-dir", str(cfg_dir),
+                "--models", "vllm_api_stream_chat",
+                "--datasets", "gsm8k_gen_0_shot_cot_str_perf",
+                "--mode", "perf", "--summarizer", "default_perf",
+                "--num-prompts", str(args.aisbench_perf_prompts),
+                "--debug"]
+    print(f"[controller] aisbench performance: {' '.join(perf_cmd)}", flush=True)
+    with perf_log.open("w", encoding="utf-8") as logf:
+        rc = subprocess.run(perf_cmd, cwd=results_dir, env=env,
+                            stdout=logf, stderr=subprocess.STDOUT).returncode
+    if rc != 0:
+        raise PipelineError("aisbench",
+                            f"ais_bench performance failed rc={rc} — see {perf_log}")
+    metrics, sources = aisbench_performance_metrics(out_dir)
+    (out_dir / "performance.json").write_text(
+        json.dumps({"metrics": metrics,
+                    "sources": [s.name for s in sources],
+                    "prompts": args.aisbench_perf_prompts}, indent=2),
+        encoding="utf-8")
+    print(f"[controller] aisbench performance: {json.dumps(metrics)}", flush=True)
+    return True
 
 
 def served_model_name(template: str) -> str:
@@ -787,8 +975,10 @@ def run_pipeline(plan: dict, args, stages: Stages, results_dir: Path) -> None:
     stages.ok("verify")
 
     if args.run_eval:
-        run_eval(plan, endpoint, results_dir)
-        stages.ok("eval")
+        if run_aisbench(plan, endpoint, results_dir, args):
+            stages.ok("aisbench")
+        else:
+            stages.map["aisbench"] = "skipped"
 
 
 def main() -> int:
@@ -869,7 +1059,11 @@ def parse_args() -> argparse.Namespace:
                         "<decode_endpoints> placeholders.")
     p.add_argument("--proxy-port", type=int, default=8088)
     p.add_argument("--run-eval", action="store_true",
-                   help="Run a lightweight latency check after verify")
+                   help="Run AISBench accuracy + performance after verify")
+    p.add_argument("--aisbench-accuracy-prompts", type=int, default=8,
+                   help="Number of gsm8k prompts for the AISBench accuracy run")
+    p.add_argument("--aisbench-perf-prompts", type=int, default=50,
+                   help="Number of prompts for the AISBench performance run")
     p.add_argument("--pod-wait-min", type=int, default=20)
     p.add_argument("--service-timeout-s", type=int, default=3600,
                    help="How long to poll the prefill endpoint for /v1/models")

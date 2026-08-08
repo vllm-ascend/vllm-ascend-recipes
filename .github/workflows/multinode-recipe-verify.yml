@@ -77,9 +77,9 @@ on:
         required: false
         default: '8088'
       run_eval:
-        description: 'Run a lightweight latency check after verify'
+        description: 'Run AISBench accuracy + performance after verify'
         required: false
-        default: 'false'
+        default: 'true'
       hold_minutes:
         description: >-
           Hold the check step N minutes before the gate (0 = no hold). Gives an
@@ -302,6 +302,21 @@ jobs:
             echo "::error::pyyaml is not importable — the controller needs it (pip install may have failed silently)"
             exit 1
           }
+
+      - name: Install AISBench
+        # Same as the single-node nightly: install ais_bench on the runner and
+        # let the controller drive accuracy/performance over HTTP. nightly-cpu
+        # has no torch, so install the CPU torch first (cluster PyPI cache).
+        run: |
+          pip config set global.index-url http://cache-service.nginx-pypi-cache.svc.cluster.local/pypi/simple
+          pip config set global.trusted-host cache-service.nginx-pypi-cache.svc.cluster.local
+          python3 -m pip install torch 2>&1 | tail -3 || echo "torch install skipped"
+          python3 -m pip install ais_bench_benchmark 2>&1 | tail -5 || echo "benchmark install skipped"
+          if python3 -c "from ais_bench.benchmark.models import VLLMCustomAPIChat" 2>/dev/null; then
+            echo "ais_bench OK: $(ais_bench -h 2>&1 | head -1)"
+          else
+            echo "::warning::ais_bench not importable — the AISBench eval stage will be skipped"
+          fi
 
       - name: Run multi-node controller
         id: controller
