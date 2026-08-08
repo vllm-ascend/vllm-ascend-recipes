@@ -1,0 +1,195 @@
+meta:
+  title: "DeepSeek-V2-Lite W8A8 — Multi-Node PD Separation"
+  slug: "deepseek-v2-lite-w8a8"
+  provider: "DeepSeek"
+  description: "DeepSeek-V2-Lite MoE (16B total / 2.4B active) served as a multi-node PD-separated deployment (1P1D) with W8A8 quantization and Mooncake KV transfer."
+  date_added: "2026-08-07"
+  tasks:
+    - text
+  hardware:
+    atlas_800_a2: verified
+
+model:
+  model_id: "vllm-ascend/DeepSeek-V2-Lite-W8A8"
+  min_vllm_version: "v0.23.0rc1"
+  architecture: moe
+  parameter_count: "16B"
+  active_parameters: "2.4B"
+  context_length: 32768
+  modality: text
+
+overview: |-
+  DeepSeek-V2-Lite is the 16B-total / 2.4B-active MoE sibling of DeepSeek-V2.
+  This recipe runs it in a **multi-node PD separation** topology — one Prefill
+  node and one Decode node (1P1D), each using 2 Atlas 800I A2 cards
+  (`TP=1 + DP=2`), with W8A8 quantized weights and Mooncake-based KV transfer
+  between the two nodes.
+
+  This is the lightest PD topology covered by the multi-node recipe verify
+  pipeline, and it is the CI end-to-end check for `scripts/multinode/`.
+
+weight_download:
+- weight_version: W8A8 (Pre-quantized)
+  sources:
+  - source: ModelScope
+    url: https://www.modelscope.cn/models/vllm-ascend/DeepSeek-V2-Lite-W8A8
+    command: |-
+      ```bash
+      pip install modelscope
+      modelscope download --model vllm-ascend/DeepSeek-V2-Lite-W8A8
+      ```
+
+prerequisites:
+- title: Model Weight
+  content: |-
+    - W8A8 weights: `vllm-ascend/DeepSeek-V2-Lite-W8A8` (pre-quantized, hosted on [ModelScope](https://www.modelscope.cn/models/vllm-ascend/DeepSeek-V2-Lite-W8A8)).
+    - Requires 2 Atlas 800I A2 (64G × 8) nodes; download the weights to the shared cache (`/root/.cache/`) on each node.
+- title: Verify Multi-node Communication
+  content: |-
+    Verify multi-node communication first: [verify multi-node communication environment](../../installation.md#verify-multi-node-communication).
+
+env_setup:
+  container:
+    A2:
+      content: |-
+        Select the A2 image and start the docker container on each node, refer to [using docker](../../installation.md#set-up-using-docker).
+
+        This scenario uses **2 NPUs per node**; expose `davinci0`/`davinci1` (adjust if your cards use different indexes):
+
+        ```bash
+        export IMAGE=quay.io/ascend/vllm-ascend:{{ vllm_ascend_version }}
+        docker run --rm \
+            --name vllm-ascend \
+            --shm-size=64g \
+            --net=host \
+            --device /dev/davinci0 \
+            --device /dev/davinci1 \
+            --device /dev/davinci_manager \
+            --device /dev/devmm_svm \
+            --device /dev/hisi_hdc \
+            -v /usr/local/dcmi:/usr/local/dcmi \
+            -v /usr/local/Ascend/driver/tools/hccn_tool:/usr/local/Ascend/driver/tools/hccn_tool \
+            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+            -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \
+            -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
+            -v /etc/ascend_install.info:/etc/ascend_install.info \
+            -v /etc/hccn.conf:/etc/hccn.conf \
+            -it $IMAGE bash
+        ```
+  pip:
+    content: |-
+      If you don't want to use the docker image as above, install `vllm-ascend` from source on each node, refer to [installation](../../installation.md).
+
+scenarios:
+- npu: Atlas 800I A2
+  precision: W8A8
+  deployment: Multi-Node PD Separation
+  case: 1P1D (1 Prefill node + 1 Decode node)
+  steps:
+  - title: Overview
+    content: |-
+      Use **2 Atlas 800 A2 nodes** — one Prefill node, one Decode node. Each node runs
+      `TP=1 + DP=2`, using 2 NPUs. This is the lightest PD topology: 1P1D, 2 cards per node,
+      driven by `launch_online_dp.py` external DP (Mooncake KV transfer).
+
+  - title: Prepare run_dp_template.sh – Prefill node
+    content: |-
+      Prefill node:
+
+      ```shell
+      # HCCL auto-discovers the HCCN interfaces. Do NOT force
+      # HCCL_IF_IP / socket ifnames onto the management NIC — that fails with
+      # HCCL "ERR02005 DIST internal error" in the vllm engine.
+      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+      export OMP_PROC_BIND=false
+      export OMP_NUM_THREADS=10
+      export TASK_QUEUE_ENABLE=1
+      export HCCL_BUFFSIZE=256
+      # launch_online_dp.py passes logical device indexes; map them onto the
+      # container's assigned physical devices (ASCEND_RT_VISIBLE_DEVICES).
+      IFS=',' read -r -a selected_devices <<< "${ASCEND_RT_VISIBLE_DEVICES:-0,1}"
+      export ASCEND_RT_VISIBLE_DEVICES="${selected_devices[$1]}"
+      export VLLM_ASCEND_ENABLE_FLASHCOMM1=0
+
+      vllm serve your_model_path \
+          --host 0.0.0.0 \
+          --port $2 \
+          --served-model-name dsv2 \
+          --data-parallel-size $3 \
+          --data-parallel-rank $4 \
+          --data-parallel-address $5 \
+          --data-parallel-rpc-port $6 \
+          --tensor-parallel-size $7 \
+          --trust-remote-code \
+          --enable-expert-parallel \
+          --quantization ascend \
+          --max-model-len 4096 \
+          --max-num-seqs 8 \
+          --kv-transfer-config '{"kv_connector": "MooncakeConnectorV1", "kv_role": "kv_producer", "kv_port": "30000", "engine_id": "0", "kv_connector_extra_config": {"prefill": {"dp_size": 2, "tp_size": 1}, "decode": {"dp_size": 2, "tp_size": 1}}}'
+      ```
+
+  - title: Prepare run_dp_template.sh – Decode node
+    content: |-
+      Decode node:
+
+      ```shell
+      # HCCL auto-discovers the HCCN interfaces. Do NOT force
+      # HCCL_IF_IP / socket ifnames onto the management NIC — that fails with
+      # HCCL "ERR02005 DIST internal error" in the vllm engine.
+      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+      export OMP_PROC_BIND=false
+      export OMP_NUM_THREADS=10
+      export TASK_QUEUE_ENABLE=1
+      export HCCL_BUFFSIZE=256
+      # launch_online_dp.py passes logical device indexes; map them onto the
+      # container's assigned physical devices (ASCEND_RT_VISIBLE_DEVICES).
+      IFS=',' read -r -a selected_devices <<< "${ASCEND_RT_VISIBLE_DEVICES:-0,1}"
+      export ASCEND_RT_VISIBLE_DEVICES="${selected_devices[$1]}"
+      export VLLM_ASCEND_ENABLE_FLASHCOMM1=0
+
+      vllm serve your_model_path \
+          --host 0.0.0.0 \
+          --port $2 \
+          --served-model-name dsv2 \
+          --data-parallel-size $3 \
+          --data-parallel-rank $4 \
+          --data-parallel-address $5 \
+          --data-parallel-rpc-port $6 \
+          --tensor-parallel-size $7 \
+          --trust-remote-code \
+          --enable-expert-parallel \
+          --quantization ascend \
+          --max-model-len 4096 \
+          --max-num-seqs 8 \
+          --kv-transfer-config '{"kv_connector": "MooncakeConnectorV1", "kv_role": "kv_consumer", "kv_port": "30000", "engine_id": "0", "kv_connector_extra_config": {"prefill": {"dp_size": 2, "tp_size": 1}, "decode": {"dp_size": 2, "tp_size": 1}}}'
+      ```
+
+  - title: Start the service
+    content: |-
+      ```bash
+      # p0 (Prefill node 0)
+      python launch_online_dp.py --dp-size 2 --tp-size 1 --dp-size-local 2 --dp-rank-start 0 \
+        --dp-address 141.xx.xx.1 --dp-rpc-port 12321 --vllm-start-port 7100
+      # d0 (Decode node 0)
+      python launch_online_dp.py --dp-size 2 --tp-size 1 --dp-size-local 2 --dp-rank-start 0 \
+        --dp-address 141.xx.xx.2 --dp-rpc-port 12321 --vllm-start-port 7100
+      ```
+
+  - title: Service Verification
+    content: |-
+      ```bash
+      # Query the prefill node's OpenAI-compatible endpoint (or the proxy if deployed)
+      curl -s http://<node0_ip>:7100/v1/models
+      # Send a chat completion to confirm prefill/decode are cooperating
+      curl -s http://<node0_ip>:7100/v1/chat/completions \
+        -H 'Content-Type: application/json' \
+        -d '{"model": "dsv2", "messages": [{"role": "user", "content": "hello"}], "max_tokens": 16}'
+      ```
+
+references:
+- title: ModelScope Model Download
+  url: https://www.modelscope.cn/models/vllm-ascend/DeepSeek-V2-Lite-W8A8
+- title: PD Disaggregation Guide (Mooncake)
+  url: https://docs.vllm.ai/projects/ascend/en/latest/tutorials/features/pd_disaggregation_mooncake_multi_node.html
+- title: vllm-ascend GitHub
+  url: https://github.com/vllm-project/vllm-ascend

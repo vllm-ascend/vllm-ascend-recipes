@@ -1,0 +1,390 @@
+#
+# Copyright (c) 2026 Huawei Technologies Co., Ltd. All Rights Reserved.
+# This file is a part of the vllm-ascend-recipes project.
+#
+
+# Multi-node PD recipe verify — a single, intentionally lean workflow.
+#
+# Triggers:
+#   - pull_request on models/**, scripts/multinode/** or this file: detects the
+#     changed recipe that has a PD scenario and verifies it (topology is
+#     auto-derived from the recipe's DP config — no manual node counts).
+#   - workflow_dispatch: manual run, recipe + optional topology overrides.
+#
+# The controller runner (`linux-aarch64-a2b4-0`, kubectl + kubeconfig to the
+# cluster) does everything itself; results are uploaded as a GitHub artifact
+# only — no badge / publish-status wiring.
+#
+# Driver: scripts/multinode/controller.py
+# Pod    : scripts/multinode/node_entry.py  (runs in every LWS pod)
+#
+# The multi-node check is `continue-on-error: true`: it shows the result on the
+# PR but never blocks merge (it depends on cluster prerequisites — LWS CRD,
+# device plugin, free 910B4 nodes, -mooncake image).
+
+name: 'Multi-node Recipe Verify'
+
+on:
+  pull_request:
+    paths:
+      - 'models/**'
+      - 'scripts/multinode/**'
+      - '.github/workflows/multinode-recipe-verify.yml'
+  workflow_dispatch:
+    inputs:
+      recipe:
+        description: 'Recipe YAML with a multi-node PD scenario'
+        required: false
+        default: 'models/en/DeepSeek/DeepSeek-V4-Flash.yaml'
+      hw_filter:
+        description: 'NPU hardware filter (A2 or A3)'
+        required: false
+        default: 'A2'
+      deployment_filter:
+        description: >-
+          Scenario deployment type to select (case-insensitive substring; 'PD'
+          matches both 多节点-PD分离 and Multi-Node PD Separation).
+        required: false
+        default: 'PD'
+      prefill_nodes:
+        description: 'Prefill node count override (0 = auto-derive from recipe DP config)'
+        required: false
+        default: '0'
+      decode_nodes:
+        description: 'Decode node count override (0 = auto-derive from recipe DP config)'
+        required: false
+        default: '0'
+      npu_per_node:
+        description: 'Ascend910B cards per pod override (0 = auto-derive = dp-size-local × tp-size)'
+        required: false
+        default: '0'
+      image:
+        description: >-
+          vllm-ascend image. PD scenarios need the Mooncake runtime baked in —
+          build once via scripts/multinode/mooncake/build.sh and point here at
+          the -mooncake tag (e.g. ...:v0.23.0rc1-mooncake).
+        required: false
+        default: 'swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/vllm-ascend:v0.23.0rc1'
+      proxy_command:
+        description: >-
+          Optional Mooncake proxy launch command, runs on prefill node 0. May use
+          placeholders <NODE_0_IP>, <node0_ip>, <prefill_endpoints>, <decode_endpoints>.
+          Leave empty to verify the prefill endpoint directly.
+        required: false
+        default: ''
+      proxy_port:
+        description: 'Proxy HTTP port (used when proxy_command is set)'
+        required: false
+        default: '8088'
+      run_eval:
+        description: 'Run AISBench accuracy + performance after verify'
+        required: false
+        default: 'true'
+      hold_minutes:
+        description: >-
+          Hold the check step N minutes before the gate (0 = no hold). Gives an
+          admin a window to log in and inspect the runner/cluster while the
+          (now-populated) kubeconfig is mounted.
+        required: false
+        default: '0'
+  # schedule:
+  #   - cron: '30 18 * * *'   # 18:30 UTC — avoids the single-node nightly at 18:00
+
+# New runs cancel stale/hung ones: the runner has been observed to hang in
+# container teardown ("Stop containers"), which would otherwise block every
+# later run in this group for hours.
+concurrency:
+  group: multinode-recipe-verify
+  cancel-in-progress: true
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      recipe: ${{ steps.detect.outputs.recipe }}
+      should_run: ${{ steps.detect.outputs.should_run }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install PyYAML
+        run: python3 -m pip install pyyaml --quiet
+
+      - name: Detect recipe to verify
+        id: detect
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            # Pick the first changed en recipe that has a PD scenario.
+            RECIPE=""
+            for f in $(git diff --name-only "${{ github.event.pull_request.base.sha }}" "${{ github.sha }}" -- models/ | grep '^models/en/.*\.ya\?ml$' || true); do
+              if [ "$(python3 -c "import yaml,sys; d=yaml.safe_load(open(sys.argv[1])); print('yes' if any('pd' in (s.get('deployment') or '').lower() for s in d.get('scenarios',[])) else 'no')" "$f")" = "yes" ]; then
+                RECIPE="$f"
+                break
+              fi
+            done
+            if [ -z "$RECIPE" ]; then
+              echo "should_run=false" >> "$GITHUB_OUTPUT"
+              echo "No changed en recipe has a PD scenario — skipping multi-node verify"
+            else
+              echo "recipe=$RECIPE" >> "$GITHUB_OUTPUT"
+              echo "should_run=true" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "recipe=${{ inputs.recipe }}" >> "$GITHUB_OUTPUT"
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  multinode-verify:
+    needs: prepare
+    if: needs.prepare.outputs.should_run == 'true'
+    # Run on the a2b4-8 runner pool (same as the nightly single-node verify):
+    # the controller is CPU-only (kubectl + python over the kubeconfig secret)
+    # and does not need the a2b4-0 scheduling node. The a2b4-0 pool's egress
+    # to GitHub's Azure results service is unreliable — artifact uploads hang
+    # and the post-job "Stop containers" teardown stalls on the log flush —
+    # while a2b4-8 runners upload consistently. a2b4-8 job containers reach
+    # the cluster-internal network (API server, pod IPs, PyPI cache), so the
+    # controller's kubectl/HTTP verification works unchanged.
+    runs-on: linux-aarch64-a2b4-8
+    # Run the controller in upstream's CPU image (vllm-ascend:nightly-cpu),
+    # same as _e2e_nightly_multi_node.yaml: kubectl + python are baked in, and
+    # all steps share ONE container so /tmp persists (the bare ARC runner had
+    # neither kubectl nor persistent /tmp).
+    container:
+      image: swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/vllm-ascend:nightly-cpu
+      env:
+        KUBECONFIG: /tmp/kubeconfig
+        # The controller's kubeconfig authenticates as the runner's own
+        # in-cluster ServiceAccount, which only has permissions inside this
+        # namespace (no cluster-scope node/namespace access). LWS pods run here.
+        NAMESPACE: vllm-ascend-vllm-ascend-recipes
+    continue-on-error: true
+    # 1h diagnostic hold in the check step + controller (apply/wait/verify) —
+    # worst case needs ~110min; 180 keeps a margin and still bounds a teardown
+    # hang well under the old 420.
+    timeout-minutes: 180
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Decode kubeconfig
+        # Upstream pattern: kubeconfig is base64 in the KUBECONFIG_B64 secret;
+        # KUBECONFIG env points at /tmp/kubeconfig (container env).
+        run: |
+          echo "${{ secrets.KUBECONFIG_B64 }}" | base64 -d > "$KUBECONFIG"
+          chmod 600 "$KUBECONFIG"
+
+      - name: Install kubectl (yum/apt)
+        # The controller only needs the kubectl *client* (the cluster already
+        # exists — kubeadm/kubelet are for building/joining nodes, not needed).
+        # Install via the image's package manager; diagnostics tee to the
+        # artifact (the runner's log upload is broken).
+        run: |
+          set -u
+          mkdir -p /tmp/multinode-results
+          # nightly-cpu already ships kubectl (v1.35.0); only install if missing.
+          if command -v kubectl >/dev/null 2>&1; then
+            echo "kubectl already present at $(command -v kubectl): $(kubectl version --client 2>&1 | head -1)" \
+              | tee /tmp/multinode-results/install-kubectl.txt
+            exit 0
+          fi
+          {
+            if command -v yum >/dev/null 2>&1; then
+              echo "package-manager=yum"
+              printf '%s\n' '[kubernetes]' 'name=Kubernetes' \
+                'baseurl=https://pkgs.k8s.io/core:/stable:/v1.30/rpm/' \
+                'enabled=1' 'gpgcheck=0' > /etc/yum.repos.d/kubernetes.repo
+              yum install -y kubectl 2>&1 | tail -8
+            elif command -v dnf >/dev/null 2>&1; then
+              echo "package-manager=dnf"
+              printf '%s\n' '[kubernetes]' 'name=Kubernetes' \
+                'baseurl=https://pkgs.k8s.io/core:/stable:/v1.30/rpm/' \
+                'enabled=1' 'gpgcheck=0' > /etc/yum.repos.d/kubernetes.repo
+              dnf install -y kubectl 2>&1 | tail -8
+            elif command -v apt-get >/dev/null 2>&1; then
+              echo "package-manager=apt"
+              apt-get update 2>&1 | tail -3
+              apt-get install -y kubectl 2>&1 | tail -8
+            else
+              echo "no known package manager"
+            fi
+            if command -v kubectl >/dev/null 2>&1; then
+              echo "kubectl OK at $(command -v kubectl)"
+              kubectl version --client 2>&1 | head -2
+            else
+              echo "kubectl install FAILED"
+            fi
+          } 2>&1 | tee /tmp/multinode-results/install-kubectl.txt
+          command -v kubectl >/dev/null 2>&1 || exit 1
+
+      - name: Check kubectl and cluster
+        # Write the diagnosis to the artifact (the runner's log upload is
+        # broken, so the artifact is the only way to read step output). No
+        # `set -e` here — capture the full failure, then gate on it explicitly.
+        # Every command passes `--kubeconfig "$KUBECONFIG"` explicitly, matching
+        # the manual probe an admin would run (`kubectl get po -n ... --kubeconfig
+        # xxx.yaml`) so there is zero ambiguity about which config is loaded.
+        # The gate is a real namespace-scoped operation (`get pods`) rather than
+        # `auth can-i`: can-i can report "no" in some RBAC/aggregation setups
+        # while the actual GET/LIST works — the real operation is what the
+        # controller depends on. The kubeconfig authenticates as the runner's
+        # own in-cluster ServiceAccount, which has permissions only inside
+        # NAMESPACE (no cluster-scope node/namespace access).
+        run: |
+          # GitHub runs steps with `set -e` by default. The diagnostics below
+          # legitimately fail when the cluster/API server is unreachable — under
+          # errexit the FIRST failing kubectl would abort the step before the
+          # gate check / hold. Disable it here; failures are captured and gated
+          # explicitly via GATE_OK.
+          set -u
+          set +e
+          mkdir -p /tmp/multinode-results
+          # Optional diagnostic hold (workflow_dispatch input hold_minutes):
+          # keep the job alive N minutes so an admin can log in and inspect the
+          # runner pod / cluster (with the populated kubeconfig mounted) before
+          # the gate runs. Heartbeat prints every 60s. Default 0 = no hold.
+          HOLD_MIN="${{ inputs.hold_minutes }}"
+          if [ "${HOLD_MIN:-0}" -gt 0 ] 2>/dev/null; then
+            HOLD_SEC=$((HOLD_MIN * 60))
+            echo "=== HOLD: sleeping ${HOLD_MIN}min (${HOLD_SEC}s) before the gate; heartbeat every 60s ==="
+            s=0
+            while [ "$s" -lt "$HOLD_SEC" ]; do
+              s=$((s + 60))
+              echo "HOLD ${s}/${HOLD_SEC}s $(date -u +%H:%M:%SZ) — kubeconfig=$KUBECONFIG"
+              sleep 60
+            done
+            echo "=== HOLD complete — proceeding to gate ==="
+          fi
+          # GATE FIRST — the one real namespace-scoped operation the pipeline
+          # depends on. Its command + output are printed at the TOP of the step
+          # log so the failing command (and the exact Forbidden error) is the
+          # first thing visible, not buried under the diagnostics below.
+          echo "=== GATE COMMAND: kubectl --kubeconfig \$KUBECONFIG get pods -n \"$NAMESPACE\" ==="
+          if kubectl --kubeconfig "$KUBECONFIG" get pods -n "$NAMESPACE" -o wide 2>&1; then
+            echo "GATE RESULT: OK"
+            GATE_OK=1
+          else
+            echo "GATE RESULT: FAILED"
+            GATE_OK=0
+          fi
+          {
+            echo "KUBECONFIG=${KUBECONFIG:-<unset>}"
+            echo "NAMESPACE=${NAMESPACE:-<unset>}"
+            echo "GATE_RESULT=${GATE_OK} (1=ok 0=fail)"
+            echo "--- kubeconfig file ---"
+            ls -la "$KUBECONFIG" 2>&1
+            echo "--- kubeconfig current-context / user / server ---"
+            kubectl --kubeconfig "$KUBECONFIG" config view --minify \
+              -o jsonpath='ctx={.current-context} user={.users[0].name} server={.clusters[0].cluster.server}{"\n"}' 2>&1
+            echo "--- kubectl version --client ---"
+            kubectl version --client 2>&1 | head -2
+            echo "--- kubectl auth whoami (authenticated identity) ---"
+            kubectl --kubeconfig "$KUBECONFIG" auth whoami 2>&1
+            echo "--- kubectl auth can-i --list (namespace-scoped) ---"
+            kubectl --kubeconfig "$KUBECONFIG" auth can-i --list -n "$NAMESPACE" 2>&1 | head -20
+          } > /tmp/multinode-results/kubectl-check.txt 2>&1
+          cat /tmp/multinode-results/kubectl-check.txt
+          if [ "${GATE_OK:-0}" != "1" ]; then
+            echo "::error::FAILED COMMAND: kubectl --kubeconfig \$KUBECONFIG get pods -n $NAMESPACE — see kubectl-check.txt artifact"
+            # HOLD ON FAILURE: keep the container alive 3600s (heartbeat every
+            # 60s) so an admin can log in and diagnose (e.g. network to the API
+            # server), then fail.
+            echo "=== HOLD-ON-FAILURE: check failed; keeping the container alive 3600s (heartbeat every 60s) for on-box diagnosis ==="
+            s=0
+            while [ "$s" -lt 3600 ]; do
+              s=$((s + 60))
+              echo "HOLD ${s}/3600s $(date -u +%H:%M:%SZ)"
+              sleep 60
+            done
+            exit 1
+          fi
+
+      - name: Install PyYAML
+        run: |
+          python3 -m pip install pyyaml --quiet 2>/dev/null || pip install pyyaml --quiet || true
+          # Don't let a silent pip failure surface later as a controller
+          # ModuleNotFoundError — verify pyyaml is actually importable now.
+          python3 -c "import yaml; print('pyyaml OK', yaml.__version__)" || {
+            echo "::error::pyyaml is not importable — the controller needs it (pip install may have failed silently)"
+            exit 1
+          }
+
+      - name: Install AISBench
+        # Same as the single-node nightly: install ais_bench on the runner and
+        # let the controller drive accuracy/performance over HTTP. nightly-cpu
+        # has no torch, so install the CPU torch first (cluster PyPI cache).
+        run: |
+          pip config set global.index-url http://cache-service.nginx-pypi-cache.svc.cluster.local/pypi/simple
+          pip config set global.trusted-host cache-service.nginx-pypi-cache.svc.cluster.local
+          python3 -m pip install torch 2>&1 | tail -3 || echo "torch install skipped"
+          python3 -m pip install ais_bench_benchmark 2>&1 | tail -5 || echo "benchmark install skipped"
+          if python3 -c "from ais_bench.benchmark.models import VLLMCustomAPIChat" 2>/dev/null; then
+            echo "ais_bench OK: $(ais_bench -h 2>&1 | head -1)"
+          else
+            echo "::warning::ais_bench not importable — the AISBench eval stage will be skipped"
+          fi
+
+      - name: Run multi-node controller
+        id: controller
+        env:
+          PROXY_COMMAND: ${{ inputs.proxy_command }}
+          RUN_ID: r${{ github.run_id }}
+        run: |
+          # NOTE: this runner's container hook executes steps with `sh -e`, NOT
+          # bash — `set -o pipefail` is a bashism and would fail with
+          # "Illegal option". There is no pipe here anyway; sh -e propagates the
+          # python exit code.
+          #
+          # The `inputs.* || 'default'` fallbacks matter: `inputs` is only
+          # populated on workflow_dispatch. On a pull_request run every
+          # `inputs.*` is EMPTY, which would make argparse fail on the int args
+          # ("invalid int value: ''"). Defaulting here keeps both trigger paths
+          # identical.
+          # --run-eval needs the same default: inputs.* is empty on PR
+          # triggers, so fall back to 'true' there — otherwise the AISBench
+          # stage silently never runs on PRs.
+          mkdir -p /tmp/multinode-results
+          python3 scripts/multinode/controller.py \
+            --recipe "${{ needs.prepare.outputs.recipe }}" \
+            --hw-filter "${{ inputs.hw_filter || 'A2' }}" \
+            --deployment-filter "${{ inputs.deployment_filter || 'PD' }}" \
+            --prefill-nodes "${{ inputs.prefill_nodes || '0' }}" \
+            --decode-nodes "${{ inputs.decode_nodes || '0' }}" \
+            --npu-per-node "${{ inputs.npu_per_node || '0' }}" \
+            --image "${{ inputs.image || 'swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/vllm-ascend:v0.23.0rc1' }}" \
+            --run-id "$RUN_ID" \
+            --proxy-port "${{ inputs.proxy_port || '8088' }}" \
+            --results-dir /tmp/multinode-results \
+            ${{ (inputs.run_eval || 'true') == 'true' && '--run-eval' || '' }}
+
+      - name: Upload multi-node results to OBS
+        if: always()
+        continue-on-error: true
+        timeout-minutes: 15
+        uses: ascend-gha-runners/artifact/upload@v0.3
+        with:
+          access_key: ${{ secrets.OBS_AK }}
+          secret_key: ${{ secrets.OBS_SK }}
+          name: multinode-results-${{ github.run_id }}
+          path: /tmp/multinode-results/
+          retention-days: 14
+          if-no-files-found: warn
+
+      - name: Upload multi-node results to GitHub
+        if: always()
+        # The self-hosted runner's upload path to GitHub's results service is
+        # intermittently flaky (v4 under the Node 24 shim and v7 native both
+        # hang at times). Both upload steps are best-effort
+        # (continue-on-error: true) so a flaky upload never turns a green
+        # pipeline red — the same pattern as the proven PR #34 runner config.
+        continue-on-error: true
+        timeout-minutes: 5
+        uses: actions/upload-artifact@v7
+        with:
+          name: multinode-results-${{ github.run_id }}
+          path: /tmp/multinode-results/
+          retention-days: 14
+          if-no-files-found: warn
+          compression-level: 0
