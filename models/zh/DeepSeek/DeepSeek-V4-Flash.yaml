@@ -20,6 +20,48 @@ model:
   context_length: 1048576
   modality: text
 
+# —— 可配置参数:默认值 = tutorial 原始配置(Key Parameter Descriptions)——
+# 页面/CI 用默认值替换步骤里的 {{name}};布尔参数用 flag / flag_when_false。
+config_params:
+  max_model_len:
+    default: 1048576
+    type: number
+    description: "最大上下文长度(输入+输出 token 之和),按实际场景调整"
+  max_num_seqs:
+    default: 32
+    type: number
+    description: "每个 DP 组最大并发序列数"
+  gpu_memory_utilization:
+    default: 0.9
+    type: number
+    description: "KV cache 可用的显存比例"
+  prefix_caching:
+    default: false
+    type: bool
+    description: "前缀缓存默认关闭;开启后使用 --enable-prefix-caching"
+    flag: "--enable-prefix-caching"
+    flag_when_false: "--no-enable-prefix-caching"
+  speculative_config:
+    default: true
+    type: bool
+    description: "MTP 投机解码(--speculative-config),加速推理"
+    flag: "--speculative-config '{\"num_speculative_tokens\": 1,\"method\": \"mtp\",\"enforce_eager\": true}'"
+  compilation_config:
+    default: true
+    type: bool
+    description: "decode 阶段全 ACL 图执行(--compilation-config cudagraph_mode=FULL_DECODE_ONLY),降低调度时延"
+    flag: "--compilation-config '{\"cudagraph_mode\":\"FULL_DECODE_ONLY\"}'"
+  async_scheduling:
+    default: true
+    type: bool
+    description: "异步调度(--async-scheduling),CPU 调度与 NPU 计算重叠"
+    flag: "--async-scheduling"
+  flashcomm1:
+    default: true
+    type: bool
+    description: "FlashComm 通信优化(VLLM_ASCEND_ENABLE_FLASHCOMM1=1)"
+    flag: "export VLLM_ASCEND_ENABLE_FLASHCOMM1=1"
+
 overview: |-
   DeepSeek-V4 相比 DeepSeek-V3 引入了多项关键升级：
 
@@ -136,14 +178,6 @@ env_setup:
 
       如果您需要部署多节点环境，需要在每个节点上设置环境。
 extra_config:
-- key: mtp-spec-decoding
-  label: MTP Speculative Decoding
-- key: prefix-caching
-  label: Prefix Caching
-- key: async-scheduling
-  label: Async Scheduling
-- key: flashcomm1
-  label: FlashComm1
 - key: npugraph-ex
   label: NPUGraph EX
 - key: cpu-binding
@@ -156,11 +190,7 @@ scenarios:
 - npu: Atlas 800I A2
   precision: W8A8
   deployment: 单节点-多卡
-  case: Multi Card
-  default_configs:
-  - mtp-spec-decoding
-  - async-scheduling
-  - flashcomm1
+  case: 高吞吐
   steps:
   - title: 启动服务
     content: |-
@@ -174,16 +204,16 @@ scenarios:
       export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
       export LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libjemalloc.so.2:$LD_PRELOAD
       export HCCL_BUFFSIZE=1024
-      %%CONFIG:flashcomm1%%export VLLM_ASCEND_ENABLE_FLASHCOMM1=1%%/CONFIG:flashcomm1%%
+      {{flashcomm1}}
       export TASK_QUEUE_ENABLE=1
       export HCCL_OP_EXPANSION_MODE="AIV"
 
       vllm serve /root/.cache/modelscope/hub/models/vllm-ascend/DeepSeek-V4-Flash-w8a8-mtp \
-          --max-model-len 133120 \
+          --max-model-len {{max_model_len}} \
           --max-num-batched-tokens 8192 \
           --served-model-name dsv4 \
-          --gpu-memory-utilization 0.9 \
-          --max-num-seqs 32 \
+          --gpu-memory-utilization {{gpu_memory_utilization}} \
+          --max-num-seqs {{max_num_seqs}} \
           --data-parallel-size 1 \
           --tensor-parallel-size 8 \
           --enable-expert-parallel \
@@ -192,14 +222,14 @@ scenarios:
           --enable-auto-tool-choice \
           --reasoning-parser deepseek_v4 \
           --safetensors-load-strategy 'prefetch' \
-          %%CONFIG:prefix-caching%%--enable-prefix-caching \%%/CONFIG:prefix-caching%%
+          {{prefix_caching}} \
           --model-loader-extra-config='{"enable_multithread_load": "true", "num_threads": 128}' \
           --quantization ascend \
           --port 8900 \
           --block-size 128 \
-          %%CONFIG:mtp-spec-decoding%%--speculative-config '{"num_speculative_tokens": 1,"method": "mtp","enforce_eager": true}' \%%/CONFIG:mtp-spec-decoding%%
-          --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY"}' \
-          %%CONFIG:async-scheduling%%--async-scheduling \%%/CONFIG:async-scheduling%%
+          {{speculative_config}} \
+          {{compilation_config}} \
+          {{async_scheduling}} \
           --additional-config '{"ascend_compilation_config":{%%CONFIG:npugraph-ex%%"enable_npugraph_ex":true,%%/CONFIG:npugraph-ex%%"enable_static_kernel":false}%%CONFIG:cpu-binding%%,"enable_cpu_binding": true%%/CONFIG:cpu-binding%%%%CONFIG:dsa-cp%%,"enable_dsa_cp": true%%/CONFIG:dsa-cp%%%%CONFIG:multistream-overlap%%,"multistream_overlap_shared_expert":true%%/CONFIG:multistream-overlap%%}'
       ```
 
@@ -213,10 +243,6 @@ scenarios:
       - `VLLM_ASCEND_ENABLE_FLASHCOMM1=1` 启用 FlashComm 通信优化。
 
       常见问题提示：如果遇到问题，请参考[公共 FAQ](https://docs.vllm.ai/projects/ascend/zh-cn/latest/faqs.html) 进行排查。
-    config_values:
-      prefix-caching:
-        enabled: "--enable-prefix-caching"
-        disabled: "--no-enable-prefix-caching"
   - title: 服务验证
     content: |-
       ```shell
@@ -241,7 +267,7 @@ scenarios:
 - npu: Atlas 800I A3
   precision: W8A8
   deployment: 单节点-多卡
-  case: Multi Card
+  case: 低时延
   steps:
   - title: 启动服务
     content: |-
@@ -255,17 +281,17 @@ scenarios:
       export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
       export LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libjemalloc.so.2:$LD_PRELOAD
       export HCCL_BUFFSIZE=1024
-      export VLLM_ASCEND_ENABLE_FLASHCOMM1=1
+      {{flashcomm1}}
       export TASK_QUEUE_ENABLE=1
       export HCCL_OP_EXPANSION_MODE="AIV"
 
       vllm serve /root/.cache/modelscope/hub/models/vllm-ascend/DeepSeek-V4-Flash-w8a8-mtp \
-          --max-model-len 1048576 \
+          --max-model-len {{max_model_len}} \
           --max-num-batched-tokens 10240 \
           --served-model-name dsv4 \
-          --gpu-memory-utilization 0.9 \
+          --gpu-memory-utilization {{gpu_memory_utilization}} \
           --api-server-count 1 \
-          --max-num-seqs 64 \
+          --max-num-seqs {{max_num_seqs}} \
           --data-parallel-size 4 \
           --tensor-parallel-size 4 \
           --enable-expert-parallel \
@@ -278,9 +304,9 @@ scenarios:
           --quantization ascend \
           --port 8900 \
           --block-size 128 \
-          --speculative-config '{"num_speculative_tokens": 1,"method": "mtp","enforce_eager": true}' \
-          --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY"}' \
-          --async-scheduling \
+          {{speculative_config}} \
+          {{compilation_config}} \
+          {{async_scheduling}} \
           --additional-config '{"ascend_compilation_config":{"enable_npugraph_ex":true,"enable_static_kernel":false},"enable_cpu_binding": true,"multistream_overlap_shared_expert":true}'
       ```
 
@@ -318,7 +344,7 @@ scenarios:
 - npu: Atlas 800I A3
   precision: W8A8
   deployment: 多节点-PD分离
-  case: PD Separation
+  case: PD 分离
   steps:
   - title: 概述
     content: |-
@@ -468,7 +494,7 @@ scenarios:
       export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
       export HCCL_BUFFSIZE=2560
       export TASK_QUEUE_ENABLE=1
-      export VLLM_ASCEND_ENABLE_FLASHCOMM1=1
+      {{flashcomm1}}
       export HCCL_OP_EXPANSION_MODE="AIV"
       export LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libjemalloc.so.2:$LD_PRELOAD
       export ASCEND_RT_VISIBLE_DEVICES=$1
@@ -484,21 +510,21 @@ scenarios:
           --enable-expert-parallel \
           --seed 1024 \
           --served-model-name dsv4 \
-          --max-model-len 1048576 \
+          --max-model-len {{max_model_len}} \
           --max-num-batched-tokens 8192 \
-          --max-num-seqs 16 \
+          --max-num-seqs {{max_num_seqs}} \
           --no-disable-hybrid-kv-cache-manager \
           --model-loader-extra-config='{"enable_multithread_load": "true", "num_threads": 128}' \
-          --no-enable-prefix-caching \
+          {{prefix_caching}} \
           --safetensors-load-strategy 'prefetch' \
-          --speculative-config '{"num_speculative_tokens": 1,"method": "mtp","enforce_eager": true}' \
+          {{speculative_config}} \
           --trust-remote-code \
           --block-size 128 \
           --tokenizer-mode deepseek_v4 \
           --tool-call-parser deepseek_v4 \
           --enable-auto-tool-choice \
           --reasoning-parser deepseek_v4 \
-          --gpu-memory-utilization 0.9 \
+          --gpu-memory-utilization {{gpu_memory_utilization}} \
           --quantization ascend \
           --enforce-eager \
           --additional-config '{"enable_cpu_binding": true, "enable_shared_expert_dp": true,  "enable_dsa_cp": true}' \
@@ -555,13 +581,13 @@ scenarios:
           --enable-expert-parallel \
           --seed 1024 \
           --served-model-name dsv4 \
-          --max-model-len 1048576 \
+          --max-model-len {{max_model_len}} \
           --max-num-batched-tokens 120 \
-          --max-num-seqs 60 \
-          --async-scheduling \
+          --max-num-seqs {{max_num_seqs}} \
+          {{async_scheduling}} \
           --block-size 128 \
           --no-disable-hybrid-kv-cache-manager \
-          --no-enable-prefix-caching \
+          {{prefix_caching}} \
           --safetensors-load-strategy 'prefetch' \
           --trust-remote-code \
           --tokenizer-mode deepseek_v4 \
@@ -569,10 +595,10 @@ scenarios:
           --tool-call-parser deepseek_v4 \
           --enable-auto-tool-choice \
           --reasoning-parser deepseek_v4 \
-          --gpu-memory-utilization 0.9 \
+          --gpu-memory-utilization {{gpu_memory_utilization}} \
           --quantization ascend \
-          --speculative-config '{"num_speculative_tokens": 1,"method": "mtp","enforce_eager": true}' \
-          --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY"}' \
+          {{speculative_config}} \
+          {{compilation_config}} \
           --kv-transfer-config \
           '{"kv_connector": "MooncakeHybridConnector",
           "kv_role": "kv_consumer",
@@ -646,7 +672,7 @@ scenarios:
 - npu: Atlas 800I A2
   precision: W8A8
   deployment: 多节点-PD分离
-  case: PD Separation
+  case: PD 分离
   steps:
   - title: 概述
     content: |-
@@ -772,16 +798,16 @@ scenarios:
           --enable-expert-parallel \
           --seed 1024 \
           --served-model-name dsv4 \
-          --max-model-len 135000 \
+          --max-model-len {{max_model_len}} \
           --max-num-batched-tokens 4096 \
-          --max-num-seqs 16 \
+          --max-num-seqs {{max_num_seqs}} \
           --block-size 128 \
           --enforce-eager \
-          --async-scheduling \
+          {{async_scheduling}} \
           --no-disable-hybrid-kv-cache-manager \
-          --enable-prefix-caching \
+          {{prefix_caching}} \
           --trust-remote-code \
-          --gpu-memory-utilization 0.9 \
+          --gpu-memory-utilization {{gpu_memory_utilization}} \
           --quantization ascend \
           --safetensors-load-strategy 'prefetch' \
           --model-loader-extra-config='{"enable_multithread_load": "true", "num_threads": 128}' \
@@ -790,7 +816,7 @@ scenarios:
           --enable-auto-tool-choice \
           --reasoning-parser deepseek_v4 \
           --additional-config '{"enable_cpu_binding": true, "enable_shared_expert_dp": true}' \
-          --speculative-config '{"num_speculative_tokens": 1, "method": "mtp","enforce_eager": true}' \
+          {{speculative_config}} \
           --kv-transfer-config \
           '{"kv_connector": "MooncakeHybridConnector",
           "kv_role": "kv_producer",
@@ -851,15 +877,15 @@ scenarios:
           --enable-expert-parallel \
           --seed 1024 \
           --served-model-name dsv4 \
-          --max-model-len 135000 \
+          --max-model-len {{max_model_len}} \
           --max-num-batched-tokens 60 \
-          --max-num-seqs 30 \
-          --async-scheduling \
+          --max-num-seqs {{max_num_seqs}} \
+          {{async_scheduling}} \
           --block-size 128 \
           --no-disable-hybrid-kv-cache-manager \
-          --no-enable-prefix-caching \
+          {{prefix_caching}} \
           --trust-remote-code \
-          --gpu-memory-utilization 0.9 \
+          --gpu-memory-utilization {{gpu_memory_utilization}} \
           --quantization ascend \
           --safetensors-load-strategy 'prefetch' \
           --model-loader-extra-config='{"enable_multithread_load": "true", "num_threads": 128}' \
@@ -867,8 +893,8 @@ scenarios:
           --tool-call-parser deepseek_v4 \
           --enable-auto-tool-choice \
           --reasoning-parser deepseek_v4 \
-          --speculative-config '{"num_speculative_tokens": 1, "method": "mtp","enforce_eager": true}' \
-          --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY"}' \
+          {{speculative_config}} \
+          {{compilation_config}} \
           --kv-transfer-config \
           '{"kv_connector": "MooncakeHybridConnector",
           "kv_role": "kv_consumer",

@@ -18,8 +18,17 @@ interface Scenario {
   precision: string;
   deployment: string;
   case: string;
+  tags?: string[];
   steps: ScenarioStep[];
   default_configs?: string[];
+}
+
+interface ConfigParam {
+  default?: unknown;
+  type?: 'number' | 'string' | 'bool';
+  description?: string;
+  flag?: string;
+  flag_when_false?: string;
 }
 
 interface CascadeSelectorProps {
@@ -27,8 +36,42 @@ interface CascadeSelectorProps {
   scenariosZh: Scenario[];
   extraConfigEn?: ExtraConfigItem[];
   extraConfigZh?: ExtraConfigItem[];
+  configParamsEn?: Record<string, ConfigParam>;
+  configParamsZh?: Record<string, ConfigParam>;
   selectorLabelsEn?: Partial<Record<'npu' | 'precision' | 'deployment' | 'case', string>>;
   selectorLabelsZh?: Partial<Record<'npu' | 'precision' | 'deployment' | 'case', string>>;
+}
+
+// Pipeline-routing tag -> display name (per language)
+const PIPELINE_LABELS: Record<string, Record<string, string>> = {
+  zh: {
+    'a2-single': 'A2 单机流水线',
+    'a3-single': 'A3 单机流水线',
+    'pd-multinode': '多机 PD 流水线',
+  },
+  en: {
+    'a2-single': 'A2 Single-Node Pipeline',
+    'a3-single': 'A3 Single-Node Pipeline',
+    'pd-multinode': 'Multi-Node PD Pipeline',
+  },
+};
+
+// Substitute {{name}}:
+//   bool param -> render `flag` when truthy, `flag_when_false` when falsy
+//   value param -> render the value
+function applyConfigParams(
+  content: string,
+  params: Record<string, unknown>,
+  meta: Record<string, ConfigParam> | undefined,
+): string {
+  return content.replace(/\{\{(\w+)\}\}/g, (_, name) => {
+    const value = params[name];
+    const p = meta?.[name];
+    if (p?.type === 'bool') {
+      return value ? p.flag ?? '' : p.flag_when_false ?? '';
+    }
+    return String(value ?? '');
+  });
 }
 
 // ---- Markdown renderer ----
@@ -189,6 +232,10 @@ const CONFIG_COLORS: Record<string, string> = {
   'prefix-caching': 'text-emerald-400',
   'async-scheduling': 'text-sky-400',
   flashcomm1: 'text-rose-400',
+  prefix_caching: 'text-emerald-400',
+  speculative_config: 'text-amber-400',
+  compilation_config: 'text-lime-400',
+  async_scheduling: 'text-sky-400',
   'npugraph-ex': 'text-violet-400',
   'cpu-binding': 'text-cyan-400',
   'dsa-cp': 'text-orange-400',
@@ -250,6 +297,8 @@ export default function CascadeSelector({
   scenariosZh,
   extraConfigEn,
   extraConfigZh,
+  configParamsEn,
+  configParamsZh,
   selectorLabelsEn,
   selectorLabelsZh,
 }: CascadeSelectorProps) {
@@ -259,6 +308,15 @@ export default function CascadeSelector({
     lang === 'zh' ? (extraConfigZh ?? extraConfigEn) : (extraConfigEn ?? extraConfigZh);
   const selectorLabels =
     lang === 'zh' ? (selectorLabelsZh ?? selectorLabelsEn) : (selectorLabelsEn ?? selectorLabelsZh);
+  const configParams =
+    lang === 'zh' ? (configParamsZh ?? configParamsEn) : (configParamsEn ?? configParamsZh);
+  const [paramValues, setParamValues] = useState<Record<string, unknown>>(() => {
+    const init: Record<string, unknown> = {};
+    for (const [key, p] of Object.entries(configParams ?? {})) {
+      init[key] = p.default;
+    }
+    return init;
+  });
 
   const npus = useMemo(() => {
     const set = new Set<string>();
@@ -360,8 +418,12 @@ export default function CascadeSelector({
   const currentStep = currentScenario?.steps[activeStep];
   const rawContent = useMemo(() => {
     if (!currentStep) return '';
-    return applyConfigReplace(currentStep.content, selectedConfigs, currentStep.config_values);
-  }, [currentStep, selectedConfigs]);
+    return applyConfigReplace(
+      applyConfigParams(currentStep.content, paramValues, configParams),
+      selectedConfigs,
+      currentStep.config_values,
+    );
+  }, [currentStep, selectedConfigs, paramValues]);
 
   const renderedHtml = useMemo(() => {
     if (!rawContent) return '';
@@ -432,38 +494,92 @@ export default function CascadeSelector({
           </div>
         ))}
 
-        {/* More Config — multi-select, synced with scenario defaults */}
-        {extraConfig && extraConfig.length > 0 && (
+        {/* Config — configurable params (values/toggles) + legacy chips */}
+        {(configParams && Object.keys(configParams).length > 0) ||
+        (extraConfig && extraConfig.length > 0) ? (
           <div className="flex items-start gap-4 px-4 py-3 border-t border-ink-800/40">
             <span className="shrink-0 w-24 pt-0.5 text-xs font-mono text-ink-300">
-              {t('labelMoreConfig')}
+              Config
             </span>
-            <div className="flex flex-wrap gap-1.5">
-              {extraConfig.map((cfg) => {
-                const isSelected = selectedConfigs.has(cfg.key);
-                const colorClass = CONFIG_COLORS[cfg.key] || 'text-ink-400';
-                const bgClass = colorClass.replace('text-', 'bg-');
-                return (
-                  <button
-                    key={cfg.key}
-                    onClick={() => toggleConfig(cfg.key)}
-                    title={cfg.label}
-                    className={`px-3 py-1.5 text-xs font-mono rounded-md transition-all cursor-pointer inline-flex items-center gap-1.5 ${
-                      isSelected
-                        ? `${colorClass} bg-accent-500/10 border border-current/30`
-                        : 'border border-ink-700/60 text-ink-400 hover:text-ink-200 hover:border-ink-600 bg-ink-900/50'
-                    }`}
-                  >
-                    <span
-                      className={`inline-block w-2 h-2 rounded-full ${bgClass} ${isSelected ? 'opacity-100' : 'opacity-30'}`}
-                    ></span>
-                    {cfg.label}
-                  </button>
-                );
-              })}
+            <div className="flex flex-wrap gap-x-4 gap-y-2">
+              {/* Value params — editable inputs (defaults = tutorial) */}
+              {configParams &&
+                Object.entries(configParams).map(([key, p]) => (
+                  p.type === 'bool' ? null : (
+                    <div key={key} className="flex items-center gap-2" title={p.description}>
+                      <label className="text-xs font-mono text-ink-400">{key}</label>
+                      <input
+                        type="number"
+                        step="any"
+                        value={String(paramValues[key] ?? '')}
+                        onChange={(e) =>
+                          setParamValues((prev) => ({
+                            ...prev,
+                            [key]: e.target.value === '' ? '' : Number(e.target.value),
+                          }))
+                        }
+                        className="w-24 rounded-md border border-ink-700 bg-ink-900 px-2 py-1 text-xs font-mono text-ink-200"
+                      />
+                    </div>
+                  )
+                ))}
+
+              {/* Bool params — colored-dot toggle chips (drives {{...}} placeholders) */}
+              {configParams &&
+                Object.entries(configParams)
+                  .filter(([, p]) => p.type === 'bool')
+                  .map(([key, p]) => {
+                    const isOn = !!paramValues[key];
+                    const colorClass = CONFIG_COLORS[key] || 'text-ink-400';
+                    const bgClass = colorClass.replace('text-', 'bg-');
+                    return (
+                      <button
+                        key={key}
+                        onClick={() =>
+                          setParamValues((prev) => ({ ...prev, [key]: !prev[key] }))
+                        }
+                        title={p.description}
+                        className={`px-3 py-1.5 text-xs font-mono rounded-md transition-all cursor-pointer inline-flex items-center gap-1.5 ${
+                          isOn
+                            ? `${colorClass} bg-accent-500/10 border border-current/30`
+                            : 'border border-ink-700/60 text-ink-400 hover:text-ink-200 hover:border-ink-600 bg-ink-900/50'
+                        }`}
+                      >
+                        <span
+                          className={`inline-block w-2 h-2 rounded-full ${bgClass} ${isOn ? 'opacity-100' : 'opacity-30'}`}
+                        ></span>
+                        {key}
+                      </button>
+                    );
+                  })}
+
+              {/* Legacy multi-select chips (npugraph-ex / cpu-binding / …) */}
+              {extraConfig &&
+                extraConfig.map((cfg) => {
+                  const isSelected = selectedConfigs.has(cfg.key);
+                  const colorClass = CONFIG_COLORS[cfg.key] || 'text-ink-400';
+                  const bgClass = colorClass.replace('text-', 'bg-');
+                  return (
+                    <button
+                      key={cfg.key}
+                      onClick={() => toggleConfig(cfg.key)}
+                      title={cfg.label}
+                      className={`px-3 py-1.5 text-xs font-mono rounded-md transition-all cursor-pointer inline-flex items-center gap-1.5 ${
+                        isSelected
+                          ? `${colorClass} bg-accent-500/10 border border-current/30`
+                          : 'border border-ink-700/60 text-ink-400 hover:text-ink-200 hover:border-ink-600 bg-ink-900/50'
+                      }`}
+                    >
+                      <span
+                        className={`inline-block w-2 h-2 rounded-full ${bgClass} ${isSelected ? 'opacity-100' : 'opacity-30'}`}
+                      ></span>
+                      {cfg.label}
+                    </button>
+                  );
+                })}
             </div>
           </div>
-        )}
+        ) : null}
       </div>
 
       {/* Result panel */}
@@ -471,6 +587,13 @@ export default function CascadeSelector({
         <div className="rounded-lg border border-ink-800/60 overflow-hidden">
           {/* Step tabs header */}
           <div className="flex items-center border-b border-ink-800/60 bg-ink-900/70">
+            {currentScenario.tags && currentScenario.tags.length > 0 && (
+              <span className="shrink-0 px-3 text-[10px] font-mono font-bold text-accent-400 uppercase tracking-wider">
+                {currentScenario.tags
+                  .map((tag) => PIPELINE_LABELS[lang]?.[tag] || tag)
+                  .join(' · ')}
+              </span>
+            )}
             <span className="shrink-0 px-3 text-[10px] font-mono font-bold text-ink-300 uppercase tracking-wider">
               {t('step') || 'Steps'}
             </span>

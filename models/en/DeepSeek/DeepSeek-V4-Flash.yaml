@@ -8,6 +8,8 @@ meta:
   difficulty: advanced
   tasks:
     - text
+  related_recipes:
+    - "deepseek-ai/DeepSeek-V3.2"
   performance_headline: "Compact 284B/13B V4 sibling — single-node 1M-context serving with W8A8 weights and MTP"
   hardware:
     atlas_800_a3: verified
@@ -23,6 +25,94 @@ model:
   active_parameters: "13B"
   context_length: 1048576
   modality: text
+  base_args:
+    - "--trust-remote-code"
+    - "--quantization"
+    - "ascend"
+  base_env: {}
+  nightly_required: false
+  install:
+    pip:
+      command: "pip install vllm-ascend==0.23.0rc1"
+      note: "Ascend installation; see the Installation section of the tutorial."
+    docker:
+      command: "docker run --rm --net=host --shm-size=512g --device /dev/davinci0 ... -it quay.io/ascend/vllm-ascend:v0.23.0rc1 bash"
+      note: "Official Ascend image; device/driver mounts are covered in env_setup.container."
+
+# Upstream alignment: variants / compatible_strategies / features / dependencies
+variants:
+  default:
+    precision: int8
+    vram_minimum_gb: 341
+    description: "W8A8 (i.e. int8) weights, single-node or multi-node PD on Atlas 800 A2/A3"
+
+compatible_strategies:
+  - single_node_tp
+  - pd_cluster
+
+features:
+  expert_parallel:
+    description: "MoE expert parallelism across the DP ranks"
+    args: ["--enable-expert-parallel"]
+  tool_calling:
+    description: "DeepSeek-V4 native tool calling"
+    args: ["--enable-auto-tool-choice"]
+  reasoning:
+    description: "Three-tier reasoning (Non-think / Think High / Think Max)"
+    args: ["--reasoning-parser", "deepseek_v4"]
+  spec_decoding:
+    description: "MTP speculative decoding"
+    args: ["--speculative-config", '{"num_speculative_tokens": 1,"method": "mtp","enforce_eager": true}']
+
+opt_in_features:
+  - spec_decoding
+
+dependencies:
+  - note: "ModelScope is used to download the W8A8 weights"
+    command: "pip install modelscope"
+
+# — Configurable params: defaults = original tutorial config (Key Parameter Descriptions) —
+# The page/CI substitutes {{name}} in steps with the default values;
+# bool params use flag / flag_when_false.
+config_params:
+  max_model_len:
+    default: 1048576
+    type: number
+    description: "Maximum context length (input + output tokens for one request); adjust per your actual scenario"
+  max_num_seqs:
+    default: 32
+    type: number
+    description: "Maximum number of concurrent sequences per DP group"
+  gpu_memory_utilization:
+    default: 0.9
+    type: number
+    description: "Fraction of NPU memory available for the KV cache"
+  prefix_caching:
+    default: false
+    type: bool
+    description: "Prefix caching is disabled by default; enable it with --enable-prefix-caching"
+    flag: "--enable-prefix-caching"
+    flag_when_false: "--no-enable-prefix-caching"
+  speculative_config:
+    default: true
+    type: bool
+    description: "MTP speculative decoding (--speculative-config) to accelerate inference"
+    flag: "--speculative-config '{\"num_speculative_tokens\": 1,\"method\": \"mtp\",\"enforce_eager\": true}'"
+  compilation_config:
+    default: true
+    type: bool
+    description: "Full ACL graph execution in decode (--compilation-config cudagraph_mode=FULL_DECODE_ONLY) to reduce scheduling latency"
+    flag: "--compilation-config '{\"cudagraph_mode\":\"FULL_DECODE_ONLY\"}'"
+  async_scheduling:
+    default: true
+    type: bool
+    description: "Asynchronous scheduling (--async-scheduling) to overlap CPU scheduling with NPU computation"
+    flag: "--async-scheduling"
+  flashcomm1:
+    default: true
+    type: bool
+    description: "FlashComm communication optimization (VLLM_ASCEND_ENABLE_FLASHCOMM1=1)"
+    flag: "export VLLM_ASCEND_ENABLE_FLASHCOMM1=1"
 
 overview: |-
   DeepSeek-V4-Flash is a 284B-total / 13B-active MoE model in the V4 preview family.
@@ -143,14 +233,6 @@ env_setup:
 
       If you want to deploy a multi-node environment, you need to set up the environment on each node.
 extra_config:
-- key: mtp-spec-decoding
-  label: MTP Speculative Decoding
-- key: prefix-caching
-  label: Prefix Caching
-- key: async-scheduling
-  label: Async Scheduling
-- key: flashcomm1
-  label: FlashComm1
 - key: npugraph-ex
   label: NPUGraph EX
 - key: cpu-binding
@@ -162,12 +244,9 @@ extra_config:
 scenarios:
 - npu: Atlas 800I A2
   precision: W8A8
-  deployment: 单节点-多卡
-  case: 高吞吐
-  default_configs:
-  - mtp-spec-decoding
-  - async-scheduling
-  - flashcomm1
+  deployment: Single-Node
+  case: High Throughput
+  tags: [a2-single]
   steps:
   - title: Start the server
     content: |-
@@ -181,16 +260,16 @@ scenarios:
       export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
       export LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libjemalloc.so.2:$LD_PRELOAD
       export HCCL_BUFFSIZE=1024
-      %%CONFIG:flashcomm1%%export VLLM_ASCEND_ENABLE_FLASHCOMM1=1%%/CONFIG:flashcomm1%%
+      {{flashcomm1}}
       export TASK_QUEUE_ENABLE=1
       export HCCL_OP_EXPANSION_MODE="AIV"
 
       vllm serve /root/.cache/modelscope/hub/models/vllm-ascend/DeepSeek-V4-Flash-w8a8-mtp \
-          --max-model-len 133120 \
+          --max-model-len {{max_model_len}} \
           --max-num-batched-tokens 8192 \
           --served-model-name dsv4 \
-          --gpu-memory-utilization 0.9 \
-          --max-num-seqs 32 \
+          --gpu-memory-utilization {{gpu_memory_utilization}} \
+          --max-num-seqs {{max_num_seqs}} \
           --data-parallel-size 1 \
           --tensor-parallel-size 8 \
           --enable-expert-parallel \
@@ -199,14 +278,14 @@ scenarios:
           --enable-auto-tool-choice \
           --reasoning-parser deepseek_v4 \
           --safetensors-load-strategy 'prefetch' \
-          %%CONFIG:prefix-caching%%--enable-prefix-caching \%%/CONFIG:prefix-caching%%
+          {{prefix_caching}} \
           --model-loader-extra-config='{"enable_multithread_load": "true", "num_threads": 128}' \
           --quantization ascend \
           --port 8900 \
           --block-size 128 \
-          %%CONFIG:mtp-spec-decoding%%--speculative-config '{"num_speculative_tokens": 1,"method": "mtp","enforce_eager": true}' \%%/CONFIG:mtp-spec-decoding%%
-          --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY"}' \
-          %%CONFIG:async-scheduling%%--async-scheduling \%%/CONFIG:async-scheduling%%
+          {{speculative_config}} \
+          {{compilation_config}} \
+          {{async_scheduling}} \
           --additional-config '{"ascend_compilation_config":{%%CONFIG:npugraph-ex%%"enable_npugraph_ex":true,%%/CONFIG:npugraph-ex%%"enable_static_kernel":false}%%CONFIG:cpu-binding%%,"enable_cpu_binding": true%%/CONFIG:cpu-binding%%%%CONFIG:dsa-cp%%,"enable_dsa_cp": true%%/CONFIG:dsa-cp%%%%CONFIG:multistream-overlap%%,"multistream_overlap_shared_expert":true%%/CONFIG:multistream-overlap%%}'
       ```
 
@@ -219,10 +298,6 @@ scenarios:
       - `VLLM_ASCEND_ENABLE_FLASHCOMM1=1` enables the FlashComm communication optimization.
 
       Common Issues Tip: If you encounter issues, please refer to the [Public FAQ](https://docs.vllm.ai/projects/ascend/en/latest/faqs.html) for troubleshooting.
-    config_values:
-      prefix-caching:
-        enabled: "--enable-prefix-caching"
-        disabled: "--no-enable-prefix-caching"
   - title: Service Verification
     content: |-
       ```shell
@@ -246,8 +321,9 @@ scenarios:
       The service returns HTTP 200 OK with a JSON response containing the `choices` field.
 - npu: Atlas 800I A3
   precision: W8A8
-  deployment: 单节点-多卡
-  case: 低时延
+  deployment: Single-Node
+  case: Low Latency
+  tags: [a3-single]
   steps:
   - title: Start the server
     content: |-
@@ -261,17 +337,17 @@ scenarios:
       export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
       export LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libjemalloc.so.2:$LD_PRELOAD
       export HCCL_BUFFSIZE=1024
-      export VLLM_ASCEND_ENABLE_FLASHCOMM1=1
+      {{flashcomm1}}
       export TASK_QUEUE_ENABLE=1
       export HCCL_OP_EXPANSION_MODE="AIV"
 
       vllm serve /root/.cache/modelscope/hub/models/vllm-ascend/DeepSeek-V4-Flash-w8a8-mtp \
-          --max-model-len 1048576 \
+          --max-model-len {{max_model_len}} \
           --max-num-batched-tokens 10240 \
           --served-model-name dsv4 \
-          --gpu-memory-utilization 0.9 \
+          --gpu-memory-utilization {{gpu_memory_utilization}} \
           --api-server-count 1 \
-          --max-num-seqs 64 \
+          --max-num-seqs {{max_num_seqs}} \
           --data-parallel-size 4 \
           --tensor-parallel-size 4 \
           --enable-expert-parallel \
@@ -284,9 +360,9 @@ scenarios:
           --quantization ascend \
           --port 8900 \
           --block-size 128 \
-          --speculative-config '{"num_speculative_tokens": 1,"method": "mtp","enforce_eager": true}' \
-          --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY"}' \
-          --async-scheduling \
+          {{speculative_config}} \
+          {{compilation_config}} \
+          {{async_scheduling}} \
           --additional-config '
           {"ascend_compilation_config":{
               "enable_npugraph_ex":true,
@@ -329,8 +405,9 @@ scenarios:
       The service returns HTTP 200 OK with a JSON response containing the `choices` field.
 - npu: Atlas 800I A3
   precision: W8A8
-  deployment: 多节点-PD分离
+  deployment: Multi-Node PD Separation
   case: PD Separation
+  tags: [pd-multinode]
   steps:
   - title: Overview
     content: |-
@@ -480,7 +557,7 @@ scenarios:
       export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
       export HCCL_BUFFSIZE=2560
       export TASK_QUEUE_ENABLE=1
-      export VLLM_ASCEND_ENABLE_FLASHCOMM1=1
+      {{flashcomm1}}
       export HCCL_OP_EXPANSION_MODE="AIV"
       export LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libjemalloc.so.2:$LD_PRELOAD
       export ASCEND_RT_VISIBLE_DEVICES=$1
@@ -496,21 +573,21 @@ scenarios:
           --enable-expert-parallel \
           --seed 1024 \
           --served-model-name dsv4 \
-          --max-model-len 1048576 \
+          --max-model-len {{max_model_len}} \
           --max-num-batched-tokens 8192 \
-          --max-num-seqs 16 \
+          --max-num-seqs {{max_num_seqs}} \
           --no-disable-hybrid-kv-cache-manager \
           --model-loader-extra-config='{"enable_multithread_load": "true", "num_threads": 128}' \
-          --no-enable-prefix-caching \
+          {{prefix_caching}} \
           --safetensors-load-strategy 'prefetch' \
-          --speculative-config '{"num_speculative_tokens": 1,"method": "mtp","enforce_eager": true}' \
+          {{speculative_config}} \
           --trust-remote-code \
           --block-size 128 \
           --tokenizer-mode deepseek_v4 \
           --tool-call-parser deepseek_v4 \
           --enable-auto-tool-choice \
           --reasoning-parser deepseek_v4 \
-          --gpu-memory-utilization 0.9 \
+          --gpu-memory-utilization {{gpu_memory_utilization}} \
           --quantization ascend \
           --enforce-eager \
           --additional-config '{"enable_cpu_binding": true, "enable_shared_expert_dp": true,  "enable_dsa_cp": true}' \
@@ -567,13 +644,13 @@ scenarios:
           --enable-expert-parallel \
           --seed 1024 \
           --served-model-name dsv4 \
-          --max-model-len 1048576 \
+          --max-model-len {{max_model_len}} \
           --max-num-batched-tokens 120 \
-          --max-num-seqs 60 \
-          --async-scheduling \
+          --max-num-seqs {{max_num_seqs}} \
+          {{async_scheduling}} \
           --block-size 128 \
           --no-disable-hybrid-kv-cache-manager \
-          --no-enable-prefix-caching \
+          {{prefix_caching}} \
           --safetensors-load-strategy 'prefetch' \
           --trust-remote-code \
           --tokenizer-mode deepseek_v4 \
@@ -581,10 +658,10 @@ scenarios:
           --tool-call-parser deepseek_v4 \
           --enable-auto-tool-choice \
           --reasoning-parser deepseek_v4 \
-          --gpu-memory-utilization 0.9 \
+          --gpu-memory-utilization {{gpu_memory_utilization}} \
           --quantization ascend \
-          --speculative-config '{"num_speculative_tokens": 1,"method": "mtp","enforce_eager": true}' \
-          --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY"}' \
+          {{speculative_config}} \
+          {{compilation_config}} \
           --kv-transfer-config \
           '{"kv_connector": "MooncakeHybridConnector",
           "kv_role": "kv_consumer",
@@ -665,8 +742,9 @@ scenarios:
       The service returns HTTP 200 OK with a JSON response containing the `choices` field.
 - npu: Atlas 800I A2
   precision: W8A8
-  deployment: 多节点-PD分离
+  deployment: Multi-Node PD Separation
   case: PD Separation
+  tags: [pd-multinode]
   steps:
   - title: Overview
     content: |-
@@ -792,16 +870,16 @@ scenarios:
           --enable-expert-parallel \
           --seed 1024 \
           --served-model-name dsv4 \
-          --max-model-len 135000 \
+          --max-model-len {{max_model_len}} \
           --max-num-batched-tokens 4096 \
-          --max-num-seqs 16 \
+          --max-num-seqs {{max_num_seqs}} \
           --block-size 128 \
           --enforce-eager \
-          --async-scheduling \
+          {{async_scheduling}} \
           --no-disable-hybrid-kv-cache-manager \
-          --enable-prefix-caching \
+          {{prefix_caching}} \
           --trust-remote-code \
-          --gpu-memory-utilization 0.9 \
+          --gpu-memory-utilization {{gpu_memory_utilization}} \
           --quantization ascend \
           --safetensors-load-strategy 'prefetch' \
           --model-loader-extra-config='{"enable_multithread_load": "true", "num_threads": 128}' \
@@ -810,7 +888,7 @@ scenarios:
           --enable-auto-tool-choice \
           --reasoning-parser deepseek_v4 \
           --additional-config '{"enable_cpu_binding": true, "enable_shared_expert_dp": true}' \
-          --speculative-config '{"num_speculative_tokens": 1, "method": "mtp","enforce_eager": true}' \
+          {{speculative_config}} \
           --kv-transfer-config \
           '{"kv_connector": "MooncakeHybridConnector",
           "kv_role": "kv_producer",
@@ -871,15 +949,15 @@ scenarios:
           --enable-expert-parallel \
           --seed 1024 \
           --served-model-name dsv4 \
-          --max-model-len 135000 \
+          --max-model-len {{max_model_len}} \
           --max-num-batched-tokens 60 \
-          --max-num-seqs 30 \
-          --async-scheduling \
+          --max-num-seqs {{max_num_seqs}} \
+          {{async_scheduling}} \
           --block-size 128 \
           --no-disable-hybrid-kv-cache-manager \
-          --no-enable-prefix-caching \
+          {{prefix_caching}} \
           --trust-remote-code \
-          --gpu-memory-utilization 0.9 \
+          --gpu-memory-utilization {{gpu_memory_utilization}} \
           --quantization ascend \
           --safetensors-load-strategy 'prefetch' \
           --model-loader-extra-config='{"enable_multithread_load": "true", "num_threads": 128}' \
@@ -887,8 +965,8 @@ scenarios:
           --tool-call-parser deepseek_v4 \
           --enable-auto-tool-choice \
           --reasoning-parser deepseek_v4 \
-          --speculative-config '{"num_speculative_tokens": 1, "method": "mtp","enforce_eager": true}' \
-          --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY"}' \
+          {{speculative_config}} \
+          {{compilation_config}} \
           --kv-transfer-config \
           '{"kv_connector": "MooncakeHybridConnector",
           "kv_role": "kv_consumer",

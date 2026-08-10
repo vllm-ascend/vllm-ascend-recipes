@@ -36,6 +36,12 @@ export const modelInfoSchema = z.object({
   active_parameters: z.string().nullable(),
   context_length: z.number(),
   modality: z.string(),
+  // Upstream-style fields (vllm-project/recipes), optional.
+  base_args: z.array(z.string()).optional(),
+  base_env: z.record(z.string(), z.string()).optional(),
+  docker_image: z.union([z.string(), z.record(z.string(), z.string())]).optional(),
+  nightly_required: z.boolean().optional(),
+  install: z.record(z.string(), z.any()).optional(),
 });
 
 // ========== Weight Download ==========
@@ -110,8 +116,20 @@ export const scenarioSchema = z.object({
   precision: z.string(),
   deployment: z.string(),
   case: z.string(),
+  // Pipeline-routing labels: a2-single / a3-single / pd-multinode, …
+  tags: z.array(z.string()).optional(),
   steps: z.array(scenarioStepSchema),
   default_configs: z.array(z.string()).optional(),
+});
+
+// Configurable parameters whose defaults come from the tutorial baseline.
+// Value params substitute {{name}}; boolean params render flag / flag_when_false.
+export const configParamSchema = z.object({
+  default: z.any(),
+  type: z.enum(['number', 'string', 'bool']).optional(),
+  description: z.string().optional(),
+  flag: z.string().optional(),
+  flag_when_false: z.string().optional(),
 });
 
 // ========== References ==========
@@ -150,6 +168,16 @@ export const modelSchema = z.object({
   tuning: z.string().optional(),
   faq: z.string().optional(),
   references: z.array(referenceSchema),
+  // Upstream-style declarative fields (optional).
+  features: z.record(z.string(), z.any()).optional(),
+  opt_in_features: z.array(z.string()).optional(),
+  variants: z.record(z.string(), z.any()).optional(),
+  compatible_strategies: z.array(z.string()).optional(),
+  strategy_overrides: z.record(z.string(), z.any()).optional(),
+  hardware_overrides: z.record(z.string(), z.any()).optional(),
+  dependencies: z.array(z.any()).optional(),
+  // Configurable parameters with tutorial defaults.
+  config_params: z.record(z.string(), configParamSchema).optional(),
 });
 
 export type ModelSchema = z.infer<typeof modelSchema>;

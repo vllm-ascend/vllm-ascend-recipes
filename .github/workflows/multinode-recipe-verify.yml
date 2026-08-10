@@ -119,7 +119,22 @@ jobs:
             # Pick the first changed en recipe that has a PD scenario.
             RECIPE=""
             for f in $(git diff --name-only "${{ github.event.pull_request.base.sha }}" "${{ github.sha }}" -- models/ | grep '^models/en/.*\.ya\?ml$' || true); do
-              if [ "$(python3 -c "import yaml,sys; d=yaml.safe_load(open(sys.argv[1])); print('yes' if any('pd' in (s.get('deployment') or '').lower() for s in d.get('scenarios',[])) else 'no')" "$f")" = "yes" ]; then
+              # Route by scenario tags (a2-single / a3-single -> single-node
+              # pipeline; pd-multinode -> this multi-node pipeline).
+              TAG="$(python3 -c "
+                import yaml,sys
+                d=yaml.safe_load(open(sys.argv[1]))
+                tags={t for s in d.get('scenarios',[]) for t in (s.get('tags') or [])}
+                if 'pd-multinode' in tags:
+                    print('pd-multinode')
+                elif 'a2-single' in tags or 'a3-single' in tags:
+                    print('single')
+                elif any('pd' in (s.get('deployment') or '').lower() for s in d.get('scenarios',[])):
+                    print('pd-multinode')
+                else:
+                    print('')
+                " "$f")"
+              if [ "$TAG" = "pd-multinode" ]; then
                 RECIPE="$f"
                 break
               fi
