@@ -139,15 +139,13 @@ jobs:
   multinode-verify:
     needs: prepare
     if: needs.prepare.outputs.should_run == 'true'
-    # Run on the lighter a2b4-1 runner pool: the controller is CPU-only
-    # (kubectl + python over the kubeconfig secret) and does not need NPU
-    # machines (a2b4-8 is an 8-card node — wasteful for a pure controller).
-    # The pool must reach the cluster-internal network (API server, pod IPs,
-    # PyPI cache) and have reliable egress to GitHub's Azure results service
-    # (the a2b4-0 pool failed there: artifact uploads hung and teardown
-    # stalled on the log flush). If a2b4-1 has either problem, fall back to
-    # linux-aarch64-a2b4-8.
-    runs-on: linux-aarch64-a2b4-1
+    # Controller is CPU-only; try the a2b4-0 scheduling-node pool again to
+    # re-check whether its upload path to GitHub's Azure results service is
+    # healthy now (it previously hung: artifact uploads stalled and teardown
+    # stuck on the log flush). The controller reaches the cluster-internal
+    # network (API server, pod IPs, PyPI cache) from any pool. Fall back to
+    # linux-aarch64-a2b4-1/-8 if -0 still fails to upload.
+    runs-on: linux-aarch64-a2b4-0
     # Run the controller in upstream's CPU image (vllm-ascend:nightly-cpu),
     # same as _e2e_nightly_multi_node.yaml: kubectl + python are baked in, and
     # all steps share ONE container so /tmp persists (the bare ARC runner had
@@ -367,6 +365,7 @@ jobs:
         with:
           access_key: ${{ secrets.OBS_AK }}
           secret_key: ${{ secrets.OBS_SK }}
+          bucket: mindx-package
           name: multinode-results-${{ github.run_id }}
           path: /tmp/multinode-results/
           retention-days: 14
