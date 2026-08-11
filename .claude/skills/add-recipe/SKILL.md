@@ -13,6 +13,7 @@ Recipes are YAML files at `models/en/<Provider>/<Model>.yaml` (English, source o
 2. **Fetch model metadata.** Pull `config.json` from HF/ModelScope: `architecture` (`moe` if `num_experts` / `*MoE*` arch names, else `dense`), `parameter_count` / `active_parameters`, `context_length` (`max_position_embeddings`, or `text_config.max_position_embeddings` for VL models).
 3. **Read the model README — don't skip.** Mine it for: `min_vllm_version` / `nightly_required`, `dependencies`, parser flags (`--tool-call-parser`, `--reasoning-parser`, `--enable-auto-tool-choice`), MTP/quantized companion repos (→ `spec_decoding` feature or `variants` with `model_id` override), recommended serve flags, and hardware guidance.
 4. **Cross-check vllm-ascend support.** Verify the model works on the vllm-ascend version you claim; required flags go into `model.base_args`, base env into `model.base_env`. Copy any `--speculative-config` JSON verbatim from the README.
+   **Reference the official tutorial** — pull `docs/source/tutorials/models/<Model>.md` from the matching vllm-ascend tag (e.g. `v0.23.0rc1`) and use it as the single source of truth for the recipe: scenario division (single-node / multi-node DP / PD separation / request forwarding), serve flags, env vars and per-scenario parameters must match the tutorial. Do not invent scenarios or parameters the tutorial doesn't cover.
 5. **Author `models/en/...`.** Follow the schema below. Use an existing recipe (e.g. `models/en/Qwen/Qwen3-30B-A3B.yaml` or `models/en/DeepSeek/DeepSeek-V4-Flash.yaml`) as a template. Keep the tutorial content in our fields (`overview` / `prerequisites` / `env_setup` / `scenarios`); leave `guide` empty.
 6. **Mirror to `models/zh/...` 1:1.** Same field structure (meta/model/features/variants/strategies/overrides/dependencies/config_params/scenarios/extra_config), only descriptions in Chinese. If the zh file is missing, the site falls back to English.
 7. **Validate.** Run `pnpm validate` (fails fast on schema + interlock errors), then `./scripts/format.sh` (validate + typecheck + lint + prettier, mirrors CI). Preview with `pnpm dev` at `/{provider}/{model}`.
@@ -119,6 +120,7 @@ extra_config:
 - `scenario.strategy` ⊆ `compatible_strategies`; tags must match the pipeline routing (a2-single / a3-single / pd-multinode).
 - Ascend install is docker-only: `install.pip: false`; `guide: ""`.
 - `en/` and `zh/` field structures must be identical.
+- The official vllm-ascend tutorial (`docs/source/tutorials/models/<Model>.md`) is the source of truth for scenario content and serve parameters; mirror it, don't improvise.
 - Keep the scenario serve commands the CI-execution source of truth; when editing flags, update base_args/base_env/features too.
 
 ## Validation (pnpm validate)
