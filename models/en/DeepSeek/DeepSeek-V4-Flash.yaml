@@ -105,14 +105,17 @@ features:
     label: "CPU Binding"
     description: "CPU core binding for reduced NUMA latencies"
     args: ["--additional-config", '{"enable_cpu_binding": true}']
+    default: false
   multistream_overlap:
     label: "Multi-stream Overlap"
     description: "Multi-stream overlap for MoE shared expert computation"
     args: ["--additional-config", '{"multistream_overlap_shared_expert": true}']
+    default: false
   npugraph_ex:
     label: "NPUGraph EX"
     description: "NPUGraph EX for accelerated graph execution"
     args: ["--additional-config", '{"ascend_compilation_config": {"enable_npugraph_ex": true, "enable_static_kernel": false}}']
+    default: false
 
 opt_in_features:
   - prefix_caching
@@ -144,8 +147,9 @@ hardware_overrides:
       - "--compilation-config"
       - '{"cudagraph_mode": "FULL_DECODE_ONLY"}'
     extra_env:
+      # HCCL_BUFFSIZE overrides base_env (1024) for A3; FlashComm1 env is
+      # declared once in `features.flashcomm1`, not duplicated here.
       HCCL_BUFFSIZE: "2560"
-      VLLM_ASCEND_ENABLE_FLASHCOMM1: "1"
   ascend_a2:
     extra_args:
       - "--compilation-config"
@@ -369,14 +373,8 @@ env_setup:
 
       If you want to deploy a multi-node environment, you need to set up the environment on each node.
 extra_config:
-- key: npugraph-ex
-  label: NPUGraph EX
-- key: cpu-binding
-  label: CPU Binding
 - key: dsa-cp
   label: DSA CP
-- key: multistream-overlap
-  label: Multi-stream Overlap
 scenarios:
 - npu: Atlas 800I A2
   precision: W8A8
@@ -423,7 +421,7 @@ scenarios:
           {{spec_decoding}} \
           {{compilation_config}} \
           {{async_scheduling}} \
-          --additional-config '{"ascend_compilation_config":{%%CONFIG:npugraph-ex%%"enable_npugraph_ex":true,%%/CONFIG:npugraph-ex%%"enable_static_kernel":false}%%CONFIG:cpu-binding%%,"enable_cpu_binding": true%%/CONFIG:cpu-binding%%%%CONFIG:dsa-cp%%,"enable_dsa_cp": true%%/CONFIG:dsa-cp%%%%CONFIG:multistream-overlap%%,"multistream_overlap_shared_expert":true%%/CONFIG:multistream-overlap%%}'
+          --additional-config '{"ascend_compilation_config":{%%CONFIG:npugraph_ex%%"enable_npugraph_ex":true,%%/CONFIG:npugraph_ex%%"enable_static_kernel":false}%%CONFIG:cpu_binding%%,"enable_cpu_binding": true%%/CONFIG:cpu_binding%%%%CONFIG:dsa-cp%%,"enable_dsa_cp": true%%/CONFIG:dsa-cp%%%%CONFIG:multistream_overlap%%,"multistream_overlap_shared_expert":true%%/CONFIG:multistream_overlap%%}'
       ```
 
       Key Parameter Descriptions:

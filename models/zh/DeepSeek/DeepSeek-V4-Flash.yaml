@@ -62,14 +62,17 @@ features:
     label: "CPU Binding"
     description: "CPU 核绑定,降低 NUMA 时延"
     args: ["--additional-config", '{"enable_cpu_binding": true}']
+    default: false
   multistream_overlap:
     label: "Multi-stream Overlap"
     description: "MoE 共享专家多流重叠"
     args: ["--additional-config", '{"multistream_overlap_shared_expert": true}']
+    default: false
   npugraph_ex:
     label: "NPUGraph EX"
     description: "NPUGraph EX 加速图执行"
     args: ["--additional-config", '{"ascend_compilation_config": {"enable_npugraph_ex": true, "enable_static_kernel": false}}']
+    default: false
 
 opt_in_features:
   - prefix_caching
@@ -209,14 +212,8 @@ env_setup:
 
       如果您需要部署多节点环境，需要在每个节点上设置环境。
 extra_config:
-- key: npugraph-ex
-  label: NPUGraph EX
-- key: cpu-binding
-  label: CPU Binding
 - key: dsa-cp
   label: DSA CP
-- key: multistream-overlap
-  label: Multi-Stream Overlap
 scenarios:
 - npu: Atlas 800I A2
   precision: W8A8
@@ -262,7 +259,7 @@ scenarios:
           {{spec_decoding}} \
           {{compilation_config}} \
           {{async_scheduling}} \
-          --additional-config '{"ascend_compilation_config":{%%CONFIG:npugraph-ex%%"enable_npugraph_ex":true,%%/CONFIG:npugraph-ex%%"enable_static_kernel":false}%%CONFIG:cpu-binding%%,"enable_cpu_binding": true%%/CONFIG:cpu-binding%%%%CONFIG:dsa-cp%%,"enable_dsa_cp": true%%/CONFIG:dsa-cp%%%%CONFIG:multistream-overlap%%,"multistream_overlap_shared_expert":true%%/CONFIG:multistream-overlap%%}'
+          --additional-config '{"ascend_compilation_config":{%%CONFIG:npugraph_ex%%"enable_npugraph_ex":true,%%/CONFIG:npugraph_ex%%"enable_static_kernel":false}%%CONFIG:cpu_binding%%,"enable_cpu_binding": true%%/CONFIG:cpu_binding%%%%CONFIG:dsa-cp%%,"enable_dsa_cp": true%%/CONFIG:dsa-cp%%%%CONFIG:multistream_overlap%%,"multistream_overlap_shared_expert":true%%/CONFIG:multistream_overlap%%}'
       ```
 
       关键参数说明：

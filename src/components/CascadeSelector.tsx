@@ -268,10 +268,10 @@ const CONFIG_COLORS: Record<string, string> = {
   spec_decoding: 'text-amber-400',
   compilation_config: 'text-lime-400',
   async_scheduling: 'text-sky-400',
-  'npugraph-ex': 'text-violet-400',
-  'cpu-binding': 'text-cyan-400',
+  npugraph_ex: 'text-violet-400',
+  cpu_binding: 'text-cyan-400',
   'dsa-cp': 'text-orange-400',
-  'multistream-overlap': 'text-pink-400',
+  multistream_overlap: 'text-pink-400',
 };
 
 // Friendly labels for config_param bool toggles (shown on the chip itself).
@@ -472,20 +472,32 @@ export default function CascadeSelector({
   // Resolve rendered content for current step (hooks must run before any
   // early return to keep call order stable across renders)
   const currentStep = currentScenario?.steps[activeStep];
+  // Effective %%CONFIG%% selection = legacy extra_config chips (dsa-cp) plus
+  // any feature toggle whose key appears in the step's %%CONFIG%% markers
+  // (cpu_binding / multistream_overlap / npugraph_ex are feature-driven).
+  const effectiveConfigs = useMemo(() => {
+    const merged = new Set(selectedConfigs);
+    for (const [key, f] of Object.entries(toggleFeatures)) {
+      if (paramValues[key]) merged.add(key);
+      else merged.delete(key);
+    }
+    return merged;
+  }, [selectedConfigs, paramValues, toggleFeatures]);
+
   const rawContent = useMemo(() => {
     if (!currentStep) return '';
     return applyConfigReplace(
       applyConfigParams(currentStep.content, paramValues, features),
-      selectedConfigs,
+      effectiveConfigs,
       currentStep.config_values,
     );
-  }, [currentStep, selectedConfigs, paramValues, features]);
+  }, [currentStep, effectiveConfigs, paramValues, features]);
 
   const renderedHtml = useMemo(() => {
     if (!rawContent) return '';
     const mdHtml = renderMarkdown(rawContent);
-    return applyColorHighlights(mdHtml, selectedConfigs);
-  }, [rawContent, selectedConfigs]);
+    return applyColorHighlights(mdHtml, effectiveConfigs);
+  }, [rawContent, effectiveConfigs]);
 
   if (npus.length === 0) return null;
 
@@ -603,7 +615,7 @@ export default function CascadeSelector({
                 );
               })}
 
-              {/* Legacy multi-select chips (npugraph-ex / cpu-binding / …) */}
+              {/* Legacy multi-select chips (dsa-cp — no upstream feature yet) */}
               {extraConfig &&
                 extraConfig.map((cfg) => {
                   const isSelected = selectedConfigs.has(cfg.key);
