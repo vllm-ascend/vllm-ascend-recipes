@@ -54,9 +54,8 @@ model:
     atlas_800_a3: "quay.io/ascend/vllm-ascend:v0.23.0rc1-a3"
   nightly_required: false
   install:
-    pip:
-      command: "pip install vllm-ascend==0.23.0rc1"
-      note: "Ascend installation; see the Installation section of the tutorial."
+    # Ascend 推荐 Docker 方式;pip 需源码编译,不提供官方 wheel,隐藏 pip 标签。
+    pip: false
     docker:
       command: "docker run --rm --net=host --shm-size=512g -v /root/.cache/modelscope:/root/.cache/modelscope --device /dev/davinci0 --device /dev/davinci1 --device /dev/davinci2 --device /dev/davinci3 --device /dev/davinci4 --device /dev/davinci5 --device /dev/davinci6 --device /dev/davinci7 -it quay.io/ascend/vllm-ascend:v0.23.0rc1 bash"
       note: "Official Ascend image; the weights directory (/root/.cache/modelscope) is mounted into the container; device/driver mounts are covered in env_setup.container."
@@ -155,80 +154,9 @@ dependencies:
   - note: "ModelScope is used to download the W8A8 weights"
     command: "pip install modelscope"
 
-guide: |-
-  ## Overview
-
-  DeepSeek-V4-Flash is a 284B-total / 13B-active MoE model in the V4 preview family. It pairs a **hybrid attention stack** — Compressed Sparse Attention (CSA) + Heavily Compressed Attention (HCA) — with **Manifold-Constrained Hyper-Connections (mHC)** to reach 27% of V3.2's per-token inference FLOPs and 10% of V3.2's KV cache at 1M context.
-
-  First supported in vLLM-Ascend v0.23.0rc1. This guide is validated on **vLLM-Ascend v0.23.0rc1**. All v0.23.0rc1 and later versions can run stably.
-
-  ## Prerequisites
-
-  - **Hardware**: 1 Atlas 800 A3 (128G × 8) or 1 Atlas 800 A2 (64G × 8)
-  - **Model weights**: [DeepSeek-V4-Flash-w8a8-mtp](https://www.modelscope.cn/models/Eco-Tech/DeepSeek-V4-Flash-w8a8-mtp) (W8A8 pre-quantized with MTP heads)
-
-  ### Environment Setup
-
-  **Docker (recommended):**
-  ```bash
-  # A3
-  docker pull quay.io/ascend/vllm-ascend:{{ vllm_ascend_version }}-a3
-  # A2
-  docker pull quay.io/ascend/vllm-ascend:{{ vllm_ascend_version }}
-  ```
-
-  **Pip install:**
-  ```bash
-  git clone https://github.com/vllm-project/vllm.git
-  cd vllm && pip install -e .
-  git clone https://github.com/vllm-project/vllm-ascend.git
-  cd vllm-ascend && pip install -e .
-  ```
-
-  ## Quantization
-
-  DeepSeek-V4-Flash uses W8A8 mixed quantization: MoE expert weights are stored in W8A8 while the remaining (attention / norm / router) params stay in W8A8. Use the pre-quantized weight from Eco-Tech on ModelScope.
-
-  ## Service Verification
-
-  After starting the service, verify with:
-  ```bash
-  curl http://localhost:8900/v1/chat/completions \
-      -H "Content-Type: application/json" \
-      -d '{
-          "model": "dsv4",
-          "messages": [{"role": "user", "content": "Who are you?"}],
-          "max_tokens": 256,
-          "temperature": 0
-      }'
-  ```
-
-  ## Accuracy Results (Atlas 800 A3, W8A8)
-
-  | Dataset | Metric   | Score  |
-  | ------- | -------- | ------ |
-  | GPQA    | accuracy | 88.17% |
-  | GSM8K   | accuracy | 96.30% |
-
-  ## Recommended Configurations
-
-  | Scenario          | NPUs    | TP | DP | max-model-len | max-num-seqs | Notes |
-  | ----------------- | ------- | -- | -- | ------------- | ------------ | ----- |
-  | High Throughput   | 16 (A3) | 4  | 4  | 133120        | 32           | Single-node mixed |
-  | Long Context (1M) | 8 (A3)  | 4  | 4  | 1048576       | 16           | dp4 tp4 single-node |
-  | PD Separation     | 32 (A3) | -  | -  | 1048576       | 16 (P) / 60 (D) | 1P1D via Mooncake |
-
-  ## Troubleshooting
-
-  Refer to [Performance Tuning Guide](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/performance_and_debug/optimization_and_tuning.html) and [FAQ](https://docs.vllm.ai/projects/ascend/en/latest/faqs.html).
-
-  ## References
-
-  - [vllm-ascend Documentation](https://docs.vllm.ai/projects/ascend/en/latest/tutorials/models/DeepSeek-V4-Flash.html)
-  - [ModelScope (W8A8-MTP)](https://www.modelscope.cn/models/Eco-Tech/DeepSeek-V4-Flash-w8a8-mtp)
-  - [PD Disaggregation Guide (Mooncake)](https://docs.vllm.ai/projects/ascend/en/latest/tutorials/features/pd_disaggregation_mooncake_multi_node.html)
-  - [vllm-ascend GitHub](https://github.com/vllm-project/vllm-ascend)
-
+guide: ""
+# Tutorial content lives in overview / prerequisites / env_setup / scenarios
+# (upstream ignores those); guide kept as an upstream-compatible placeholder.
 # — Configurable VALUE params (page/CI extension; defaults = tutorial baseline).
 #   Boolean toggles live in `features` (upstream field) with label/args/env
 #   and our `default`/`flag_when_false` extensions; the page renders both. —
