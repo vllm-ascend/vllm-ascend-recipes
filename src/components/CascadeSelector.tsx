@@ -36,7 +36,6 @@ interface FeatureMeta {
   description?: string;
   args?: string[];
   env?: Record<string, string>;
-  default?: boolean;
   flag_when_false?: string;
 }
 
@@ -49,6 +48,8 @@ interface CascadeSelectorProps {
   configParamsZh?: Record<string, ConfigParam>;
   featuresEn?: Record<string, FeatureMeta>;
   featuresZh?: Record<string, FeatureMeta>;
+  optInFeaturesEn?: string[];
+  optInFeaturesZh?: string[];
   selectorLabelsEn?: Partial<Record<'npu' | 'precision' | 'deployment' | 'case', string>>;
   selectorLabelsZh?: Partial<Record<'npu' | 'precision' | 'deployment' | 'case', string>>;
 }
@@ -89,12 +90,12 @@ function renderFeature(f: FeatureMeta, on: boolean): string {
 function applyConfigParams(
   content: string,
   params: Record<string, unknown>,
-  features: Record<string, FeatureMeta> | undefined,
+  toggleFeatures: Record<string, FeatureMeta>,
 ): string {
   return content.replace(/\{\{(\w+)\}\}/g, (_, name) => {
     const value = params[name];
-    const feat = features?.[name];
-    if (feat?.default !== undefined) {
+    const feat = toggleFeatures[name];
+    if (feat) {
       const text = renderFeature(feat, !!value);
       // Wrap in %%HL%% markers so the rendered command shows the flag in the
       // same color as its Config chip (stripped by stripRenderMarkers for the
@@ -343,6 +344,8 @@ export default function CascadeSelector({
   configParamsZh,
   featuresEn,
   featuresZh,
+  optInFeaturesEn,
+  optInFeaturesZh,
   selectorLabelsEn,
   selectorLabelsZh,
 }: CascadeSelectorProps) {
@@ -355,21 +358,35 @@ export default function CascadeSelector({
   const configParams =
     lang === 'zh' ? (configParamsZh ?? configParamsEn) : (configParamsEn ?? configParamsZh);
   const features = lang === 'zh' ? (featuresZh ?? featuresEn) : (featuresEn ?? featuresZh);
-  // Only features with an explicit `default` are Config-panel toggles.
+  const optInFeatures =
+    lang === 'zh' ? (optInFeaturesZh ?? optInFeaturesEn) : (optInFeaturesEn ?? optInFeaturesZh);
+  // Config-panel toggles = features referenced by the recipe steps
+  // ({{name}} placeholders or %%CONFIG%% markers). Default state comes from
+  // upstream opt_in_features (absent = default-on).
+  const referencedKeys = useMemo(() => {
+    const set = new Set<string>();
+    for (const s of scenarios) {
+      for (const st of s.steps) {
+        for (const m of st.content.matchAll(/\{\{(\w+)\}\}/g)) set.add(m[1]);
+        for (const m of st.content.matchAll(/%%CONFIG:([\w-]+)%%/g)) set.add(m[1]);
+      }
+    }
+    return set;
+  }, [scenarios]);
   const toggleFeatures = useMemo(() => {
     const out: Record<string, FeatureMeta> = {};
     for (const [key, f] of Object.entries(features ?? {})) {
-      if (f?.default !== undefined) out[key] = f;
+      if (referencedKeys.has(key)) out[key] = f;
     }
     return out;
-  }, [features]);
+  }, [features, referencedKeys]);
   const [paramValues, setParamValues] = useState<Record<string, unknown>>(() => {
     const init: Record<string, unknown> = {};
     for (const [key, p] of Object.entries(configParams ?? {})) {
       init[key] = p.default;
     }
-    for (const [key, f] of Object.entries(toggleFeatures)) {
-      init[key] = f.default;
+    for (const key of Object.keys(toggleFeatures)) {
+      init[key] = !(optInFeatures ?? []).includes(key);
     }
     return init;
   });
@@ -487,11 +504,11 @@ export default function CascadeSelector({
   const rawContent = useMemo(() => {
     if (!currentStep) return '';
     return applyConfigReplace(
-      applyConfigParams(currentStep.content, paramValues, features),
+      applyConfigParams(currentStep.content, paramValues, toggleFeatures),
       effectiveConfigs,
       currentStep.config_values,
     );
-  }, [currentStep, effectiveConfigs, paramValues, features]);
+  }, [currentStep, effectiveConfigs, paramValues, toggleFeatures]);
 
   const renderedHtml = useMemo(() => {
     if (!rawContent) return '';

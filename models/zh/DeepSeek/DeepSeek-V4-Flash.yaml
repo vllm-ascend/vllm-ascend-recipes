@@ -35,44 +35,36 @@ features:
     label: "MTP Spec Decoding"
     description: "MTP(Multi-Token Prediction)投机解码,加速推理"
     args: ["--speculative-config", '{"num_speculative_tokens": 1, "method": "mtp", "enforce_eager": true}']
-    default: true
   flashcomm1:
     label: "FlashComm1"
     description: "FlashComm 通信优化,提升芯片间带宽"
     env:
       VLLM_ASCEND_ENABLE_FLASHCOMM1: "1"
-    default: true
   prefix_caching:
     label: "Prefix Caching"
     description: "KV 缓存前缀缓存(--enable-prefix-caching / --no-enable-prefix-caching)"
     args: ["--enable-prefix-caching"]
-    default: false
     flag_when_false: "--no-enable-prefix-caching"
   async_scheduling:
     label: "Async Scheduling"
     description: "异步调度,CPU 调度与 NPU 计算重叠"
     args: ["--async-scheduling"]
-    default: true
   compilation_config:
     label: "Compilation Config"
     description: "decode 阶段全 ACL 图执行(--compilation-config cudagraph_mode=FULL_DECODE_ONLY),降低调度时延"
     args: ["--compilation-config", '{"cudagraph_mode":"FULL_DECODE_ONLY"}']
-    default: true
   cpu_binding:
     label: "CPU Binding"
     description: "CPU 核绑定,降低 NUMA 时延"
     args: ["--additional-config", '{"enable_cpu_binding": true}']
-    default: false
   multistream_overlap:
     label: "Multi-stream Overlap"
     description: "MoE 共享专家多流重叠"
     args: ["--additional-config", '{"multistream_overlap_shared_expert": true}']
-    default: false
   npugraph_ex:
     label: "NPUGraph EX"
     description: "NPUGraph EX 加速图执行"
     args: ["--additional-config", '{"ascend_compilation_config": {"enable_npugraph_ex": true, "enable_static_kernel": false}}']
-    default: false
 
 opt_in_features:
   - prefix_caching

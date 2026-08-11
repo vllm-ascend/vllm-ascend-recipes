@@ -103,9 +103,6 @@ export interface FeatureMeta {
   description?: string;
   args?: string[];
   env?: Record<string, string>;
-  // Page-extension: whether the feature is a Config toggle and its default
-  // state (upstream treats absence in opt_in_features as default-on).
-  default?: boolean;
   flag_when_false?: string;
 }
 
@@ -138,6 +135,7 @@ export interface Model {
   scenario_selector_labels?: ScenarioSelectorLabels;
   config_params?: Record<string, ConfigParam>;
   features?: Record<string, FeatureMeta>;
+  opt_in_features?: string[];
   performance?: PerformanceSection;
   evaluation?: Evaluation;
   verification?: string;
