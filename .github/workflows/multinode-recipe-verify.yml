@@ -46,6 +46,13 @@ on:
           matches both 多节点-PD分离 and Multi-Node PD Separation).
         required: false
         default: 'PD'
+      strategy:
+        description: >-
+          Scenario strategy to verify exactly (pd_cluster / multi_node_dp /
+          single_node_A2 / single_node_A3). Overrides hw/deployment filters;
+          empty = auto-detect from the recipe.
+        required: false
+        default: ''
       prefill_nodes:
         description: 'Prefill node count override (0 = auto-derive from recipe DP config)'
         required: false
@@ -103,6 +110,8 @@ jobs:
     outputs:
       recipe: ${{ steps.detect.outputs.recipe }}
       should_run: ${{ steps.detect.outputs.should_run }}
+      route: ${{ steps.detect.outputs.route }}
+      strategy: ${{ steps.detect.outputs.strategy }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -116,11 +125,13 @@ jobs:
         id: detect
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            # Pick the first changed en recipe that has a PD scenario.
+            # Pick the first changed en recipe that routes to a multi-node
+            # pipeline (PD separation or multi-node DP).
             RECIPE=""
+            ROUTE=""
             for f in $(git diff --name-only "${{ github.event.pull_request.base.sha }}" "${{ github.sha }}" -- models/ | grep '^models/en/.*\.ya\?ml$' || true); do
               # Route by scenario tags (a2-single / a3-single -> single-node
-              # pipeline; pd-multinode -> this multi-node pipeline).
+              # pipeline; pd-multinode / multi-node-dp -> multi-node pipelines).
               TAG="$(python3 -c "
           import yaml,sys
           d=yaml.safe_load(open(sys.argv[1]))
@@ -128,6 +139,8 @@ jobs:
           strategies={s.get('strategy') for s in d.get('scenarios',[]) if s.get('strategy')}
           if 'pd-multinode' in tags or 'pd_cluster' in strategies:
               print('pd-multinode')
+          elif 'multi-node-dp' in tags or 'multi_node_dp' in strategies:
+              print('multi-node-dp')
           elif ('a2-single' in tags or 'a3-single' in tags
                 or 'single_node_A2' in strategies or 'single_node_A3' in strategies):
               print('single')
@@ -136,26 +149,84 @@ jobs:
           else:
               print('')
           " "$f")"
-              if [ "$TAG" = "pd-multinode" ]; then
+              STRATEGY="$(python3 -c "
+          import yaml,sys
+          d=yaml.safe_load(open(sys.argv[1]))
+          tags={t for s in d.get('scenarios',[]) for t in (s.get('tags') or [])}
+          strategies={s.get('strategy') for s in d.get('scenarios',[]) if s.get('strategy')}
+          if 'pd-multinode' in tags or 'pd_cluster' in strategies:
+              print('pd_cluster')
+          elif 'multi-node-dp' in tags or 'multi_node_dp' in strategies:
+              print('multi_node_dp')
+          else:
+              print('')
+          " "$f")"
+              if [ "$TAG" = "pd-multinode" ] || [ "$TAG" = "multi-node-dp" ]; then
                 RECIPE="$f"
+                ROUTE="$TAG"
                 break
               fi
             done
             if [ -z "$RECIPE" ]; then
               echo "should_run=false" >> "$GITHUB_OUTPUT"
-              echo "No changed en recipe has a PD scenario — skipping multi-node verify"
+              echo "No changed en recipe has a multi-node scenario — skipping multi-node verify"
             else
               echo "recipe=$RECIPE" >> "$GITHUB_OUTPUT"
+              echo "route=$ROUTE" >> "$GITHUB_OUTPUT"
+              echo "strategy=$STRATEGY" >> "$GITHUB_OUTPUT"
               echo "should_run=true" >> "$GITHUB_OUTPUT"
             fi
           else
-            echo "recipe=${{ inputs.recipe }}" >> "$GITHUB_OUTPUT"
+            # workflow_dispatch: route by the recipe's scenarios; inputs.strategy
+            # (if set) overrides the auto-detected strategy for manual tuning.
+            RECIPE="${{ inputs.recipe }}"
+            TAG="$(python3 -c "
+          import yaml,sys
+          d=yaml.safe_load(open(sys.argv[1]))
+          tags={t for s in d.get('scenarios',[]) for t in (s.get('tags') or [])}
+          strategies={s.get('strategy') for s in d.get('scenarios',[]) if s.get('strategy')}
+          if 'pd-multinode' in tags or 'pd_cluster' in strategies:
+              print('pd-multinode')
+          elif 'multi-node-dp' in tags or 'multi_node_dp' in strategies:
+              print('multi-node-dp')
+          elif ('a2-single' in tags or 'a3-single' in tags
+                or 'single_node_A2' in strategies or 'single_node_A3' in strategies):
+              print('single')
+          else:
+              print('')
+          " "$RECIPE")"
+            STRATEGY="${{ inputs.strategy }}"
+            if [ -n "$STRATEGY" ]; then
+              if [ "$STRATEGY" = "pd_cluster" ]; then ROUTE="pd-multinode"
+              elif [ "$STRATEGY" = "multi_node_dp" ]; then ROUTE="multi-node-dp"
+              else ROUTE="single"; fi
+            else
+              STRATEGY="$(python3 -c "
+          import yaml,sys
+          d=yaml.safe_load(open(sys.argv[1]))
+          tags={t for s in d.get('scenarios',[]) for t in (s.get('tags') or [])}
+          strategies={s.get('strategy') for s in d.get('scenarios',[]) if s.get('strategy')}
+          if 'pd-multinode' in tags or 'pd_cluster' in strategies:
+              print('pd_cluster')
+          elif 'multi-node-dp' in tags or 'multi_node_dp' in strategies:
+              print('multi_node_dp')
+          else:
+              print('')
+          " "$RECIPE")"
+              ROUTE="$TAG"
+            fi
+            echo "recipe=$RECIPE" >> "$GITHUB_OUTPUT"
+            echo "route=$ROUTE" >> "$GITHUB_OUTPUT"
+            echo "strategy=$STRATEGY" >> "$GITHUB_OUTPUT"
             echo "should_run=true" >> "$GITHUB_OUTPUT"
           fi
 
   multinode-verify:
     needs: prepare
-    if: needs.prepare.outputs.should_run == 'true'
+    if: needs.prepare.outputs.should_run == 'true' && needs.prepare.outputs.route == matrix.route
+    strategy:
+      matrix:
+        route: [pd-multinode, multi-node-dp]
     # Run on the lighter a2b4-1 runner pool: the controller is CPU-only
     # (kubectl + python over the kubeconfig secret) and does not need NPU
     # machines (a2b4-8 is an 8-card node — wasteful for a pure controller).
@@ -365,6 +436,7 @@ jobs:
           mkdir -p /tmp/multinode-results
           python3 scripts/multinode/controller.py \
             --recipe "${{ needs.prepare.outputs.recipe }}" \
+            --strategy "${{ inputs.strategy || (matrix.route == 'pd-multinode' && 'pd_cluster' || 'multi_node_dp') }}" \
             --hw-filter "${{ inputs.hw_filter || 'A2' }}" \
             --deployment-filter "${{ inputs.deployment_filter || 'PD' }}" \
             --prefill-nodes "${{ inputs.prefill_nodes || '0' }}" \

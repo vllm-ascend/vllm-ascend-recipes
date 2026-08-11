@@ -391,7 +391,13 @@ def main() -> int:
     node_dir = os.path.join(WORKDIR, f"node-{idx}")
     os.makedirs(node_dir, exist_ok=True)
 
-    template = plan.get("role_templates", {}).get(role, "")
+    # Multi-node DP: each pod runs its own per-node template (node 0, 1, ...);
+    # PD uses the shared prefill/decode role templates.
+    node_templates = plan.get("node_templates") or []
+    if node_templates:
+        template = node_templates[idx] if idx < len(node_templates) else ""
+    else:
+        template = plan.get("role_templates", {}).get(role, "")
     if not template:
         log(f"no role template for {role}")
         return 1

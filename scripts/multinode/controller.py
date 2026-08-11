@@ -141,6 +141,13 @@ def parse_recipe(args) -> dict:
     target = None
     want_deployment = args.deployment_filter.strip().lower()
     for s in data.get("scenarios", []):
+        # Prefer an exact `strategy` match when the caller routes by strategy
+        # (pd_cluster / multi_node_dp / single_node_A2 / ...). This lets the
+        # workflow pick the right scenario even when its NPU differs from the
+        # default hw-filter (e.g. GLM-5 PD is A3 while hw_filter defaults A2).
+        if args.strategy and s.get("strategy") == args.strategy:
+            target = s
+            break
         npu = s.get("npu", "")
         deployment = s.get("deployment", "")
         # Case-insensitive substring so the same filter works across the
@@ -169,6 +176,8 @@ def parse_recipe(args) -> dict:
         "topology": {"prefill": args.prefill_nodes, "decode": args.decode_nodes},
         "npu_per_node": args.npu_per_node,
         "role_templates": {},
+        "node_templates": [],
+        "mode": target.get("strategy", ""),
         "launch_cmds": {},
         "launch_online_dp_py": "",
         "verify_cmds": [],
@@ -203,10 +212,21 @@ def parse_recipe(args) -> dict:
         elif "verify" in tl or "验证" in tl or tl.endswith("verification"):
             plan["verify_cmds"].extend(shell)
 
-    # First launch block -> prefill, second -> decode (recipe order).
-    if len(launch_blocks) >= 2:
-        plan["launch_cmds"]["prefill"] = launch_blocks[0]
-        plan["launch_cmds"]["decode"] = launch_blocks[1]
+    # Multi-node DP (no prefill/decode split): every shell block in the
+    # scenario is one node's template (recipe order: node 0, node 1, ...).
+    if plan["mode"] == "multi_node_dp":
+        node_blocks = [b for step in target.get("steps", [])
+                       for b in shell_blocks(step.get("content", ""))]
+        if not node_blocks:
+            raise PipelineError("extract", "multi_node_dp scenario has no shell blocks")
+        plan["node_templates"] = node_blocks
+        plan["topology"]["prefill"] = args.prefill_nodes or len(node_blocks)
+        plan["topology"]["decode"] = args.decode_nodes or 0
+    else:
+        # First launch block -> prefill, second -> decode (recipe order).
+        if len(launch_blocks) >= 2:
+            plan["launch_cmds"]["prefill"] = launch_blocks[0]
+            plan["launch_cmds"]["decode"] = launch_blocks[1]
 
     # Recipes embed launch_online_dp.py (DeepSeek) or only reference it (Qwen);
     # fall back to the vendored upstream copy so the pod always has it.
@@ -218,16 +238,24 @@ def parse_recipe(args) -> dict:
                                 "vendored scripts/multinode/launch_online_dp.py is missing")
         plan["launch_online_dp_py"] = vendor.read_text(encoding="utf-8")
 
-    missing_tpl = [k for k in ("prefill", "decode") if k not in plan["role_templates"]]
-    missing_launch = [k for k in ("prefill", "decode") if k not in plan["launch_cmds"]]
-    if missing_tpl:
-        raise PipelineError("extract", f"role template missing for: {missing_tpl}")
-    if missing_launch:
-        raise PipelineError("extract", f"launch command missing for: {missing_launch}")
+    if plan["mode"] == "multi_node_dp":
+        # DP pods run their own per-node template; no prefill/decode roles.
+        if plan["npu_per_node"] == 0:
+            plan["npu_per_node"] = _parse_dp_npu_per_node(plan["node_templates"][0])
+    else:
+        missing_tpl = [k for k in ("prefill", "decode") if k not in plan["role_templates"]]
+        missing_launch = [k for k in ("prefill", "decode") if k not in plan["launch_cmds"]]
+        if missing_tpl:
+            raise PipelineError("extract", f"role template missing for: {missing_tpl}")
+        if missing_launch:
+            raise PipelineError("extract", f"launch command missing for: {missing_launch}")
 
     # Topology: an explicit input wins; 0 = auto-derive from the launch command
     # (nodes = dp-size // dp-size-local, npu-per-node = dp-size-local × tp-size).
-    if plan["topology"]["prefill"] == 0 or plan["topology"]["decode"] == 0 \
+    # multi_node_dp derives its topology from node_templates instead.
+    if plan["mode"] == "multi_node_dp":
+        pass
+    elif plan["topology"]["prefill"] == 0 or plan["topology"]["decode"] == 0 \
             or plan["npu_per_node"] == 0:
         auto_topology, auto_npu = _parse_launch_topology(plan)
         if plan["topology"]["prefill"] == 0:
@@ -264,6 +292,19 @@ def _parse_launch_topology(plan: dict) -> tuple[dict, int]:
         topology[role] = dp_size // dp_local
         npu = max(npu, dp_local * tp_size)
     return topology, npu
+
+
+def _parse_dp_npu_per_node(template: str) -> int:
+    """Derive npu-per-node for a multi-node DP template from its vllm serve
+    flags: npu = dp-size-local × tensor-parallel-size."""
+    dpl = re.search(r"--data-parallel-size-local\s+(\d+)", template)
+    tp = re.search(r"--tensor-parallel-size\s+(\d+)", template)
+    if not (dpl and tp):
+        raise PipelineError(
+            "extract",
+            "cannot derive npu-per-node from multi_node_dp template "
+            "(missing --data-parallel-size-local / --tensor-parallel-size)")
+    return int(dpl.group(1)) * int(tp.group(1))
 
 
 # ---------------------------------------------------------------------------
@@ -1038,6 +1079,11 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--deployment-filter", default="PD",
                    help="Scenario deployment type to select (case-insensitive "
                         "substring; 'PD' matches both languages)")
+    p.add_argument("--strategy", default="",
+                   help="Exact scenario strategy to select (pd_cluster / "
+                        "multi_node_dp / single_node_A2 / ...); overrides the "
+                        "hw/deployment filters. The workflow passes this when "
+                        "routing by scenario tags.")
     p.add_argument("--prefill-nodes", type=int, default=0,
                    help="Prefill node count (0 = auto-derive from recipe DP config)")
     p.add_argument("--decode-nodes", type=int, default=0,
