@@ -354,8 +354,7 @@ export default function CascadeSelector({
     lang === 'zh' ? (selectorLabelsZh ?? selectorLabelsEn) : (selectorLabelsEn ?? selectorLabelsZh);
   const configParams =
     lang === 'zh' ? (configParamsZh ?? configParamsEn) : (configParamsEn ?? configParamsZh);
-  const features =
-    lang === 'zh' ? (featuresZh ?? featuresEn) : (featuresEn ?? featuresZh);
+  const features = lang === 'zh' ? (featuresZh ?? featuresEn) : (featuresEn ?? featuresZh);
   // Only features with an explicit `default` are Config-panel toggles.
   const toggleFeatures = useMemo(() => {
     const out: Record<string, FeatureMeta> = {};
