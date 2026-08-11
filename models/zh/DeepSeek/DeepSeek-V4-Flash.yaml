@@ -20,8 +20,65 @@ model:
   context_length: 1048576
   modality: text
 
-# —— 可配置参数:默认值 = tutorial 原始配置(Key Parameter Descriptions)——
-# 页面/CI 用默认值替换步骤里的 {{name}};布尔参数用 flag / flag_when_false。
+# —— 特性(上游字段):布尔开关统一放这里,页面 Config 面板直接读 ——
+features:
+  expert_parallel:
+    description: "跨 DP rank 的 MoE 专家并行"
+    args: ["--enable-expert-parallel"]
+  tool_calling:
+    description: "DeepSeek-V4 原生工具调用"
+    args: ["--enable-auto-tool-choice", "--tool-call-parser", "deepseek_v4"]
+  reasoning:
+    description: "三级推理(Non-think / Think High / Think Max)"
+    args: ["--reasoning-parser", "deepseek_v4"]
+  spec_decoding:
+    label: "MTP Spec Decoding"
+    description: "MTP(Multi-Token Prediction)投机解码,加速推理"
+    args: ["--speculative-config", '{"num_speculative_tokens": 1, "method": "mtp", "enforce_eager": true}']
+    default: true
+  flashcomm1:
+    label: "FlashComm1"
+    description: "FlashComm 通信优化,提升芯片间带宽"
+    env:
+      VLLM_ASCEND_ENABLE_FLASHCOMM1: "1"
+    default: true
+  prefix_caching:
+    label: "Prefix Caching"
+    description: "KV 缓存前缀缓存(--enable-prefix-caching / --no-enable-prefix-caching)"
+    args: ["--enable-prefix-caching"]
+    default: false
+    flag_when_false: "--no-enable-prefix-caching"
+  async_scheduling:
+    label: "Async Scheduling"
+    description: "异步调度,CPU 调度与 NPU 计算重叠"
+    args: ["--async-scheduling"]
+    default: true
+  compilation_config:
+    label: "Compilation Config"
+    description: "decode 阶段全 ACL 图执行(--compilation-config cudagraph_mode=FULL_DECODE_ONLY),降低调度时延"
+    args: ["--compilation-config", '{"cudagraph_mode":"FULL_DECODE_ONLY"}']
+    default: true
+  cpu_binding:
+    label: "CPU Binding"
+    description: "CPU 核绑定,降低 NUMA 时延"
+    args: ["--additional-config", '{"enable_cpu_binding": true}']
+  multistream_overlap:
+    label: "Multi-stream Overlap"
+    description: "MoE 共享专家多流重叠"
+    args: ["--additional-config", '{"multistream_overlap_shared_expert": true}']
+  npugraph_ex:
+    label: "NPUGraph EX"
+    description: "NPUGraph EX 加速图执行"
+    args: ["--additional-config", '{"ascend_compilation_config": {"enable_npugraph_ex": true, "enable_static_kernel": false}}']
+
+opt_in_features:
+  - prefix_caching
+  - cpu_binding
+  - multistream_overlap
+  - npugraph_ex
+
+# —— 可配置数值参数(页面/CI 扩展;默认值 = tutorial 基线)——
+# 布尔开关统一在 features(上游字段),页面同时渲染两者。
 config_params:
   max_model_len:
     default: 1048576
@@ -35,32 +92,6 @@ config_params:
     default: 0.9
     type: number
     description: "KV cache 可用的显存比例"
-  prefix_caching:
-    default: false
-    type: bool
-    description: "前缀缓存默认关闭;开启后使用 --enable-prefix-caching"
-    flag: "--enable-prefix-caching"
-    flag_when_false: "--no-enable-prefix-caching"
-  speculative_config:
-    default: true
-    type: bool
-    description: "MTP 投机解码(--speculative-config),加速推理"
-    flag: "--speculative-config '{\"num_speculative_tokens\": 1,\"method\": \"mtp\",\"enforce_eager\": true}'"
-  compilation_config:
-    default: true
-    type: bool
-    description: "decode 阶段全 ACL 图执行(--compilation-config cudagraph_mode=FULL_DECODE_ONLY),降低调度时延"
-    flag: "--compilation-config '{\"cudagraph_mode\":\"FULL_DECODE_ONLY\"}'"
-  async_scheduling:
-    default: true
-    type: bool
-    description: "异步调度(--async-scheduling),CPU 调度与 NPU 计算重叠"
-    flag: "--async-scheduling"
-  flashcomm1:
-    default: true
-    type: bool
-    description: "FlashComm 通信优化(VLLM_ASCEND_ENABLE_FLASHCOMM1=1)"
-    flag: "export VLLM_ASCEND_ENABLE_FLASHCOMM1=1"
 
 overview: |-
   DeepSeek-V4 相比 DeepSeek-V3 引入了多项关键升级：
@@ -228,7 +259,7 @@ scenarios:
           --quantization ascend \
           --port 8900 \
           --block-size 128 \
-          {{speculative_config}} \
+          {{spec_decoding}} \
           {{compilation_config}} \
           {{async_scheduling}} \
           --additional-config '{"ascend_compilation_config":{%%CONFIG:npugraph-ex%%"enable_npugraph_ex":true,%%/CONFIG:npugraph-ex%%"enable_static_kernel":false}%%CONFIG:cpu-binding%%,"enable_cpu_binding": true%%/CONFIG:cpu-binding%%%%CONFIG:dsa-cp%%,"enable_dsa_cp": true%%/CONFIG:dsa-cp%%%%CONFIG:multistream-overlap%%,"multistream_overlap_shared_expert":true%%/CONFIG:multistream-overlap%%}'
@@ -306,7 +337,7 @@ scenarios:
           --quantization ascend \
           --port 8900 \
           --block-size 128 \
-          {{speculative_config}} \
+          {{spec_decoding}} \
           {{compilation_config}} \
           {{async_scheduling}} \
           --additional-config '{"ascend_compilation_config":{"enable_npugraph_ex":true,"enable_static_kernel":false},"enable_cpu_binding": true,"multistream_overlap_shared_expert":true}'
@@ -520,7 +551,7 @@ scenarios:
           --model-loader-extra-config='{"enable_multithread_load": "true", "num_threads": 128}' \
           {{prefix_caching}} \
           --safetensors-load-strategy 'prefetch' \
-          {{speculative_config}} \
+          {{spec_decoding}} \
           --trust-remote-code \
           --block-size 128 \
           --tokenizer-mode deepseek_v4 \
@@ -600,7 +631,7 @@ scenarios:
           --reasoning-parser deepseek_v4 \
           --gpu-memory-utilization {{gpu_memory_utilization}} \
           --quantization ascend \
-          {{speculative_config}} \
+          {{spec_decoding}} \
           {{compilation_config}} \
           --kv-transfer-config \
           '{"kv_connector": "MooncakeHybridConnector",
@@ -820,7 +851,7 @@ scenarios:
           --enable-auto-tool-choice \
           --reasoning-parser deepseek_v4 \
           --additional-config '{"enable_cpu_binding": true, "enable_shared_expert_dp": true}' \
-          {{speculative_config}} \
+          {{spec_decoding}} \
           --kv-transfer-config \
           '{"kv_connector": "MooncakeHybridConnector",
           "kv_role": "kv_producer",
@@ -897,7 +928,7 @@ scenarios:
           --tool-call-parser deepseek_v4 \
           --enable-auto-tool-choice \
           --reasoning-parser deepseek_v4 \
-          {{speculative_config}} \
+          {{spec_decoding}} \
           {{compilation_config}} \
           --kv-transfer-config \
           '{"kv_connector": "MooncakeHybridConnector",

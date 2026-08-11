@@ -98,6 +98,17 @@ export interface ConfigParam {
   flag_when_false?: string;
 }
 
+export interface FeatureMeta {
+  label?: string;
+  description?: string;
+  args?: string[];
+  env?: Record<string, string>;
+  // Page-extension: whether the feature is a Config toggle and its default
+  // state (upstream treats absence in opt_in_features as default-on).
+  default?: boolean;
+  flag_when_false?: string;
+}
+
 export interface PerformanceSection {
   accuracy?: string;
   benchmark?: string;
@@ -126,6 +137,7 @@ export interface Model {
   extra_config?: ExtraConfigItem[];
   scenario_selector_labels?: ScenarioSelectorLabels;
   config_params?: Record<string, ConfigParam>;
+  features?: Record<string, FeatureMeta>;
   performance?: PerformanceSection;
   evaluation?: Evaluation;
   verification?: string;

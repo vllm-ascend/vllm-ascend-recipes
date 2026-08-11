@@ -78,19 +78,29 @@ features:
     label: "MTP Spec Decoding"
     description: "MTP (Multi-Token Prediction) speculative decoding with 1 token for accelerated inference"
     args: ["--speculative-config", '{"num_speculative_tokens": 1, "method": "mtp", "enforce_eager": true}']
+    default: true
   flashcomm1:
     label: "FlashComm1"
     description: "FlashComm communication optimization for inter-chip bandwidth"
     env:
       VLLM_ASCEND_ENABLE_FLASHCOMM1: "1"
+    default: true
   prefix_caching:
     label: "Prefix Caching"
     description: "KV-cache prefix caching (--enable-prefix-caching / --no-enable-prefix-caching)"
     args: ["--enable-prefix-caching"]
+    default: false
+    flag_when_false: "--no-enable-prefix-caching"
   async_scheduling:
     label: "Async Scheduling"
     description: "Asynchronous scheduling to overlap CPU scheduling with NPU computation"
     args: ["--async-scheduling"]
+    default: true
+  compilation_config:
+    label: "Compilation Config"
+    description: "Full ACL graph execution in decode (--compilation-config cudagraph_mode=FULL_DECODE_ONLY) to reduce scheduling latency"
+    args: ["--compilation-config", '{"cudagraph_mode":"FULL_DECODE_ONLY"}']
+    default: true
   cpu_binding:
     label: "CPU Binding"
     description: "CPU core binding for reduced NUMA latencies"
@@ -105,10 +115,7 @@ features:
     args: ["--additional-config", '{"ascend_compilation_config": {"enable_npugraph_ex": true, "enable_static_kernel": false}}']
 
 opt_in_features:
-  - spec_decoding
-  - flashcomm1
   - prefix_caching
-  - async_scheduling
   - cpu_binding
   - multistream_overlap
   - npugraph_ex
@@ -226,9 +233,9 @@ guide: |-
   - [PD Disaggregation Guide (Mooncake)](https://docs.vllm.ai/projects/ascend/en/latest/tutorials/features/pd_disaggregation_mooncake_multi_node.html)
   - [vllm-ascend GitHub](https://github.com/vllm-project/vllm-ascend)
 
-# — Configurable params: defaults = original tutorial config (Key Parameter Descriptions) —
-# The page/CI substitutes {{name}} in steps with the default values;
-# bool params use flag / flag_when_false.
+# — Configurable VALUE params (page/CI extension; defaults = tutorial baseline).
+#   Boolean toggles live in `features` (upstream field) with label/args/env
+#   and our `default`/`flag_when_false` extensions; the page renders both. —
 config_params:
   max_model_len:
     default: 1048576
@@ -242,32 +249,6 @@ config_params:
     default: 0.9
     type: number
     description: "Fraction of NPU memory available for the KV cache"
-  prefix_caching:
-    default: false
-    type: bool
-    description: "Prefix caching is disabled by default; enable it with --enable-prefix-caching"
-    flag: "--enable-prefix-caching"
-    flag_when_false: "--no-enable-prefix-caching"
-  speculative_config:
-    default: true
-    type: bool
-    description: "MTP speculative decoding (--speculative-config) to accelerate inference"
-    flag: "--speculative-config '{\"num_speculative_tokens\": 1,\"method\": \"mtp\",\"enforce_eager\": true}'"
-  compilation_config:
-    default: true
-    type: bool
-    description: "Full ACL graph execution in decode (--compilation-config cudagraph_mode=FULL_DECODE_ONLY) to reduce scheduling latency"
-    flag: "--compilation-config '{\"cudagraph_mode\":\"FULL_DECODE_ONLY\"}'"
-  async_scheduling:
-    default: true
-    type: bool
-    description: "Asynchronous scheduling (--async-scheduling) to overlap CPU scheduling with NPU computation"
-    flag: "--async-scheduling"
-  flashcomm1:
-    default: true
-    type: bool
-    description: "FlashComm communication optimization (VLLM_ASCEND_ENABLE_FLASHCOMM1=1)"
-    flag: "export VLLM_ASCEND_ENABLE_FLASHCOMM1=1"
 
 overview: |-
   DeepSeek-V4-Flash is a 284B-total / 13B-active MoE model in the V4 preview family.
@@ -439,7 +420,7 @@ scenarios:
           --quantization ascend \
           --port 8900 \
           --block-size 128 \
-          {{speculative_config}} \
+          {{spec_decoding}} \
           {{compilation_config}} \
           {{async_scheduling}} \
           --additional-config '{"ascend_compilation_config":{%%CONFIG:npugraph-ex%%"enable_npugraph_ex":true,%%/CONFIG:npugraph-ex%%"enable_static_kernel":false}%%CONFIG:cpu-binding%%,"enable_cpu_binding": true%%/CONFIG:cpu-binding%%%%CONFIG:dsa-cp%%,"enable_dsa_cp": true%%/CONFIG:dsa-cp%%%%CONFIG:multistream-overlap%%,"multistream_overlap_shared_expert":true%%/CONFIG:multistream-overlap%%}'
@@ -517,7 +498,7 @@ scenarios:
           --quantization ascend \
           --port 8900 \
           --block-size 128 \
-          {{speculative_config}} \
+          {{spec_decoding}} \
           {{compilation_config}} \
           {{async_scheduling}} \
           --additional-config '
@@ -738,7 +719,7 @@ scenarios:
           --model-loader-extra-config='{"enable_multithread_load": "true", "num_threads": 128}' \
           {{prefix_caching}} \
           --safetensors-load-strategy 'prefetch' \
-          {{speculative_config}} \
+          {{spec_decoding}} \
           --trust-remote-code \
           --block-size 128 \
           --tokenizer-mode deepseek_v4 \
@@ -818,7 +799,7 @@ scenarios:
           --reasoning-parser deepseek_v4 \
           --gpu-memory-utilization {{gpu_memory_utilization}} \
           --quantization ascend \
-          {{speculative_config}} \
+          {{spec_decoding}} \
           {{compilation_config}} \
           --kv-transfer-config \
           '{"kv_connector": "MooncakeHybridConnector",
@@ -1047,7 +1028,7 @@ scenarios:
           --enable-auto-tool-choice \
           --reasoning-parser deepseek_v4 \
           --additional-config '{"enable_cpu_binding": true, "enable_shared_expert_dp": true}' \
-          {{speculative_config}} \
+          {{spec_decoding}} \
           --kv-transfer-config \
           '{"kv_connector": "MooncakeHybridConnector",
           "kv_role": "kv_producer",
@@ -1124,7 +1105,7 @@ scenarios:
           --tool-call-parser deepseek_v4 \
           --enable-auto-tool-choice \
           --reasoning-parser deepseek_v4 \
-          {{speculative_config}} \
+          {{spec_decoding}} \
           {{compilation_config}} \
           --kv-transfer-config \
           '{"kv_connector": "MooncakeHybridConnector",

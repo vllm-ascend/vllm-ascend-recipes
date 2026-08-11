@@ -31,6 +31,15 @@ interface ConfigParam {
   flag_when_false?: string;
 }
 
+interface FeatureMeta {
+  label?: string;
+  description?: string;
+  args?: string[];
+  env?: Record<string, string>;
+  default?: boolean;
+  flag_when_false?: string;
+}
+
 interface CascadeSelectorProps {
   scenariosEn: Scenario[];
   scenariosZh: Scenario[];
@@ -38,6 +47,8 @@ interface CascadeSelectorProps {
   extraConfigZh?: ExtraConfigItem[];
   configParamsEn?: Record<string, ConfigParam>;
   configParamsZh?: Record<string, ConfigParam>;
+  featuresEn?: Record<string, FeatureMeta>;
+  featuresZh?: Record<string, FeatureMeta>;
   selectorLabelsEn?: Partial<Record<'npu' | 'precision' | 'deployment' | 'case', string>>;
   selectorLabelsZh?: Partial<Record<'npu' | 'precision' | 'deployment' | 'case', string>>;
 }
@@ -56,19 +67,35 @@ const PIPELINE_LABELS: Record<string, Record<string, string>> = {
   },
 };
 
+// Quote an argv token for the shell line (JSON/spacey args from features).
+function renderArg(a: string): string {
+  return /[\s{}]/.test(a) && !/^['"]/.test(a) ? `'${a}'` : a;
+}
+
+// Render an upstream-style feature toggle to shell text.
+function renderFeature(f: FeatureMeta, on: boolean): string {
+  if (!on) return f.flag_when_false ?? '';
+  const parts: string[] = [];
+  if (f.args && f.args.length) parts.push(f.args.map(renderArg).join(' '));
+  if (f.env) {
+    for (const [k, v] of Object.entries(f.env)) parts.push(`export ${k}=${v}`);
+  }
+  return parts.join('\n');
+}
+
 // Substitute {{name}}:
-//   bool param -> render `flag` when truthy, `flag_when_false` when falsy
-//   value param -> render the value
+//   feature toggle -> renderFeature (args/env or flag_when_false), colored
+//   config value  -> render the value
 function applyConfigParams(
   content: string,
   params: Record<string, unknown>,
-  meta: Record<string, ConfigParam> | undefined,
+  features: Record<string, FeatureMeta> | undefined,
 ): string {
   return content.replace(/\{\{(\w+)\}\}/g, (_, name) => {
     const value = params[name];
-    const p = meta?.[name];
-    if (p?.type === 'bool') {
-      const text = value ? (p.flag ?? '') : (p.flag_when_false ?? '');
+    const feat = features?.[name];
+    if (feat?.default !== undefined) {
+      const text = renderFeature(feat, !!value);
       // Wrap in %%HL%% markers so the rendered command shows the flag in the
       // same color as its Config chip (stripped by stripRenderMarkers for the
       // copy button and by renderMarkdown's SSR pass).
@@ -238,6 +265,7 @@ const CONFIG_COLORS: Record<string, string> = {
   flashcomm1: 'text-rose-400',
   prefix_caching: 'text-emerald-400',
   speculative_config: 'text-amber-400',
+  spec_decoding: 'text-amber-400',
   compilation_config: 'text-lime-400',
   async_scheduling: 'text-sky-400',
   'npugraph-ex': 'text-violet-400',
@@ -250,6 +278,7 @@ const CONFIG_COLORS: Record<string, string> = {
 const CONFIG_LABELS: Record<string, string> = {
   prefix_caching: 'Prefix Caching',
   speculative_config: 'Speculative Config',
+  spec_decoding: 'MTP Spec Decoding',
   compilation_config: 'Compilation Config',
   async_scheduling: 'Async Scheduling',
   flashcomm1: 'FlashComm1',
@@ -312,6 +341,8 @@ export default function CascadeSelector({
   extraConfigZh,
   configParamsEn,
   configParamsZh,
+  featuresEn,
+  featuresZh,
   selectorLabelsEn,
   selectorLabelsZh,
 }: CascadeSelectorProps) {
@@ -323,10 +354,23 @@ export default function CascadeSelector({
     lang === 'zh' ? (selectorLabelsZh ?? selectorLabelsEn) : (selectorLabelsEn ?? selectorLabelsZh);
   const configParams =
     lang === 'zh' ? (configParamsZh ?? configParamsEn) : (configParamsEn ?? configParamsZh);
+  const features =
+    lang === 'zh' ? (featuresZh ?? featuresEn) : (featuresEn ?? featuresZh);
+  // Only features with an explicit `default` are Config-panel toggles.
+  const toggleFeatures = useMemo(() => {
+    const out: Record<string, FeatureMeta> = {};
+    for (const [key, f] of Object.entries(features ?? {})) {
+      if (f?.default !== undefined) out[key] = f;
+    }
+    return out;
+  }, [features]);
   const [paramValues, setParamValues] = useState<Record<string, unknown>>(() => {
     const init: Record<string, unknown> = {};
     for (const [key, p] of Object.entries(configParams ?? {})) {
       init[key] = p.default;
+    }
+    for (const [key, f] of Object.entries(toggleFeatures)) {
+      init[key] = f.default;
     }
     return init;
   });
@@ -432,11 +476,11 @@ export default function CascadeSelector({
   const rawContent = useMemo(() => {
     if (!currentStep) return '';
     return applyConfigReplace(
-      applyConfigParams(currentStep.content, paramValues, configParams),
+      applyConfigParams(currentStep.content, paramValues, features),
       selectedConfigs,
       currentStep.config_values,
     );
-  }, [currentStep, selectedConfigs, paramValues]);
+  }, [currentStep, selectedConfigs, paramValues, features]);
 
   const renderedHtml = useMemo(() => {
     if (!rawContent) return '';
@@ -509,6 +553,7 @@ export default function CascadeSelector({
 
         {/* Config — configurable params (values/toggles) + legacy chips */}
         {(configParams && Object.keys(configParams).length > 0) ||
+        Object.keys(toggleFeatures).length > 0 ||
         (extraConfig && extraConfig.length > 0) ? (
           <div className="flex items-start gap-4 px-4 py-3 border-t border-ink-800/40">
             <span className="shrink-0 w-24 pt-0.5 text-xs font-mono text-ink-300">Config</span>
@@ -535,32 +580,29 @@ export default function CascadeSelector({
                   ),
                 )}
 
-              {/* Bool params — colored-dot toggle chips (drives {{...}} placeholders) */}
-              {configParams &&
-                Object.entries(configParams)
-                  .filter(([, p]) => p.type === 'bool')
-                  .map(([key, p]) => {
-                    const isOn = !!paramValues[key];
-                    const colorClass = CONFIG_COLORS[key] || 'text-ink-400';
-                    const bgClass = colorClass.replace('text-', 'bg-');
-                    return (
-                      <button
-                        key={key}
-                        onClick={() => setParamValues((prev) => ({ ...prev, [key]: !prev[key] }))}
-                        title={p.description}
-                        className={`px-3 py-1.5 text-xs font-mono rounded-md transition-all cursor-pointer inline-flex items-center gap-1.5 ${
-                          isOn
-                            ? `${colorClass} bg-accent-500/10 border border-current/30`
-                            : 'border border-ink-700/60 text-ink-400 hover:text-ink-200 hover:border-ink-600 bg-ink-900/50'
-                        }`}
-                      >
-                        <span
-                          className={`inline-block w-2 h-2 rounded-full ${bgClass} ${isOn ? 'opacity-100' : 'opacity-30'}`}
-                        ></span>
-                        {CONFIG_LABELS[key] || key}
-                      </button>
-                    );
-                  })}
+              {/* Feature toggles — colored-dot chips (upstream features; label/args/env) */}
+              {Object.entries(toggleFeatures).map(([key, f]) => {
+                const isOn = !!paramValues[key];
+                const colorClass = CONFIG_COLORS[key] || 'text-ink-400';
+                const bgClass = colorClass.replace('text-', 'bg-');
+                return (
+                  <button
+                    key={key}
+                    onClick={() => setParamValues((prev) => ({ ...prev, [key]: !prev[key] }))}
+                    title={f.description}
+                    className={`px-3 py-1.5 text-xs font-mono rounded-md transition-all cursor-pointer inline-flex items-center gap-1.5 ${
+                      isOn
+                        ? `${colorClass} bg-accent-500/10 border border-current/30`
+                        : 'border border-ink-700/60 text-ink-400 hover:text-ink-200 hover:border-ink-600 bg-ink-900/50'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block w-2 h-2 rounded-full ${bgClass} ${isOn ? 'opacity-100' : 'opacity-30'}`}
+                    ></span>
+                    {f.label || CONFIG_LABELS[key] || key}
+                  </button>
+                );
+              })}
 
               {/* Legacy multi-select chips (npugraph-ex / cpu-binding / …) */}
               {extraConfig &&
