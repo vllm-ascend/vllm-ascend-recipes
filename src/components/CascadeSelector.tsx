@@ -68,7 +68,7 @@ function applyConfigParams(
     const value = params[name];
     const p = meta?.[name];
     if (p?.type === 'bool') {
-      return value ? p.flag ?? '' : p.flag_when_false ?? '';
+      return value ? (p.flag ?? '') : (p.flag_when_false ?? '');
     }
     return String(value ?? '');
   });
@@ -498,13 +498,11 @@ export default function CascadeSelector({
         {(configParams && Object.keys(configParams).length > 0) ||
         (extraConfig && extraConfig.length > 0) ? (
           <div className="flex items-start gap-4 px-4 py-3 border-t border-ink-800/40">
-            <span className="shrink-0 w-24 pt-0.5 text-xs font-mono text-ink-300">
-              Config
-            </span>
+            <span className="shrink-0 w-24 pt-0.5 text-xs font-mono text-ink-300">Config</span>
             <div className="flex flex-wrap gap-x-4 gap-y-2">
               {/* Value params — editable inputs (defaults = tutorial) */}
               {configParams &&
-                Object.entries(configParams).map(([key, p]) => (
+                Object.entries(configParams).map(([key, p]) =>
                   p.type === 'bool' ? null : (
                     <div key={key} className="flex items-center gap-2" title={p.description}>
                       <label className="text-xs font-mono text-ink-400">{key}</label>
@@ -521,8 +519,8 @@ export default function CascadeSelector({
                         className="w-24 rounded-md border border-ink-700 bg-ink-900 px-2 py-1 text-xs font-mono text-ink-200"
                       />
                     </div>
-                  )
-                ))}
+                  ),
+                )}
 
               {/* Bool params — colored-dot toggle chips (drives {{...}} placeholders) */}
               {configParams &&
@@ -535,9 +533,7 @@ export default function CascadeSelector({
                     return (
                       <button
                         key={key}
-                        onClick={() =>
-                          setParamValues((prev) => ({ ...prev, [key]: !prev[key] }))
-                        }
+                        onClick={() => setParamValues((prev) => ({ ...prev, [key]: !prev[key] }))}
                         title={p.description}
                         className={`px-3 py-1.5 text-xs font-mono rounded-md transition-all cursor-pointer inline-flex items-center gap-1.5 ${
                           isOn
@@ -589,9 +585,7 @@ export default function CascadeSelector({
           <div className="flex items-center border-b border-ink-800/60 bg-ink-900/70">
             {currentScenario.tags && currentScenario.tags.length > 0 && (
               <span className="shrink-0 px-3 text-[10px] font-mono font-bold text-accent-400 uppercase tracking-wider">
-                {currentScenario.tags
-                  .map((tag) => PIPELINE_LABELS[lang]?.[tag] || tag)
-                  .join(' · ')}
+                {currentScenario.tags.map((tag) => PIPELINE_LABELS[lang]?.[tag] || tag).join(' · ')}
               </span>
             )}
             <span className="shrink-0 px-3 text-[10px] font-mono font-bold text-ink-300 uppercase tracking-wider">
