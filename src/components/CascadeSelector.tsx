@@ -477,7 +477,7 @@ export default function CascadeSelector({
   // (cpu_binding / multistream_overlap / npugraph_ex are feature-driven).
   const effectiveConfigs = useMemo(() => {
     const merged = new Set(selectedConfigs);
-    for (const [key, f] of Object.entries(toggleFeatures)) {
+    for (const key of Object.keys(toggleFeatures)) {
       if (paramValues[key]) merged.add(key);
       else merged.delete(key);
     }
