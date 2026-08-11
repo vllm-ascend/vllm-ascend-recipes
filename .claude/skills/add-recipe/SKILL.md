@@ -85,6 +85,8 @@ compatible_strategies: [single_node_A2, single_node_A3, pd_cluster]
 
 `config_params` holds only editable VALUE params (`default` / `type` / `description`). Steps reference them with `{{name}}`; boolean toggles come from `features` via the same `{{name}}` syntax (on → `args`/`env`, off → `flag_when_false`). Rendered flags are highlighted in the chip color (`%%HL%%` markers are injected automatically; copy buttons get clean text).
 
+> Only parameters with a **single tutorial baseline** become `config_params`. Scenario-specific values (e.g. different `--max-model-len` per precision / hardware, like GLM-5's 200000/40960/32768/131072) stay literal in the step command — a top-level default cannot represent them all.
+
 ### `scenarios` and `extra_config`
 
 ```yaml
