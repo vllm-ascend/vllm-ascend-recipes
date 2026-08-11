@@ -122,18 +122,18 @@ jobs:
               # Route by scenario tags (a2-single / a3-single -> single-node
               # pipeline; pd-multinode -> this multi-node pipeline).
               TAG="$(python3 -c "
-                import yaml,sys
-                d=yaml.safe_load(open(sys.argv[1]))
-                tags={t for s in d.get('scenarios',[]) for t in (s.get('tags') or [])}
-                if 'pd-multinode' in tags:
-                    print('pd-multinode')
-                elif 'a2-single' in tags or 'a3-single' in tags:
-                    print('single')
-                elif any('pd' in (s.get('deployment') or '').lower() for s in d.get('scenarios',[])):
-                    print('pd-multinode')
-                else:
-                    print('')
-                " "$f")"
+          import yaml,sys
+          d=yaml.safe_load(open(sys.argv[1]))
+          tags={t for s in d.get('scenarios',[]) for t in (s.get('tags') or [])}
+          if 'pd-multinode' in tags:
+              print('pd-multinode')
+          elif 'a2-single' in tags or 'a3-single' in tags:
+              print('single')
+          elif any('pd' in (s.get('deployment') or '').lower() for s in d.get('scenarios',[])):
+              print('pd-multinode')
+          else:
+              print('')
+          " "$f")"
               if [ "$TAG" = "pd-multinode" ]; then
                 RECIPE="$f"
                 break
