@@ -68,7 +68,11 @@ function applyConfigParams(
     const value = params[name];
     const p = meta?.[name];
     if (p?.type === 'bool') {
-      return value ? (p.flag ?? '') : (p.flag_when_false ?? '');
+      const text = value ? (p.flag ?? '') : (p.flag_when_false ?? '');
+      // Wrap in %%HL%% markers so the rendered command shows the flag in the
+      // same color as its Config chip (stripped by stripRenderMarkers for the
+      // copy button and by renderMarkdown's SSR pass).
+      return text ? `%%HL:${name}%%${text}%%/HL:${name}%%` : '';
     }
     return String(value ?? '');
   });
@@ -240,6 +244,15 @@ const CONFIG_COLORS: Record<string, string> = {
   'cpu-binding': 'text-cyan-400',
   'dsa-cp': 'text-orange-400',
   'multistream-overlap': 'text-pink-400',
+};
+
+// Friendly labels for config_param bool toggles (shown on the chip itself).
+const CONFIG_LABELS: Record<string, string> = {
+  prefix_caching: 'Prefix Caching',
+  speculative_config: 'Speculative Config',
+  compilation_config: 'Compilation Config',
+  async_scheduling: 'Async Scheduling',
+  flashcomm1: 'FlashComm1',
 };
 
 // ---- Config placeholder replacer ----
@@ -544,7 +557,7 @@ export default function CascadeSelector({
                         <span
                           className={`inline-block w-2 h-2 rounded-full ${bgClass} ${isOn ? 'opacity-100' : 'opacity-30'}`}
                         ></span>
-                        {key}
+                        {CONFIG_LABELS[key] || key}
                       </button>
                     );
                   })}
