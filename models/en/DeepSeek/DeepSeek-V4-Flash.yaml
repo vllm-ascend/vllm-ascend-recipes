@@ -74,7 +74,7 @@ features:
   reasoning:
     description: "Three-tier reasoning (Non-think / Think High / Think Max)"
     args: ["--reasoning-parser", "deepseek_v4"]
-  mtp_spec_decoding:
+  spec_decoding:
     label: "MTP Spec Decoding"
     description: "MTP (Multi-Token Prediction) speculative decoding with 1 token for accelerated inference"
     args: ["--speculative-config", '{"num_speculative_tokens": 1, "method": "mtp", "enforce_eager": true}']
@@ -105,7 +105,7 @@ features:
     args: ["--additional-config", '{"ascend_compilation_config": {"enable_npugraph_ex": true, "enable_static_kernel": false}}']
 
 opt_in_features:
-  - mtp_spec_decoding
+  - spec_decoding
   - flashcomm1
   - prefix_caching
   - async_scheduling
