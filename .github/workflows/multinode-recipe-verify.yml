@@ -125,9 +125,11 @@ jobs:
           import yaml,sys
           d=yaml.safe_load(open(sys.argv[1]))
           tags={t for s in d.get('scenarios',[]) for t in (s.get('tags') or [])}
-          if 'pd-multinode' in tags:
+          strategies={s.get('strategy') for s in d.get('scenarios',[]) if s.get('strategy')}
+          if 'pd-multinode' in tags or 'pd_cluster' in strategies:
               print('pd-multinode')
-          elif 'a2-single' in tags or 'a3-single' in tags:
+          elif ('a2-single' in tags or 'a3-single' in tags
+                or 'single_node_A2' in strategies or 'single_node_A3' in strategies):
               print('single')
           elif any('pd' in (s.get('deployment') or '').lower() for s in d.get('scenarios',[])):
               print('pd-multinode')

@@ -30,24 +30,35 @@ model:
     - "--quantization"
     - "ascend"
   base_env: {}
+  docker_image:
+    atlas_800_a2: "quay.io/ascend/vllm-ascend:v0.23.0rc1"
+    atlas_800_a3: "quay.io/ascend/vllm-ascend:v0.23.0rc1-a3"
   nightly_required: false
   install:
     pip:
       command: "pip install vllm-ascend==0.23.0rc1"
       note: "Ascend installation; see the Installation section of the tutorial."
     docker:
-      command: "docker run --rm --net=host --shm-size=512g --device /dev/davinci0 ... -it quay.io/ascend/vllm-ascend:v0.23.0rc1 bash"
-      note: "Official Ascend image; device/driver mounts are covered in env_setup.container."
+      command: "docker run --rm --net=host --shm-size=512g -v /root/.cache/modelscope:/root/.cache/modelscope --device /dev/davinci0 --device /dev/davinci1 --device /dev/davinci2 --device /dev/davinci3 --device /dev/davinci4 --device /dev/davinci5 --device /dev/davinci6 --device /dev/davinci7 -it quay.io/ascend/vllm-ascend:v0.23.0rc1 bash"
+      note: "Official Ascend image; the weights directory (/root/.cache/modelscope) is mounted into the container; device/driver mounts are covered in env_setup.container."
 
 # Upstream alignment: variants / compatible_strategies / features / dependencies
 variants:
   default:
-    precision: int8
+    precision: W8A8
     vram_minimum_gb: 341
-    description: "W8A8 (i.e. int8) weights, single-node or multi-node PD on Atlas 800 A2/A3"
+    description: "W8A8 weights on Atlas 800 A2/A3 — single-node or multi-node PD"
+    supported_hardware: [atlas_800_a2, atlas_800_a3]
+  w8a8_mtp:
+    model_id: "Eco-Tech/DeepSeek-V4-Flash-w8a8-mtp"
+    precision: W8A8
+    vram_minimum_gb: 341
+    description: "W8A8 + MTP weights used by the tutorial baselines"
+    supported_hardware: [atlas_800_a2, atlas_800_a3]
 
 compatible_strategies:
-  - single_node_tp
+  - single_node_A2
+  - single_node_A3
   - pd_cluster
 
 features:
@@ -247,6 +258,7 @@ scenarios:
   deployment: Single-Node
   case: High Throughput
   tags: [a2-single]
+  strategy: single_node_A2
   steps:
   - title: Start the server
     content: |-
@@ -324,6 +336,7 @@ scenarios:
   deployment: Single-Node
   case: Low Latency
   tags: [a3-single]
+  strategy: single_node_A3
   steps:
   - title: Start the server
     content: |-
@@ -408,6 +421,7 @@ scenarios:
   deployment: Multi-Node PD Separation
   case: PD Separation
   tags: [pd-multinode]
+  strategy: pd_cluster
   steps:
   - title: Overview
     content: |-
@@ -745,6 +759,7 @@ scenarios:
   deployment: Multi-Node PD Separation
   case: PD Separation
   tags: [pd-multinode]
+  strategy: pd_cluster
   steps:
   - title: Overview
     content: |-

@@ -35,6 +35,7 @@ scenarios:     # 保留(CI 基线),每场景打流水线标签
 - npu: Atlas 800I A2
   deployment: 单节点-多卡
   tags: [a2-single]         # ← 流水线路由
+  strategy: single_node_A2  # ← 与顶层 compatible_strategies 互锁
   steps:
     content: |
       vllm serve ... --max-model-len {{max_model_len}} \
@@ -44,6 +45,12 @@ scenarios:     # 保留(CI 基线),每场景打流水线标签
 - npu: Atlas 800I A3
   deployment: 多节点-PD分离
   tags: [pd-multinode]
+  strategy: pd_cluster
+
+compatible_strategies:      # 与 scenarios.strategy 一一对应
+  - single_node_A2          # → 单机 A2 流水线
+  - single_node_A3          # → 单机 A3 流水线
+  - pd_cluster              # → 多机 PD 流水线
 ```
 
 ## 占位符约定

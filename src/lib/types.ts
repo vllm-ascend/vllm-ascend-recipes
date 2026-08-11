@@ -85,6 +85,7 @@ export interface Scenario {
   deployment: string;
   case: string;
   tags?: string[];
+  strategy?: string;
   steps: ScenarioStep[];
   default_configs?: string[];
 }

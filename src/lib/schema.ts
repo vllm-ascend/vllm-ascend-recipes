@@ -118,6 +118,9 @@ export const scenarioSchema = z.object({
   case: z.string(),
   // Pipeline-routing labels: a2-single / a3-single / pd-multinode, …
   tags: z.array(z.string()).optional(),
+  // Interlocks with top-level compatible_strategies (single_node_A2 /
+  // single_node_A3 / pd_cluster) and routes the CI pipeline.
+  strategy: z.string().optional(),
   steps: z.array(scenarioStepSchema),
   default_configs: z.array(z.string()).optional(),
 });

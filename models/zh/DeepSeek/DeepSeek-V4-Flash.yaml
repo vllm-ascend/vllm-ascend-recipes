@@ -191,6 +191,7 @@ scenarios:
   precision: W8A8
   deployment: 单节点-多卡
   case: 高吞吐
+  strategy: single_node_A2
   steps:
   - title: 启动服务
     content: |-
@@ -268,6 +269,7 @@ scenarios:
   precision: W8A8
   deployment: 单节点-多卡
   case: 低时延
+  strategy: single_node_A3
   steps:
   - title: 启动服务
     content: |-
@@ -345,6 +347,7 @@ scenarios:
   precision: W8A8
   deployment: 多节点-PD分离
   case: PD 分离
+  strategy: pd_cluster
   steps:
   - title: 概述
     content: |-
@@ -673,6 +676,7 @@ scenarios:
   precision: W8A8
   deployment: 多节点-PD分离
   case: PD 分离
+  strategy: pd_cluster
   steps:
   - title: 概述
     content: |-
