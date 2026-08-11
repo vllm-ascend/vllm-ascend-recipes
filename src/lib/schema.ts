@@ -179,6 +179,9 @@ export const modelSchema = z.object({
   strategy_overrides: z.record(z.string(), z.any()).optional(),
   hardware_overrides: z.record(z.string(), z.any()).optional(),
   dependencies: z.array(z.any()).optional(),
+  // Upstream tutorial body (vllm-project/recipes `guide` field).
+  guide: z.string().optional(),
+  guide_zh: z.string().optional(),
   // Configurable parameters with tutorial defaults.
   config_params: z.record(z.string(), configParamSchema).optional(),
 });

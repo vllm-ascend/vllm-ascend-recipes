@@ -27,9 +27,28 @@ model:
   modality: text
   base_args:
     - "--trust-remote-code"
+    - "--tokenizer-mode"
+    - "deepseek_v4"
+    - "--tool-call-parser"
+    - "deepseek_v4"
+    - "--enable-auto-tool-choice"
+    - "--reasoning-parser"
+    - "deepseek_v4"
+    - "--enable-expert-parallel"
+    - "--safetensors-load-strategy"
+    - "prefetch"
+    - "--block-size"
+    - "128"
     - "--quantization"
     - "ascend"
-  base_env: {}
+  base_env:
+    HCCL_OP_EXPANSION_MODE: "AIV"
+    HCCL_BUFFSIZE: "1024"
+    PYTORCH_NPU_ALLOC_CONF: "expandable_segments:True"
+    OMP_PROC_BIND: "false"
+    OMP_NUM_THREADS: "10"
+    TASK_QUEUE_ENABLE: "1"
+    LD_PRELOAD: "/usr/lib/aarch64-linux-gnu/libjemalloc.so.2:$LD_PRELOAD"
   docker_image:
     atlas_800_a2: "quay.io/ascend/vllm-ascend:v0.23.0rc1"
     atlas_800_a3: "quay.io/ascend/vllm-ascend:v0.23.0rc1-a3"
@@ -42,7 +61,58 @@ model:
       command: "docker run --rm --net=host --shm-size=512g -v /root/.cache/modelscope:/root/.cache/modelscope --device /dev/davinci0 --device /dev/davinci1 --device /dev/davinci2 --device /dev/davinci3 --device /dev/davinci4 --device /dev/davinci5 --device /dev/davinci6 --device /dev/davinci7 -it quay.io/ascend/vllm-ascend:v0.23.0rc1 bash"
       note: "Official Ascend image; the weights directory (/root/.cache/modelscope) is mounted into the container; device/driver mounts are covered in env_setup.container."
 
-# Upstream alignment: variants / compatible_strategies / features / dependencies
+# Upstream alignment: features / variants / strategies / hardware_overrides / guide
+# (shape mirrors vllm-project/recipes; scenarios/config_params below remain our
+# CI-execution extension and are ignored by the upstream builder)
+features:
+  expert_parallel:
+    description: "MoE expert parallelism across the DP ranks"
+    args: ["--enable-expert-parallel"]
+  tool_calling:
+    description: "DeepSeek-V4 native tool calling"
+    args: ["--enable-auto-tool-choice", "--tool-call-parser", "deepseek_v4"]
+  reasoning:
+    description: "Three-tier reasoning (Non-think / Think High / Think Max)"
+    args: ["--reasoning-parser", "deepseek_v4"]
+  mtp_spec_decoding:
+    label: "MTP Spec Decoding"
+    description: "MTP (Multi-Token Prediction) speculative decoding with 1 token for accelerated inference"
+    args: ["--speculative-config", '{"num_speculative_tokens": 1, "method": "mtp", "enforce_eager": true}']
+  flashcomm1:
+    label: "FlashComm1"
+    description: "FlashComm communication optimization for inter-chip bandwidth"
+    env:
+      VLLM_ASCEND_ENABLE_FLASHCOMM1: "1"
+  prefix_caching:
+    label: "Prefix Caching"
+    description: "KV-cache prefix caching (--enable-prefix-caching / --no-enable-prefix-caching)"
+    args: ["--enable-prefix-caching"]
+  async_scheduling:
+    label: "Async Scheduling"
+    description: "Asynchronous scheduling to overlap CPU scheduling with NPU computation"
+    args: ["--async-scheduling"]
+  cpu_binding:
+    label: "CPU Binding"
+    description: "CPU core binding for reduced NUMA latencies"
+    args: ["--additional-config", '{"enable_cpu_binding": true}']
+  multistream_overlap:
+    label: "Multi-stream Overlap"
+    description: "Multi-stream overlap for MoE shared expert computation"
+    args: ["--additional-config", '{"multistream_overlap_shared_expert": true}']
+  npugraph_ex:
+    label: "NPUGraph EX"
+    description: "NPUGraph EX for accelerated graph execution"
+    args: ["--additional-config", '{"ascend_compilation_config": {"enable_npugraph_ex": true, "enable_static_kernel": false}}']
+
+opt_in_features:
+  - mtp_spec_decoding
+  - flashcomm1
+  - prefix_caching
+  - async_scheduling
+  - cpu_binding
+  - multistream_overlap
+  - npugraph_ex
+
 variants:
   default:
     precision: W8A8
@@ -61,26 +131,100 @@ compatible_strategies:
   - single_node_A3
   - pd_cluster
 
-features:
-  expert_parallel:
-    description: "MoE expert parallelism across the DP ranks"
-    args: ["--enable-expert-parallel"]
-  tool_calling:
-    description: "DeepSeek-V4 native tool calling"
-    args: ["--enable-auto-tool-choice"]
-  reasoning:
-    description: "Three-tier reasoning (Non-think / Think High / Think Max)"
-    args: ["--reasoning-parser", "deepseek_v4"]
-  spec_decoding:
-    description: "MTP speculative decoding"
-    args: ["--speculative-config", '{"num_speculative_tokens": 1,"method": "mtp","enforce_eager": true}']
+hardware_overrides:
+  ascend_a3:
+    extra_args:
+      - "--compilation-config"
+      - '{"cudagraph_mode": "FULL_DECODE_ONLY"}'
+    extra_env:
+      HCCL_BUFFSIZE: "2560"
+      VLLM_ASCEND_ENABLE_FLASHCOMM1: "1"
+  ascend_a2:
+    extra_args:
+      - "--compilation-config"
+      - '{"cudagraph_mode": "FULL_DECODE_ONLY"}'
+    extra_env:
+      HCCL_BUFFSIZE: "1024"
 
-opt_in_features:
-  - spec_decoding
+strategy_overrides: {}
 
 dependencies:
   - note: "ModelScope is used to download the W8A8 weights"
     command: "pip install modelscope"
+
+guide: |-
+  ## Overview
+
+  DeepSeek-V4-Flash is a 284B-total / 13B-active MoE model in the V4 preview family. It pairs a **hybrid attention stack** — Compressed Sparse Attention (CSA) + Heavily Compressed Attention (HCA) — with **Manifold-Constrained Hyper-Connections (mHC)** to reach 27% of V3.2's per-token inference FLOPs and 10% of V3.2's KV cache at 1M context.
+
+  First supported in vLLM-Ascend v0.23.0rc1. This guide is validated on **vLLM-Ascend v0.23.0rc1**. All v0.23.0rc1 and later versions can run stably.
+
+  ## Prerequisites
+
+  - **Hardware**: 1 Atlas 800 A3 (128G × 8) or 1 Atlas 800 A2 (64G × 8)
+  - **Model weights**: [DeepSeek-V4-Flash-w8a8-mtp](https://www.modelscope.cn/models/Eco-Tech/DeepSeek-V4-Flash-w8a8-mtp) (W8A8 pre-quantized with MTP heads)
+
+  ### Environment Setup
+
+  **Docker (recommended):**
+  ```bash
+  # A3
+  docker pull quay.io/ascend/vllm-ascend:{{ vllm_ascend_version }}-a3
+  # A2
+  docker pull quay.io/ascend/vllm-ascend:{{ vllm_ascend_version }}
+  ```
+
+  **Pip install:**
+  ```bash
+  git clone https://github.com/vllm-project/vllm.git
+  cd vllm && pip install -e .
+  git clone https://github.com/vllm-project/vllm-ascend.git
+  cd vllm-ascend && pip install -e .
+  ```
+
+  ## Quantization
+
+  DeepSeek-V4-Flash uses W8A8 mixed quantization: MoE expert weights are stored in W8A8 while the remaining (attention / norm / router) params stay in W8A8. Use the pre-quantized weight from Eco-Tech on ModelScope.
+
+  ## Service Verification
+
+  After starting the service, verify with:
+  ```bash
+  curl http://localhost:8900/v1/chat/completions \
+      -H "Content-Type: application/json" \
+      -d '{
+          "model": "dsv4",
+          "messages": [{"role": "user", "content": "Who are you?"}],
+          "max_tokens": 256,
+          "temperature": 0
+      }'
+  ```
+
+  ## Accuracy Results (Atlas 800 A3, W8A8)
+
+  | Dataset | Metric   | Score  |
+  | ------- | -------- | ------ |
+  | GPQA    | accuracy | 88.17% |
+  | GSM8K   | accuracy | 96.30% |
+
+  ## Recommended Configurations
+
+  | Scenario          | NPUs    | TP | DP | max-model-len | max-num-seqs | Notes |
+  | ----------------- | ------- | -- | -- | ------------- | ------------ | ----- |
+  | High Throughput   | 16 (A3) | 4  | 4  | 133120        | 32           | Single-node mixed |
+  | Long Context (1M) | 8 (A3)  | 4  | 4  | 1048576       | 16           | dp4 tp4 single-node |
+  | PD Separation     | 32 (A3) | -  | -  | 1048576       | 16 (P) / 60 (D) | 1P1D via Mooncake |
+
+  ## Troubleshooting
+
+  Refer to [Performance Tuning Guide](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/performance_and_debug/optimization_and_tuning.html) and [FAQ](https://docs.vllm.ai/projects/ascend/en/latest/faqs.html).
+
+  ## References
+
+  - [vllm-ascend Documentation](https://docs.vllm.ai/projects/ascend/en/latest/tutorials/models/DeepSeek-V4-Flash.html)
+  - [ModelScope (W8A8-MTP)](https://www.modelscope.cn/models/Eco-Tech/DeepSeek-V4-Flash-w8a8-mtp)
+  - [PD Disaggregation Guide (Mooncake)](https://docs.vllm.ai/projects/ascend/en/latest/tutorials/features/pd_disaggregation_mooncake_multi_node.html)
+  - [vllm-ascend GitHub](https://github.com/vllm-project/vllm-ascend)
 
 # — Configurable params: defaults = original tutorial config (Key Parameter Descriptions) —
 # The page/CI substitutes {{name}} in steps with the default values;
