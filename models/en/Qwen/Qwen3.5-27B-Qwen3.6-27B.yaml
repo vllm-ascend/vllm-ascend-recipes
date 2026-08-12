@@ -7,6 +7,10 @@ meta:
   tasks:
     - text
   performance_headline: "Single-node deployment on Atlas 800 A2/A3 with TP=2 + DP=8 DP-first parallelism"
+  date_updated: 2026-07-27
+  difficulty: advanced
+  related_recipes:
+    - "Qwen/Qwen3-30B-A3B"
   hardware:
     atlas_800_a3: verified
     atlas_800_a2: verified
@@ -19,6 +23,100 @@ model:
   active_parameters: null
   context_length: 262144
   modality: text
+  base_args:
+    - "--trust-remote-code"
+  base_env:
+    VLLM_USE_MODELSCOPE: "True"
+    PYTORCH_NPU_ALLOC_CONF: "expandable_segments:True"
+    HCCL_BUFFSIZE: "512"
+    OMP_PROC_BIND: "false"
+    OMP_NUM_THREADS: "1"
+    TASK_QUEUE_ENABLE: "1"
+  docker_image:
+    atlas_800_a2: "quay.io/ascend/vllm-ascend:v0.23.0rc1"
+    atlas_800_a3: "quay.io/ascend/vllm-ascend:v0.23.0rc1-a3"
+  nightly_required: false
+  install:
+    # Ascend 推荐 Docker 方式;pip 需源码编译,不提供官方 wheel,隐藏 pip 标签。
+    pip: false
+    docker:
+      command: "docker run --rm --net=host --shm-size=512g -v /root/.cache/modelscope:/root/.cache/modelscope --device /dev/davinci0 --device /dev/davinci1 ... --device /dev/davinci7 -it quay.io/ascend/vllm-ascend:v0.23.0rc1 bash"
+      note: "Official Ascend image; full device/driver mounts are covered in env_setup.container."
+
+# —— Upstream alignment: features / variants / strategies / overrides / guide ——
+features:
+  spec_decoding:
+    label: "MTP Spec Decoding"
+    description: "MTP speculative decoding (qwen3_5_mtp, 3 tokens) to accelerate inference"
+    args: ["--speculative-config", '{"method": "qwen3_5_mtp", "num_speculative_tokens": 3, "enforce_eager": true}']
+  compilation_config:
+    label: "Compilation Config"
+    description: "Full ACL graph execution in decode (--compilation-config cudagraph_mode=FULL_DECODE_ONLY)"
+    args: ["--compilation-config", '{"cudagraph_mode":"FULL_DECODE_ONLY"}']
+  async_scheduling:
+    label: "Async Scheduling"
+    description: "Asynchronous scheduling to overlap CPU scheduling with NPU computation"
+    args: ["--async-scheduling"]
+  prefix_caching:
+    label: "Prefix Caching"
+    description: "KV-cache prefix caching (--enable-prefix-caching / --no-enable-prefix-caching)"
+    args: ["--enable-prefix-caching"]
+    flag_when_false: "--no-enable-prefix-caching"
+  cpu_binding:
+    label: "CPU Binding"
+    description: "CPU core binding for reduced NUMA latencies"
+    args: ["--additional-config", '{"enable_cpu_binding":true}']
+  flashcomm1:
+    label: "FlashComm1"
+    description: "FlashComm communication optimization"
+    env:
+      VLLM_ASCEND_ENABLE_FLASHCOMM1: "1"
+
+opt_in_features:
+  - prefix_caching
+
+variants:
+  default:
+    precision: W8A8
+    vram_minimum_gb: 33
+    description: "W8A8 quantized weights on Atlas 800 A2/A3"
+  w8a8_mtp:
+    model_id: "Eco-Tech/Qwen3.5-27B-w8a8-mtp"
+    precision: W8A8
+    vram_minimum_gb: 33
+    description: "W8A8 + MTP weights (Qwen3.5-27B-w8a8-mtp)"
+  bf16:
+    model_id: "Qwen/Qwen3.6-27B"
+    precision: bf16
+    vram_minimum_gb: 65
+    description: "BF16 weights on Atlas 800 A3"
+
+compatible_strategies:
+  - single_node_A2
+  - single_node_A3
+  - pd_cluster
+
+hardware_overrides: {}
+strategy_overrides: {}
+
+dependencies: []
+
+guide: ""
+
+# —— 可配置数值参数(页面/CI 扩展;默认值 = tutorial 基线)——
+config_params:
+  max_model_len:
+    default: 133000
+    type: number
+    description: "Maximum context length (input + output tokens)"
+  max_num_seqs:
+    default: 32
+    type: number
+    description: "Maximum number of concurrent sequences"
+  gpu_memory_utilization:
+    default: 0.9
+    type: number
+    description: "Fraction of NPU memory available for the KV cache"
 
 overview: |-
   Qwen3.5-27B and Qwen3.6-27B are dense hybrid Mamba-Transformer language models in the Qwen3.5/Qwen3.6 family. Both share the same hybrid attention design (GDN + full attention) and the same MTP head design, so deployment on Ascend NPUs follows the same pattern for both models. They are suitable for general-purpose text generation tasks such as dialogue, content creation, and code generation running on Ascend NPUs.
@@ -275,6 +373,8 @@ scenarios:
   precision: W8A8
   deployment: Single-Node
   case: Multi Card
+  tags: [a2-single]
+  strategy: single_node_A2
   steps:
   - title: Start the server (Qwen3.5-27B-w8a8)
     content: |-
@@ -297,16 +397,16 @@ scenarios:
       --seed 1024 \
       --quantization ascend \
       --served-model-name qwen3.5 \
-      --max-num-seqs 32 \
-      --max-model-len 133000 \
+      --max-num-seqs {{max_num_seqs}} \
+      --max-model-len {{max_model_len}} \
       --max-num-batched-tokens 8096 \
       --trust-remote-code \
-      --gpu-memory-utilization 0.90 \
-      --no-enable-prefix-caching \
-      --speculative-config '{"method": "qwen3_5_mtp", "num_speculative_tokens": 3, "enforce_eager": true}' \
-      --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY"}' \
-      --additional-config '{"enable_cpu_binding":true}' \
-      --async-scheduling
+      --gpu-memory-utilization {{gpu_memory_utilization}} \
+      {{prefix_caching}} \
+      {{spec_decoding}} \
+      {{compilation_config}} \
+      {{cpu_binding}} \
+      {{async_scheduling}}
       ```
 
       For Qwen3.6-27B-w8a8: replace the model id with `Eco-Tech/Qwen3.6-27B-w8a8`, `--served-model-name qwen3.6`, and raise `--max-model-len 262144` if needed.
@@ -319,6 +419,8 @@ scenarios:
   precision: W8A8
   deployment: Single-Node
   case: Multi Card
+  tags: [a3-single]
+  strategy: single_node_A3
   steps:
   - title: Start the server (Qwen3.5-27B-w8a8, full 16 NPUs)
     content: |-
@@ -341,16 +443,16 @@ scenarios:
       --seed 1024 \
       --quantization ascend \
       --served-model-name qwen3.5 \
-      --max-num-seqs 32 \
-      --max-model-len 133000 \
+      --max-num-seqs {{max_num_seqs}} \
+      --max-model-len {{max_model_len}} \
       --max-num-batched-tokens 16384 \
       --trust-remote-code \
-      --gpu-memory-utilization 0.90 \
-      --no-enable-prefix-caching \
-      --speculative-config '{"method": "qwen3_5_mtp", "num_speculative_tokens": 3, "enforce_eager": true}' \
-      --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY"}' \
-      --additional-config '{"enable_cpu_binding":true}' \
-      --async-scheduling
+      --gpu-memory-utilization {{gpu_memory_utilization}} \
+      {{prefix_caching}} \
+      {{spec_decoding}} \
+      {{compilation_config}} \
+      {{cpu_binding}} \
+      {{async_scheduling}}
       ```
   - title: Service verification
     content: |-
@@ -361,6 +463,8 @@ scenarios:
   precision: BF16
   deployment: Single-Node
   case: Multi Card
+  tags: [a3-single]
+  strategy: single_node_A3
   steps:
   - title: Start the server (Qwen3.5-27B BF16)
     content: |-
@@ -373,15 +477,15 @@ scenarios:
       --data-parallel-size 8 \
       --tensor-parallel-size 2 \
       --served-model-name qwen3.5 \
-      --max-num-seqs 32 \
-      --max-model-len 133000 \
+      --max-num-seqs {{max_num_seqs}} \
+      --max-model-len {{max_model_len}} \
       --max-num-batched-tokens 16384 \
       --trust-remote-code \
-      --gpu-memory-utilization 0.90 \
-      --no-enable-prefix-caching \
-      --speculative-config '{"method": "qwen3_5_mtp", "num_speculative_tokens": 3, "enforce_eager": true}' \
-      --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY"}' \
-      --async-scheduling
+      --gpu-memory-utilization {{gpu_memory_utilization}} \
+      {{prefix_caching}} \
+      {{spec_decoding}} \
+      {{compilation_config}} \
+      {{async_scheduling}}
       ```
   - title: Service verification
     content: |-
@@ -392,6 +496,8 @@ scenarios:
   precision: W8A8
   deployment: Multi-Node PD Separation
   case: 1P1D (1 Prefill node + 1 Decode node)
+  tags: [pd-multinode]
+  strategy: pd_cluster
   steps:
   - title: Layout (1P1D, TP=2 + DP=8 per node)
     content: |-
@@ -415,7 +521,7 @@ scenarios:
       export TASK_QUEUE_ENABLE=1
       export LD_LIBRARY_PATH=/usr/local/Ascend/ascend-toolkit/latest/python/site-packages/mooncake:$LD_LIBRARY_PATH
       export HCCL_BUFFSIZE=1024
-      export VLLM_ASCEND_ENABLE_FLASHCOMM1=1
+      {{flashcomm1}}
       export ASCEND_RT_VISIBLE_DEVICES=$1
 
       vllm serve your_model_path \
@@ -433,11 +539,11 @@ scenarios:
         --max-num-seqs 4 \
         --max-model-len 32768 \
         --max-num-batched-tokens 16384 \
-        --no-enable-prefix-caching \
+        {{prefix_caching}} \
         --gpu-memory-utilization 0.95 \
         --enforce-eager \
-        --speculative-config '{"method": "qwen3_5_mtp", "num_speculative_tokens": 3, "enforce_eager": true}' \
-        --additional-config '{"enable_cpu_binding":true}' \
+        {{spec_decoding}} \
+        {{cpu_binding}} \
         --kv-transfer-config \
         '{"kv_connector": "MooncakeConnectorV1",
         "kv_role": "kv_producer",
@@ -469,12 +575,12 @@ scenarios:
         --max-num-seqs 16 \
         --max-model-len 32768 \
         --max-num-batched-tokens 2048 \
-        --no-enable-prefix-caching \
+        {{prefix_caching}} \
         --gpu-memory-utilization 0.91 \
-        --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY"}' \
+        {{compilation_config}} \
         --additional-config '{"recompute_scheduler_enable":true,"enable_cpu_binding":true}' \
-        --async-scheduling \
-        --speculative-config '{"method": "qwen3_5_mtp", "num_speculative_tokens": 3, "enforce_eager": true}' \
+        {{async_scheduling}} \
+        {{spec_decoding}} \
         --kv-transfer-config \
         '{"kv_connector": "MooncakeConnectorV1",
         "kv_role": "kv_consumer",
@@ -587,9 +693,9 @@ evaluation:
           --trust-remote-code \
           --quantization ascend \
           --tensor-parallel-size 2 \
-          --max-model-len 133000 \
-          --max-num-seqs 32 \
-          --gpu-memory-utilization 0.90 \
+          --max-model-len {{max_model_len}} \
+          --max-num-seqs {{max_num_seqs}} \
+          --gpu-memory-utilization {{gpu_memory_utilization}} \
           --no-enable-prefix-caching
 
       # Run lm_eval in another terminal

@@ -5,6 +5,10 @@ meta:
   description: "Qwen3 系列中的 MoE（混合专家）模型，总参数量 30.5B，每 token 激活 3.3B 参数。稀疏 MoE 架构实现高效训练与推理，在推理、指令遵循和智能体能力方面表现优异，同时相比同等能力的稠密模型具有更低的计算成本。"
   date_added: 2026-07-07
   performance_headline: "Atlas 800 A2/A3 单节点部署，支持 W8A8 精度"
+  date_updated: 2026-07-07
+  difficulty: intermediate
+  related_recipes:
+    - "Qwen/Qwen3.6-27B"
   hardware:
     atlas_800_a3: verified
     atlas_800_a2: verified
@@ -19,6 +23,102 @@ model:
   active_parameters: "3.3B"
   context_length: 40960
   modality: text
+  base_args:
+    - "--trust-remote-code"
+    - "--enable-expert-parallel"
+    - "--quantization"
+    - "ascend"
+    - "--distributed_executor_backend"
+    - "mp"
+  base_env:
+    HCCL_BUFFSIZE: "512"
+    OMP_PROC_BIND: "false"
+    OMP_NUM_THREADS: "1"
+    PYTORCH_NPU_ALLOC_CONF: "expandable_segments:True"
+  docker_image:
+    atlas_800_a2: "quay.io/ascend/vllm-ascend:v0.23.0rc1"
+    atlas_800_a3: "quay.io/ascend/vllm-ascend:v0.23.0rc1-a3"
+  nightly_required: false
+  install:
+    # Ascend 推荐 Docker 方式;pip 需源码编译,不提供官方 wheel,隐藏 pip 标签。
+    pip: false
+    docker:
+      command: "docker run --rm --net=host --shm-size=128g -v /root/.cache/modelscope:/root/.cache/modelscope --device /dev/davinci0 --device /dev/davinci1 ... --device /dev/davinci7 -it quay.io/ascend/vllm-ascend:v0.23.0rc1 bash"
+      note: "Ascend 官方镜像;完整设备/驱动挂载见 env_setup.container。"
+
+# —— 上游对齐:features / variants / strategies / overrides / guide ——
+features:
+  expert_parallel:
+    description: "跨 DP rank 的 MoE 专家并行(Qwen3-30B-A3B MoE 必需)"
+    args: ["--enable-expert-parallel"]
+  spec_decoding:
+    label: "Eagle3 Spec Decoding"
+    description: "Eagle3 投机解码 — 将 your_eagle3_model_path 替换为草稿模型路径"
+    args: ["--speculative-config", '{"method": "eagle3", "model": "your_eagle3_model_path", "draft_tensor_parallel_size": 1, "num_speculative_tokens": 3}']
+  compilation_config:
+    label: "Compilation Config"
+    description: "decode 阶段全 ACL 图执行(--compilation-config cudagraph_mode=FULL_DECODE_ONLY)"
+    args: ["--compilation-config", '{"cudagraph_mode": "FULL_DECODE_ONLY"}']
+  async_scheduling:
+    label: "Async Scheduling"
+    description: "异步调度,CPU 调度与 NPU 计算重叠"
+    args: ["--async-scheduling"]
+  prefix_caching:
+    label: "Prefix Caching"
+    description: "KV 缓存前缀缓存(--enable-prefix-caching / --no-enable-prefix-caching)"
+    args: ["--enable-prefix-caching"]
+    flag_when_false: "--no-enable-prefix-caching"
+  flashcomm1:
+    label: "FlashComm1"
+    description: "FlashComm 通信优化(通过 --additional-config)"
+    args: ["--additional-config", '{"enable_flashcomm1": true, "weight_nz_mode": 2}']
+
+opt_in_features:
+  - prefix_caching
+
+variants:
+  default:
+    precision: W8A8
+    vram_minimum_gb: 37
+    description: "W8A8 量化权重,适用于 Atlas 800 A2/A3"
+  w8a8:
+    model_id: "Eco-Tech/Qwen3-30B-A3B-w8a8"
+    precision: W8A8
+    vram_minimum_gb: 37
+    description: "W8A8 预量化权重"
+  bf16:
+    model_id: "Qwen/Qwen3-30B-A3B"
+    precision: bf16
+    vram_minimum_gb: 74
+    description: "BF16 权重,适用于 Atlas 800 A3"
+
+compatible_strategies:
+  - single_node_A3
+  - single_node_A2
+
+hardware_overrides: {}
+strategy_overrides: {}
+
+dependencies:
+  - note: "Eagle3 投机解码草稿模型(替换 your_eagle3_model_path)"
+    command: "pip install modelscope && modelscope download --model AngelSlim/Qwen3-a3B_eagle3"
+
+guide: ""
+
+# —— 可配置数值参数(页面/CI 扩展;默认值 = tutorial 基线)——
+config_params:
+  max_model_len:
+    default: 40960
+    type: number
+    description: "最大上下文长度(输入+输出 token 之和)"
+  max_num_seqs:
+    default: 100
+    type: number
+    description: "最大并发序列数"
+  gpu_memory_utilization:
+    default: 0.95
+    type: number
+    description: "KV cache 可用的显存比例"
 
 overview: |-
   Qwen3-30B-A3B 是 Qwen3 系列中的混合专家（MoE）模型，总参数量 30.5B，每 token 激活 3.3B 参数。稀疏 MoE 架构实现了高效的训练和推理，在推理、指令遵循和智能体能力方面表现出色，同时相比同等能力的稠密模型保持了更低的计算成本。
@@ -126,14 +226,14 @@ env_setup:
         **拉取 Docker 镜像：**
 
         ```bash
-        docker pull quay.io/ascend/vllm-ascend:{{ vllm_ascend_version }}
+        docker pull quay.io/ascend/vllm-ascend:v0.23.0rc1
         ```
 
         **启动 Docker 容器：**
 
         ```bash
 
-        export IMAGE=quay.io/ascend/vllm-ascend:{{ vllm_ascend_version }}-a3
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0rc1-a3
 
         docker run \
             --name vllm-ascend-env \
@@ -181,14 +281,14 @@ env_setup:
         **拉取 Docker 镜像：**
 
         ```bash
-        docker pull quay.io/ascend/vllm-ascend:{{ vllm_ascend_version }}
+        docker pull quay.io/ascend/vllm-ascend:v0.23.0rc1
         ```
 
         **启动 Docker 容器：**
 
         ```bash
 
-        export IMAGE=quay.io/ascend/vllm-ascend:{{ vllm_ascend_version }}
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0rc1
 
         docker run \
             --name vllm-ascend-env \
@@ -273,6 +373,8 @@ scenarios:
   precision: W8A8
   deployment: 单节点-多卡
   case: Single Node Multi Card
+  tags: [a3-single]
+  strategy: single_node_A3
   steps:
   - title: 启动服务
     content: |-
@@ -293,20 +395,20 @@ scenarios:
       vllm serve your_model_path \
           --served-model-name qwen3 \
           --trust-remote-code \
-          --max-num-seqs 100 \
-          --max-model-len 40960 \
+          --max-num-seqs {{max_num_seqs}} \
+          --max-model-len {{max_model_len}} \
           --max-num-batched-tokens 16384 \
           --tensor-parallel-size 4 \
           --enable-expert-parallel \
           --quantization ascend \
           --distributed_executor_backend "mp" \
-          --no-enable-prefix-caching \
-          --async-scheduling \
-          --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY"}' \
-          --additional-config '{"enable_flashcomm1": true, "weight_nz_mode": 2}' \
-          --gpu-memory-utilization 0.95 \
+          {{prefix_caching}} \
+          {{async_scheduling}} \
+          {{compilation_config}} \
+          {{flashcomm1}} \
+          --gpu-memory-utilization {{gpu_memory_utilization}} \
           --port 8000 \
-          --speculative-config '{"method": "eagle3", "model": "your_eagle3_model_path", "draft_tensor_parallel_size": 1, "num_speculative_tokens": 3}'
+          {{spec_decoding}}
       ```
 
       > - `ASCEND_RT_VISIBLE_DEVICES`：必须设置为分配给您环境的 NPU 芯片 ID（例如，4 芯片为 `0,1,2,3`）。
@@ -326,6 +428,8 @@ scenarios:
   precision: W8A8
   deployment: 单节点-多卡
   case: Single Node Multi Card (A2)
+  tags: [a2-single]
+  strategy: single_node_A2
   steps:
   - title: 启动服务
     content: |-
@@ -345,20 +449,20 @@ scenarios:
       vllm serve your_model_path \
           --served-model-name qwen3 \
           --trust-remote-code \
-          --max-num-seqs 100 \
-          --max-model-len 40960 \
+          --max-num-seqs {{max_num_seqs}} \
+          --max-model-len {{max_model_len}} \
           --max-num-batched-tokens 16384 \
           --tensor-parallel-size 4 \
           --enable-expert-parallel \
           --quantization ascend \
           --distributed_executor_backend "mp" \
-          --no-enable-prefix-caching \
-          --async-scheduling \
-          --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY"}' \
-          --additional-config '{"enable_flashcomm1": true, "weight_nz_mode": 2}' \
-          --gpu-memory-utilization 0.95 \
+          {{prefix_caching}} \
+          {{async_scheduling}} \
+          {{compilation_config}} \
+          {{flashcomm1}} \
+          --gpu-memory-utilization {{gpu_memory_utilization}} \
           --port 8000 \
-          --speculative-config '{"method": "eagle3", "model": "your_eagle3_model_path", "draft_tensor_parallel_size": 1, "num_speculative_tokens": 3}'
+          {{spec_decoding}}
       ```
 
       > - `ASCEND_RT_VISIBLE_DEVICES`：必须设置为分配给您环境的 NPU 芯片 ID（例如，4 芯片为 `0,1,2,3`）。
@@ -590,18 +694,18 @@ performance:
     vllm serve your_model_path \
         --served-model-name qwen3 \
         --trust-remote-code \
-        --max-num-seqs 100 \
+        --max-num-seqs {{max_num_seqs}} \
         --max-model-len 37364 \
         --max-num-batched-tokens 16384 \
         --tensor-parallel-size 4 \
         --enable-expert-parallel \
         --distributed_executor_backend "mp" \
-        --no-enable-prefix-caching \
-        --async-scheduling \
+        {{prefix_caching}} \
+        {{async_scheduling}} \
         --quantization ascend \
-        --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY"}' \
-        --additional-config '{"enable_flashcomm1": true, "weight_nz_mode": 2}' \
-        --gpu-memory-utilization 0.95 \
+        {{compilation_config}} \
+        {{flashcomm1}} \
+        --gpu-memory-utilization {{gpu_memory_utilization}} \
         --port 8000 \
         --speculative-config '{"method": "eagle3","model": "your_eagle3_model_path", "num_speculative_tokens": 3}'
     ```
@@ -625,17 +729,17 @@ performance:
     vllm serve your_model_path \
         --served-model-name qwen3 \
         --trust-remote-code \
-        --max-num-seqs 100 \
+        --max-num-seqs {{max_num_seqs}} \
         --max-model-len 37364 \
         --max-num-batched-tokens 16384 \
         --tensor-parallel-size 1 \
         --distributed_executor_backend "mp" \
-        --no-enable-prefix-caching \
-        --async-scheduling \
+        {{prefix_caching}} \
+        {{async_scheduling}} \
         --quantization ascend \
-        --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY"}' \
+        {{compilation_config}} \
         --additional-config '{"weight_nz_mode": 2}' \
-        --gpu-memory-utilization 0.95 \
+        --gpu-memory-utilization {{gpu_memory_utilization}} \
         --port 8000 \
         --speculative-config '{"method": "eagle3","model": "your_eagle3_model_path", "num_speculative_tokens": 3}'
     ```
@@ -665,12 +769,12 @@ performance:
         --tensor-parallel-size 4 \
         --enable-expert-parallel \
         --distributed_executor_backend "mp" \
-        --no-enable-prefix-caching \
-        --async-scheduling \
+        {{prefix_caching}} \
+        {{async_scheduling}} \
         --quantization ascend \
-        --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY"}' \
-        --additional-config '{"enable_flashcomm1": true, "weight_nz_mode": 2}' \
-        --gpu-memory-utilization 0.95 \
+        {{compilation_config}} \
+        {{flashcomm1}} \
+        --gpu-memory-utilization {{gpu_memory_utilization}} \
         --port 8000 \
         --speculative-config '{"method": "eagle3","model": "your_eagle3_model_path", "num_speculative_tokens": 3}' \
         --hf-overrides '{"rope_parameters": {"rope_type":"yarn","factor":4,"original_max_position_embeddings":32768}}'
