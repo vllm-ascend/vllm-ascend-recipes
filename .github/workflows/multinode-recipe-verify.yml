@@ -119,6 +119,13 @@ jobs:
             # Pick the first changed en recipe that has a PD scenario.
             RECIPE=""
             for f in $(git diff --name-only "${{ github.event.pull_request.base.sha }}" "${{ github.sha }}" -- models/ | grep '^models/en/.*\.ya\?ml$' || true); do
+              # Global deployment-verify whitelist (single-node / multi-node /
+              # PD all follow .github/recipe-verify-whitelist.txt). Recipes
+              # outside it never trigger the multi-node pipeline on PRs.
+              if ! grep -qE -f <(grep -vE '^\s*(#|$)' .github/recipe-verify-whitelist.txt) <<< "$f"; then
+                echo "Skipped (not in whitelist): $f"
+                continue
+              fi
               # Route by scenario tags (a2-single / a3-single -> single-node
               # pipeline; pd-multinode -> this multi-node pipeline).
               TAG="$(python3 -c "

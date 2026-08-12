@@ -1,0 +1,7 @@
+# Global deployment-verify whitelist (single-node / multi-node / PD pipelines).
+# One extended-regex pattern per line, matched against the changed recipe path
+# (e.g. `models/en/Qwen/` whitelists every Qwen recipe). Both
+# pr-recipe-verify.yml and multinode-recipe-verify.yml read this file; recipes
+# not matching any pattern are skipped on pull_request triggers (manual
+# workflow_dispatch always runs the recipe the caller selected).
+models/en/Qwen/

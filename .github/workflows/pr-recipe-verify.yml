@@ -62,15 +62,17 @@ jobs:
           MODEL_FILES="${{ steps.filter.outputs.models_files }}"
           echo "All changed model files: $MODEL_FILES"
           EN_RECIPES=$(echo "$MODEL_FILES" | tr ',' '\n' | grep '^models/en/.*\.\(yaml\|yml\)$' || true)
-          # Only trigger deployment verify for whitelisted models (expand as needed)
-          VERIFY_RECIPES=$(echo "$EN_RECIPES" | grep -E 'models/en/Qwen/' || true)
+          # Only trigger deployment verify for whitelisted models (see
+          # .github/recipe-verify-whitelist.txt — the single global whitelist
+          # shared with multinode-recipe-verify.yml).
+          VERIFY_RECIPES=$(echo "$EN_RECIPES" | grep -E -f <(grep -vE '^\s*(#|$)' .github/recipe-verify-whitelist.txt) || true)
           if [ -n "$VERIFY_RECIPES" ]; then
             COUNT=$(echo "$VERIFY_RECIPES" | wc -l)
             echo "count=$COUNT" >> "$GITHUB_OUTPUT"
             FILES=$(echo "$VERIFY_RECIPES" | jq -R -s -c 'split("\n") | map(select(length > 0))')
             echo "files=$FILES" >> "$GITHUB_OUTPUT"
             echo "Verification recipes ($COUNT): $VERIFY_RECIPES"
-            SKIPPED_RECIPES=$(echo "$EN_RECIPES" | grep -v -E 'models/en/Qwen/' || true)
+            SKIPPED_RECIPES=$(echo "$EN_RECIPES" | grep -v -E -f <(grep -vE '^\s*(#|$)' .github/recipe-verify-whitelist.txt) || true)
             if [ -n "$SKIPPED_RECIPES" ]; then
               echo "Skipped (not in whitelist): $SKIPPED_RECIPES"
             fi
