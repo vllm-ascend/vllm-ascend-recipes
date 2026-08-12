@@ -85,6 +85,40 @@ def shell_blocks(content: str) -> list[str]:
     return re.findall(r"```(?:bash|shell)\s*\n(.*?)```", content, re.DOTALL)
 
 
+def resolve_placeholders(content: str, data: dict) -> str:
+    """Resolve {{name}} placeholders exactly like the site's Config panel:
+    config_params (values) -> its `default`; features (boolean toggles) ->
+    args/env when ON, flag_when_false when OFF (default state from
+    opt_in_features, absent = ON)."""
+    features = data.get("features") or {}
+    config_params = data.get("config_params") or {}
+    opt_in = set(data.get("opt_in_features") or [])
+
+    def render_arg(a: str) -> str:
+        return f"'{a}'" if re.search(r"[\s{}]", a) and not re.match(r"^['\"]", a) else a
+
+    def render_feature(f: dict, on: bool) -> str:
+        if not on:
+            return f.get("flag_when_false", "")
+        parts: list[str] = []
+        if f.get("args"):
+            parts.append(" ".join(render_arg(a) for a in f["args"]))
+        if f.get("env"):
+            for k, v in f["env"].items():
+                parts.append(f"export {k}={v}")
+        return "\n".join(parts)
+
+    def repl(m: re.Match) -> str:
+        name = m.group(1)
+        if name in features:
+            return render_feature(features[name], name not in opt_in)
+        if name in config_params:
+            return str(config_params[name].get("default", ""))
+        return m.group(0)
+
+    return re.sub(r"\{\{(\w+)\}\}", repl, content)
+
+
 def python_blocks(content: str) -> list[str]:
     return re.findall(r"```python\s*\n(.*?)```", content, re.DOTALL)
 
@@ -179,7 +213,7 @@ def parse_recipe(args) -> dict:
     launch_blocks: list[str] = []
     for step in target.get("steps", []):
         title = step.get("title", "")
-        content = step.get("content", "")
+        content = resolve_placeholders(step.get("content", ""), data)
         shell = shell_blocks(content)
         py = python_blocks(content)
         tl = title.lower()

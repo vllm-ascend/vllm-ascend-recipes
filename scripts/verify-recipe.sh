@@ -61,6 +61,7 @@ import sys
 import os
 import yaml
 import json
+import re
 
 recipe_path, hw_key, cache_paths_file = sys.argv[1], sys.argv[2], sys.argv[3]
 
@@ -85,12 +86,44 @@ container_content = env_setup.get('container', {}).get(hw_to_container.get(hw_ke
 # Extract global verification (curl commands shared across scenarios)
 verification = data.get('verification', '')
 global_verify_cmd = ''
-import re
 m = re.search(r'```(?:bash|shell)\s*\n(.*?)```', verification, re.DOTALL)
 if m:
     global_verify_cmd = m.group(1).strip()
     # Replace <node0_ip> etc
     global_verify_cmd = global_verify_cmd.replace('<node0_ip>', 'localhost')
+
+# Resolve {{name}} placeholders exactly like the site's Config panel:
+#   - config_params (value params) -> its `default`
+#   - features (boolean toggles)   -> args/env when ON, flag_when_false when OFF;
+#     default state derives from opt_in_features (absent = ON)
+def _render_arg(a):
+    return "'%s'" % a if re.search(r'[\s{}]', a) and not re.match(r"^['\"]", a) else a
+
+def resolve_placeholders(content, data):
+    features = data.get('features') or {}
+    config_params = data.get('config_params') or {}
+    opt_in = set(data.get('opt_in_features') or [])
+
+    def render_feature(f, on):
+        if not on:
+            return f.get('flag_when_false', '')
+        parts = []
+        if f.get('args'):
+            parts.append(' '.join(_render_arg(a) for a in f['args']))
+        if f.get('env'):
+            for k, v in f['env'].items():
+                parts.append('export %s=%s' % (k, v))
+        return '\n'.join(parts)
+
+    def repl(m):
+        name = m.group(1)
+        if name in features:
+            return render_feature(features[name], name not in opt_in)
+        if name in config_params:
+            return str(config_params[name].get('default', ''))
+        return m.group(0)
+
+    return re.sub(r'\{\{(\w+)\}\}', repl, content)
 
 # Select the cached weights path that this recipe's vllm serve command should
 # resolve `your_model_path` to. The alias file `models/_cache_paths.yaml` maps
@@ -165,6 +198,8 @@ for s in scenarios:
         bash_content = re.sub(r'%%/CONFIG:[^%]+%%', '', bash_content)
         # Replace placeholder model paths with actual weights on the runner
         bash_content = bash_content.replace('your_model_path', CACHE_PATH)
+        # Resolve {{name}} config/feature placeholders (mirrors the page)
+        bash_content = resolve_placeholders(bash_content, data)
         # Remove speculative-config lines (contain placeholder paths)
         bash_content = re.sub(r'.*--speculative-config.*\n?', '', bash_content)
         if 'vllm serve' in bash_content:
