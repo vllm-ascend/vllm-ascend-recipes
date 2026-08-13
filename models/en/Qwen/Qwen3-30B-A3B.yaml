@@ -509,7 +509,7 @@ scenarios:
       After the service is started, verify it is running by sending a prompt. Refer to the verification section below for a usage example.
 - npu: Atlas 300I DUO
   precision: W8A8
-  deployment: 单节点-多卡
+  deployment: Single-Node
   case: 300I DUO (TP2)
   tags: [310p-single]
   strategy: single_node_310p
@@ -532,8 +532,8 @@ scenarios:
           --quantization ascend \
           --max-model-len 16384 \
           --additional-config '{"ascend_compilation_config": {"fuse_norm_quant": false,"enable_npu_graph_ex":false}}' \
-          --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY", "cudagraph_capture_sizes": [1,32]}' \
-          --no-enable-prefix-caching
+          {{compilation_config}} \
+          {{prefix_caching}}
       ```
 
       > - `--tensor-parallel-size 2` maps the model across two Atlas inference devices.

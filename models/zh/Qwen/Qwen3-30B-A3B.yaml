@@ -536,8 +536,8 @@ scenarios:
           --quantization ascend \
           --max-model-len 16384 \
           --additional-config '{"ascend_compilation_config": {"fuse_norm_quant": false,"enable_npu_graph_ex":false}}' \
-          --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY", "cudagraph_capture_sizes": [1,32]}' \
-          --no-enable-prefix-caching
+          {{compilation_config}} \
+          {{prefix_caching}}
       ```
 
       > - `--tensor-parallel-size 2` 将模型映射到两个 Atlas 推理设备。

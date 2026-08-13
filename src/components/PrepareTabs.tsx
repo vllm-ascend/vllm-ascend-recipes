@@ -97,10 +97,17 @@ function renderContent(md: string): string {
     /^## (.+)$/gm,
     '<h2 class="font-display text-lg font-semibold mt-6 mb-3 text-ink-100">$1</h2>',
   );
-  html = html.replace(
-    /^> (.+)$/gm,
-    '<blockquote class="border-l-2 border-accent-500/40 pl-4 py-2 my-4 bg-accent-500/5 rounded-r text-sm text-ink-400">$1</blockquote>',
-  );
+  html = html.replace(/^> (.+)$/gm, (_: string, content: string) => {
+    const processed = content
+      .replace(
+        /\[([^\]]+)\]\(([^)]+)\)/g,
+        (_l: string, label: string, url: string) =>
+          `<a href="${resolveVllmAscendLink(url)}" target="_blank" rel="noopener" class="text-accent-400 hover:text-accent-300 border-b border-accent-500/30">${label}</a>`,
+      )
+      .replace(/`([^`]+)`/g, '<code>$1</code>')
+      .replace(/\*\*(.+?)\*\*/g, '<strong class="text-ink-200 font-semibold">$1</strong>');
+    return `<blockquote class="border-l-2 border-accent-500/40 pl-4 py-2 my-4 bg-accent-500/5 rounded-r text-sm text-ink-400">${processed}</blockquote>`;
+  });
 
   const lines = html.split('\n');
   const result: string[] = [];
@@ -217,7 +224,10 @@ export default function PrepareTabs({
   // Env setup sub-tabs
   const envHasPip = !!envSetup.pip;
   const envHasContainer = !!envSetup.container && Object.keys(envSetup.container).length > 0;
-  const [envMain, setEnvMain] = useState<'pip' | 'container'>(envHasPip ? 'pip' : 'container');
+  // Docker is the recommended install path on Ascend — default to container.
+  const [envMain, setEnvMain] = useState<'pip' | 'container'>(
+    envHasContainer ? 'container' : 'pip',
+  );
   const containerNpus = envSetup.container ? Object.keys(envSetup.container).sort() : [];
   const [containerTab, setContainerTab] = useState(containerNpus[0] || '');
 

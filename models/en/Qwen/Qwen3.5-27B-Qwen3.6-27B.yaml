@@ -671,7 +671,7 @@ scenarios:
       --mamba-ssm-cache-dtype float16 \
       --dtype float16 \
       --speculative-config '{"method": "qwen3_5_mtp","num_speculative_tokens":1}' \
-      --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY", "cudagraph_capture_sizes": [1,8]}' \
+      {{compilation_config}} \
       --additional-config '{"ascend_compilation_config": {"enable_npugraph_ex": false}}'
       ```
 
