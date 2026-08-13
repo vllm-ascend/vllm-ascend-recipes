@@ -41,7 +41,7 @@ model:
     atlas_800_a3: "quay.io/ascend/vllm-ascend:v0.22.1rc-a3"
   nightly_required: false
   install:
-    # Ascend 推荐 Docker 方式;pip 需源码编译,不提供官方 wheel,隐藏 pip 标签。
+    # Ascend recommends Docker; pip requires source build (no official wheel), so the pip tab is hidden.
     pip: false
     docker:
       command: "docker run --rm --net=host --shm-size=128g --device /dev/davinci0 --device /dev/davinci1 ... --device /dev/davinci15 -it quay.io/ascend/vllm-ascend:v0.22.1rc bash"
@@ -114,7 +114,7 @@ dependencies:
 
 guide: ""
 
-# —— 可配置数值参数(页面/CI 扩展;默认值 = tutorial 基线)——
+# —— Configurable value params (page/CI extension; defaults = tutorial baseline) ——
 config_params:
   gpu_memory_utilization:
     default: 0.95
@@ -370,7 +370,7 @@ env_setup:
 scenarios:
 - npu: Atlas 800I A3
   precision: W4A8
-  deployment: 单节点-多卡
+  deployment: Single-Node
   case: Multi Card
   tags: [a3-single]
   strategy: single_node_A3
@@ -427,7 +427,7 @@ scenarios:
       After the service is started, verify it is running by sending a prompt. Refer to the verification section below for a usage example.
 - npu: Atlas 800I A3
   precision: W8A8
-  deployment: 单节点-多卡
+  deployment: Single-Node
   case: Multi Card
   tags: [a3-single]
   strategy: single_node_A3
@@ -473,7 +473,7 @@ scenarios:
       After the service is started, verify it is running by sending a prompt. Refer to the verification section below for a usage example.
 - npu: Atlas 800I A2
   precision: W4A8
-  deployment: 单节点-多卡
+  deployment: Single-Node
   case: Multi Card
   tags: [a2-single]
   strategy: single_node_A2
@@ -518,7 +518,7 @@ scenarios:
       After the service is started, verify it is running by sending a prompt. Refer to the verification section below for a usage example.
 - npu: Atlas 800I A3
   precision: BF16
-  deployment: 多节点
+  deployment: Multi-Node
   case: Multi Node
   tags: [multi-node-dp]
   strategy: multi_node_dp
@@ -615,7 +615,7 @@ scenarios:
       After the service is started, verify it is running by sending a prompt. Refer to the verification section below for a usage example.
 - npu: Atlas 800I A2
   precision: W4A8
-  deployment: 多节点
+  deployment: Multi-Node
   case: Multi Node
   tags: [multi-node-dp]
   strategy: multi_node_dp
@@ -715,7 +715,7 @@ scenarios:
       After the service is started, verify it is running by sending a prompt. Refer to the verification section below for a usage example.
 - npu: Atlas 800I A3
   precision: W8A8
-  deployment: 多节点-PD分离
+  deployment: Multi-Node PD Separation
   case: PD Separation
   tags: [pd-multinode]
   strategy: pd_cluster
@@ -952,6 +952,12 @@ verification: |-
 
   Expected result: HTTP 200 with a JSON response containing the `choices` field with generated text.
 performance:
+  accuracy: |-
+    ### Using AISBench
+
+    1. Refer to [Using AISBench](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/evaluation/using_ais_bench.html) for details.
+
+    2. After execution, you can get the result.
   benchmark: |-
     ### Recommended Configurations
 

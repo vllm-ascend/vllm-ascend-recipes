@@ -405,7 +405,7 @@ scenarios:
 - npu: Atlas 800I A3
   precision: W8A8
   deployment: 单节点-多卡
-  case: Single Node Multi Card
+  case: 多卡
   tags: [a3-single]
   strategy: single_node_A3
   steps:
@@ -460,7 +460,7 @@ scenarios:
 - npu: Atlas 800I A2
   precision: W8A8
   deployment: 单节点-多卡
-  case: Single Node Multi Card (A2)
+  case: 多卡（A2）
   tags: [a2-single]
   strategy: single_node_A2
   steps:

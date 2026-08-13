@@ -213,7 +213,7 @@ env_setup:
 
         ```bash
 
-        export IMAGE=quay.io/ascend/vllm-ascend:{{ vllm_ascend_version }}-a3
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0rc1-a3
         docker run --rm \
             --name vllm-ascend \
             --shm-size=512g \
@@ -254,7 +254,7 @@ env_setup:
 
         ```bash
 
-        export IMAGE=quay.io/ascend/vllm-ascend:{{ vllm_ascend_version }}
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0rc1
         docker run --rm \
             --name vllm-ascend \
             --shm-size=512g \
@@ -296,6 +296,7 @@ scenarios:
   precision: W8A8
   deployment: 单节点-多卡
   case: 高吞吐
+  tags: [a2-single]
   strategy: single_node_A2
   steps:
   - title: 启动服务
@@ -374,6 +375,7 @@ scenarios:
   precision: W8A8
   deployment: 单节点-多卡
   case: 低时延
+  tags: [a3-single]
   strategy: single_node_A3
   steps:
   - title: 启动服务
@@ -452,6 +454,7 @@ scenarios:
   precision: W8A8
   deployment: 多节点-PD分离
   case: PD 分离
+  tags: [pd-multinode]
   strategy: pd_cluster
   steps:
   - title: 概述
@@ -781,6 +784,7 @@ scenarios:
   precision: W8A8
   deployment: 多节点-PD分离
   case: PD 分离
+  tags: [pd-multinode]
   strategy: pd_cluster
   steps:
   - title: 概述

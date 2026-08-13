@@ -134,7 +134,7 @@ overview: |-
 
   硬件支持：
     - Atlas 800 A3 (64G × 16)：单节点 + 多节点 PD 分离
-    - Atlas 800 A2 (64G × 8)：仅支持单节点（Atlas 300I DUO A2 包括 300I / 800I 同样**不支持**多节点 PD 分离）
+    - Atlas 800I A2 (64G × 8)：仅支持单节点，不支持多节点 PD 分离
     - **最低版本要求**（参考 vllm-ascend release notes）：
       - `Qwen3.5-27B`：`vllm-ascend:v0.17.0rc1` 起支持
       - `Qwen3.6-27B`：`vllm-ascend:v0.18.0rc1` 起支持
@@ -642,7 +642,7 @@ scenarios:
 
 - npu: Atlas 300I DUO
   precision: W8A8
-  deployment: Single-Node
+  deployment: 单节点
   case: 300I DUO(TP)
   tags: [310p-single]
   strategy: single_node_310p

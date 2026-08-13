@@ -7,7 +7,7 @@ meta:
   performance_headline: "已在 Atlas 800 A3（128G × 8）节点上验证 W8A8 精度"
   hardware:
     atlas_800_a3: verified
-    atlas_800_a2: unsupported
+    atlas_800_a2: verified
 
 model:
   model_id: "Qwen/Qwen3-235B-A22B"
@@ -137,7 +137,7 @@ env_setup:
         **拉取镜像：**
 
         ```bash
-        docker pull quay.io/ascend/vllm-ascend:{{ vllm_ascend_version }}
+        docker pull quay.io/ascend/vllm-ascend:v0.23.0rc1
         ```
 
         **运行容器：**
@@ -145,7 +145,7 @@ env_setup:
         在每个节点上启动 Docker 镜像。
 
         ```bash
-        export IMAGE=quay.io/ascend/vllm-ascend:{{ vllm_ascend_version }}-a3
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0rc1-a3
 
         docker run --rm \
             --name vllm-ascend-env \
@@ -188,7 +188,7 @@ env_setup:
         **拉取镜像：**
 
         ```bash
-        docker pull quay.io/ascend/vllm-ascend:{{ vllm_ascend_version }}
+        docker pull quay.io/ascend/vllm-ascend:v0.23.0rc1
         ```
 
         **运行容器：**
@@ -196,7 +196,7 @@ env_setup:
         在每个节点上启动 Docker 镜像。
 
         ```bash
-        export IMAGE=quay.io/ascend/vllm-ascend:{{ vllm_ascend_version }}
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0rc1
 
         docker run --rm \
             --name vllm-ascend-env \
@@ -256,7 +256,7 @@ scenarios:
 - npu: Atlas 800I A2
   precision: W8A8
   deployment: 单节点-多卡
-  case: Multi Card
+  case: 多卡
   steps:
   - title: 启动服务
     content: |-
@@ -306,7 +306,7 @@ scenarios:
 - npu: Atlas 800I A3
   precision: W8A8
   deployment: 单节点-多卡
-  case: Multi Card
+  case: 多卡
   steps:
   - title: 启动服务
     content: |-
@@ -356,7 +356,7 @@ scenarios:
 - npu: Atlas 800I A3
   precision: W8A8
   deployment: 多节点-PD分离
-  case: PD Separation
+  case: PD 分离
   steps:
   - title: 概述
     content: |-
@@ -696,7 +696,7 @@ scenarios:
 - npu: Atlas 800I A3
   precision: W8A8
   deployment: 单节点-PD混合
-  case: PD Hybrid
+  case: PD 混合
   steps:
   - title: 高吞吐配置 (TP4, DP4)
     content: |-

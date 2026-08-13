@@ -114,14 +114,14 @@ env_setup:
         **Docker Pull:**
 
         ```bash
-        docker pull quay.io/ascend/vllm-ascend:{{ vllm_ascend_version }}-a3
+        docker pull quay.io/ascend/vllm-ascend:v0.23.0rc1-a3
         ```
 
         **Docker Run:**
 
         ```bash
 
-        export IMAGE=quay.io/ascend/vllm-ascend:{{ vllm_ascend_version }}-a3
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0rc1-a3
 
         docker run \
             --name vllm-ascend-env \
@@ -169,14 +169,14 @@ env_setup:
         **Docker Pull:**
 
         ```bash
-        docker pull quay.io/ascend/vllm-ascend:{{ vllm_ascend_version }}
+        docker pull quay.io/ascend/vllm-ascend:v0.23.0rc1
         ```
 
         **Docker Run:**
 
         ```bash
 
-        export IMAGE=quay.io/ascend/vllm-ascend:{{ vllm_ascend_version }}
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0rc1
 
         docker run \
             --name vllm-ascend-env \
@@ -253,7 +253,7 @@ env_setup:
 scenarios:
 - npu: Atlas 800I A3
   precision: W8A8
-  deployment: 单节点-多卡
+  deployment: Single-Node
   case: Multi Card
   steps:
   - title: Start the server
@@ -303,7 +303,7 @@ scenarios:
       After the service is started, verify it is running by sending a prompt. Refer to the verification section below for a usage example.
 - npu: Atlas 800I A2
   precision: W8A8
-  deployment: 单节点-多卡
+  deployment: Single-Node
   case: Multi Card
   steps:
   - title: Start the server
@@ -343,7 +343,7 @@ scenarios:
       After the service is started, verify it is running by sending a prompt. Refer to the verification section below for a usage example.
 - npu: Atlas 800I A3
   precision: BF16
-  deployment: 多节点
+  deployment: Multi-Node
   case: Multi Node
   steps:
   - title: Start the server
@@ -469,12 +469,20 @@ verification: |-
   Expected result: HTTP 200 with a JSON response containing the `choices` field with generated text.
 performance:
   accuracy: |-
-    **Accuracy Results (GLM-4.7, vllm-ascend >=0.14.0rc1, Atlas 800 A3):**
+    ### Using AISBench
 
-    | Dataset | Metric | Score |
-    |---------|--------|-------|
-    | GPQA | accuracy (gen) | 84.85 |
-    | MATH500 | accuracy (gen) | 98.8 |
+    1. Refer to [Using AISBench](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/evaluation/using_ais_bench.html) for details.
+
+    2. After execution, you can get the result. The following is the result of `GLM-4.7` on `vllm-ascend:main` (after `vllm-ascend:0.14.0rc1`) for reference only:
+
+    | dataset | version | metric | mode | vllm-api-general-chat | note |
+    | ----- | ----- | ----- | ----- | ----- | ----- |
+    | GPQA | - | accuracy | gen | 84.85 | 1 Atlas 800 A3 (64G × 16) |
+    | MATH500 | - | accuracy | gen | 98.8 | 1 Atlas 800 A3 (64G × 16) |
+
+    ### Using Language Model Evaluation Harness
+
+    Not tested yet.
   benchmark: |-
     ### Recommended Configurations
 

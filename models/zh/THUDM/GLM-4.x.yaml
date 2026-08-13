@@ -114,14 +114,14 @@ env_setup:
         **Docker 拉取：**
 
         ```bash
-        docker pull quay.io/ascend/vllm-ascend:{{ vllm_ascend_version }}-a3
+        docker pull quay.io/ascend/vllm-ascend:v0.23.0rc1-a3
         ```
 
         **Docker 运行：**
 
         ```bash
 
-        export IMAGE=quay.io/ascend/vllm-ascend:{{ vllm_ascend_version }}-a3
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0rc1-a3
 
         docker run \
             --name vllm-ascend-env \
@@ -169,14 +169,14 @@ env_setup:
         **Docker 拉取：**
 
         ```bash
-        docker pull quay.io/ascend/vllm-ascend:{{ vllm_ascend_version }}
+        docker pull quay.io/ascend/vllm-ascend:v0.23.0rc1
         ```
 
         **Docker 运行：**
 
         ```bash
 
-        export IMAGE=quay.io/ascend/vllm-ascend:{{ vllm_ascend_version }}
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0rc1
 
         docker run \
             --name vllm-ascend-env \
@@ -254,7 +254,7 @@ scenarios:
 - npu: Atlas 800I A3
   precision: W8A8
   deployment: 单节点-多卡
-  case: Multi Card
+  case: 多卡
   steps:
   - title: 启动服务
     content: |-
@@ -304,7 +304,7 @@ scenarios:
 - npu: Atlas 800I A2
   precision: W8A8
   deployment: 单节点-多卡
-  case: Multi Card
+  case: 多卡
   steps:
   - title: 启动服务
     content: |-
@@ -344,7 +344,7 @@ scenarios:
 - npu: Atlas 800I A3
   precision: BF16
   deployment: 多节点
-  case: Multi Node
+  case: 多节点
   steps:
   - title: 启动服务
     content: |-
@@ -469,12 +469,20 @@ verification: |-
   预期结果：HTTP 200，返回包含 `choices` 字段的 JSON 响应及生成文本。
 performance:
   accuracy: |-
-    **精度结果（GLM-4.7，vllm-ascend >=0.14.0rc1，Atlas 800 A3）：**
+    ### 使用 AISBench
 
-    | 数据集 | 指标 | 分数 |
-    |--------|------|------|
-    | GPQA | accuracy (gen) | 84.85 |
-    | MATH500 | accuracy (gen) | 98.8 |
+    1. 参考 [使用 AISBench](https://docs.vllm.ai/projects/ascend/zh-cn/latest/developer_guide/evaluation/using_ais_bench.html) 了解详情。
+
+    2. 执行后，您可以获得结果。以下是 `GLM-4.7` 在 `vllm-ascend:main`（`vllm-ascend:0.14.0rc1` 之后）上的结果，仅供参考：
+
+    | 数据集 | 版本 | 指标 | 模式 | vllm-api-general-chat | 备注 |
+    | ----- | ----- | ----- | ----- | ----- | ----- |
+    | GPQA | - | accuracy | gen | 84.85 | 1 Atlas 800 A3 (64G × 16) |
+    | MATH500 | - | accuracy | gen | 98.8 | 1 Atlas 800 A3 (64G × 16) |
+
+    ### 使用 Language Model Evaluation Harness
+
+    尚未测试。
   benchmark: |-
     ### 推荐配置
 

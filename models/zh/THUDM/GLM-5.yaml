@@ -371,7 +371,7 @@ scenarios:
 - npu: Atlas 800I A3
   precision: W4A8
   deployment: 单节点-多卡
-  case: Multi Card
+  case: 多卡
   tags: [a3-single]
   strategy: single_node_A3
   steps:
@@ -428,7 +428,7 @@ scenarios:
 - npu: Atlas 800I A3
   precision: W8A8
   deployment: 单节点-多卡
-  case: Multi Card
+  case: 多卡
   tags: [a3-single]
   strategy: single_node_A3
   steps:
@@ -474,7 +474,7 @@ scenarios:
 - npu: Atlas 800I A2
   precision: W4A8
   deployment: 单节点-多卡
-  case: Multi Card
+  case: 多卡
   tags: [a2-single]
   strategy: single_node_A2
   steps:
@@ -519,7 +519,7 @@ scenarios:
 - npu: Atlas 800I A3
   precision: BF16
   deployment: 多节点
-  case: Multi Node
+  case: 多节点
   tags: [multi-node-dp]
   strategy: multi_node_dp
   steps:
@@ -616,7 +616,7 @@ scenarios:
 - npu: Atlas 800I A2
   precision: W4A8
   deployment: 多节点
-  case: Multi Node
+  case: 多节点
   tags: [multi-node-dp]
   strategy: multi_node_dp
   steps:
@@ -952,6 +952,12 @@ verification: |-
 
   预期结果：HTTP 200，返回包含 `choices` 字段的 JSON 响应及生成文本。
 performance:
+  accuracy: |-
+    ### 使用 AISBench
+
+    1. 参考 [使用 AISBench](https://docs.vllm.ai/projects/ascend/zh-cn/latest/developer_guide/evaluation/using_ais_bench.html) 了解详情。
+
+    2. 执行后，您可以获得结果。
   benchmark: |-
     ### 推荐配置
 

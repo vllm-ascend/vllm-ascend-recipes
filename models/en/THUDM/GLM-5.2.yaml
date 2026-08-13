@@ -75,14 +75,14 @@ env_setup:
         **Docker Pull:**
 
         ```bash
-        docker pull quay.io/ascend/vllm-ascend:{{ vllm_ascend_version }}-a3
+        docker pull quay.io/ascend/vllm-ascend:v0.23.0rc1-a3
         ```
 
         **Docker Run:**
 
         ```bash
 
-        export IMAGE=quay.io/ascend/vllm-ascend:{{ vllm_ascend_version }}-a3
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0rc1-a3
 
         docker run \
             --name vllm-ascend-env \
@@ -130,14 +130,14 @@ env_setup:
         **Docker Pull:**
 
         ```bash
-        docker pull quay.io/ascend/vllm-ascend:{{ vllm_ascend_version }}
+        docker pull quay.io/ascend/vllm-ascend:v0.23.0rc1
         ```
 
         **Docker Run:**
 
         ```bash
 
-        export IMAGE=quay.io/ascend/vllm-ascend:{{ vllm_ascend_version }}
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0rc1
 
         docker run \
             --name vllm-ascend-env \
@@ -633,6 +633,16 @@ verification: |-
 
   Expected result: HTTP 200 with a JSON response containing the `choices` field with generated text.
 performance:
+  accuracy: |-
+    ### Using AISBench
+
+    1. Refer to [Using AISBench](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/evaluation/using_ais_bench.html) for details.
+
+    2. After execution, you can get the result.
+
+    ### Using Language Model Evaluation Harness
+
+    Not tested yet.
   benchmark: |-
     ### Recommended Configurations
 

@@ -7,7 +7,7 @@ meta:
   performance_headline: "Verified on Atlas 800 A3 (128G × 8) nodes with W8A8 precision"
   hardware:
     atlas_800_a3: verified
-    atlas_800_a2: unsupported
+    atlas_800_a2: verified
 
 model:
   model_id: "Qwen/Qwen3-235B-A22B"
@@ -43,7 +43,7 @@ weight_download:
       pip install -U huggingface_hub
       huggingface-cli download Qwen/Qwen3-235B-A22B
       ```
-  - source: 魔乐社区
+  - source: Modelers
     url: ''
     command: |-
       ```bash
@@ -58,7 +58,7 @@ weight_download:
       ```
 - weight_version: W8A8 (Pre-quantized)
   sources:
-  - source: 魔乐社区
+  - source: Modelers
     url: https://modelers.cn/models/Modelers_Park/Qwen3-235B-A22B-w8a8
     command: |-
       ```bash
@@ -137,7 +137,7 @@ env_setup:
         **Docker Pull:**
 
         ```bash
-        docker pull quay.io/ascend/vllm-ascend:{{ vllm_ascend_version }}
+        docker pull quay.io/ascend/vllm-ascend:v0.23.0rc1
         ```
 
         **Docker Run:**
@@ -145,7 +145,7 @@ env_setup:
         Start the docker image on your each node.
 
         ```bash
-        export IMAGE=quay.io/ascend/vllm-ascend:{{ vllm_ascend_version }}-a3
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0rc1-a3
 
         docker run --rm \
             --name vllm-ascend-env \
@@ -188,7 +188,7 @@ env_setup:
         **Docker Pull:**
 
         ```bash
-        docker pull quay.io/ascend/vllm-ascend:{{ vllm_ascend_version }}
+        docker pull quay.io/ascend/vllm-ascend:v0.23.0rc1
         ```
 
         **Docker Run:**
@@ -196,7 +196,7 @@ env_setup:
         Start the docker image on your each node.
 
         ```bash
-        export IMAGE=quay.io/ascend/vllm-ascend:{{ vllm_ascend_version }}
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0rc1
 
         docker run --rm \
             --name vllm-ascend-env \
@@ -255,7 +255,7 @@ env_setup:
 scenarios:
 - npu: Atlas 800I A2
   precision: W8A8
-  deployment: 单节点-多卡
+  deployment: Single-Node
   case: Multi Card
   steps:
   - title: Start the server
@@ -305,7 +305,7 @@ scenarios:
       ```
 - npu: Atlas 800I A3
   precision: W8A8
-  deployment: 单节点-多卡
+  deployment: Single-Node
   case: Multi Card
   steps:
   - title: Start the server
@@ -355,7 +355,7 @@ scenarios:
       ```
 - npu: Atlas 800I A3
   precision: W8A8
-  deployment: 多节点-PD分离
+  deployment: Multi-Node PD Separation
   case: PD Separation
   steps:
   - title: Overview
@@ -695,7 +695,7 @@ scenarios:
       ```
 - npu: Atlas 800I A3
   precision: W8A8
-  deployment: 单节点-PD混合
+  deployment: Single-Node PD Hybrid
   case: PD Hybrid
   steps:
   - title: High Throughput (TP4, DP4)

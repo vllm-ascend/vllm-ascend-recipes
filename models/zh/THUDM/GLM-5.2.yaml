@@ -75,14 +75,14 @@ env_setup:
         **Docker 拉取：**
 
         ```bash
-        docker pull quay.io/ascend/vllm-ascend:{{ vllm_ascend_version }}-a3
+        docker pull quay.io/ascend/vllm-ascend:v0.23.0rc1-a3
         ```
 
         **Docker 运行：**
 
         ```bash
 
-        export IMAGE=quay.io/ascend/vllm-ascend:{{ vllm_ascend_version }}-a3
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0rc1-a3
 
         docker run \
             --name vllm-ascend-env \
@@ -130,14 +130,14 @@ env_setup:
         **Docker 拉取：**
 
         ```bash
-        docker pull quay.io/ascend/vllm-ascend:{{ vllm_ascend_version }}
+        docker pull quay.io/ascend/vllm-ascend:v0.23.0rc1
         ```
 
         **Docker 运行：**
 
         ```bash
 
-        export IMAGE=quay.io/ascend/vllm-ascend:{{ vllm_ascend_version }}
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0rc1
 
         docker run \
             --name vllm-ascend-env \
@@ -633,6 +633,16 @@ verification: |-
 
   预期结果：HTTP 200，返回包含 `choices` 字段的 JSON 响应及生成文本。
 performance:
+  accuracy: |-
+    ### 使用 AISBench
+
+    1. 参考 [使用 AISBench](https://docs.vllm.ai/projects/ascend/zh-cn/latest/developer_guide/evaluation/using_ais_bench.html) 了解详情。
+
+    2. 执行后，您可以获得结果。
+
+    ### 使用 Language Model Evaluation Harness
+
+    尚未测试。
   benchmark: |-
     ### 推荐配置
 

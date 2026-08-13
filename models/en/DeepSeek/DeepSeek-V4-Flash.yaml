@@ -54,7 +54,7 @@ model:
     atlas_800_a3: "quay.io/ascend/vllm-ascend:v0.23.0rc1-a3"
   nightly_required: false
   install:
-    # Ascend 推荐 Docker 方式;pip 需源码编译,不提供官方 wheel,隐藏 pip 标签。
+    # Ascend recommends Docker; pip requires source build (no official wheel), so the pip tab is hidden.
     pip: false
     docker:
       command: "docker run --rm --net=host --shm-size=512g -v /root/.cache/modelscope:/root/.cache/modelscope --device /dev/davinci0 --device /dev/davinci1 --device /dev/davinci2 --device /dev/davinci3 --device /dev/davinci4 --device /dev/davinci5 --device /dev/davinci6 --device /dev/davinci7 -it quay.io/ascend/vllm-ascend:v0.23.0rc1 bash"
@@ -217,7 +217,7 @@ env_setup:
 
         ```bash
 
-        export IMAGE=quay.io/ascend/vllm-ascend:{{ vllm_ascend_version }}-a3
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0rc1-a3
         docker run --rm \
             --name vllm-ascend \
             --shm-size=512g \
@@ -258,7 +258,7 @@ env_setup:
 
         ```bash
 
-        export IMAGE=quay.io/ascend/vllm-ascend:{{ vllm_ascend_version }}
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0rc1
         docker run --rm \
             --name vllm-ascend \
             --shm-size=512g \

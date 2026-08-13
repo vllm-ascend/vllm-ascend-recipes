@@ -39,7 +39,7 @@ model:
     atlas_300i_duo: "quay.io/ascend/vllm-ascend:v0.23.0rc1-310p"
   nightly_required: false
   install:
-    # Ascend 推荐 Docker 方式;pip 需源码编译,不提供官方 wheel,隐藏 pip 标签。
+    # Ascend recommends Docker; pip requires source build (no official wheel), so the pip tab is hidden.
     pip: false
     docker:
       command: "docker run --rm --net=host --shm-size=512g -v /root/.cache/modelscope:/root/.cache/modelscope --device /dev/davinci0 --device /dev/davinci1 ... --device /dev/davinci7 -it quay.io/ascend/vllm-ascend:v0.23.0rc1 bash"
@@ -106,7 +106,7 @@ dependencies: []
 
 guide: ""
 
-# —— 可配置数值参数(页面/CI 扩展;默认值 = tutorial 基线)——
+# —— Configurable value params (page/CI extension; defaults = tutorial baseline) ——
 config_params:
   max_model_len:
     default: 133000
@@ -134,7 +134,7 @@ overview: |-
 
   Hardware support:
     - Atlas 800 A3 (64G × 16): single-node + multi-node PD separation
-    - Atlas 800 A2 (64G × 8): single-node only (multi-node PD separation is **not** supported on Atlas 300I DUO — including 300I / 800I A2 inference variants that share the same path)
+    - Atlas 800I A2 (64G × 8): single-node only; multi-node PD separation is not supported
     - **Minimum versions** (per vllm-ascend release notes):
       - `Qwen3.5-27B`: first supported in `vllm-ascend:v0.17.0rc1`
       - `Qwen3.6-27B`: first supported in `vllm-ascend:v0.18.0rc1`
@@ -164,7 +164,7 @@ weight_download:
       pip install -U huggingface_hub
       huggingface-cli download Qwen/Qwen3.5-27B
       ```
-  - source: 魔乐社区
+  - source: Modelers
     url: ''
     command: |-
       ```bash
@@ -195,7 +195,7 @@ weight_download:
       pip install -U huggingface_hub
       huggingface-cli download Eco-Tech/Qwen3.5-27B-w8a8-mtp
       ```
-  - source: 魔乐社区
+  - source: Modelers
     url: ''
     command: |-
       ```bash
@@ -226,7 +226,7 @@ weight_download:
       pip install -U huggingface_hub
       huggingface-cli download Qwen/Qwen3.6-27B
       ```
-  - source: 魔乐社区
+  - source: Modelers
     url: ''
     command: |-
       ```bash
@@ -257,7 +257,7 @@ weight_download:
       pip install -U huggingface_hub
       huggingface-cli download Eco-Tech/Qwen3.6-27B-w8a8
       ```
-  - source: 魔乐社区
+  - source: Modelers
     url: ''
     command: |-
       ```bash
