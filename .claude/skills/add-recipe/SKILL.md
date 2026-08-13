@@ -122,6 +122,20 @@ extra_config:
 - `en/` and `zh/` field structures must be identical.
 - The official vllm-ascend tutorial (`docs/source/tutorials/models/<Model>.md`) is the source of truth for scenario content and serve parameters; mirror it, don't improvise.
 - Keep the scenario serve commands the CI-execution source of truth; when editing flags, update base_args/base_env/features too.
+- Resolve `{{ vllm_ascend_version }}` literals in env_setup to the pinned version — the site only substitutes `|vllm_ascend_version|`, so curly-brace placeholders render verbatim to users.
+
+### Atlas 300I DUO (310p)
+
+When the tutorial covers Atlas 300I DUO (inference products), mirror it faithfully:
+
+- `meta.hardware` gains `atlas_300i_duo: verified`; `model.docker_image` gains `atlas_300i_duo: "<image>-310p"`.
+- `env_setup.container` gets a `300I DUO` entry using the `-310p` image (mount only the inference devices: davinci0 + davinci_manager/devmm_svm/hisi_hdc).
+- Add a scenario with `npu: Atlas 300I DUO`, `tags: [310p-single]`, `strategy: single_node_310p` (add `single_node_310p` to `compatible_strategies`); 300I is TP-only (`--dtype float16`, conservative `--max-model-len`, per-tutorial values stay literal).
+- `scripts/verify-recipe.sh` skips `300I` scenarios on the A2/A3 runners — keep that skip in place.
+
+### Referenced helper scripts
+
+When a tutorial's PD/multi-node steps reference helper scripts (`launch_online_dp.py`, `run_dp_template.sh`, `load_balance_proxy_server_example.py`), either embed them in the step (like DeepSeek-V2-Lite) **or** link to the upstream examples (`https://github.com/vllm-project/vllm-ascend/blob/main/examples/...`) — never leave a dangling filename with no source.
 
 ## Validation (pnpm validate)
 
