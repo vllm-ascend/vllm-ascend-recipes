@@ -27,6 +27,7 @@ interface PrepareTabsProps {
   prerequisitesZh?: PrerequisiteItem[];
   envSetupEn: EnvSetup;
   envSetupZh: EnvSetup;
+  weightLinks?: { source: string; url: string }[];
   hasQuantization: boolean;
   quantizationEn?: string;
   quantizationZh?: string;
@@ -192,6 +193,7 @@ export default function PrepareTabs({
   prerequisitesZh,
   envSetupEn,
   envSetupZh,
+  weightLinks = [],
   hasQuantization: _hasQuantization,
   quantizationEn: _quantizationEn,
   quantizationZh: _quantizationZh,
@@ -260,6 +262,39 @@ export default function PrepareTabs({
 
         {active === 'prerequisites' && (
           <div className="space-y-6">
+            {weightLinks.length > 0 && (
+              <div>
+                <h3 className="font-display text-base font-semibold text-ink-200 mb-2">
+                  {t('sectionWeightDownload')}
+                </h3>
+                <div className="flex flex-wrap gap-1.5">
+                  {weightLinks.map((wl) => (
+                    <a
+                      key={wl.source}
+                      href={wl.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-mono text-ink-500 hover:text-accent-400 border border-transparent hover:border-accent-500/20 rounded transition-colors"
+                    >
+                      <svg
+                        className="w-3 h-3"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                        />
+                      </svg>
+                      <span data-i18n="viewOn">{t('viewOn')}</span> {wl.source}
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
             {prerequisites.map((item, i) => (
               <div key={i}>
                 <h3 className="font-display text-base font-semibold text-ink-200 mb-2">
