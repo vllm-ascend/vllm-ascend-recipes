@@ -12,6 +12,7 @@ meta:
   hardware:
     atlas_800_a3: verified
     atlas_800_a2: verified
+    atlas_300i_duo: verified
 
 model:
   model_id: "Qwen/Qwen3-30B-A3B"
@@ -38,6 +39,7 @@ model:
   docker_image:
     atlas_800_a2: "quay.io/ascend/vllm-ascend:v0.23.0rc1"
     atlas_800_a3: "quay.io/ascend/vllm-ascend:v0.23.0rc1-a3"
+    atlas_300i_duo: "quay.io/ascend/vllm-ascend:v0.23.0rc1-310p"
   nightly_required: false
   install:
     # Ascend 推荐 Docker 方式;pip 需源码编译,不提供官方 wheel,隐藏 pip 标签。
@@ -91,10 +93,16 @@ variants:
     precision: bf16
     vram_minimum_gb: 74
     description: "BF16 权重,适用于 Atlas 800 A3"
+  w8a8_310:
+    model_id: "Eco-Tech/Qwen3-30B-A3B-w8a8-QuaRot-310"
+    precision: W8A8
+    vram_minimum_gb: 37
+    description: "W8A8 QuaRot 权重,适用于 Atlas 300I DUO(TP2)"
 
 compatible_strategies:
   - single_node_A3
   - single_node_A2
+  - single_node_310p
 
 hardware_overrides: {}
 strategy_overrides: {}
@@ -337,6 +345,31 @@ env_setup:
         ```
 
         预期结果：显示版本信息，与拉取的镜像版本一致。
+    300I DUO:
+      content: |-
+        对于 Atlas 300I DUO,请使用 `-310p` 镜像：
+
+        ```bash
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0rc1-310p
+        docker run --rm \
+            --name vllm-ascend \
+            --shm-size=1g \
+            --net=host \
+            --device /dev/davinci0 \
+            --device /dev/davinci_manager \
+            --device /dev/devmm_svm \
+            --device /dev/hisi_hdc \
+            -v /usr/local/dcmi:/usr/local/dcmi \
+            -v /usr/local/Ascend/driver/tools/hccn_tool:/usr/local/Ascend/driver/tools/hccn_tool \
+            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+            -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \
+            -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
+            -v /etc/ascend_install.info:/etc/ascend_install.info \
+            -v /root/.cache:/root/.cache \
+            -it $IMAGE bash
+        ```
+
+        > 在 Atlas 300I DUO 上,若安装了 `triton-ascend` 和 `triton`,请卸载以避免依赖冲突。
   pip:
     content: |-
       如果您不想使用 Docker 镜像，可以从源码构建。首先从源码安装 vLLM：
@@ -475,6 +508,42 @@ scenarios:
       - [vLLM CLI 文档](https://docs.vllm.ai/en/stable/cli/) — 标准 serve 参数（`--host`、`--port`、`--max-model-len` 等）
       - [环境变量](https://docs.vllm.ai/projects/ascend/zh-cn/latest/user_guide/configuration/env_vars.html) — Ascend 特定环境变量（`HCCL_*` 等）
       - [额外配置](https://docs.vllm.ai/projects/ascend/zh-cn/latest/user_guide/configuration/additional_config.html) — `--additional-config` 格式和选项
+  - title: 服务验证
+    content: |-
+      服务启动后，通过发送 prompt 验证其运行状态。使用示例请参考下方的验证部分。
+- npu: Atlas 300I DUO
+  precision: W8A8
+  deployment: 单节点-多卡
+  case: 300I DUO(TP2)
+  tags: [310p-single]
+  strategy: single_node_310p
+  steps:
+  - title: 启动服务
+    content: |-
+      Atlas 300I DUO 单节点部署(TP=2),使用 QuaRot-310 权重。
+
+      ```bash
+      export VLLM_USE_MODELSCOPE=True
+      export ASCEND_RT_VISIBLE_DEVICES=0,1
+
+      vllm serve your_model_path \
+          --host 127.0.0.1 \
+          --port 8000 \
+          --tensor-parallel-size 2 \
+          --max-num-seqs 32 \
+          --served_model_name qwen3 \
+          --dtype float16 \
+          --quantization ascend \
+          --max-model-len 16384 \
+          --additional-config '{"ascend_compilation_config": {"fuse_norm_quant": false,"enable_npu_graph_ex":false}}' \
+          --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY", "cudagraph_capture_sizes": [1,32]}' \
+          --no-enable-prefix-caching
+      ```
+
+      > - `--tensor-parallel-size 2` 将模型映射到两个 Atlas 推理设备。
+      > - `--dtype float16` 匹配 Atlas 300I DUO 推理执行路径。
+      > - `--max-model-len 16384` 在 Atlas 300I DUO 上故意保守设置。
+      > - `--max-num-seqs` 限制并发请求数,以降低 KV cache 和图捕获压力。
   - title: 服务验证
     content: |-
       服务启动后，通过发送 prompt 验证其运行状态。使用示例请参考下方的验证部分。

@@ -14,6 +14,7 @@ meta:
   hardware:
     atlas_800_a3: verified
     atlas_800_a2: verified
+    atlas_300i_duo: verified
 
 model:
   model_id: "Qwen/Qwen3.6-27B"
@@ -35,6 +36,7 @@ model:
   docker_image:
     atlas_800_a2: "quay.io/ascend/vllm-ascend:v0.23.0rc1"
     atlas_800_a3: "quay.io/ascend/vllm-ascend:v0.23.0rc1-a3"
+    atlas_300i_duo: "quay.io/ascend/vllm-ascend:v0.23.0rc1-310p"
   nightly_required: false
   install:
     # Ascend 推荐 Docker 方式;pip 需源码编译,不提供官方 wheel,隐藏 pip 标签。
@@ -94,6 +96,7 @@ variants:
 compatible_strategies:
   - single_node_A2
   - single_node_A3
+  - single_node_310p
   - pd_cluster
 
 hardware_overrides: {}
@@ -506,6 +509,8 @@ scenarios:
       > **为什么是 TP=2 + DP=8（DP-first）？** 模型仅 ~30 GB，单卡 64 GB HBM 即可放下。TP > 1 仅用于放不下的模型。最大化 DP 让 16 个 NPU 各自处理独立的请求 batch —— 这是小稠密模型的标准模式。
   - title: Prefill 节点 —— `run_dp_template.sh`
     content: |-
+      模板可从仓库示例获取：[run_dp_template.sh](https://github.com/vllm-project/vllm-ascend/blob/main/examples/external_online_dp/run_dp_template.sh)。
+
       ```shell
       nic_name="xxx"
       local_ip="141.xx.xx.1"
@@ -557,7 +562,7 @@ scenarios:
       ```
   - title: Decode 节点 —— `run_dp_template.sh`
     content: |-
-      环境变量与 Prefill 节点相同，仅 `local_ip="141.xx.xx.2"`（decode 节点 IP）。vllm serve 命令不同：
+      环境变量与 Prefill 节点相同，仅 `local_ip="141.xx.xx.2"`（decode 节点 IP）。vllm serve 命令不同。模板可从仓库示例获取：[run_dp_template.sh](https://github.com/vllm-project/vllm-ascend/blob/main/examples/external_online_dp/run_dp_template.sh)。
 
       ```shell
       vllm serve your_model_path \
@@ -594,6 +599,8 @@ scenarios:
       ```
   - title: 在每节点启动 DP engine
     content: |-
+      先从仓库示例获取 [launch_online_dp.py](https://github.com/vllm-project/vllm-ascend/blob/main/examples/external_online_dp/launch_online_dp.py),然后在每个节点启动 DP engine：
+
       ```shell
       # p0 (Prefill 节点 0)
       python launch_online_dp.py --dp-size 8 --tp-size 2 --dp-size-local 8 --dp-rank-start 0 \
@@ -604,6 +611,8 @@ scenarios:
       ```
   - title: 在 Prefill 主节点上启动 proxy
     content: |-
+      先从仓库示例获取 [load_balance_proxy_server_example.py](https://github.com/vllm-project/vllm-ascend/blob/main/examples/disaggregated_prefill_v1/load_balance_proxy_server_example.py),然后在 Prefill 主节点上运行：
+
       ```shell
       python load_balance_proxy_server_example.py \
         --port 1999 \
@@ -630,6 +639,49 @@ scenarios:
       ```
 
       预期：HTTP 200 OK，包含 `choices` 字段 —— Prefill 与 Decode 节点协作正常。
+
+- npu: Atlas 300I DUO
+  precision: W8A8
+  deployment: Single-Node
+  case: 300I DUO(TP)
+  tags: [310p-single]
+  strategy: single_node_310p
+  steps:
+  - title: 启动服务
+    content: |-
+      Atlas 300I DUO 单节点部署。目前仅支持 **TP** 场景——根据可用设备选择 TP=2 或 TP=4。
+
+      ```bash
+      #!/bin/sh
+      # 通过 ModelScope 加载模型以加快下载
+      export VLLM_USE_MODELSCOPE=True
+
+      # 模型权重路径；可以是 ModelScope 模型 id（如 Eco-Tech/Qwen3.5-27B-w8a8-mtp）或本地目录路径
+      export MODEL_PATH=Eco-Tech/Qwen3.5-27B-w8a8-mtp
+
+      vllm serve $MODEL_PATH \
+      --host 127.0.0.1 \
+      --port 1025 \
+      --tensor-parallel-size 4 \
+      --served-model-name qwen3.5 \
+      --max-num-seqs 128 \
+      --max-model-len 16384 \
+      --trust-remote-code \
+      --gpu-memory-utilization 0.90 \
+      --mamba-ssm-cache-dtype float16 \
+      --dtype float16 \
+      --speculative-config '{"method": "qwen3_5_mtp","num_speculative_tokens":1}' \
+      --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY", "cudagraph_capture_sizes": [1,8]}' \
+      --additional-config '{"ascend_compilation_config": {"enable_npugraph_ex": false}}'
+      ```
+
+      > - `--tensor-parallel-size`：根据可用设备选择 TP=2 或 TP=4。
+      > - `--max-model-len 16384` 在 Atlas 300I DUO 上故意保守设置。
+      > - `--dtype float16` 与 `--mamba-ssm-cache-dtype float16` 匹配 Atlas 推理执行路径。
+      > - 量化版本需要加上 `--quantization ascend` 参数。
+  - title: 服务验证
+    content: |-
+      服务启动后，通过发送 prompt 验证其运行状态。使用示例请参考下方的验证部分。
 
 verification: |-
   服务启动后，日志应显示：

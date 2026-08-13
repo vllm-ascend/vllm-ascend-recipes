@@ -14,6 +14,7 @@ meta:
   hardware:
     atlas_800_a3: verified
     atlas_800_a2: verified
+    atlas_300i_duo: verified
 
 model:
   model_id: "Qwen/Qwen3.6-27B"
@@ -35,6 +36,7 @@ model:
   docker_image:
     atlas_800_a2: "quay.io/ascend/vllm-ascend:v0.23.0rc1"
     atlas_800_a3: "quay.io/ascend/vllm-ascend:v0.23.0rc1-a3"
+    atlas_300i_duo: "quay.io/ascend/vllm-ascend:v0.23.0rc1-310p"
   nightly_required: false
   install:
     # Ascend 推荐 Docker 方式;pip 需源码编译,不提供官方 wheel,隐藏 pip 标签。
@@ -94,6 +96,7 @@ variants:
 compatible_strategies:
   - single_node_A2
   - single_node_A3
+  - single_node_310p
   - pd_cluster
 
 hardware_overrides: {}
@@ -506,6 +509,8 @@ scenarios:
       > **Why TP=2 + DP=8 (DP-first)?** The model is only ~30 GB and fits in a single NPU. TP > 1 is only needed for models that don't fit in one NPU. Maximizing DP keeps all 16 NPUs busy with independent request batches — this is the standard pattern for small dense models.
   - title: Prefill node — `run_dp_template.sh`
     content: |-
+      Get the template from the repository examples: [run_dp_template.sh](https://github.com/vllm-project/vllm-ascend/blob/main/examples/external_online_dp/run_dp_template.sh).
+
       ```shell
       nic_name="xxx"
       local_ip="141.xx.xx.1"
@@ -557,7 +562,7 @@ scenarios:
       ```
   - title: Decode node — `run_dp_template.sh`
     content: |-
-      Same shell setup as prefill node, but `local_ip="141.xx.xx.2"` (decode node IP). The vllm serve command differs:
+      Same shell setup as prefill node, but `local_ip="141.xx.xx.2"` (decode node IP). The vllm serve command differs. Get the template from the repository examples: [run_dp_template.sh](https://github.com/vllm-project/vllm-ascend/blob/main/examples/external_online_dp/run_dp_template.sh).
 
       ```shell
       vllm serve your_model_path \
@@ -594,6 +599,8 @@ scenarios:
       ```
   - title: Launch the DP engine on each node
     content: |-
+      Get [launch_online_dp.py](https://github.com/vllm-project/vllm-ascend/blob/main/examples/external_online_dp/launch_online_dp.py) from the repository examples, then start the DP engines:
+
       ```shell
       # p0 (Prefill node 0)
       python launch_online_dp.py --dp-size 8 --tp-size 2 --dp-size-local 8 --dp-rank-start 0 \
@@ -604,6 +611,8 @@ scenarios:
       ```
   - title: Run the proxy on the prefill master node
     content: |-
+      Get [load_balance_proxy_server_example.py](https://github.com/vllm-project/vllm-ascend/blob/main/examples/disaggregated_prefill_v1/load_balance_proxy_server_example.py), then run it on the prefill master node:
+
       ```shell
       python load_balance_proxy_server_example.py \
         --port 1999 \
@@ -630,6 +639,49 @@ scenarios:
       ```
 
       Expected: HTTP 200 OK with a `choices` field — prefill and decode nodes are correctly cooperating.
+
+- npu: Atlas 300I DUO
+  precision: W8A8
+  deployment: Single-Node
+  case: 300I DUO (TP)
+  tags: [310p-single]
+  strategy: single_node_310p
+  steps:
+  - title: Start the server
+    content: |-
+      Atlas 300I DUO single-node deployment. Currently only the **TP** scenario is supported — choose TP=2 or TP=4 according to the available devices.
+
+      ```bash
+      #!/bin/sh
+      # Load model from ModelScope to speed up download
+      export VLLM_USE_MODELSCOPE=True
+
+      # Model weight path; can be a ModelScope model id (e.g., Eco-Tech/Qwen3.5-27B-w8a8-mtp) or a local directory path
+      export MODEL_PATH=Eco-Tech/Qwen3.5-27B-w8a8-mtp
+
+      vllm serve $MODEL_PATH \
+      --host 127.0.0.1 \
+      --port 1025 \
+      --tensor-parallel-size 4 \
+      --served-model-name qwen3.5 \
+      --max-num-seqs 128 \
+      --max-model-len 16384 \
+      --trust-remote-code \
+      --gpu-memory-utilization 0.90 \
+      --mamba-ssm-cache-dtype float16 \
+      --dtype float16 \
+      --speculative-config '{"method": "qwen3_5_mtp","num_speculative_tokens":1}' \
+      --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY", "cudagraph_capture_sizes": [1,8]}' \
+      --additional-config '{"ascend_compilation_config": {"enable_npugraph_ex": false}}'
+      ```
+
+      > - `--tensor-parallel-size`: choose TP=2 or TP=4 according to the available devices.
+      > - `--max-model-len 16384` is intentionally conservative on Atlas 300I DUO.
+      > - `--dtype float16` and `--mamba-ssm-cache-dtype float16` match the Atlas inference execution path.
+      > - The quantized versions need to start with the `--quantization ascend` parameter.
+  - title: Service Verification
+    content: |-
+      After the service is started, verify it is running by sending a prompt. Refer to the verification section below for a usage example.
 
 verification: |-
   After the service starts, the log should show:
