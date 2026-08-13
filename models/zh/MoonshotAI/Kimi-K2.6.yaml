@@ -1,0 +1,750 @@
+meta:
+  title: "Kimi-K2.6"
+  slug: "kimi-k2-6"
+  provider: "Moonshot AI"
+  description: "原生多模态智能体模型，基于 Kimi-K2-Base 在约 15 万亿图文混合 token 上持续预训练，融合视觉与语言理解，支持即时/思考模式以及对话/智能体范式。"
+  date_added: 2026-08-13
+  date_updated: 2026-08-13
+  difficulty: advanced
+  tasks:
+    - text
+    - image
+    - video
+  related_recipes:
+    - "moonshotai/Kimi-K2.5"
+  performance_headline: "1T/32B MoE 多模态智能体模型 — 基于 W4A8 权重的单机与多机 PD 分离部署"
+  hardware:
+    atlas_800_a3: verified
+    atlas_800_a2: verified
+
+model:
+  model_id: "moonshotai/Kimi-K2.6"
+  performance_model_names:
+    - "Kimi-K2.6"
+  min_vllm_version: "v0.20.0rc1"
+  architecture: moe
+  parameter_count: "1T"
+  active_parameters: "32B"
+  context_length: 262144
+  modality: text
+  base_args:
+    - "--trust-remote-code"
+    - "--quantization"
+    - "ascend"
+    - "--tool-call-parser"
+    - "kimi_k2"
+    - "--reasoning-parser"
+    - "kimi_k2"
+    - "--served-model-name"
+    - "kimi_k26"
+    - "--enable-expert-parallel"
+    - "--mm-encoder-tp-mode"
+    - "data"
+  base_env:
+    HCCL_OP_EXPANSION_MODE: "AIV"
+    PYTORCH_NPU_ALLOC_CONF: "expandable_segments:True"
+    OMP_PROC_BIND: "false"
+    OMP_NUM_THREADS: "1"
+    TASK_QUEUE_ENABLE: "1"
+  docker_image:
+    atlas_800_a2: "quay.io/ascend/vllm-ascend:v0.20.0rc1"
+    atlas_800_a3: "quay.io/ascend/vllm-ascend:v0.20.0rc1-a3"
+  nightly_required: false
+  install:
+    # Ascend 推荐 Docker 方式；pip 需源码编译，隐藏 pip 标签。
+    pip: false
+    docker:
+      command: "docker run --rm --name vllm-ascend --shm-size=1g --net=host --privileged=true --device /dev/davinci0 --device /dev/davinci1 --device /dev/davinci2 --device /dev/davinci3 --device /dev/davinci4 --device /dev/davinci5 --device /dev/davinci6 --device /dev/davinci7 --device /dev/davinci8 --device /dev/davinci9 --device /dev/davinci10 --device /dev/davinci11 --device /dev/davinci12 --device /dev/davinci13 --device /dev/davinci14 --device /dev/davinci15 --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc -it quay.io/ascend/vllm-ascend:v0.20.0rc1-a3 bash"
+      note: "Ascend 官方镜像；完整的设备/驱动挂载见 env_setup.container。"
+
+features:
+  tool_calling:
+    description: "Kimi-K2 原生工具调用"
+    args: ["--enable-auto-tool-choice", "--tool-call-parser", "kimi_k2"]
+  reasoning:
+    description: "Kimi-K2 思考模式"
+    args: ["--reasoning-parser", "kimi_k2"]
+  expert_parallel:
+    description: "跨 DP rank 的 MoE 专家并行"
+    args: ["--enable-expert-parallel"]
+  flashcomm1:
+    label: "FlashComm1"
+    description: "Prefill 节点的 FlashComm 通信优化"
+    env:
+      VLLM_ASCEND_ENABLE_FLASHCOMM1: "1"
+  mlapo:
+    label: "MLAPO"
+    description: "Decode 节点的 MLAPO 融合算子"
+    env:
+      VLLM_ASCEND_ENABLE_MLAPO: "1"
+  prefix_caching:
+    label: "Prefix Caching"
+    description: "KV 缓存前缀缓存（--enable-prefix-caching / --no-enable-prefix-caching）"
+    args: ["--enable-prefix-caching"]
+    flag_when_false: "--no-enable-prefix-caching"
+
+opt_in_features:
+  - prefix_caching
+
+variants:
+  default:
+    model_id: "Eco-Tech/Kimi-K2.6-W4A8"
+    precision: W4A8
+    vram_minimum_gb: 600
+    description: "Atlas 800 A3（或 2× A2）上的 W4A8 权重 — 单机或多机 PD"
+    supported_hardware: [atlas_800_a2, atlas_800_a3]
+
+compatible_strategies:
+  - single_node_A3
+  - pd_cluster
+
+dependencies:
+  - note: "使用 ModelScope 下载 W4A8 权重"
+    command: "pip install modelscope"
+
+guide: ""
+
+overview: |-
+  Kimi-K2.6 是一个开源的原生多模态智能体模型，基于 Kimi-K2-Base 在约 15 万亿图文混合
+  token 上持续预训练而来。它融合了视觉与语言理解，具备先进的智能体能力、即时与思考两种
+  模式，以及对话与智能体两种范式。
+
+  本 Ascend recipe 使用 W4A8 权重 `Eco-Tech/Kimi-K2.6-W4A8`，即针对 Atlas NPU 优化的
+  4-bit 权重 / 8-bit 激活量化版本。本文档展示模型的主要验证步骤，包括支持的特性、特性
+  配置、环境准备、单机与多机部署、精度与性能评估。
+
+  本文档基于 **vLLM-Ascend v0.20.0rc1** 验证并编写，Kimi-K2.6 在该版本中首次得到支持。
+
+weight_download:
+- weight_version: W4A8 (Pre-quantized)
+  sources:
+  - source: ModelScope
+    url: https://www.modelscope.cn/models/Eco-Tech/Kimi-K2.6-W4A8
+    command: |-
+      ```bash
+      pip install modelscope
+      modelscope download --model Eco-Tech/Kimi-K2.6-W4A8
+      ```
+- weight_version: Eagle3 MTP (draft model)
+  sources:
+  - source: HuggingFace
+    url: https://huggingface.co/lightseekorg/kimi-k2.6-eagle3
+    command: |-
+      ```bash
+      huggingface-cli download lightseekorg/kimi-k2.6-eagle3
+      ```
+- weight_version: DFlash (speculative decoding)
+  sources:
+  - source: HuggingFace
+    url: https://huggingface.co/z-lab/Kimi-K2.5-DFlash
+    command: |-
+      ```bash
+      huggingface-cli download z-lab/Kimi-K2.5-DFlash
+      ```
+
+prerequisites:
+- title: Model Weight
+  content: |-
+    - `Kimi-K2.6-w4a8`（W4A8 量化版本）：需要 1 台 Atlas 800 A3（64GB × 16）或 2 台 Atlas 800 A2（64GB × 8）。[下载模型权重](https://www.modelscope.cn/models/Eco-Tech/Kimi-K2.6-W4A8)。
+    - `kimi-k2.6-eagle3`（用于加速 Kimi-K2.6 推理的 Eagle3 MTP 草稿模型）：[下载模型权重](https://huggingface.co/lightseekorg/kimi-k2.6-eagle3)。
+    - `Kimi-K2.5-DFlash`（利用轻量级块扩散模型做并行草稿生成的投机解码框架）：[下载模型权重](https://huggingface.co/z-lab/Kimi-K2.5-DFlash)。
+
+    建议将模型权重下载到多节点共享目录，例如 `/root/.cache/`。
+- title: Verify Multi-node Communication
+  content: |-
+    如需部署多机环境，请按照[多机通信环境验证](https://docs.vllm.ai/projects/ascend/zh-cn/latest/installation.html#verify-multi-node-communication)验证多机通信。
+
+env_setup:
+  container:
+    A3:
+      content: |-
+        根据机器类型选择镜像，并在节点上启动 docker 镜像，参考[使用 docker](https://docs.vllm.ai/projects/ascend/zh-cn/latest/installation.html#set-up-using-docker)。
+
+        在每个节点上启动 docker 镜像。
+
+        ```shell
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.20.0rc1-a3
+        docker run --rm \
+            --name vllm-ascend \
+            --shm-size=1g \
+            --net=host \
+            --privileged=true \
+            --device /dev/davinci0 \
+            --device /dev/davinci1 \
+            --device /dev/davinci2 \
+            --device /dev/davinci3 \
+            --device /dev/davinci4 \
+            --device /dev/davinci5 \
+            --device /dev/davinci6 \
+            --device /dev/davinci7 \
+            --device /dev/davinci8 \
+            --device /dev/davinci9 \
+            --device /dev/davinci10 \
+            --device /dev/davinci11 \
+            --device /dev/davinci12 \
+            --device /dev/davinci13 \
+            --device /dev/davinci14 \
+            --device /dev/davinci15 \
+            --device /dev/davinci_manager \
+            --device /dev/devmm_svm \
+            --device /dev/hisi_hdc \
+            -v /usr/local/dcmi:/usr/local/dcmi \
+            -v /usr/local/Ascend/driver/tools/hccn_tool:/usr/local/Ascend/driver/tools/hccn_tool \
+            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+            -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \
+            -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
+            -v /etc/ascend_install.info:/etc/ascend_install.info \
+            -v /root/.cache:/root/.cache \
+            -it $IMAGE bash
+        ```
+    A2:
+      content: |-
+        根据机器类型选择镜像，并在节点上启动 docker 镜像，参考[使用 docker](https://docs.vllm.ai/projects/ascend/zh-cn/latest/installation.html#set-up-using-docker)。
+
+        在每个节点上启动 docker 镜像。
+
+        ```shell
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.20.0rc1
+        docker run --rm \
+            --name vllm-ascend \
+            --shm-size=1g \
+            --net=host \
+            --privileged=true \
+            --device /dev/davinci0 \
+            --device /dev/davinci1 \
+            --device /dev/davinci2 \
+            --device /dev/davinci3 \
+            --device /dev/davinci4 \
+            --device /dev/davinci5 \
+            --device /dev/davinci6 \
+            --device /dev/davinci7 \
+            --device /dev/davinci_manager \
+            --device /dev/devmm_svm \
+            --device /dev/hisi_hdc \
+            -v /usr/local/dcmi:/usr/local/dcmi \
+            -v /usr/local/Ascend/driver/tools/hccn_tool:/usr/local/Ascend/driver/tools/hccn_tool \
+            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+            -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \
+            -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
+            -v /etc/ascend_install.info:/etc/ascend_install.info \
+            -v /root/.cache:/root/.cache \
+            -it $IMAGE bash
+        ```
+
+        启动成功后，可通过 `docker ps` 命令验证容器服务是否正常运行。
+  pip:
+    content: |-
+      如不想使用上述 docker 镜像，也可从源码编译安装：
+
+      - 从源码安装 `vllm-ascend`，参考[安装文档](https://docs.vllm.ai/projects/ascend/zh-cn/latest/installation.html)。
+
+      如需部署多机环境，需在每个节点上配置环境。
+
+      使用 tool_calls 特性时，请确保 transformers 版本不高于 4.57.6。如果 vllm-ascend 已升级到 v0.21 或更高版本，此要求不再适用。
+
+scenarios:
+- npu: Atlas 800I A3
+  precision: W4A8
+  deployment: 单节点-多卡
+  case: 高吞吐
+  tags: [a3-single]
+  strategy: single_node_A3
+  steps:
+  - title: 启动服务
+    content: |-
+      单节点部署在同一节点内完成 Prefill 与 Decode。量化模型 `Kimi-K2.6-w4a8` 可部署在 1 台 Atlas 800 A3（64G × 16）上。
+
+      单节点部署支持所有输入/输出场景，但如需获得最佳性能，建议考虑多节点部署。
+
+      ```shell
+      export HCCL_OP_EXPANSION_MODE="AIV"
+      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+      export OMP_PROC_BIND=false
+      export OMP_NUM_THREADS=1
+      export TASK_QUEUE_ENABLE=1
+      export VLLM_ASCEND_ENABLE_MLAPO=1
+      # [可选] jemalloc
+      # jemalloc 用于提升性能，如果机器上已安装 `libjemalloc.so`，可以开启。
+      export LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libjemalloc.so.2:$LD_PRELOAD
+      echo performance | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
+      sysctl -w vm.swappiness=0
+      sysctl -w kernel.numa_balancing=0
+      sysctl -w kernel.sched_migration_cost_ns=50000
+      export HCCL_BUFFSIZE=600
+      export VLLM_ASCEND_ENABLE_FLASHCOMM1=1
+      export VLLM_ASCEND_BALANCE_SCHEDULING=0
+
+      vllm serve Eco-Tech/Kimi-K2.6-W4A8 \
+          --quantization ascend \
+          --tool-call-parser kimi_k2 \
+          --reasoning-parser kimi_k2 \
+          --allowed-local-media-path / \
+          --served-model-name kimi_k26 \
+          --trust-remote-code \
+          --tensor-parallel-size 4 \
+          --data-parallel-size 4 \
+          --no-enable-prefix-caching \
+          --enable-expert-parallel \
+          --port 8000 \
+          --max-num-seqs 4 \
+          --max-model-len 34816 \
+          --max-num-batched-tokens 16384 \
+          --gpu-memory-utilization 0.87 \
+          --seed 42 \
+          --async-scheduling \
+          --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY"}' \
+          --profiler-config '{"profiler": "torch", "torch_profiler_dir": "./vllm_profile", "torch_profiler_with_stack": true}' \
+          --mm-processor-cache-gb 0 \
+          --mm-encoder-tp-mode data \
+          --additional-config '{"enable_balance_scheduling": true}' \
+          --speculative-config '{"method": "dflash","model": "z-lab/Kimi-K2.5-DFlash", "num_speculative_tokens": 15}'
+      ```
+
+      关键参数说明：
+
+      - 设置环境变量 `VLLM_ASCEND_BALANCE_SCHEDULING=1` 可开启负载均衡调度，可能有助于提升输出吞吐并降低 v1 调度器中的 TPOT，但在某些场景下 TTFT 可能变差。此外，在 PD 分离场景下不建议开启该特性。
+      - `--max-model-len` 指定最大上下文长度，即单个请求输入与输出 token 之和。若输入长度 3.5K、输出长度 1.5K 的性能测试，`16384` 已足够；精度测试请至少设为 `35000`。
+      - `--no-enable-prefix-caching` 表示关闭前缀缓存；如需开启，请移除该选项。
+      - `--mm-encoder-tp-mode` 指定如何使用张量并行（TP）优化多模态编码器推理；对于多模态输入，推荐使用 `data`。
+      - 若使用 w4a8 权重，将为 KV 缓存分配更多显存，可尝试增大 `--max-num-seqs` 以提升系统吞吐。
+
+      常见问题提示：如遇到问题，请参考[公共 FAQ](https://docs.vllm.ai/projects/ascend/zh-cn/latest/faqs.html)排查。
+  - title: 服务验证
+    content: |-
+      ```shell
+      curl http://<node_ip>:8000/v1/chat/completions \
+          -H "Content-Type: application/json" \
+          -d '{
+              "model": "kimi_k26",
+              "messages": [{
+                  "role": "user",
+                  "content": [
+                  {
+                      "type": "text",
+                      "text": "The future of AI is"
+                  }]
+              }],
+              "max_tokens": 1024,
+              "temperature": 1.0,
+              "top_p": 0.95
+          }'
+      ```
+
+      预期结果：
+
+      服务返回 HTTP 200 OK，JSON 响应中包含 `choices` 字段。
+- npu: Atlas 800I A3
+  precision: W4A8
+  deployment: 多节点-PD分离
+  case: PD 分离
+  tags: [pd-multinode]
+  strategy: pd_cluster
+  steps:
+  - title: 概述
+    content: |-
+      建议使用 Mooncake 进行部署：[Mooncake](https://docs.vllm.ai/projects/ascend/zh-cn/latest/tutorials/features/pd_disaggregation_mooncake_multi_node.html)。
+
+      在标准单节点部署模式下，Prefill（提示处理）与 Decode（token 生成）任务在同一组 NPU 上运行，可能带来两个问题：
+
+      1. **Prefill 抢占中断 Decode**：Prefill 是计算密集型任务，一次性处理整个输入上下文，而 Decode 逐个生成 token。当新用户请求到达时，其 Prefill 阶段可能抢占并中断正在进行的 Decode 任务，造成抖动与更高的每输出 token 时延（TPOT）。
+      2. **资源分配不灵活**：Prefill 与 Decode 的计算特征根本不同——Prefill 是计算密集且内存带宽密集，Decode 是内存带宽密集。在同一硬件上运行二者会做出两边都不尽如人意的折中。
+
+      PD（Prefill-Decode）分离通过在专用节点组上分别运行 Prefill 与 Decode 来解决这些问题，每组独立配置：
+
+      - **Prefill 节点**专注于高吞吐提示处理，针对计算与通信优化（如启用 FlashComm 加速 Allreduce）。
+      - **Decode 节点**专注于低时延 token 生成，针对内存带宽优化（如启用 MLAPO 融合算子）。
+
+      该架构推荐用于同时要求稳定时延与高吞吐的生产级并发多用户工作负载。
+
+      以 Atlas 800 A3（64G × 16）为例，推荐部署 2P1D（4 节点）而非 1P1D（2 节点），因为在 1P1D 情况下 NPU 显存不足以支撑高并发。
+
+      - `Kimi-K2.6-w4a8 2P1D`：需要 4 台 Atlas 800 A3（64G × 16）。
+  - title: 准备辅助脚本
+    content: |-
+      要运行 vllm-ascend 的 Prefill-Decode 分离服务，需在每个节点部署 `launch_online_dp.py` 与 `run_dp_template.sh` 脚本，并在 prefill 主节点部署代理脚本以转发请求。
+
+      - [launch_online_dp.py](https://github.com/vllm-project/vllm-ascend/blob/main/examples/external_online_dp/launch_online_dp.py)
+      - [load_balance_proxy_server_example.py](https://github.com/vllm-project/vllm-ascend/blob/main/examples/disaggregated_prefill_v1/load_balance_proxy_server_example.py)
+
+      `launch_online_dp.py` 参数说明：
+
+      | 参数 | 类型 | 必填 | 默认值 | 说明 |
+      | --- | --- | --- | --- | --- |
+      | `--dp-size` | int | 是 | - | 数据并行大小（所有节点上的 DP rank 总数）。 |
+      | `--tp-size` | int | 否 | 1 | 每个 DP rank 内的张量并行大小。 |
+      | `--dp-size-local` | int | 否 | （同 `--dp-size`） | 当前节点上的 DP rank 数。 |
+      | `--dp-rank-start` | int | 否 | 0 | 当前节点数据并行 rank 的起始偏移。 |
+      | `--dp-address` | str | 是 | - | 数据并行主节点（node 0）的 IP 地址。 |
+      | `--dp-rpc-port` | str | 否 | 12345 | 数据并行主节点通信的 RPC 端口。 |
+      | `--vllm-start-port` | int | 否 | 9000 | 当前节点每个 vLLM 引擎实例的起始端口。 |
+  - title: 配置 Prefill 节点
+    content: |-
+      在每个 prefill 节点上设置网卡与 IP，并以 `kv_producer` 角色启动 vLLM 引擎。以下展示 Node 0（Prefill）；Node 1（Prefill）除 `local_ip`、`engine_id`、`kv_port` 不同外其余相同。
+
+      ```shell
+      # 通过 ifconfig 获取
+      # nic_name 是当前节点 local_ip 对应的网卡名
+      nic_name="xxx"
+      local_ip="141.xx.xx.1"
+
+      # node0_ip 的值必须与 node0（主节点）中设置的 local_ip 一致
+      node0_ip="xxxx"
+
+      export HCCL_IF_IP=$local_ip
+      export GLOO_SOCKET_IFNAME=$nic_name
+      export TP_SOCKET_IFNAME=$nic_name
+      export HCCL_SOCKET_IFNAME=$nic_name
+      export VLLM_RPC_TIMEOUT=3600000
+      export VLLM_EXECUTE_MODEL_TIMEOUT_SECONDS=30000
+      export HCCL_EXEC_TIMEOUT=204
+      export HCCL_CONNECT_TIMEOUT=120
+      export HCCL_OP_EXPANSION_MODE="AIV"
+      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+      export OMP_PROC_BIND=false
+      export OMP_NUM_THREADS=1
+      export TASK_QUEUE_ENABLE=1
+      export ASCEND_BUFFER_POOL=4:8
+      export LD_LIBRARY_PATH=/usr/local/Ascend/ascend-toolkit/latest/python/site-packages/mooncake:$LD_LIBRARY_PATH
+      export HCCL_BUFFSIZE=1536
+      export VLLM_ASCEND_ENABLE_FLASHCOMM1=1
+      export ASCEND_RT_VISIBLE_DEVICES=$1
+
+      vllm serve Eco-Tech/Kimi-K2.6-W4A8 \
+          --host 0.0.0.0 \
+          --port $2 \
+          --data-parallel-size $3 \
+          --data-parallel-rank $4 \
+          --data-parallel-address $5 \
+          --data-parallel-rpc-port $6 \
+          --tensor-parallel-size $7 \
+          --enable-expert-parallel \
+          --seed 1024 \
+          --quantization ascend \
+          --served-model-name kimi_k26 \
+          --trust-remote-code \
+          --max-num-seqs 1 \
+          --max-model-len 133120 \
+          --max-num-batched-tokens 16384 \
+          --no-enable-prefix-caching \
+          --gpu-memory-utilization 0.92 \
+          --enforce-eager \
+          --enable-auto-tool-choice \
+          --tool-call-parser kimi_k2 \
+          --reasoning-parser kimi_k2 \
+          --additional-config '{"recompute_scheduler_enable":true,"enable_shared_expert_dp": true}' \
+          --mm-encoder-tp-mode data \
+          --kv-transfer-config \
+          '{"kv_connector": "MooncakeConnectorV1",
+          "kv_role": "kv_producer",
+          "kv_port": "30000",
+          "engine_id": "0",
+          "kv_connector_extra_config": {
+                  "use_ascend_direct": true,
+                  "prefill": {
+                          "dp_size": 4,
+                          "tp_size": 4
+                  },
+                  "decode": {
+                          "dp_size": 8,
+                          "tp_size": 4
+                  }
+              }
+          }'
+      ```
+  - title: 配置 Decode 节点
+    content: |-
+      在每个 decode 节点上以 `kv_consumer` 角色启动 vLLM 引擎。以下展示 Node 0（Decode）；Node 1（Decode）除 `local_ip`、`engine_id`、`kv_port` 不同外其余相同。
+
+      ```shell
+      nic_name="xxx"
+      local_ip="141.xx.xx.3"
+      node0_ip="xxxx"
+
+      export HCCL_IF_IP=$local_ip
+      export GLOO_SOCKET_IFNAME=$nic_name
+      export TP_SOCKET_IFNAME=$nic_name
+      export HCCL_SOCKET_IFNAME=$nic_name
+      export VLLM_RPC_TIMEOUT=3600000
+      export VLLM_EXECUTE_MODEL_TIMEOUT_SECONDS=30000
+      export HCCL_EXEC_TIMEOUT=204
+      export HCCL_CONNECT_TIMEOUT=120
+      export HCCL_OP_EXPANSION_MODE="AIV"
+      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+      export OMP_PROC_BIND=false
+      export OMP_NUM_THREADS=1
+      export TASK_QUEUE_ENABLE=1
+      export ASCEND_BUFFER_POOL=4:8
+      export LD_LIBRARY_PATH=/usr/local/Ascend/ascend-toolkit/latest/python/site-packages/mooncake:$LD_LIBRARY_PATH
+      export HCCL_BUFFSIZE=800
+      export VLLM_ASCEND_ENABLE_MLAPO=1
+      export ASCEND_RT_VISIBLE_DEVICES=$1
+
+      vllm serve Eco-Tech/Kimi-K2.6-W4A8 \
+          --host 0.0.0.0 \
+          --port $2 \
+          --data-parallel-size $3 \
+          --data-parallel-rank $4 \
+          --data-parallel-address $5 \
+          --data-parallel-rpc-port $6 \
+          --tensor-parallel-size $7 \
+          --enable-expert-parallel \
+          --seed 1024 \
+          --quantization ascend \
+          --served-model-name kimi_k26 \
+          --trust-remote-code \
+          --max-num-seqs 8 \
+          --max-model-len 133720 \
+          --max-num-batched-tokens 32 \
+          --no-enable-prefix-caching \
+          --gpu-memory-utilization 0.91 \
+          --enable-auto-tool-choice \
+          --tool-call-parser kimi_k2 \
+          --reasoning-parser kimi_k2 \
+          --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY"}' \
+          --additional-config '{"recompute_scheduler_enable":true,"multistream_overlap_shared_expert": true}' \
+          --speculative-config '{"method": "eagle3", "model":"lightseekorg/kimi-k2.6-eagle3", "num_speculative_tokens": 3}' \
+          --kv-transfer-config \
+          '{"kv_connector": "MooncakeConnectorV1",
+          "kv_role": "kv_consumer",
+          "kv_port": "30200",
+          "engine_id": "2",
+          "kv_connector_extra_config": {
+                  "prefill": {
+                          "dp_size": 4,
+                          "tp_size": 4
+                  },
+                  "decode": {
+                          "dp_size": 8,
+                          "tp_size": 4
+                  }
+              }
+          }'
+      ```
+
+      关键参数说明：
+
+      - `VLLM_ASCEND_ENABLE_FLASHCOMM1=1` 在 prefill 节点上启用通信优化。
+      - `VLLM_ASCEND_ENABLE_MLAPO=1` 启用融合算子，可显著提升性能但会占用更多 NPU 显存。在 PD 分离场景下，仅在 decode 节点启用 MLAPO。
+      - `recompute_scheduler_enable: true` 启用重计算调度器。当 decode 节点的 KV 缓存不足时，请求将被发送到 prefill 节点重计算 KV 缓存。在 PD 分离场景下，建议在 prefill 与 decode 节点上同时启用该配置。
+      - `multistream_overlap_shared_expert: true`：当 TP 大小为 1 或启用 `enable_shared_expert_dp: true` 时，额外启用一个流来重叠共享专家的计算过程。
+  - title: 在各节点启动服务
+    content: |-
+      ```shell
+      # p0
+      python launch_online_dp.py --dp-size 4 --tp-size 4 --dp-size-local 4 --dp-rank-start 0 --dp-address 141.xx.xx.1 --dp-rpc-port 12321 --vllm-start-port 7100
+      # p1
+      python launch_online_dp.py --dp-size 4 --tp-size 4 --dp-size-local 4 --dp-rank-start 0 --dp-address 141.xx.xx.2 --dp-rpc-port 12321 --vllm-start-port 7100
+      # d0
+      python launch_online_dp.py --dp-size 8 --tp-size 4 --dp-size-local 4 --dp-rank-start 0 --dp-address 141.xx.xx.3 --dp-rpc-port 12321 --vllm-start-port 7100
+      # d1
+      python launch_online_dp.py --dp-size 8 --tp-size 4 --dp-size-local 4 --dp-rank-start 4 --dp-address 141.xx.xx.3 --dp-rpc-port 12321 --vllm-start-port 7100
+      ```
+  - title: 在 Prefill 主节点运行代理
+    content: |-
+      在与 prefill 服务实例相同的节点上运行代理服务器。
+
+      ```shell
+      python load_balance_proxy_server_example.py \
+        --port 1999 \
+        --host 141.xx.xx.1 \
+        --prefiller-hosts \
+          141.xx.xx.1 \
+          141.xx.xx.1 \
+          141.xx.xx.1 \
+          141.xx.xx.1 \
+          141.xx.xx.2 \
+          141.xx.xx.2 \
+          141.xx.xx.2 \
+          141.xx.xx.2 \
+        --prefiller-ports \
+          7100 7101 7102 7103 7100 7101 7102 7103 \
+        --decoder-hosts \
+          141.xx.xx.3 \
+          141.xx.xx.3 \
+          141.xx.xx.3 \
+          141.xx.xx.3 \
+          141.xx.xx.4 \
+          141.xx.xx.4 \
+          141.xx.xx.4 \
+          141.xx.xx.4 \
+        --decoder-ports \
+          7100 7101 7102 7103 \
+          7100 7101 7102 7103 \
+      ```
+
+      ```shell
+      cd vllm-ascend/examples/disaggregated_prefill_v1/
+      bash proxy.sh
+      ```
+  - title: 部署验证
+    content: |-
+      PD 分离服务完全启动后，通过 prefill 主节点上的代理端口发送请求，验证 Prefill 与 Decode 节点是否协同工作：
+
+      ```shell
+      curl http://141.xx.xx.1:1999/v1/chat/completions \
+          -H "Content-Type: application/json" \
+          -d '{
+              "model": "kimi_k26",
+              "messages": [{
+                  "role": "user",
+                  "content": [
+                  {
+                      "type": "text",
+                      "text": "The future of AI is"
+                  }]
+              }],
+              "max_tokens": 1024,
+              "temperature": 1.0,
+              "top_p": 0.95
+          }'
+      ```
+
+      预期结果：
+
+      代理返回 HTTP 200 OK。JSON 响应中包含 `choices` 字段及生成的文本，说明 Prefill 节点已成功处理提示、Decode 节点已生成响应。
+
+verification: |-
+  服务启动后，可使用输入提示查询模型：
+
+  ```shell
+  curl http://<node0_ip>:<port>/v1/chat/completions \
+      -H "Content-Type: application/json" \
+      -d '{
+          "model": "kimi_k26",
+          "messages": [{
+              "role": "user",
+              "content": [
+              {
+                  "type": "text",
+                  "text": "The future of AI is"
+              }]
+          }],
+          "max_tokens": 1024,
+          "temperature": 1.0,
+          "top_p": 0.95
+      }'
+  ```
+
+  预期结果：
+
+  服务返回 HTTP 200 OK。JSON 响应中包含 `choices` 字段及生成的文本，并附带 usage 统计信息。
+
+evaluation:
+  accuracy:
+    content: |-
+      这里给出一种精度评估方法。
+
+      ### 使用 AISBench
+
+      1. 详情参考[使用 AISBench](https://docs.vllm.ai/projects/ascend/zh-cn/latest/developer_guide/evaluation/using_ais_bench.html)。
+
+      2. 执行后可得到结果。以下是 `Kimi-K2.6-w4a8` 在 `vllm-ascend:v0.20.0rc1` 上的结果，仅供参考。
+
+      | dataset | version | metric | mode | vllm-api-general-chat | note |
+      | ----- | ----- | ----- | ----- | ----- | ----- |
+      | AIME2026 | - | accuracy | gen | 90.00 | 1 Atlas 800 A3 (64G × 16) |
+      | GPQA | - | accuracy | gen | 89.90 | 1 Atlas 800 A3 (64G × 16) |
+      | MMMU | - | accuracy | gen | 82.67 | 1 Atlas 800 A3 (64G × 16) |
+  performance:
+    content: |-
+      ### 使用 AISBench
+
+      详情参考[使用 AISBench 进行性能评估](https://docs.vllm.ai/projects/ascend/zh-cn/latest/developer_guide/evaluation/using_ais_bench.html#execute-performance-evaluation)。
+
+      ### 使用 vLLM Benchmark
+
+      以 `Kimi-K2.6-w4a8` 为例进行性能评估，详情参考 [vllm benchmark](https://docs.vllm.ai/en/latest/benchmarking/)。
+
+      `vllm bench` 有三个子命令：
+
+      - `latency`：基准测试单批请求的时延。
+      - `serve`：基准测试在线服务吞吐。
+      - `throughput`：基准测试离线推理吞吐。
+
+      以 `serve` 为例，运行如下命令。
+
+      ```shell
+      vllm bench serve --model Eco-Tech/Kimi-K2.6-w4a8 --dataset-name random --random-input 1024 --num-prompts 200 --request-rate 1 --save-result --result-dir ./
+      ```
+
+      大约几分钟后即可得到性能评估结果。
+
+performance:
+  accuracy: |-
+    ### 使用 AISBench
+
+    1. 详情参考[使用 AISBench](https://docs.vllm.ai/projects/ascend/zh-cn/latest/developer_guide/evaluation/using_ais_bench.html)。
+
+    2. 执行后可得到结果。以下是 `Kimi-K2.6-w4a8` 在 `vllm-ascend:v0.20.0rc1` 上的结果，仅供参考。
+
+    | dataset | version | metric | mode | vllm-api-general-chat | note |
+    | ----- | ----- | ----- | ----- | ----- | ----- |
+    | AIME2026 | - | accuracy | gen | 90.00 | 1 Atlas 800 A3 (64G × 16) |
+    | GPQA | - | accuracy | gen | 89.90 | 1 Atlas 800 A3 (64G × 16) |
+    | MMMU | - | accuracy | gen | 82.67 | 1 Atlas 800 A3 (64G × 16) |
+  benchmark: |-
+    ### 推荐配置
+
+    > **注意**：以下配置在特定测试环境中验证，仅供参考。最优配置取决于最大输入/输出长度、前缀缓存命中率、精度要求以及部署机器配比等因素。建议根据实际情况参考调优指南。
+
+    #### 表 1：场景概览
+
+    > `*Total NPUs` 表示所有节点使用的 NPU 总数。1 节点 = 1 台 Atlas 800 A3（64G × 16 NPU）。
+
+    | 场景 | 部署模式 | *Total NPUs | 权重版本 | 关键考虑 |
+    | --- | --- | --- | --- | --- |
+    | 高吞吐（16k 输入） | 单节点混合 | 16 (A3) | kimi-k2.6-w4a8 | 使用 dp2 tp8 平衡显存容量与计算效率 |
+    | 高吞吐（16k 输入） | 1P1D 部署 | 32 (A3) | kimi-k2.6-w4a8 | P 与 D 节点均 dp2 tp8；平衡时延与吞吐 |
+    | 高吞吐（16k 输入） | 2P1D 部署 | 64 (A3) | kimi-k2.6-w4a8 | 跨节点从 dp4 tp4 扩展到 dp8 tp4 |
+    | 长上下文（128k，无前缀缓存） | 单节点混合 | 16 (A3) | kimi-k2.6-w4a8 | dp1 tp16 最大化 TP，容纳极端上下文长度 |
+    | 长上下文（128k，有前缀缓存） | 单节点混合 | 16 (A3) | kimi-k2.6-w4a8 | dp2 tp8 优化内存带宽并提升缓存利用率 |
+    | 多模态（1080P） | 单节点混合 | 16 (A3) | kimi-k2.6-w4a8 | 高分辨率视觉输入使用 dp1 tp16 |
+    | 多模态（1080P） | 1P1D 部署 | 32 (A3) | kimi-k2.6-w4a8 | 视内存与并发选择 dp2 tp8 或 dp16 tp1 |
+    | 多模态（1080P） | 2P1D 部署 | 64 (A3) | kimi-k2.6-w4a8 | dp8 tp2 到 dp32 tp1，最大化重多模态负载吞吐 |
+
+    #### 表 2：节点详细配置
+
+    | 场景 | 配置 | NPUs | TP | DP | Max Model Len | MTP Speculation Num |
+    | --- | --- | --- | --- | --- | --- | --- |
+    | 高吞吐 / 低时延（16k） | Server / 单机 | 16 | 8 | 2 | 17k | 15 |
+    | 高吞吐 / 低时延（16k） | Server-P 节点 | 16 | 8 | 2 | 17k | 3 |
+    | 高吞吐 / 低时延（16k） | Server-D 节点 | 16 | 8 | 2 | 17k | 3 |
+    | 长上下文（128k，无缓存） | Server / 单机 | 16 | 16 | 1 | 130k | 15 |
+    | 长上下文（128k，有缓存） | Server / 单机 | 16 | 8 | 2 | 130k | 15 |
+    | 多模态（1080P） | Server / 单机 | 16 | 16 | 1 | 17k | 15 |
+    | 多模态（1080P） | Server-P 节点 | 16 | 8 | 2 | 17k | 3 |
+    | 多模态（1080P） | Server-D 节点 | 16 | 1 | 16 | 17k | 3 |
+
+    > 完整启动命令与参数说明请参考部署章节中的部署示例。
+
+    **注意：**
+
+    `max-model-len` 与 `max-num-seqs` 需要根据实际使用场景设置。其他设置请参考部署章节。
+
+tuning: |-
+  ### 调优指南
+
+  调优方法请参考[公开性能调优文档](https://docs.vllm.ai/projects/ascend/zh-cn/latest/developer_guide/performance_and_debug/optimization_and_tuning.html)。
+
+  特性详细说明请参考[特性指南](https://docs.vllm.ai/projects/ascend/zh-cn/latest/user_guide/support_matrix/feature_matrix.html)。
+
+faq: |-
+  常见环境、安装与通用参数问题请参考[公共 FAQ](https://docs.vllm.ai/projects/ascend/zh-cn/latest/faqs.html)；本章仅涉及模型相关问题。
+
+  - **Q：使用 tool_calls 特性需要什么 transformers 版本？**
+
+    A：使用 tool_calls 特性时，请确保 transformers 版本不高于 4.57.6。如果 vllm-ascend 已升级到 v0.21 或更高版本，此要求不再适用。
+
+references:
+- title: ModelScope 模型下载
+  url: https://www.modelscope.cn/models/Eco-Tech/Kimi-K2.6-W4A8
+- title: Eagle3 草稿模型
+  url: https://huggingface.co/lightseekorg/kimi-k2.6-eagle3
+- title: DFlash 投机解码
+  url: https://huggingface.co/z-lab/Kimi-K2.5-DFlash
+- title: PD 分离部署指南（Mooncake）
+  url: https://docs.vllm.ai/projects/ascend/zh-cn/latest/tutorials/features/pd_disaggregation_mooncake_multi_node.html
+- title: vllm-ascend 文档
+  url: https://docs.vllm.ai/projects/ascend/zh-cn/latest/tutorials/models/Kimi-K2.6.html
+- title: vllm-ascend GitHub
+  url: https://github.com/vllm-project/vllm-ascend
