@@ -133,6 +133,12 @@ extra_config:
 - **Use official hardware names**: write `Atlas 300I DUO` (or `Atlas 800I A2/A3`), not generic "Atlas inference products".
 - **Weight download is required**: every recipe must have `weight_download` (the page renders weight chips near the top from it).
 - **Blockquotes**: lines starting with `>` are rendered as styled blockquotes by the site — don't use literal `>` inside prose expecting it to stay text.
+- **Never nest code blocks inside blockquotes**: lines like `> ```bash` make the renderer emit code with a literal `>` prefix. Keep the `>` note as plain text and put the command in a standalone fenced block below it.
+- **No English section names in zh prose**: in `models/zh/**`, refer to sections by their Chinese page titles (e.g. "参见下方“功能验证”部分", never "参见下方 `verification` 部分"). The YAML field keys stay as-is (`verification:`); only prose changes.
+- **No mixed-language product names in zh**: write `Atlas 300I DUO`, not "Atlas 300I DUO昇腾产品" (or similar suffixes). Keep zh product names identical to en (brand names are not translated).
+- **Image version is model-linked, not global**: resolve `{{ vllm_ascend_version }}` to the version the tutorial specifies for that model (e.g. Qwen3.5-27B/Qwen3.6-27B → `v0.18.0rc1`, with Atlas 300I DUO → `v0.23.0rc1-310p` per tutorial), not one global version. Keep the tutorial's own "validated against" / "supported starting" statements untouched.
+- **`meta.tasks` must not duplicate `model.modality`**: the page renders both as tags, so `tasks: [text]` + `modality: text` shows "text" twice. Only add tasks values that differ from the modality.
+- **Weight download placement**: the page renders `weight_download` chips automatically inside the Prerequisites tab — don't duplicate weight links in `overview` / `prerequisites` prose.
 
 ### Atlas 300I DUO (310p)
 
