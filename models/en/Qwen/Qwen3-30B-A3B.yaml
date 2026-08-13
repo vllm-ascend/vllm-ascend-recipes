@@ -5,6 +5,10 @@ meta:
   description: "A Mixture-of-Experts (MoE) model in the Qwen3 series, featuring 30.5B total parameters with 3.3B activated per token. The sparse MoE architecture enables efficient training and inference, delivering strong performance across reasoning, instruction-following, and agent capabilities while maintaining lower computational cost."
   date_added: 2026-07-07
   performance_headline: "Single-node deployment on Atlas 800 A2/A3 with W8A8 precision"
+  date_updated: 2026-07-07
+  difficulty: intermediate
+  related_recipes:
+    - "Qwen/Qwen3.6-27B"
   hardware:
     atlas_800_a3: verified
     atlas_800_a2: verified

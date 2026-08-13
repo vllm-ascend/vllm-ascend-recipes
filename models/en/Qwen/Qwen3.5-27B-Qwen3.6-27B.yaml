@@ -34,15 +34,15 @@ model:
     OMP_NUM_THREADS: "1"
     TASK_QUEUE_ENABLE: "1"
   docker_image:
-    atlas_800_a2: "quay.io/ascend/vllm-ascend:v0.23.0rc1"
-    atlas_800_a3: "quay.io/ascend/vllm-ascend:v0.23.0rc1-a3"
+    atlas_800_a2: "quay.io/ascend/vllm-ascend:v0.18.0rc1"
+    atlas_800_a3: "quay.io/ascend/vllm-ascend:v0.18.0rc1-a3"
     atlas_300i_duo: "quay.io/ascend/vllm-ascend:v0.23.0rc1-310p"
   nightly_required: false
   install:
     # Ascend recommends Docker; pip requires source build (no official wheel), so the pip tab is hidden.
     pip: false
     docker:
-      command: "docker run --rm --net=host --shm-size=512g -v /root/.cache/modelscope:/root/.cache/modelscope --device /dev/davinci0 --device /dev/davinci1 ... --device /dev/davinci7 -it quay.io/ascend/vllm-ascend:v0.23.0rc1 bash"
+      command: "docker run --rm --net=host --shm-size=512g -v /root/.cache/modelscope:/root/.cache/modelscope --device /dev/davinci0 --device /dev/davinci1 ... --device /dev/davinci7 -it quay.io/ascend/vllm-ascend:v0.18.0rc1 bash"
       note: "Official Ascend image; full device/driver mounts are covered in env_setup.container."
 
 # —— Upstream alignment: features / variants / strategies / overrides / guide ——
@@ -302,16 +302,17 @@ env_setup:
       pip show vllm-ascend
       ```
 
-      > **On Atlas 300I DUO**, you may need to uninstall `triton-ascend` and `triton` to avoid dependency conflicts:
-      > ```bash
-      > pip uninstall -y triton-ascend triton
-      > ```
+      > **On Atlas 300I DUO**, you may need to uninstall `triton-ascend` and `triton` to avoid dependency conflicts.
+
+      ```bash
+      pip uninstall -y triton-ascend triton
+      ```
 
   container:
     "Atlas 800 A3":
       content: |-
         ```bash
-        export IMAGE=m.daocloud.io/quay.io/ascend/vllm-ascend:v0.23.0rc1-a3
+        export IMAGE=m.daocloud.io/quay.io/ascend/vllm-ascend:v0.18.0rc1-a3
         docker run --rm \
             --name vllm-ascend \
             --shm-size=1g \
@@ -333,7 +334,7 @@ env_setup:
     "Atlas 800 A2":
       content: |-
         ```bash
-        export IMAGE=m.daocloud.io/quay.io/ascend/vllm-ascend:v0.23.0rc1
+        export IMAGE=m.daocloud.io/quay.io/ascend/vllm-ascend:v0.18.0rc1
         docker run --rm \
             --name vllm-ascend \
             --shm-size=1g \
