@@ -270,9 +270,10 @@ export default function PrepareTabs({
                 <div className="flex flex-wrap gap-1.5">
                   {weightLinks.map((wl) => (
                     <a
+                      key={wl.source}
                       href={wl.url}
                       target="_blank"
-                      rel="noopener"
+                      rel="noreferrer"
                       className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-mono text-ink-500 hover:text-accent-400 border border-transparent hover:border-accent-500/20 rounded transition-colors"
                     >
                       <svg
