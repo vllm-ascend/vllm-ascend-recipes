@@ -1156,6 +1156,17 @@ evaluation:
 
       Refer to [vllm benchmark](https://docs.vllm.ai/en/latest/contributing/) for more details.
 performance:
+  accuracy: |-
+    ### Using AISBench
+
+    1. Refer to [Using AISBench](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/evaluation/using_ais_bench.html) for details.
+
+    2. After execution, you can get the result.
+
+    | dataset | version | metric | mode | vllm-api-general-chat | note |
+    | ----- | ----- | ----- | ----- | ----- | ----- |
+    | GPQA | - | accuracy | gen | 88.17 | 1 Atlas 800 A3 (128G × 8) |
+    | GSM8K | - | accuracy | gen | 96.30 | 1 Atlas 800 A3 (128G × 8) |
   benchmark: |-
     ### Recommended Configurations
 

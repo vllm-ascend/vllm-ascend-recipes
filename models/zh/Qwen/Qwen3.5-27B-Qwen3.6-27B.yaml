@@ -131,13 +131,13 @@ overview: |-
 
   硬件支持：
     - Atlas 800 A3 (64G × 16)：单节点 + 多节点 PD 分离
-    - Atlas 800 A2 (64G × 8)：仅支持单节点（推理型 A2 包括 300I / 800I 同样**不支持**多节点 PD 分离）
+    - Atlas 800 A2 (64G × 8)：仅支持单节点（Atlas 300I DUO A2 包括 300I / 800I 同样**不支持**多节点 PD 分离）
     - **最低版本要求**（参考 vllm-ascend release notes）：
       - `Qwen3.5-27B`：`vllm-ascend:v0.17.0rc1` 起支持
       - `Qwen3.6-27B`：`vllm-ascend:v0.18.0rc1` 起支持
-      - 推理型昇腾产品（A2 300I 推理等）：`vllm-ascend:v0.23.0rc1` 起支持
+      - Atlas 300I DUO昇腾产品（A2 300I 推理等）：`vllm-ascend:v0.23.0rc1` 起支持
       - 在 Atlas 800 A3 上跑 Qwen3.6-27B，请使用对应的 `v0.18.0rc1-a3`（或更新的 `-a3`）镜像
-      - 在推理型昇腾产品上，请使用 `vllm-ascend:v0.23.0rc1-310p`（或更新的 `-310p`）镜像
+      - 在Atlas 300I DUO昇腾产品上，请使用 `vllm-ascend:v0.23.0rc1-310p`（或更新的 `-310p`）镜像
 
   本文档基于 `vllm-ascend:v0.23.0rc1` 验证。**强烈建议使用最新的 rc 或正式版本**以获得最佳兼容性和最新特性。
 
@@ -279,7 +279,7 @@ prerequisites:
   content: |-
     - **Atlas 800 A3** (64G × 16)：单节点部署至少 1 个节点；多节点 PD 分离至少 2 个节点。
     - **Atlas 800 A2** (64G × 8)：单节点部署至少 1 个节点；该平台不支持多节点 PD 分离。
-    - **推理型昇腾产品**（A2 300I 推理等）：至少 2 个设备；仅支持 TP 模式（TP=2 或 TP=4）。
+    - **Atlas 300I DUO昇腾产品**（A2 300I 推理等）：至少 2 个设备；仅支持 TP 模式（TP=2 或 TP=4）。
 
 - title: 多节点通信（仅在使用 PD 分离时需要）
   content: |-
@@ -299,7 +299,7 @@ env_setup:
       pip show vllm-ascend
       ```
 
-      > **在推理型昇腾产品上**，可能需要卸载 `triton-ascend` 和 `triton` 以避免依赖冲突：
+      > **在Atlas 300I DUO昇腾产品上**，可能需要卸载 `triton-ascend` 和 `triton` 以避免依赖冲突：
       > ```bash
       > pip uninstall -y triton-ascend triton
       > ```
@@ -347,7 +347,7 @@ env_setup:
             -v /root/.cache:/root/.cache \
             -it $IMAGE bash
         ```
-    "推理型昇腾产品":
+    "Atlas 300I DUO昇腾产品":
       content: |-
         ```bash
         export IMAGE=m.daocloud.io/quay.io/ascend/vllm-ascend:v0.23.0rc1-310p
@@ -501,7 +501,7 @@ scenarios:
   steps:
   - title: 拓扑（1P1D，每节点 TP=2 + DP=8）
     content: |-
-      使用 **2 台 Atlas 800 A3 (64G × 16)** —— 一台 Prefill 节点，一台 Decode 节点。每节点运行 `TP=2 + DP=8`，充分利用全部 16 个 NPU。推理型昇腾产品**不支持**多节点 PD 分离。
+      使用 **2 台 Atlas 800 A3 (64G × 16)** —— 一台 Prefill 节点，一台 Decode 节点。每节点运行 `TP=2 + DP=8`，充分利用全部 16 个 NPU。Atlas 300I DUO昇腾产品**不支持**多节点 PD 分离。
 
       > **为什么是 TP=2 + DP=8（DP-first）？** 模型仅 ~30 GB，单卡 64 GB HBM 即可放下。TP > 1 仅用于放不下的模型。最大化 DP 让 16 个 NPU 各自处理独立的请求 batch —— 这是小稠密模型的标准模式。
   - title: Prefill 节点 —— `run_dp_template.sh`
@@ -669,7 +669,14 @@ verification: |-
   预期：HTTP 200 OK，`choices` 字段包含生成的文本。
 
 performance:
-  accuracy: "Qwen3.5-27B-w8a8 在 vllm-ascend:v0.17.0rc1 上跑 gsm8k（AISBench）准确率为 96.74。Qwen3.6-27B-w8a8 采用相同评估方法 —— 结果未在此列出，请通过 AISBench 自行获取。"
+  accuracy: |-
+    ### 使用 AISBench
+
+    参考 [使用 AISBench](https://docs.vllm.ai/projects/ascend/zh-cn/latest/developer_guide/evaluation/using_ais_bench.html) 了解详情。Qwen3.5-27B-w8a8 在 vllm-ascend:v0.17.0rc1 上跑 gsm8k 的准确率为 **96.74**。Qwen3.6-27B-w8a8 采用相同评估方法 —— 结果未在此列出，请通过 AISBench 自行获取。
+  benchmark: |-
+    ### 使用 vLLM Benchmark
+
+    参考 [vllm benchmark](https://docs.vllm.ai/en/latest/benchmarking/) 了解详情（`latency`、`throughput` 和 `serve` 模式）。
 
 evaluation:
   accuracy:
@@ -732,7 +739,7 @@ tuning: |-
 
   **并行策略**：`Qwen3.5-27B-w8a8` 和 `Qwen3.6-27B-w8a8` 约 30 GB，单卡 64 GB HBM 即可放下。按 **DP-first** 原则，**TP=2 是大多数场景的推荐默认值**；剩余 NPU 走 DP 处理并行请求 batch。**TP=8 仅推荐用于超长上下文（256K+）场景**，将 KV cache 分片到 8 个 NPU 以扩大上下文窗口。
 
-  **推理型昇腾产品**：仅支持 TP —— 选择 **TP=2** 或 **TP=4**。**TP=4** 时 `--max-model-len` 可支持 **128K** 与 **256K** 长序列场景。
+  **Atlas 300I DUO昇腾产品**：仅支持 TP —— 选择 **TP=2** 或 **TP=4**。**TP=4** 时 `--max-model-len` 可支持 **128K** 与 **256K** 长序列场景。
 
   | 场景 | 部署 | *NPU 数 | 权重 | 说明 |
   |----------|------------|-------|--------|-------|
@@ -756,7 +763,7 @@ tuning: |-
     - `--gpu-memory-utilization`：调高分配更多 KV cache；**过高有 OOM 风险**（warm-up 峰值 HBM 可能超过均值）
     - `--max-num-batched-tokens`：越大延迟越低，但 HBM 激活内存压力更大
     - `--no-enable-prefix-caching`：混合 Qwen3.5/3.6 KV cache 必须开启（block_size 会涨到 2048，短前缀不会被缓存）
-    - `--speculative-config`：Qwen3.5 与 Qwen3.6 共用 `qwen3_5_mtp` 头；推理型昇腾产品设 `num_speculative_tokens: 1`
+    - `--speculative-config`：Qwen3.5 与 Qwen3.6 共用 `qwen3_5_mtp` 头；Atlas 300I DUO昇腾产品设 `num_speculative_tokens: 1`
     - `--compilation-config cudagraph_mode=FULL_DECODE_ONLY`：推荐；PIECEWISE 是另一选项
     - 在 **PD 分离**上，开启 `VLLM_ASCEND_ENABLE_FLASHCOMM1=1`，decode 节点上开启 `recompute_scheduler_enable:true`
 

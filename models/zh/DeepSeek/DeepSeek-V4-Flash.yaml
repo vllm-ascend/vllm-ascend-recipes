@@ -1127,6 +1127,17 @@ evaluation:
 
       参考 [vllm benchmark](https://docs.vllm.ai/en/latest/contributing/) 了解更多详情。
 performance:
+  accuracy: |-
+    ### 使用 AISBench
+
+    1. 参考 [使用 AISBench](https://docs.vllm.ai/projects/ascend/zh-cn/latest/developer_guide/evaluation/using_ais_bench.html) 了解详情。
+
+    2. 执行后，您可以获得结果。
+
+    | 数据集 | 版本 | 指标 | 模式 | vllm-api-general-chat | 备注 |
+    | ----- | ----- | ----- | ----- | ----- | ----- |
+    | GPQA | - | accuracy | gen | 88.17 | 1 Atlas 800 A3（128G × 8） |
+    | GSM8K | - | accuracy | gen | 96.30 | 1 Atlas 800 A3（128G × 8） |
   benchmark: |-
     ### 推荐配置
 

@@ -131,13 +131,13 @@ overview: |-
 
   Hardware support:
     - Atlas 800 A3 (64G × 16): single-node + multi-node PD separation
-    - Atlas 800 A2 (64G × 8): single-node only (multi-node PD separation is **not** supported on Atlas inference products — including 300I / 800I A2 inference variants that share the same path)
+    - Atlas 800 A2 (64G × 8): single-node only (multi-node PD separation is **not** supported on Atlas 300I DUO — including 300I / 800I A2 inference variants that share the same path)
     - **Minimum versions** (per vllm-ascend release notes):
       - `Qwen3.5-27B`: first supported in `vllm-ascend:v0.17.0rc1`
       - `Qwen3.6-27B`: first supported in `vllm-ascend:v0.18.0rc1`
-      - Atlas inference products (A2 300I inference / etc.): supported starting `vllm-ascend:v0.23.0rc1`
+      - Atlas 300I DUO (A2 300I inference / etc.): supported starting `vllm-ascend:v0.23.0rc1`
       - For Qwen3.6-27B on Atlas 800 A3, use the matching `v0.18.0rc1-a3` (or later `-a3`) image
-      - For Atlas inference products, use `vllm-ascend:v0.23.0rc1-310p` (or later `-310p`) image
+      - For Atlas 300I DUO, use `vllm-ascend:v0.23.0rc1-310p` (or later `-310p`) image
 
   This document is validated against `vllm-ascend:v0.23.0rc1`. It is **strongly recommended to use the latest release candidate (rc) or official version** of `vllm-ascend` for best compatibility and access to the latest features.
 
@@ -279,7 +279,7 @@ prerequisites:
   content: |-
     - **Atlas 800 A3** (64G × 16): 1 node minimum for single-node; 2 nodes for multi-node PD separation.
     - **Atlas 800 A2** (64G × 8): 1 node minimum; multi-node PD separation not supported on this platform.
-    - **Atlas inference products** (A2 300I inference etc.): at least 2 devices; only TP mode supported (TP=2 or TP=4).
+    - **Atlas 300I DUO** (A2 300I inference etc.): at least 2 devices; only TP mode supported (TP=2 or TP=4).
 
 - title: Multi-node communication (only if using PD separation)
   content: |-
@@ -299,7 +299,7 @@ env_setup:
       pip show vllm-ascend
       ```
 
-      > **On Atlas inference products**, you may need to uninstall `triton-ascend` and `triton` to avoid dependency conflicts:
+      > **On Atlas 300I DUO**, you may need to uninstall `triton-ascend` and `triton` to avoid dependency conflicts:
       > ```bash
       > pip uninstall -y triton-ascend triton
       > ```
@@ -347,7 +347,7 @@ env_setup:
             -v /root/.cache:/root/.cache \
             -it $IMAGE bash
         ```
-    "Atlas inference products":
+    "Atlas 300I DUO":
       content: |-
         ```bash
         export IMAGE=m.daocloud.io/quay.io/ascend/vllm-ascend:v0.23.0rc1-310p
@@ -501,7 +501,7 @@ scenarios:
   steps:
   - title: Layout (1P1D, TP=2 + DP=8 per node)
     content: |-
-      Use **2 Atlas 800 A3 (64G × 16)** nodes — one Prefill node, one Decode node. Each node runs `TP=2 + DP=8`, fully utilizing all 16 NPUs. Multi-node PD separation is **not supported on Atlas inference products**.
+      Use **2 Atlas 800 A3 (64G × 16)** nodes — one Prefill node, one Decode node. Each node runs `TP=2 + DP=8`, fully utilizing all 16 NPUs. Multi-node PD separation is **not supported on Atlas 300I DUO**.
 
       > **Why TP=2 + DP=8 (DP-first)?** The model is only ~30 GB and fits in a single NPU. TP > 1 is only needed for models that don't fit in one NPU. Maximizing DP keeps all 16 NPUs busy with independent request batches — this is the standard pattern for small dense models.
   - title: Prefill node — `run_dp_template.sh`
@@ -669,7 +669,14 @@ verification: |-
   Expected: HTTP 200 OK with a `choices` field containing generated text.
 
 performance:
-  accuracy: "Qwen3.5-27B-w8a8 in vllm-ascend:v0.17.0rc1 on gsm8k (AISBench): 96.74 accuracy. Qwen3.6-27B-w8a8 follows the same evaluation methodology — results not listed here, run via AISBench to obtain."
+  accuracy: |-
+    ### Using AISBench
+
+    Refer to [Using AISBench](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/evaluation/using_ais_bench.html) for details. Qwen3.5-27B-w8a8 in vllm-ascend:v0.17.0rc1 on gsm8k: **96.74 accuracy**. Qwen3.6-27B-w8a8 follows the same evaluation methodology — results not listed here, run via AISBench to obtain.
+  benchmark: |-
+    ### Using vLLM Benchmark
+
+    Refer to [vllm benchmark](https://docs.vllm.ai/en/latest/benchmarking/) for details (`latency`, `throughput` and `serve` modes).
 
 evaluation:
   accuracy:
@@ -732,7 +739,7 @@ tuning: |-
 
   **Parallelism strategy**: `Qwen3.5-27B-w8a8` and `Qwen3.6-27B-w8a8` are ~30 GB and fit in a single 64 GB HBM NPU. Following the **DP-first** principle, **TP=2 is the recommended default** for most scenarios; remaining NPUs go to DP for parallel request batches. **TP=8 is only recommended for ultra-long context (256K+) scenarios** to shard KV cache across 8 NPUs.
 
-  **Atlas inference products**: only TP is supported — choose **TP=2** or **TP=4**. With **TP=4**, `--max-model-len` can support **128K** and **256K** long-sequence scenarios.
+  **Atlas 300I DUO**: only TP is supported — choose **TP=2** or **TP=4**. With **TP=4**, `--max-model-len` can support **128K** and **256K** long-sequence scenarios.
 
   | Scenario | Deployment | *NPUs | Weight | Notes |
   |----------|------------|-------|--------|-------|
@@ -756,7 +763,7 @@ tuning: |-
     - `--gpu-memory-utilization`: increase to allocate more KV cache; **risk of OOM** if too high (peak HBM during warm-up can exceed average)
     - `--max-num-batched-tokens`: larger = lower latency but higher HBM activation memory pressure
     - `--no-enable-prefix-caching`: required for hybrid Qwen3.5/3.6 KV cache (block_size grows to 2048; short prefixes are never cached)
-    - `--speculative-config`: both Qwen3.5 and Qwen3.6 share the `qwen3_5_mtp` head; on Atlas inference products set `num_speculative_tokens: 1`
+    - `--speculative-config`: both Qwen3.5 and Qwen3.6 share the `qwen3_5_mtp` head; on Atlas 300I DUO set `num_speculative_tokens: 1`
     - `--compilation-config cudagraph_mode=FULL_DECODE_ONLY`: recommended; PIECEWISE is the other option
     - On **PD separation**, enable `VLLM_ASCEND_ENABLE_FLASHCOMM1=1` and `recompute_scheduler_enable:true` on the decode node
 

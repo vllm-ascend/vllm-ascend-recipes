@@ -209,8 +209,8 @@ prerequisites:
 
     | 模型                  | 硬件需求                                                                                         | 下载                                                                     |
     | -------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------ |
-    | Qwen3-30B-A3B (BF16) | Atlas 800I A3 (64G, 1\~2 卡)<br>Atlas 800I A2 (64G, 2\~4 卡) | [下载](https://www.modelscope.cn/models/Qwen/Qwen3-30B-A3B)              |
-    | Qwen3-30B-A3B-W8A8   | Atlas 800I A3 (64G, 1\~2 卡)<br>Atlas 800I A2 (64G, 2\~4 卡)                                     | [下载](https://www.modelscope.cn/models/Eco-Tech/Qwen3-30B-A3B-w8a8)     |
+    | Qwen3-30B-A3B (BF16) | Atlas 800I A3 (64G, 1~2 卡)<br>Atlas 800I A2 (64G, 2~4 卡) | [下载](https://www.modelscope.cn/models/Qwen/Qwen3-30B-A3B)              |
+    | Qwen3-30B-A3B-W8A8   | Atlas 800I A3 (64G, 1~2 卡)<br>Atlas 800I A2 (64G, 2~4 卡)                                     | [下载](https://www.modelscope.cn/models/Eco-Tech/Qwen3-30B-A3B-w8a8)     |
     | Eagle3 Draft Model   | 不适用                                                                                           | [下载](https://huggingface.co/AngelSlim/Qwen3-a3B_eagle3)                |
 
     以上为推荐卡数，可根据实际情况调整。
@@ -656,6 +656,18 @@ evaluation:
           --result-dir ./
       ```
 performance:
+  accuracy: |-
+    ### 使用 AISBench
+
+    参考 [使用 AISBench](https://docs.vllm.ai/projects/ascend/zh-cn/latest/developer_guide/evaluation/using_ais_bench.html) 了解详情。
+
+    **精度结果(Atlas 800I A3,vLLM-Ascend v0.22.1rc,W8A8):**
+
+    | 数据集        | 指标                    | 得分    |
+    | ------------- | ----------------------- | ------ |
+    | GSM8K         | accuracy (4-shot CoT)   | 92.87% |
+    | GPQA-Diamond  | accuracy (0-shot CoT)   | 60.10% |
+    | AIME 2024     | accuracy (0-shot)       | 76.67% |
   benchmark: |-
     ### 推荐配置
 

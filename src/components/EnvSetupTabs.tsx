@@ -85,7 +85,11 @@ export default function EnvSetupTabs({ envSetupEn, envSetupZh }: EnvSetupTabsPro
   const hasPip = !!envSetup.pip;
   const hasContainer = !!envSetup.container && Object.keys(envSetup.container).length > 0;
 
-  const [mainTab, setMainTab] = useState<'pip' | 'container'>(hasPip ? 'pip' : 'container');
+  // Docker is the recommended install path on Ascend — default to the
+  // container tab when both exist.
+  const [mainTab, setMainTab] = useState<'pip' | 'container'>(
+    hasContainer ? 'container' : 'pip',
+  );
 
   const containerNpus = useMemo(() => {
     if (!envSetup.container) return [];

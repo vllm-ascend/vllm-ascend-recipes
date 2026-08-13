@@ -5,8 +5,7 @@ export const translations = {
     siteTitle: 'vLLM-Ascend Recipes',
     siteDescription:
       'Deploy any model on Ascend NPUs — community-maintained vllm-ascend deployment recipes',
-    siteSubtitle:
-      'Community-maintained recipes for Atlas 800 A2/A3, Atlas 300I and other Ascend NPU hardware',
+    siteSubtitle: 'Community-maintained deployment recipes for Ascend NPUs',
     navBrowse: 'Browse',
     navDocs: 'Docs',
     navGitHub: 'GitHub',
@@ -16,8 +15,7 @@ export const translations = {
     heroHighlight: 'Recipes',
     heroDescription:
       'Deploy any model on Ascend NPUs — pick a model, choose your hardware, copy the vllm serve command and run',
-    heroSubtitle:
-      'Community-maintained recipes for Atlas 800 A2/A3, Atlas 300I and other Ascend NPU hardware',
+    heroSubtitle: 'Community-maintained deployment recipes for Ascend NPUs',
     heroBrowse: 'Browse all models',
     heroGithub: 'GitHub',
     heroH1Pre: 'Deploy any model',
@@ -88,7 +86,7 @@ export const translations = {
   zh: {
     siteTitle: 'vLLM-Ascend Recipes',
     siteDescription: '在 Ascend NPU 上部署任何大模型 — 社区维护的 vllm-ascend 部署指南',
-    siteSubtitle: '社区维护的 vllm-ascend 部署指南，覆盖 Atlas 800 A2/A3, Atlas 300I, 等 NPU 硬件',
+    siteSubtitle: '社区维护的 vllm-ascend 昇腾 NPU 部署指南',
     navBrowse: '浏览',
     navDocs: '文档',
     navGitHub: 'GitHub',
@@ -98,7 +96,7 @@ export const translations = {
     heroHighlight: 'Recipes',
     heroDescription:
       '在 Ascend NPU 上部署任何大模型 — 选模型、选硬件、复制 vllm serve 命令即可运行',
-    heroSubtitle: '社区维护的 vllm-ascend 部署指南，覆盖 Atlas 800 A2/A3, Atlas 300I, 等 NPU 硬件',
+    heroSubtitle: '社区维护的 vllm-ascend 昇腾 NPU 部署指南',
     heroBrowse: '浏览全部模型',
     heroGithub: 'GitHub',
     heroH1Pre: '在 Ascend NPU 上',
