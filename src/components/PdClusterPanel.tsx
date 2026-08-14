@@ -84,14 +84,23 @@ function renderNodeScript(
   endpoints: Record<string, string>,
 ): string {
   const baseKey = role === 'prefill' ? 'PREFILL' : 'DECODE';
-  const ip = endpoints[`${baseKey}_NODE_${nodeIdx + 1}`] || '';
+  const ip = endpoints[`${baseKey}_NODE_${nodeIdx + 1}`];
+  const masterIp = endpoints['PREFILL_NODE_1'];
+  const iface = endpoints['IFACE_NAME'];
 
   let text = template;
-  // local_ip="141.xx.xx.N" / "xx.xx.xx.N" → the node's real IP
-  text = text.replace(
-    /(local_ip\s*=\s*)"(?:\d+\.)?(?:x+\.){2,3}[\dXx]+"/,
-    (_m, prefix) => `${prefix}"${ip}"`,
-  );
+  // local_ip="141.xx.xx.N" → the node's real IP
+  if (ip) {
+    text = text.replace(/(local_ip\s*=\s*)"(?:\d+\.)?(?:x+\.){2,3}[\dXx]+"/, `$1"${ip}"`);
+  }
+  // nic_name="xxx" → fabric interface name
+  if (iface) {
+    text = text.replace(/(nic_name\s*=\s*)"[^"]*"/, `$1"${iface}"`);
+  }
+  // node0_ip="xxxx" → prefill master IP (PREFILL_NODE_1)
+  if (masterIp) {
+    text = text.replace(/(node0_ip\s*=\s*)"[^"]*"/, `$1"${masterIp}"`);
+  }
   text = bumpKvConfig(text, nodeIdx);
   return text;
 }
@@ -169,7 +178,9 @@ export default function PdClusterPanel({ scenario, pdCluster, lang }: PdClusterP
   const renderedScript = renderNodeScript(role, safeIdx, template, endpoints);
   const renderedLaunch = renderLaunchCommand(role, safeIdx, launch, endpoints);
 
-  const ipFields: { key: string; label: string }[] = [];
+  const ipFields: { key: string; label: string }[] = [
+    { key: 'IFACE_NAME', label: t ? 'Fabric NIC / 网卡名' : 'Fabric NIC / interface' },
+  ];
   for (let i = 0; i < prefillNodes; i++)
     ipFields.push({ key: `PREFILL_NODE_${i + 1}`, label: `Prefill Node ${i + 1} IP` });
   for (let i = 0; i < decodeNodes; i++)
@@ -243,8 +254,8 @@ export default function PdClusterPanel({ scenario, pdCluster, lang }: PdClusterP
         </div>
         <div className="mt-2 text-[11px] text-ink-500">
           {t
-            ? '填写各节点真实 IP 后，脚本中的 local_ip / kv_port / engine_id 会自动替换；留空则保留占位符。'
-            : 'Fill in each node IP and the script will substitute local_ip / kv_port / engine_id; empty fields stay as placeholders.'}
+            ? '填写各节点 IP 和网卡名后，脚本中的 local_ip / nic_name / node0_ip / kv_port / engine_id 会自动替换；留空则保留占位符。'
+            : 'Fill in each node IP and NIC name; the script substitutes local_ip / nic_name / node0_ip / kv_port / engine_id. Empty fields stay as placeholders.'}
         </div>
       </div>
 
