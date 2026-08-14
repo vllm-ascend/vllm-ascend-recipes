@@ -98,6 +98,69 @@ compatible_strategies:
   - single_node_A3
   - pd_cluster
 
+# 与上游对齐的声明式 PD-cluster 拓扑。站点据此渲染节点选择（prefill/decode 节点）
+# 与 "Cluster env"，再生成各节点脚本；下方命令式 `scenarios` 仍是 Ascend runner 的
+# CI 执行基线。
+strategy_overrides:
+  pd_cluster:
+    env:
+      HCCL_OP_EXPANSION_MODE: "AIV"
+      PYTORCH_NPU_ALLOC_CONF: "expandable_segments:True"
+      OMP_PROC_BIND: "false"
+      OMP_NUM_THREADS: "1"
+      TASK_QUEUE_ENABLE: "1"
+      ASCEND_BUFFER_POOL: "4:8"
+      VLLM_RPC_TIMEOUT: "3600000"
+      VLLM_EXECUTE_MODEL_TIMEOUT_SECONDS: "30000"
+      HCCL_EXEC_TIMEOUT: "204"
+      HCCL_CONNECT_TIMEOUT: "120"
+      LD_LIBRARY_PATH: "/usr/local/Ascend/ascend-toolkit/latest/python/site-packages/mooncake:$LD_LIBRARY_PATH"
+    prefill:
+      nodes:
+        default: 2
+      parallelism: dep
+      vllm_args:
+        - "--enforce-eager"
+        - "--max-num-seqs"
+        - "1"
+        - "--max-model-len"
+        - "133120"
+        - "--max-num-batched-tokens"
+        - "16384"
+        - "--gpu-memory-utilization"
+        - "0.92"
+        - "--additional-config"
+        - '{"recompute_scheduler_enable":true,"enable_shared_expert_dp": true}'
+        - "--kv-transfer-config"
+        - '{"kv_connector":"MooncakeConnectorV1","kv_role":"kv_producer","kv_port":"30000","engine_id":"0","kv_connector_extra_config":{"use_ascend_direct":true,"prefill":{"dp_size":4,"tp_size":4},"decode":{"dp_size":8,"tp_size":4}}}'
+      env:
+        HCCL_BUFFSIZE: "1536"
+        VLLM_ASCEND_ENABLE_FLASHCOMM1: "1"
+    decode:
+      nodes:
+        default: 2
+      parallelism: dep
+      vllm_args:
+        - "--max-num-seqs"
+        - "8"
+        - "--max-model-len"
+        - "133720"
+        - "--max-num-batched-tokens"
+        - "32"
+        - "--gpu-memory-utilization"
+        - "0.91"
+        - "--compilation-config"
+        - '{"cudagraph_mode": "FULL_DECODE_ONLY"}'
+        - "--additional-config"
+        - '{"recompute_scheduler_enable":true,"multistream_overlap_shared_expert": true}'
+        - "--speculative-config"
+        - '{"method": "eagle3", "model":"lightseekorg/kimi-k2.6-eagle3", "num_speculative_tokens": 3}'
+        - "--kv-transfer-config"
+        - '{"kv_connector":"MooncakeConnectorV1","kv_role":"kv_consumer","kv_port":"30200","engine_id":"2","kv_connector_extra_config":{"prefill":{"dp_size":4,"tp_size":4},"decode":{"dp_size":8,"tp_size":4}}}'
+      env:
+        HCCL_BUFFSIZE: "800"
+        VLLM_ASCEND_ENABLE_MLAPO: "1"
+
 dependencies:
   - note: "使用 ModelScope 下载 W4A8 权重"
     command: "pip install modelscope"
@@ -530,14 +593,10 @@ scenarios:
   - title: 在各节点启动服务
     content: |-
       ```shell
-      # p0
-      python launch_online_dp.py --dp-size 4 --tp-size 4 --dp-size-local 4 --dp-rank-start 0 --dp-address 141.xx.xx.1 --dp-rpc-port 12321 --vllm-start-port 7100
-      # p1
-      python launch_online_dp.py --dp-size 4 --tp-size 4 --dp-size-local 4 --dp-rank-start 0 --dp-address 141.xx.xx.2 --dp-rpc-port 12321 --vllm-start-port 7100
-      # d0
-      python launch_online_dp.py --dp-size 8 --tp-size 4 --dp-size-local 4 --dp-rank-start 0 --dp-address 141.xx.xx.3 --dp-rpc-port 12321 --vllm-start-port 7100
-      # d1
-      python launch_online_dp.py --dp-size 8 --tp-size 4 --dp-size-local 4 --dp-rank-start 4 --dp-address 141.xx.xx.3 --dp-rpc-port 12321 --vllm-start-port 7100
+      # Prefill — 每个 prefill 节点都是自己的 DP master（dp-address = 本机 IP）
+      python launch_online_dp.py --dp-size 4 --tp-size 4 --dp-size-local 4 --dp-rank-start 0 --dp-address xx.xx.xx.1 --dp-rpc-port 12321 --vllm-start-port 7100
+      # Decode — 一个 DP 组跨节点（dp-rank-start 按节点递增）
+      python launch_online_dp.py --dp-size 8 --tp-size 4 --dp-size-local 4 --dp-rank-start 0 --dp-address xx.xx.xx.3 --dp-rpc-port 12321 --vllm-start-port 7100
       ```
   - title: 在 Prefill 主节点运行代理
     content: |-
