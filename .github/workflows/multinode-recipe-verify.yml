@@ -162,7 +162,11 @@ jobs:
 
   multinode-verify:
     needs: prepare
-    if: needs.prepare.outputs.should_run == 'true'
+    # Fork PRs never receive the KUBECONFIG_B64 secret (GitHub does not pass
+    # secrets to pull_request events from forks), so the kubeconfig gate fails
+    # and the job hangs in its 1h diagnostic hold. Skip the whole job for forks;
+    # same-repo PRs and workflow_dispatch still run.
+    if: needs.prepare.outputs.should_run == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false)
     # Run on the lighter a2b4-1 runner pool: the controller is CPU-only
     # (kubectl + python over the kubeconfig secret) and does not need NPU
     # machines (a2b4-8 is an 8-card node — wasteful for a pure controller).
