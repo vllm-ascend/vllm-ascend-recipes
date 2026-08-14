@@ -174,16 +174,6 @@ overview: |-
   Kimi-K2-Base. It integrates vision and language understanding with advanced agentic
   capabilities, instant and thinking modes, as well as conversational and agentic
   paradigms.
-
-  The Ascend recipe uses the W4A8 checkpoint `Eco-Tech/Kimi-K2.6-W4A8`, a 4-bit weight /
-  8-bit activation quantized variant optimized for Atlas NPUs. This document shows the
-  main verification steps of the model, including supported features, feature
-  configuration, environment preparation, single-node and multi-node deployment,
-  accuracy and performance evaluation.
-
-  This document is validated and written based on **vLLM-Ascend v0.20.0rc1**. The
-  current model (Kimi-K2.6) is first supported in this version.
-
 weight_download:
 - weight_version: W4A8 (Pre-quantized)
   sources:

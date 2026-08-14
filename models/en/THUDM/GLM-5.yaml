@@ -127,13 +127,7 @@ config_params:
     description: "Fraction of NPU memory available for the KV cache"
 
 overview: |-
-  GLM-5 and GLM-5.1 are Mixture-of-Experts (MoE) models from Zhipu AI (THUDM), targeting complex systems engineering and long-horizon agentic tasks. With 744B total parameters, these models support Multi-Token Prediction (MTP) speculative decoding, expert parallelism, data parallelism, and Prefill-Decode disaggregation on Ascend NPUs.
-
-  This document demonstrates the main validation steps for GLM-5/GLM-5.1 in the vLLM-Ascend environment, including supported features, environment preparation, single-node and multi-node deployment, as well as accuracy and performance evaluation.
-
-  The GLM-5 model is first supported in vllm-ascend v0.17.0rc1. This document is validated and written based on **vLLM-Ascend v0.22.1rc**. All **v0.22.1rc and later versions** can run stably. To use the latest features, it is recommended to use the latest release candidate or official version.
-
-  > **Note**: GLM-5 and GLM-5.1 share the same architecture and deployment commands. The differences are in the training data and model weights. This document uses GLM-5 as the primary example; simply replace the model path for GLM-5.1.
+  GLM-5 and GLM-5.1 are Mixture-of-Experts (MoE) models from Zhipu AI (THUDM), targeting complex systems engineering and long-horizon agentic tasks. With 744B total parameters.
 weight_download:
 - weight_version: BF16
   sources:

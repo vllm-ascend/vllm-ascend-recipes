@@ -23,13 +23,7 @@ model:
   modality: text
 
 overview: |-
-  GLM-4.x (GLM-4.5/4.6/4.7) are Mixture-of-Experts (MoE) foundational models from Zhipu AI (THUDM), specifically designed for agent applications. They support Multi-Token Prediction (MTP) speculative decoding, expert parallelism, data parallelism, and Prefill-Decode disaggregation on Ascend NPUs.
-
-  This document demonstrates the main validation steps for GLM-4.x in the vLLM-Ascend environment, including supported features, environment preparation, single-node and multi-node deployment, as well as accuracy and performance evaluation.
-
-  The GLM-4.5 model is first supported in vllm-ascend v0.10.0rc1. This document is validated and written based on **vLLM-Ascend v0.22.1rc**. All **v0.22.1rc and later versions** can run stably. To use the latest features, it is recommended to use the latest release candidate or official version.
-
-  > **Note**: GLM-4.5, GLM-4.6, and GLM-4.7 share the same architecture and deployment commands. The differences are in the training data and model weights. This document uses GLM-4.7 as the primary example; simply replace the model path for GLM-4.5 or GLM-4.6.
+  GLM-4.x (GLM-4.5/4.6/4.7) are Mixture-of-Experts (MoE) foundational models from Zhipu AI (THUDM), specifically designed for agent applications.
 weight_download:
 - weight_version: GLM-4.5 BF16
   sources:

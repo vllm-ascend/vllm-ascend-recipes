@@ -179,6 +179,8 @@ python launch_online_dp.py --dp-size 8 --tp-size 4 --dp-size-local 4 --dp-rank-s
 - **Image version is model-linked, not global**: resolve `{{ vllm_ascend_version }}` to the version the tutorial specifies for that model (e.g. Qwen3.5-27B/Qwen3.6-27B → `v0.18.0rc1`, with Atlas 300I DUO → `v0.23.0rc1-310p` per tutorial), not one global version. Keep the tutorial's own "validated against" / "supported starting" statements untouched.
 - **`meta.tasks` must not duplicate `model.modality`**: the page renders both as tags, so `tasks: [text]` + `modality: text` shows "text" twice. Only add tasks values that differ from the modality.
 - **Weight download placement**: the page renders `weight_download` chips automatically inside the Prerequisites tab — don't duplicate weight links in `overview` / `prerequisites` prose.
+- **`overview` is a concise model description only**: 1–2 short paragraphs about the model itself (architecture / parameter count / family / purpose). Do NOT put supported hardware, software features, deployment topology, or version-validation notes in `overview` — those belong in `meta.hardware`, `features`, `scenarios`, and `model.min_vllm_version` respectively. Drop the "This document will show…" boilerplate.
+- **No hardware badges at the top of the page**: `meta.hardware` is CI/status metadata, not a header badge. Hardware availability is communicated through the scenario selector (`scenarios[].npu`) and the preparation/deployment sections — do not duplicate it in the page header or `overview`.
 
 ### Atlas 300I DUO (310p)
 

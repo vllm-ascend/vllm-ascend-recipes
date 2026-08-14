@@ -23,13 +23,7 @@ model:
   modality: text
 
 overview: |-
-  GLM-4.x（GLM-4.5/4.6/4.7）是智谱 AI（THUDM）推出的混合专家（MoE）基础模型，专为智能体应用设计。支持多 Token 预测（MTP）投机解码、专家并行、数据并行和 Prefill-Decode 分离部署于昇腾 NPU。
-
-  本文档将演示 GLM-4.x 在 vLLM-Ascend 环境中的主要验证步骤，包括支持的特性、环境准备、单节点和多节点部署，以及精度和性能评估。
-
-  GLM-4.5 模型首次在 vllm-ascend v0.10.0rc1 中支持。本文档基于 **vLLM-Ascend v0.22.1rc** 验证并编写。所有 **v0.22.1rc 及更高版本**均可稳定运行。如需使用最新特性，建议使用最新的候选版本或正式版本。
-
-  > **注意**：GLM-4.5、GLM-4.6 和 GLM-4.7 共享相同的架构和部署命令，区别在于训练数据和模型权重。本文档以 GLM-4.7 为主要示例，使用 GLM-4.5 或 GLM-4.6 时只需替换模型路径即可。
+  GLM-4.x（GLM-4.5/4.6/4.7）是智谱 AI（THUDM）推出的混合专家（MoE）基础模型，专为智能体应用设计。
 weight_download:
 - weight_version: GLM-4.5 BF16
   sources:

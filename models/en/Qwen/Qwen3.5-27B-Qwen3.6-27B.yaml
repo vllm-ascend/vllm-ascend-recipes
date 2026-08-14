@@ -127,30 +127,7 @@ config_params:
     description: "Fraction of NPU memory available for the KV cache"
 
 overview: |-
-  Qwen3.5-27B and Qwen3.6-27B are dense hybrid Mamba-Transformer language models in the Qwen3.5/Qwen3.6 family. Both share the same hybrid attention design (GDN + full attention) and the same MTP head design, so deployment on Ascend NPUs follows the same pattern for both models. They are suitable for general-purpose text generation tasks such as dialogue, content creation, and code generation running on Ascend NPUs.
-
-  This document covers:
-    - Supported features and feature configuration
-    - Environment preparation (Docker / source install)
-    - Single-node deployment on Atlas 800 A2 / A3
-    - Multi-node PD separation deployment on Atlas 800 A3 (via Mooncake)
-    - Functional, accuracy, and performance evaluation
-    - Performance tuning recommendations
-
-  Hardware support:
-    - Atlas 800 A3 (64G × 16): single-node + multi-node PD separation
-    - Atlas 800I A2 (64G × 8): single-node only; multi-node PD separation is not supported
-    - **Minimum versions** (per vllm-ascend release notes):
-      - `Qwen3.5-27B`: first supported in `vllm-ascend:v0.17.0rc1`
-      - `Qwen3.6-27B`: first supported in `vllm-ascend:v0.18.0rc1`
-      - Atlas 300I DUO (A2 300I inference / etc.): supported starting `vllm-ascend:v0.23.0rc1`
-      - For Qwen3.6-27B on Atlas 800 A3, use the matching `v0.18.0rc1-a3` (or later `-a3`) image
-      - For Atlas 300I DUO, use `vllm-ascend:v0.23.0rc1-310p` (or later `-310p`) image
-
-  This document is validated against `vllm-ascend:v0.23.0rc1`. It is **strongly recommended to use the latest release candidate (rc) or official version** of `vllm-ascend` for best compatibility and access to the latest features.
-
-  > **Note**: Throughout this document, deployment commands are shown for `Qwen3.5-27B-w8a8-mtp` (and the equivalent Qwen3.6-27B-w8a8). For BF16 deployments, remove the `--quantization ascend` flag. For Qwen3.6-27B, replace `Eco-Tech/Qwen3.5-27B-w8a8-mtp` with `Eco-Tech/Qwen3.6-27B-w8a8` and `--served-model-name qwen3.5` with `qwen3.6`.
-
+  Qwen3.5-27B and Qwen3.6-27B are dense hybrid Mamba-Transformer language models in the Qwen3.5/Qwen3.6 family. Both share the same hybrid attention design (GDN + full attention) and the same MTP head design. They are suitable for general-purpose text generation tasks such as dialogue, content creation, and code generation.
 weight_download:
 # ---- Qwen3.5-27B BF16 ----
 - weight_version: Qwen3.5-27B BF16

@@ -127,13 +127,7 @@ config_params:
     description: "KV cache 可用的显存比例"
 
 overview: |-
-  GLM-5 和 GLM-5.1 是智谱 AI（THUDM）推出的混合专家（MoE）模型，面向复杂系统工程和长周期智能体任务。模型总参数量 744B，支持多 Token 预测（MTP）投机解码、专家并行、数据并行和 Prefill-Decode 分离部署于昇腾 NPU。
-
-  本文档将演示 GLM-5/GLM-5.1 在 vLLM-Ascend 环境中的主要验证步骤，包括支持的特性、环境准备、单节点和多节点部署，以及精度和性能评估。
-
-  GLM-5 模型首次在 vllm-ascend v0.17.0rc1 中支持。本文档基于 **vLLM-Ascend v0.22.1rc** 验证并编写。所有 **v0.22.1rc 及更高版本**均可稳定运行。如需使用最新特性，建议使用最新的候选版本或正式版本。
-
-  > **注意**：GLM-5 和 GLM-5.1 共享相同的架构和部署命令，区别在于训练数据和模型权重。本文档以 GLM-5 为主要示例，使用 GLM-5.1 时只需替换模型路径即可。
+  GLM-5 和 GLM-5.1 是智谱 AI（THUDM）推出的混合专家（MoE）模型，面向复杂系统工程和长周期智能体任务。模型总参数量 744B。
 weight_download:
 - weight_version: BF16
   sources:

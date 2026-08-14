@@ -127,30 +127,7 @@ config_params:
     description: "KV cache 可用的显存比例"
 
 overview: |-
-  Qwen3.5-27B 与 Qwen3.6-27B 是 Qwen3.5/Qwen3.6 系列的稠密混合 Mamba-Transformer 语言模型。两者共享相同的混合注意力设计（GDN + 全注意力）和 MTP 头设计，在昇腾 NPU 上的部署方式完全一致，适用于对话、内容创作、代码生成等通用文本生成任务。
-
-  本文档涵盖：
-    - 支持的特性与特性配置
-    - 环境准备（Docker 镜像 / 源码安装）
-    - Atlas 800 A2 / A3 单节点部署
-    - Atlas 800 A3 多节点 PD 分离部署（基于 Mooncake）
-    - 功能、精度与性能评估
-    - 性能调优建议
-
-  硬件支持：
-    - Atlas 800 A3 (64G × 16)：单节点 + 多节点 PD 分离
-    - Atlas 800I A2 (64G × 8)：仅支持单节点，不支持多节点 PD 分离
-    - **最低版本要求**（参考 vllm-ascend release notes）：
-      - `Qwen3.5-27B`：`vllm-ascend:v0.17.0rc1` 起支持
-      - `Qwen3.6-27B`：`vllm-ascend:v0.18.0rc1` 起支持
-      - Atlas 300I DUO（A2 300I 推理等）：`vllm-ascend:v0.23.0rc1` 起支持
-      - 在 Atlas 800 A3 上跑 Qwen3.6-27B，请使用对应的 `v0.18.0rc1-a3`（或更新的 `-a3`）镜像
-      - 在 Atlas 300I DUO 上，请使用 `vllm-ascend:v0.23.0rc1-310p`（或更新的 `-310p`）镜像
-
-  本文档基于 `vllm-ascend:v0.23.0rc1` 验证。**强烈建议使用最新的 rc 或正式版本**以获得最佳兼容性和最新特性。
-
-  > **说明**：本文档中部署命令以 `Qwen3.5-27B-w8a8-mtp`（及等价的 `Qwen3.6-27B-w8a8`）为例。BF16 部署请移除 `--quantization ascend`；跑 Qwen3.6-27B 时，将模型路径替换为 `Eco-Tech/Qwen3.6-27B-w8a8`、`--served-model-name` 替换为 `qwen3.6`。
-
+  Qwen3.5-27B 与 Qwen3.6-27B 是 Qwen3.5/Qwen3.6 系列的稠密混合 Mamba-Transformer 语言模型。两者共享相同的混合注意力设计（GDN + 全注意力）和 MTP 头设计，适用于对话、内容创作、代码生成等通用文本生成任务。
 weight_download:
 # ---- Qwen3.5-27B BF16 ----
 - weight_version: Qwen3.5-27B BF16

@@ -41,18 +41,6 @@ const baseSuffix = base.endsWith('/') ? base.slice(0, -1) : base;
 const editUrl = `https://github.com/vllm-ascend/vllm-ascend-recipes/edit/main/models/en/${model._provider_slug}/${model._model_slug}.yaml`;
 const hasQuantization = !!modelEn.quantization;
 
-// Map hardware keys to friendly display names
-const hwDisplayNames: Record<string, string> = {
-  atlas_800_a3: 'Atlas 800 A3',
-  atlas_800_a2: 'Atlas 800 A2',
-  mi300x: 'MI300X',
-  mi325x: 'MI325X',
-  mi355x: 'MI355X',
-  h200: 'H200',
-  b200: 'B200',
-  gb200: 'GB200',
-};
-
 // Collect unique sources with URLs across all weight versions
 const weightLinks: { source: string; url: string }[] = [];
 const seenSources = new Set<string>();
@@ -64,11 +52,6 @@ for (const wd of modelEn.weight_download) {
     }
   }
 }
-
-// Collect hardware support info
-const hardwareItems = Object.entries(model.meta.hardware ?? {}).filter(
-  ([_, status]) => status === 'verified',
-);
 
 const sectionTitle = 'font-display text-lg font-semibold text-ink-50 tracking-tight mb-4';
 
@@ -169,51 +152,6 @@ addToc('reference', 'sectionMoreInfo');
                   .map((task) => <Tag label={task} color="gray" />)
             }
           </div>
-
-          {/* Hardware support badges */}
-          {
-            hardwareItems.length > 0 && (
-              <div class="flex flex-wrap gap-2 mt-2 mb-3">
-                {hardwareItems.map(([hw, status]) => (
-                  <span
-                    class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full border"
-                    class:list={{
-                      'bg-emerald-500/10 text-emerald-400 border-emerald-500/20':
-                        status === 'verified',
-                      'bg-gray-500/10 text-gray-400 border-gray-500/20': status !== 'verified',
-                    }}
-                  >
-                    {status === 'verified' ? (
-                      <svg
-                        class="w-3.5 h-3.5"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        stroke-width="2.5"
-                      >
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-                      </svg>
-                    ) : (
-                      <svg
-                        class="w-3.5 h-3.5"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        stroke-width="2.5"
-                      >
-                        <path
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                          d="M6 18L18 6M6 6l12 12"
-                        />
-                      </svg>
-                    )}
-                    {hwDisplayNames[hw] || hw}
-                  </span>
-                ))}
-              </div>
-            )
-          }
 
           {/* Performance headline */}
           {

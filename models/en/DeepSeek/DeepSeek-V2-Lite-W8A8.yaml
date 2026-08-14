@@ -92,14 +92,6 @@ config_params:
 
 overview: |-
   DeepSeek-V2-Lite is the 16B-total / 2.4B-active MoE sibling of DeepSeek-V2.
-  This recipe runs it in a **multi-node PD separation** topology — one Prefill
-  node and one Decode node (1P1D), each using 2 Atlas 800I A2 cards
-  (`TP=1 + DP=2`), with W8A8 quantized weights and Mooncake-based KV transfer
-  between the two nodes.
-
-  This is the lightest PD topology covered by the multi-node recipe verify
-  pipeline, and it is the CI end-to-end check for `scripts/multinode/`.
-
 weight_download:
 - weight_version: W8A8 (Pre-quantized)
   sources:

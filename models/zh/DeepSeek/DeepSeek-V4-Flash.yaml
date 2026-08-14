@@ -185,10 +185,6 @@ overview: |-
   - 混合注意力架构，通过 Compress-4-Attention 和 Compress-128-Attention 大幅提升长上下文效率。对于混合专家（MoE）组件，仍采用 DeepSeekMoE 架构，仅做了少量调整。
 
   DeepSeek-V4-Flash 是 DeepSeek-V4 系列的轻量级变体，适用于高吞吐量和低延迟的服务场景。
-
-  本文档将展示该模型的主要验证步骤，包括支持的特性、特性配置、环境准备、单节点和多节点部署、精度和性能评估。
-
-  > **注意**：请将上述版本占位符替换为您实际的验证版本。
 weight_download:
 - weight_version: W8A8-MTP（预量化）
   sources:

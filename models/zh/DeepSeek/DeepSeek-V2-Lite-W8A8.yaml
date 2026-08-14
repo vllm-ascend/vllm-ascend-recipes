@@ -91,11 +91,6 @@ config_params:
 
 overview: |-
   DeepSeek-V2-Lite 是 DeepSeek-V2 的 16B 总参 / 2.4B 激活 MoE 轻量版。
-  本 recipe 以**多节点 PD 分离**拓扑部署——1 个 Prefill 节点 + 1 个 Decode 节点(1P1D),每个节点使用 2 张 Atlas 800I A2 卡
-  (`TP=1 + DP=2`),W8A8 量化权重,节点间通过 Mooncake 进行 KV 传输。
-
-  这是多节点 recipe 验证流水线覆盖的最轻量 PD 拓扑,也是 `scripts/multinode/` 的 CI 端到端检查项。
-
 weight_download:
 - weight_version: W8A8(预量化)
   sources:

@@ -187,13 +187,6 @@ overview: |-
   reach 27% of V3.2's per-token inference FLOPs and 10% of V3.2's KV cache at 1M
   context. Pre-trained on 32T+ tokens; post-training is a two-stage pipeline (domain-
   specific expert cultivation + unified consolidation via on-policy distillation).
-
-  Checkpoint is **W8A8 mixed**: MoE expert weights are stored in W8A8 while the
-  remaining (attention / norm / router) params stay in W8A8.
-
-  This document will show the main verification steps of the model, including supported features, feature configuration, environment preparation, single-node and multi-node deployment, accuracy and performance evaluation.
-
-  > **Note**: Please replace the version placeholder above with your actual validation version.
 weight_download:
 - weight_version: W8A8-MTP (Pre-quantized)
   sources:
