@@ -33,7 +33,7 @@ Recipes are YAML files at `models/en/<Provider>/<Model>.yaml` (English, source o
 | `opt_in_features` | no | Feature keys that default OFF (must reference `features`) |
 | `variants` | no | Upstream variants; `default` variant required |
 | `compatible_strategies` | no | Deployment strategies, interlocked with `scenarios[].strategy` |
-| `hardware_overrides` / `strategy_overrides` | no | `{extra_args, extra_env}` per hardware / strategy |
+| `hardware_overrides` / `strategy_overrides` | no | `{extra_args, extra_env}` per hardware / strategy; PD recipes additionally declare `strategy_overrides.pd_cluster.prefill/decode.nodes` (see below) |
 | `dependencies` | no | Extra installs: `note` + `command` |
 | `guide` | no | Upstream tutorial body — keep `""` (content lives in our fields) |
 | `extra_config` | no | Toggleable additional-config chips (see scenarios) |
@@ -112,6 +112,46 @@ extra_config:
 ```
 
 `%%CONFIG:key%%...%%/CONFIG:key%%` keeps the wrapped text when the chip is on, removes it when off; optional per-step `config_values` (`enabled`/`disabled`) replaces instead.
+
+### PD-cluster scenarios + declarative topology
+
+Multi-node PD recipes (`tags: [pd-multinode]` / `strategy: pd_cluster`) must declare `strategy_overrides.pd_cluster` so the site can render the **node selector + Cluster env** panel and generate the per-node commands:
+
+```yaml
+compatible_strategies: [..., pd_cluster]
+strategy_overrides:
+  pd_cluster:
+    prefill:
+      nodes: { default: 1 }                  # prefill node count
+    decode:
+      nodes: { default: 1, atlas_800_a2: 4 } # per-hardware overrides win over default
+```
+
+- `nodes` = the number of nodes for that role. Derive it from the tutorial's `launch_online_dp.py` commands: `nodes = dp-size // dp-size-local`.
+- Use per-hardware keys (`atlas_800_a2` / `atlas_800_a3`) when different hardware has different topology (e.g. DeepSeek-V4-Flash is 1P1D on A3 but 1P4D on A2's 8-machine PD).
+- **Independent multi-P groups are NOT derivable from `dp-size // dp-local`**: a recipe with 2 independent prefill groups each `--dp-size 4 --dp-size-local 4` still declares `prefill.nodes: 2` explicitly. Don't try to infer the count from one launch command.
+- The imperative `scenarios` below remain the CI source of truth; `strategy_overrides.pd_cluster` is the declarative site data. `parallelism` / `vllm_args` / `env` may also be added for upstream-compatible script generation, but the current Ascend site only consumes `nodes`.
+
+**Launch command convention** — collapse the tutorial's per-node launch commands into exactly **2 commands** (first = prefill, second = decode):
+
+```bash
+# Prefill — each prefill node is its own DP master (dp-address = node IP)
+python launch_online_dp.py --dp-size 4 --tp-size 4 --dp-size-local 4 --dp-rank-start 0 --dp-address xx.xx.xx.1 ...
+# Decode — one DP group across nodes (dp-rank-start increments per node)
+python launch_online_dp.py --dp-size 8 --tp-size 4 --dp-size-local 4 --dp-rank-start 0 --dp-address xx.xx.xx.3 ...
+```
+
+`node_entry.py` fills `--dp-address` (prefill → own IP, decode → master) and `--dp-rank-start` (decode → `group_offset × dp-size-local`) at runtime. Do NOT write four separate p0/p1/d0/d1 commands — the controller only reads `launch_blocks[0]` (prefill) and `[1]` (decode) and misassigns the rest.
+
+**Placeholders the Cluster env panel substitutes** — keep these in the step code blocks, don't hardcode real values:
+
+- Dotted node IPs `141.xx.xx.N` / `xx.xx.xx.N`: `N` is the 1-based pod index (prefill first, then decode). The site maps them to `$PREFILL_NODE_*` / `$DECODE_NODE_*`.
+- `local_ip="141.xx.xx.N"` → the node's own IP.
+- `nic_name="xxx"` → `$IFACE_NAME` (fabric NIC).
+- `node0_ip="xxxx"` → prefill master IP (`$PREFILL_NODE_1`).
+- `<prefill_ip>` / `<decode_ip>` → prefill/decode master IP (Qwen3-235B style).
+
+> `use_ascend_direct` inside the prefill `kv_connector_extra_config` appears only on prefill node 0 in some tutorials (e.g. Kimi-K2.6) — treat it as a tutorial inconsistency; put it on all prefill nodes or drop it consistently (DeepSeek-V4-Flash has none).
 
 ## Hard rules
 
