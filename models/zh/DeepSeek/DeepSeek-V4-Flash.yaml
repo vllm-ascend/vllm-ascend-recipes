@@ -147,7 +147,12 @@ hardware_overrides:
     extra_env:
       HCCL_BUFFSIZE: "1024"
 
-strategy_overrides: {}
+strategy_overrides:
+  pd_cluster:
+    prefill:
+      nodes: { default: 1 }
+    decode:
+      nodes: { default: 1, atlas_800_a2: 4 }
 
 dependencies:
   - note: "ModelScope 用于下载 W8A8 权重"

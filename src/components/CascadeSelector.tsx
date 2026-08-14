@@ -8,6 +8,14 @@ import {
   substitutePdContent,
 } from '../lib/pd-cluster';
 
+// Map the UI's NPU display name to the strategy_overrides hardware key.
+function hwKeyForNpu(npu: string): string {
+  const n = npu.toLowerCase();
+  if (n.includes('a2')) return 'atlas_800_a2';
+  if (n.includes('a3')) return 'atlas_800_a3';
+  return 'default';
+}
+
 interface ExtraConfigItem {
   key: string;
   label: string;
@@ -511,9 +519,15 @@ export default function CascadeSelector({
   // Resolve rendered content for current step (hooks must run before any
   // early return to keep call order stable across renders)
   const currentStep = currentScenario?.steps[activeStep];
+  const dep = (currentScenario?.deployment || '').toLowerCase();
   const isPd =
     !!currentScenario &&
-    (currentScenario.strategy === 'pd_cluster' || currentScenario.tags?.includes('pd-multinode'));
+    (currentScenario.strategy === 'pd_cluster' ||
+      currentScenario.tags?.includes('pd-multinode') ||
+      (dep.includes('pd') && (dep.includes('multi') || dep.includes('多节点'))));
+  const hwKey = hwKeyForNpu(selectedNpu);
+  const pdPrefillNodes = roleNodeCount(pdCluster?.prefill, hwKey);
+  const pdDecodeNodes = roleNodeCount(pdCluster?.decode, hwKey);
   const pdRole: 'prefill' | 'decode' | null = currentStep
     ? currentStep.title.toLowerCase().includes('prefill')
       ? 'prefill'
@@ -522,11 +536,7 @@ export default function CascadeSelector({
         : null
     : null;
   const pdNodeCount =
-    pdRole === 'prefill'
-      ? roleNodeCount(pdCluster?.prefill)
-      : pdRole === 'decode'
-        ? roleNodeCount(pdCluster?.decode)
-        : 0;
+    pdRole === 'prefill' ? pdPrefillNodes : pdRole === 'decode' ? pdDecodeNodes : 0;
   const setPdEndpoint = (key: string, value: string) => {
     setPdEndpoints((prev) => {
       const next = { ...prev };
@@ -556,8 +566,27 @@ export default function CascadeSelector({
       effectiveConfigs,
       currentStep.config_values,
     );
-    return isPd ? substitutePdContent(base, currentStep.title, pdNodeIdx, pdEndpoints) : base;
-  }, [currentStep, effectiveConfigs, paramValues, toggleFeatures, isPd, pdNodeIdx, pdEndpoints]);
+    return isPd
+      ? substitutePdContent(
+          base,
+          currentStep.title,
+          pdNodeIdx,
+          pdEndpoints,
+          pdPrefillNodes,
+          pdDecodeNodes,
+        )
+      : base;
+  }, [
+    currentStep,
+    effectiveConfigs,
+    paramValues,
+    toggleFeatures,
+    isPd,
+    pdNodeIdx,
+    pdEndpoints,
+    pdPrefillNodes,
+    pdDecodeNodes,
+  ]);
 
   const renderedHtml = useMemo(() => {
     if (!rawContent) return '';
@@ -783,11 +812,11 @@ export default function CascadeSelector({
                       key: 'IFACE_NAME',
                       label: lang === 'zh' ? 'Fabric NIC / 网卡名' : 'Fabric NIC / interface',
                     },
-                    ...Array.from({ length: roleNodeCount(pdCluster?.prefill) }, (_, i) => ({
+                    ...Array.from({ length: pdPrefillNodes }, (_, i) => ({
                       key: `PREFILL_NODE_${i + 1}`,
                       label: `Prefill Node ${i + 1} IP`,
                     })),
-                    ...Array.from({ length: roleNodeCount(pdCluster?.decode) }, (_, i) => ({
+                    ...Array.from({ length: pdDecodeNodes }, (_, i) => ({
                       key: `DECODE_NODE_${i + 1}`,
                       label: `Decode Node ${i + 1} IP`,
                     })),

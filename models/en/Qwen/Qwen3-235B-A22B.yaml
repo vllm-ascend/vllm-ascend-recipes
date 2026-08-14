@@ -20,6 +20,13 @@ model:
   context_length: 131072
   modality: text
 
+strategy_overrides:
+  pd_cluster:
+    prefill:
+      nodes: { default: 1 }
+    decode:
+      nodes: { default: 2 }
+
 overview: |-
   Qwen3 is the latest generation of large language models in Qwen series, offering a comprehensive suite of dense and mixture-of-experts (MoE) models. Built upon extensive training, Qwen3 delivers groundbreaking advancements in reasoning, instruction-following, agent capabilities, and multilingual support. Qwen3-235B-A22B is the largest MoE variant, featuring 235B total parameters with 22B activated per token.
 

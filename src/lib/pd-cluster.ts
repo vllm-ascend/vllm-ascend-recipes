@@ -1,8 +1,12 @@
 export const PD_ENDPOINTS_STORAGE_KEY = 'vllm-ascend-recipes:pd-endpoints';
 
-export function roleNodeCount(cfg?: { nodes?: number | { default?: number } }): number {
+export type PdNodes = number | { default?: number; [hw: string]: number | undefined };
+
+export function roleNodeCount(cfg?: { nodes?: PdNodes }, hwKey?: string): number {
   if (!cfg?.nodes) return 1;
-  return typeof cfg.nodes === 'number' ? cfg.nodes : (cfg.nodes.default ?? 1);
+  if (typeof cfg.nodes === 'number') return cfg.nodes;
+  if (hwKey && typeof cfg.nodes[hwKey] === 'number') return cfg.nodes[hwKey] as number;
+  return cfg.nodes.default ?? 1;
 }
 
 export function loadPdEndpoints(): Record<string, string> {
@@ -26,16 +30,23 @@ export function savePdEndpoint(key: string, value: string) {
   }
 }
 
-// Map 141.xx.xx.N / xx.xx.xx.N (last octet 1..4) to the corresponding node IP:
-// 1 → PREFILL_NODE_1, 2 → PREFILL_NODE_2, 3 → DECODE_NODE_1, 4 → DECODE_NODE_2.
-export function fillDottedIps(text: string, endpoints: Record<string, string>): string {
-  const ips = [1, 2, 3, 4].map((i) => {
-    const role = i <= 2 ? 'PREFILL' : 'DECODE';
-    const idx = i <= 2 ? i : i - 2;
-    return endpoints[`${role}_NODE_${idx}`] || '';
-  });
+// Map 141.xx.xx.N / xx.xx.xx.N (last octet = pod index + 1, prefill first) to the
+// matching node IP. Pod order matches node_entry.py: prefill pods come first, then
+// decode pods.
+export function fillDottedIps(
+  text: string,
+  endpoints: Record<string, string>,
+  prefillNodes: number,
+  decodeNodes: number,
+): string {
   return text.replace(/\b(?:\d+\.)?(?:x+\.){2,3}(\d+)\b/g, (m, last: string) => {
-    const ip = ips[Number(last) - 1];
+    const pod = Number(last) - 1;
+    let ip = '';
+    if (pod >= 0 && pod < prefillNodes) {
+      ip = endpoints[`PREFILL_NODE_${pod + 1}`] || '';
+    } else if (pod >= prefillNodes && pod < prefillNodes + decodeNodes) {
+      ip = endpoints[`DECODE_NODE_${pod - prefillNodes + 1}`] || '';
+    }
     return ip ? ip : m;
   });
 }
@@ -59,14 +70,22 @@ export function substitutePdContent(
   stepTitle: string,
   nodeIdx: number,
   endpoints: Record<string, string>,
+  prefillNodes: number,
+  decodeNodes: number,
 ): string {
-  let text = fillDottedIps(content, endpoints);
+  let text = fillDottedIps(content, endpoints, prefillNodes, decodeNodes);
 
   if (endpoints.IFACE_NAME) {
     text = text.replace(/(nic_name\s*=\s*)"[^"]*"/, `$1"${endpoints.IFACE_NAME}"`);
   }
   if (endpoints.PREFILL_NODE_1) {
     text = text.replace(/(node0_ip\s*=\s*)"[^"]*"/, `$1"${endpoints.PREFILL_NODE_1}"`);
+  }
+  if (endpoints.PREFILL_NODE_1) {
+    text = text.replace(/<prefill_ip>/g, endpoints.PREFILL_NODE_1);
+  }
+  if (endpoints.DECODE_NODE_1) {
+    text = text.replace(/<decode_ip>/g, endpoints.DECODE_NODE_1);
   }
 
   const t = stepTitle.toLowerCase();

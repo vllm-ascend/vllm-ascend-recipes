@@ -65,7 +65,13 @@ compatible_strategies:
   - pd_cluster
 
 hardware_overrides: {}
-strategy_overrides: {}
+strategy_overrides:
+  # Declarative PD-cluster topology for the site's node selector; CI still runs `scenarios`.
+  pd_cluster:
+    prefill:
+      nodes: { default: 1 }
+    decode:
+      nodes: { default: 1 }
 
 dependencies:
   - note: "ModelScope is used to download the W8A8 weights"

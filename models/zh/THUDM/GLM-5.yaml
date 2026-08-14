@@ -106,7 +106,12 @@ compatible_strategies:
   - pd_cluster
 
 hardware_overrides: {}
-strategy_overrides: {}
+strategy_overrides:
+  pd_cluster:
+    prefill:
+      nodes: { default: 2 }
+    decode:
+      nodes: { default: 4 }
 
 dependencies:
   - note: "GLM-5 tokenizer 需要 transformers >= 5.2.0"

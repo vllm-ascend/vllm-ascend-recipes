@@ -65,7 +65,12 @@ compatible_strategies:
   - pd_cluster
 
 hardware_overrides: {}
-strategy_overrides: {}
+strategy_overrides:
+  pd_cluster:
+    prefill:
+      nodes: { default: 1 }
+    decode:
+      nodes: { default: 1 }
 
 dependencies:
   - note: "ModelScope 用于下载 W8A8 权重"

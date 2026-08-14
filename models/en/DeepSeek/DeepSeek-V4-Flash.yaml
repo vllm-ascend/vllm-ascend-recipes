@@ -148,7 +148,13 @@ hardware_overrides:
     extra_env:
       HCCL_BUFFSIZE: "1024"
 
-strategy_overrides: {}
+strategy_overrides:
+  # A3 PD is 1P1D; the A2 8-machine PD uses 4 decode nodes.
+  pd_cluster:
+    prefill:
+      nodes: { default: 1 }
+    decode:
+      nodes: { default: 1, atlas_800_a2: 4 }
 
 dependencies:
   - note: "ModelScope is used to download the W8A8 weights"
