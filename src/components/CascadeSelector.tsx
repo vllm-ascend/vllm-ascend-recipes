@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useLang } from '../lib/useLang';
 import { resolveVllmAscendLink } from '../lib/links';
+import PdClusterPanel from './PdClusterPanel';
 
 interface ExtraConfigItem {
   key: string;
@@ -19,6 +20,7 @@ interface Scenario {
   deployment: string;
   case: string;
   tags?: string[];
+  strategy?: string;
   steps: ScenarioStep[];
   default_configs?: string[];
 }
@@ -52,6 +54,11 @@ interface CascadeSelectorProps {
   optInFeaturesZh?: string[];
   selectorLabelsEn?: Partial<Record<'npu' | 'precision' | 'deployment' | 'case', string>>;
   selectorLabelsZh?: Partial<Record<'npu' | 'precision' | 'deployment' | 'case', string>>;
+  pdCluster?: {
+    env?: Record<string, string>;
+    prefill?: { nodes?: number | { default?: number } };
+    decode?: { nodes?: number | { default?: number } };
+  };
 }
 
 // Pipeline-routing tag -> display name (per language)
@@ -348,6 +355,7 @@ export default function CascadeSelector({
   optInFeaturesZh,
   selectorLabelsEn,
   selectorLabelsZh,
+  pdCluster,
 }: CascadeSelectorProps) {
   const { lang, t } = useLang();
   const scenarios = lang === 'zh' ? scenariosZh : scenariosEn;
@@ -660,6 +668,13 @@ export default function CascadeSelector({
           </div>
         ) : null}
       </div>
+
+      {/* PD-cluster interactive panel: role/node selector + Cluster env + copy */}
+      {currentScenario &&
+        (currentScenario.strategy === 'pd_cluster' ||
+          currentScenario.tags?.includes('pd-multinode')) && (
+          <PdClusterPanel scenario={currentScenario} pdCluster={pdCluster} lang={lang} />
+        )}
 
       {/* Result panel */}
       {currentScenario && (

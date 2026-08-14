@@ -136,6 +136,7 @@ export interface Model {
   config_params?: Record<string, ConfigParam>;
   features?: Record<string, FeatureMeta>;
   opt_in_features?: string[];
+  strategy_overrides?: Record<string, any>;
   performance?: PerformanceSection;
   evaluation?: Evaluation;
   verification?: string;
