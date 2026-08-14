@@ -122,6 +122,24 @@ export interface Evaluation {
   performance?: { content: string };
 }
 
+export interface PdClusterRole {
+  nodes?: number | { default?: number };
+  parallelism?: string;
+  vllm_args?: string[];
+  env?: Record<string, string>;
+}
+
+export interface PdCluster {
+  env?: Record<string, string>;
+  prefill?: PdClusterRole;
+  decode?: PdClusterRole;
+}
+
+export interface StrategyOverrides {
+  pd_cluster?: PdCluster;
+  [strategy: string]: unknown;
+}
+
 export interface Model {
   meta: Meta;
   model: ModelInfo;
@@ -136,7 +154,7 @@ export interface Model {
   config_params?: Record<string, ConfigParam>;
   features?: Record<string, FeatureMeta>;
   opt_in_features?: string[];
-  strategy_overrides?: Record<string, any>;
+  strategy_overrides?: StrategyOverrides;
   performance?: PerformanceSection;
   evaluation?: Evaluation;
   verification?: string;

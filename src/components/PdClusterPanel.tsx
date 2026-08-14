@@ -18,7 +18,13 @@ interface ScenarioStep {
 }
 
 interface PdClusterPanelProps {
-  scenario: { npu: string; precision: string; deployment: string; case: string; steps: ScenarioStep[] };
+  scenario: {
+    npu: string;
+    precision: string;
+    deployment: string;
+    case: string;
+    steps: ScenarioStep[];
+  };
   pdCluster: PdCluster | undefined;
   lang: 'en' | 'zh';
 }
@@ -68,10 +74,7 @@ function bumpKvConfig(text: string, nodeIdx: number): string {
       /("kv_port"\s*:\s*")(\d+)(")/,
       (_, a, num, c) => `${a}${Number(num) + nodeIdx * 100}${c}`,
     )
-    .replace(
-      /("engine_id"\s*:\s*")(\d+)(")/,
-      (_, a, num, c) => `${a}${Number(num) + nodeIdx}${c}`,
-    );
+    .replace(/("engine_id"\s*:\s*")(\d+)(")/, (_, a, num, c) => `${a}${Number(num) + nodeIdx}${c}`);
 }
 
 function renderNodeScript(
@@ -119,11 +122,17 @@ export default function PdClusterPanel({ scenario, pdCluster, lang }: PdClusterP
   const t = lang === 'zh';
 
   const prefillTemplate = useMemo(
-    () => extractBash(scenario.steps.find((s) => s.title.toLowerCase().includes('prefill'))?.content ?? ''),
+    () =>
+      extractBash(
+        scenario.steps.find((s) => s.title.toLowerCase().includes('prefill'))?.content ?? '',
+      ),
     [scenario],
   );
   const decodeTemplate = useMemo(
-    () => extractBash(scenario.steps.find((s) => s.title.toLowerCase().includes('decode'))?.content ?? ''),
+    () =>
+      extractBash(
+        scenario.steps.find((s) => s.title.toLowerCase().includes('decode'))?.content ?? '',
+      ),
     [scenario],
   );
 
@@ -132,7 +141,8 @@ export default function PdClusterPanel({ scenario, pdCluster, lang }: PdClusterP
     return step ? launchLines(step.content) : [];
   }, [scenario]);
   const prefillLaunch = launchCmds.find((l) => l.includes('--dp-size 4')) ?? launchCmds[0] ?? '';
-  const decodeLaunch = launchCmds.find((l) => l.includes('--dp-size 8')) ?? launchCmds[1] ?? 'VLLM_DECODE_LAUNCH';
+  const decodeLaunch =
+    launchCmds.find((l) => l.includes('--dp-size 8')) ?? launchCmds[1] ?? 'VLLM_DECODE_LAUNCH';
 
   const prefillNodes = roleNodes(pdCluster?.prefill);
   const decodeNodes = roleNodes(pdCluster?.decode);
@@ -160,8 +170,10 @@ export default function PdClusterPanel({ scenario, pdCluster, lang }: PdClusterP
   const renderedLaunch = renderLaunchCommand(role, safeIdx, launch, endpoints);
 
   const ipFields: { key: string; label: string }[] = [];
-  for (let i = 0; i < prefillNodes; i++) ipFields.push({ key: `PREFILL_NODE_${i + 1}`, label: `Prefill Node ${i + 1} IP` });
-  for (let i = 0; i < decodeNodes; i++) ipFields.push({ key: `DECODE_NODE_${i + 1}`, label: `Decode Node ${i + 1} IP` });
+  for (let i = 0; i < prefillNodes; i++)
+    ipFields.push({ key: `PREFILL_NODE_${i + 1}`, label: `Prefill Node ${i + 1} IP` });
+  for (let i = 0; i < decodeNodes; i++)
+    ipFields.push({ key: `DECODE_NODE_${i + 1}`, label: `Decode Node ${i + 1} IP` });
 
   const copy = (text: string) => {
     if (typeof navigator !== 'undefined') navigator.clipboard?.writeText(text);
