@@ -1,7 +1,12 @@
 import { useState, useMemo } from 'react';
 import { useLang } from '../lib/useLang';
 import { resolveVllmAscendLink } from '../lib/links';
-import PdClusterPanel from './PdClusterPanel';
+import {
+  roleNodeCount,
+  loadPdEndpoints,
+  savePdEndpoint,
+  substitutePdContent,
+} from '../lib/pd-cluster';
 
 interface ExtraConfigItem {
   key: string;
@@ -464,6 +469,15 @@ export default function CascadeSelector({
     setActiveStep(0);
   }
 
+  // PD-cluster interactive state: node index (within the active role) and
+  // Cluster env endpoints (persisted in localStorage, like upstream).
+  const [pdNodeIdx, setPdNodeIdx] = useState(0);
+  const [pdEndpoints, setPdEndpoints] = useState<Record<string, string>>(loadPdEndpoints);
+  const [showClusterEnv, setShowClusterEnv] = useState(false);
+  if (currentScenario !== trackedScenario) {
+    setPdNodeIdx(0);
+  }
+
   // Extra config multi-select — initialize from current scenario defaults,
   // and re-sync when the scenario changes
   const [selectedConfigs, setSelectedConfigs] = useState<Set<string>>(() => {
@@ -497,6 +511,32 @@ export default function CascadeSelector({
   // Resolve rendered content for current step (hooks must run before any
   // early return to keep call order stable across renders)
   const currentStep = currentScenario?.steps[activeStep];
+  const isPd =
+    !!currentScenario &&
+    (currentScenario.strategy === 'pd_cluster' || currentScenario.tags?.includes('pd-multinode'));
+  const pdRole: 'prefill' | 'decode' | null = currentStep
+    ? currentStep.title.toLowerCase().includes('prefill')
+      ? 'prefill'
+      : currentStep.title.toLowerCase().includes('decode')
+        ? 'decode'
+        : null
+    : null;
+  const pdNodeCount =
+    pdRole === 'prefill'
+      ? roleNodeCount(pdCluster?.prefill)
+      : pdRole === 'decode'
+        ? roleNodeCount(pdCluster?.decode)
+        : 0;
+  const setPdEndpoint = (key: string, value: string) => {
+    setPdEndpoints((prev) => {
+      const next = { ...prev };
+      if (!value) delete next[key];
+      else next[key] = value;
+      savePdEndpoint(key, value);
+      return next;
+    });
+  };
+
   // Effective %%CONFIG%% selection = legacy extra_config chips (dsa-cp) plus
   // any feature toggle whose key appears in the step's %%CONFIG%% markers
   // (cpu_binding / multistream_overlap / npugraph_ex are feature-driven).
@@ -511,12 +551,13 @@ export default function CascadeSelector({
 
   const rawContent = useMemo(() => {
     if (!currentStep) return '';
-    return applyConfigReplace(
+    const base = applyConfigReplace(
       applyConfigParams(currentStep.content, paramValues, toggleFeatures),
       effectiveConfigs,
       currentStep.config_values,
     );
-  }, [currentStep, effectiveConfigs, paramValues, toggleFeatures]);
+    return isPd ? substitutePdContent(base, currentStep.title, pdNodeIdx, pdEndpoints) : base;
+  }, [currentStep, effectiveConfigs, paramValues, toggleFeatures, isPd, pdNodeIdx, pdEndpoints]);
 
   const renderedHtml = useMemo(() => {
     if (!rawContent) return '';
@@ -669,13 +710,6 @@ export default function CascadeSelector({
         ) : null}
       </div>
 
-      {/* PD-cluster interactive panel: role/node selector + Cluster env + copy */}
-      {currentScenario &&
-        (currentScenario.strategy === 'pd_cluster' ||
-          currentScenario.tags?.includes('pd-multinode')) && (
-          <PdClusterPanel scenario={currentScenario} pdCluster={pdCluster} lang={lang} />
-        )}
-
       {/* Result panel */}
       {currentScenario && (
         <div className="rounded-lg border border-ink-800/60 overflow-hidden">
@@ -703,6 +737,78 @@ export default function CascadeSelector({
               </button>
             ))}
           </div>
+
+          {/* PD-cluster controls: node selector + Cluster env (integrated into steps) */}
+          {isPd && (
+            <div className="border-b border-ink-800/60 bg-ink-900/40 px-4 py-3">
+              <div className="flex flex-wrap items-center gap-2">
+                {pdRole && (
+                  <>
+                    <span className="text-[10px] font-mono font-bold text-ink-300 uppercase tracking-wider">
+                      {lang === 'zh' ? '节点' : 'Node'}
+                    </span>
+                    {Array.from({ length: pdNodeCount }, (_, i) => (
+                      <button
+                        key={i}
+                        onClick={() => setPdNodeIdx(i)}
+                        className={`px-3 py-1 text-xs font-mono rounded-md border transition-colors ${
+                          pdNodeIdx === i
+                            ? 'bg-accent-500/10 text-accent-400 border-accent-500/30'
+                            : 'border-ink-700/60 text-ink-400 hover:text-ink-200'
+                        }`}
+                      >
+                        {pdRole === 'prefill' ? 'p' : 'd'}
+                        {i}
+                      </button>
+                    ))}
+                    <span className="w-px h-4 bg-ink-700/60" />
+                  </>
+                )}
+                <button
+                  onClick={() => setShowClusterEnv((v) => !v)}
+                  className={`px-3 py-1 text-xs font-mono rounded-md border transition-colors ${
+                    showClusterEnv
+                      ? 'bg-accent-500/10 text-accent-400 border-accent-500/30'
+                      : 'border-ink-700/60 text-ink-400 hover:text-ink-200'
+                  }`}
+                >
+                  Cluster env
+                </button>
+              </div>
+
+              {showClusterEnv && (
+                <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                  {[
+                    {
+                      key: 'IFACE_NAME',
+                      label: lang === 'zh' ? 'Fabric NIC / 网卡名' : 'Fabric NIC / interface',
+                    },
+                    ...Array.from({ length: roleNodeCount(pdCluster?.prefill) }, (_, i) => ({
+                      key: `PREFILL_NODE_${i + 1}`,
+                      label: `Prefill Node ${i + 1} IP`,
+                    })),
+                    ...Array.from({ length: roleNodeCount(pdCluster?.decode) }, (_, i) => ({
+                      key: `DECODE_NODE_${i + 1}`,
+                      label: `Decode Node ${i + 1} IP`,
+                    })),
+                  ].map((f) => (
+                    <label
+                      key={f.key}
+                      className="flex items-center gap-2 text-xs font-mono text-ink-400"
+                    >
+                      <span className="shrink-0">${f.key}</span>
+                      <input
+                        value={pdEndpoints[f.key] || ''}
+                        onChange={(e) => setPdEndpoint(f.key, e.target.value)}
+                        placeholder={f.label}
+                        className="w-full rounded-md border border-ink-700 bg-ink-900 px-2 py-1 text-xs font-mono text-ink-200"
+                      />
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Active step content */}
           {currentStep && (
