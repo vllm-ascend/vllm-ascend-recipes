@@ -49,19 +49,19 @@
   },
   "weight_download[0].weight_version": {
     "en": "W4A8 (Pre-quantized)",
-    "zh": "W4A8 (Pre-quantized)"
+    "zh": "W4A8（预量化）"
   },
   "weight_download[1].weight_version": {
     "en": "Eagle3 MTP (draft model)",
-    "zh": "Eagle3 MTP (draft model)"
+    "zh": "Eagle3 MTP（草稿模型）"
   },
   "weight_download[2].weight_version": {
     "en": "DFlash (speculative decoding)",
-    "zh": "DFlash (speculative decoding)"
+    "zh": "DFlash（投机解码）"
   },
   "prerequisites[0].title": {
     "en": "Model Weight",
-    "zh": "Model Weight"
+    "zh": "模型权重"
   },
   "prerequisites[0].content": {
     "en": "- `Kimi-K2.6-w4a8` (Quantized version for w4a8): requires 1 Atlas 800 A3 (64GB × 16) node or 2 Atlas 800 A2 (64GB × 8) nodes. [Download model weight](https://www.modelscope.cn/models/Eco-Tech/Kimi-K2.6-W4A8).\n- `kimi-k2.6-eagle3` (Eagle3 MTP draft model for accelerating inference of Kimi-K2.6): [Download model weight](https://huggingface.co/lightseekorg/kimi-k2.6-eagle3).\n- `Kimi-K2.5-DFlash` (a speculative decoding framework that leverages a lightweight block diffusion model for parallel drafting): [Download model weight](https://huggingface.co/z-lab/Kimi-K2.5-DFlash).\n\nIt is recommended to download the model weight to the shared directory of multiple nodes, such as `/root/.cache/`.",
@@ -69,7 +69,7 @@
   },
   "prerequisites[1].title": {
     "en": "Verify Multi-node Communication",
-    "zh": "Verify Multi-node Communication"
+    "zh": "验证多节点通信"
   },
   "prerequisites[1].content": {
     "en": "If you want to deploy a multi-node environment, you need to verify multi-node communication according to [verify multi-node communication environment](https://docs.vllm.ai/projects/ascend/en/latest/installation.html#verify-multi-node-communication).",
