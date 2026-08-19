@@ -179,12 +179,8 @@ config_params:
     description: "KV cache 可用的显存比例"
 
 overview: |-
-  DeepSeek-V4 相比 DeepSeek-V3 引入了多项关键升级：
-
-  - 流形约束超连接（mHC），用于增强传统残差连接。
-  - 混合注意力架构，通过 Compress-4-Attention 和 Compress-128-Attention 大幅提升长上下文效率。对于混合专家（MoE）组件，仍采用 DeepSeekMoE 架构，仅做了少量调整。
-
-  DeepSeek-V4-Flash 是 DeepSeek-V4 系列的轻量级变体，适用于高吞吐量和低延迟的服务场景。
+  DeepSeek-V4-Flash 是 V4 预览系列中一个总参数 284B / 激活参数 13B 的 MoE 模型。
+  它将**混合注意力堆栈**——压缩稀疏注意力（CSA）+ 重度压缩注意力（HCA）——与**流形约束超连接（mHC）**相结合，在 1M 上下文下达到 V3.2 每 token 推理 FLOPs 的 27% 和 KV 缓存的 10%。预训练基于 32T+ tokens；后训练采用两阶段流水线（领域特定专家培育 + 通过在线策略蒸馏进行统一整合）。
 weight_download:
 - weight_version: W8A8-MTP（预量化）
   sources:

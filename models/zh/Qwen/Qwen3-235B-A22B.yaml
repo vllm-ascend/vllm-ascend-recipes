@@ -51,7 +51,7 @@ config_params:
     type: number
     description: "YaRN 缩放因子；4 可将原始 32K 上下文扩展到约 128K token"
 overview: |-
-  Qwen3 是 Qwen 系列的最新一代大语言模型，提供 Dense 和 MoE 两种架构。基于大规模训练，Qwen3 在推理、指令跟随、Agent 能力和多语言支持方面实现了突破性进展。Qwen3-235B-A22B 是最大的 MoE 变体，总参数 235B，每 token 激活 22B。
+  Qwen3 是 Qwen 系列最新一代大语言模型，提供全面的密集和混合专家（MoE）模型套件。基于大规模训练，Qwen3 在推理、指令遵循、智能体能力和多语言支持方面取得了突破性进展。Qwen3-235B-A22B 是最大的 MoE 变体，总参数为 235B，每个 token 激活 22B 参数。
 weight_download:
 - weight_version: BF16
   sources:
@@ -133,21 +133,21 @@ quantization:
 prerequisites:
 - title: 模型权重
   content: |-
-    以下模型变体可供选择。建议将模型权重下载到所有节点可访问的共享目录中。
+    以下模型变体可用。建议将模型权重下载到所有节点均可访问的共享目录。
 
     **BF16 版本：**
 
     | 模型 | 硬件要求 | 下载 |
     |-------|---------------------|----------|
-    | Qwen3-235B-A22B (BF16) | 1 台 Atlas 800I A3（64G × 16）、1 台 Atlas 800I A2（64G × 8）或 2 台 Atlas 800I A2（32G × 8） | [下载](https://www.modelscope.cn/models/Qwen/Qwen3-235B-A22B) |
+    | Qwen3-235B-A22B (BF16) | 1 台 Atlas 800I A3（64G × 16），1 台 Atlas 800I A2（64G × 8），或 2 台 Atlas 800I A2（32G × 8） | [下载](https://www.modelscope.cn/models/Qwen/Qwen3-235B-A22B) |
 
     **量化版本（预转换）：**
 
-    | 模型 | 量化方式 | 硬件要求 | 下载 |
+    | 模型 | 量化 | 硬件要求 | 下载 |
     |-------|-------------|---------------------|----------|
-    | Qwen3-235B-A22B-W8A8 | W8A8 | 1 台 Atlas 800I A3（64G × 16）、1 台 Atlas 800I A2（64G × 8）或 2 台 Atlas 800I A2（32G × 8） | [下载](https://modelers.cn/models/Modelers_Park/Qwen3-235B-A22B-w8a8) |
+    | Qwen3-235B-A22B-W8A8 | W8A8 | 1 台 Atlas 800I A3（64G × 16），1 台 Atlas 800I A2（64G × 8），或 2 台 Atlas 800I A2（32G × 8） | [下载](https://modelers.cn/models/Modelers_Park/Qwen3-235B-A22B-w8a8) |
 
-    以上为推荐卡数，可根据实际情况调整。
+    这些是推荐的卡数，可根据实际情况进行调整。
 - title: 模型量化
   content: |-
     参考上方量化章节。
@@ -286,7 +286,7 @@ scenarios:
   steps:
   - title: 启动服务
     content: |-
-      当你有 1 台 Atlas 800I A2（64G × 8）节点，并希望直接部署 BF16 权重时，选择此配置。若使用 Atlas 800I A2（32G × 8）节点，建议采用 2 节点部署方案。
+      当您拥有一个 Atlas 800I A2 节点（64G × 8 内存）并希望直接提供 BF16 检查点服务时，请使用此选项。对于 32G × 8 内存的 Atlas 800I A2 节点，请使用两节点部署方案。
 
       ```shell
       export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
@@ -317,9 +317,9 @@ scenarios:
 
       关键参数说明：
 
-      - `--max-model-len` 可在页面控件中配置，表示单个请求的输入 + 输出 token 最大长度。
-      - `--hf-overrides` 使用 YaRN rope-scaling 启用超过原始 32K 的长上下文；需要更长上下文时，请配合调整 `max_model_len` 和 `yarn_factor`。
-      - `--enable-expert-parallel` 应始终为该 MoE 模型启用。
+      - `--max-model-len` 可在页面控件中配置。它指定单个请求的最大输入 + 输出 token 长度。
+      - `--hf-overrides` 为超出原始 32K 窗口的上下文启用 YaRN rope 缩放。当您需要更长上下文时，请同时增加 `yarn_factor` 和 `max_model_len`。
+      - 对于此 MoE 模型，应保持 `--enable-expert-parallel` 启用。
   - title: 服务验证
     content: |-
       服务启动成功后，将显示以下启动日志：
@@ -336,7 +336,7 @@ scenarios:
   steps:
   - title: 启动服务
     content: |-
-      当你有 1 台 Atlas 800I A3（64G × 16）节点，并希望直接部署 BF16 权重时，选择此配置。
+      当您拥有一个 Atlas 800I A3 节点（64G × 16 内存）并希望直接提供 BF16 检查点服务时，请使用此选项。
 
       ```shell
       export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15
@@ -367,9 +367,9 @@ scenarios:
 
       关键参数说明：
 
-      - `--max-model-len` 可在页面控件中配置，表示单个请求的输入 + 输出 token 最大长度。
-      - `--hf-overrides` 使用 YaRN rope-scaling 启用超过原始 32K 的长上下文；需要更长上下文时，请配合调整 `max_model_len` 和 `yarn_factor`。
-      - `--enable-expert-parallel` 应始终为该 MoE 模型启用。
+      - `--max-model-len` 可在页面控件中配置。它指定单个请求的最大输入 + 输出 token 长度。
+      - `--hf-overrides` 为超出原始 32K 窗口的上下文启用 YaRN rope 缩放。当您需要更长上下文时，请同时增加 `yarn_factor` 和 `max_model_len`。
+      - 对于此 MoE 模型，应保持 `--enable-expert-parallel` 启用。
   - title: 服务验证
     content: |-
       服务启动成功后，将显示以下启动日志：
@@ -381,10 +381,10 @@ scenarios:
       ```
 - npu: Atlas 800I A2
   precision: W8A8
-  deployment: 单节点-多卡
+  deployment: 单节点
   case: 多卡
   steps:
-  - title: 启动服务
+  - title: 启动服务器
     content: |-
       以下命令为示例配置，请根据实际场景调整参数。
 
@@ -418,11 +418,11 @@ scenarios:
           --async-scheduling
       ```
 
-      > - [vLLM Serving Arguments 文档](https://docs.vllm.com.cn/en/latest/cli/serve/?h=block+size#arguments) — vLLM serve 命令的更多参数详情。
-      > - [环境变量](https://docs.vllm.ai/projects/ascend/zh-cn/latest/user_guide/configuration/env_vars.html) — Ascend 特定环境变量（`HCCL_*` 等）。
+      > - [vLLM 服务参数文档](https://docs.vllm.com.cn/en/latest/cli/serve/?h=block+size#arguments) — vLLM serve 命令的更多参数详情。
+      > - [环境变量](https://docs.vllm.ai/projects/ascend/en/latest/user_guide/configuration/env_vars.html) — Ascend 专属环境变量（`HCCL_*` 等）。
   - title: 服务验证
     content: |-
-      服务启动成功后，将显示以下启动日志：
+      如果服务启动成功，将显示以下启动日志：
 
       ```text
       (APIServer pid=<pid>) INFO:     Started server process [<pid>]
@@ -431,7 +431,7 @@ scenarios:
       ```
 - npu: Atlas 800I A3
   precision: W8A8
-  deployment: 单节点-多卡
+  deployment: 单节点
   case: 多卡
   steps:
   - title: 启动服务
@@ -468,11 +468,11 @@ scenarios:
           --async-scheduling
       ```
 
-      > - [vLLM Serving Arguments 文档](https://docs.vllm.com.cn/en/latest/cli/serve/?h=block+size#arguments) — vLLM serve 命令的更多参数详情。
-      > - [环境变量](https://docs.vllm.ai/projects/ascend/zh-cn/latest/user_guide/configuration/env_vars.html) — Ascend 特定环境变量（`HCCL_*` 等）。
+      > - [vLLM 服务参数文档](https://docs.vllm.com.cn/en/latest/cli/serve/?h=block+size#arguments) — vLLM serve 命令的更多参数详情。
+      > - [环境变量](https://docs.vllm.ai/projects/ascend/en/latest/user_guide/configuration/env_vars.html) — Ascend 专属环境变量（`HCCL_*` 等）。
   - title: 服务验证
     content: |-
-      服务启动成功后，将显示以下启动日志：
+      如果服务启动成功，将显示以下启动日志：
 
       ```text
       (APIServer pid=<pid>) INFO:     Started server process [<pid>]
@@ -1099,26 +1099,26 @@ performance:
   benchmark: |-
     ### 推荐配置
 
-    > **注意**：以下配置在特定测试环境中验证，仅供参考。最佳配置取决于最大输入/输出长度、前缀缓存命中率、精度要求和部署机器比例等因素。建议参考第 9.2 节根据实际情况进行调优。
+    > **注意**：以下配置在特定测试环境中验证，仅供参考。最优配置取决于最大输入/输出长度、前缀缓存命中率、精度要求以及部署机器比例等因素。建议参考第 9.2 节根据实际情况进行调优。
 
     #### 表 1：场景概览
 
-    | 场景 | 部署模式 | *总 NPU 数 | 权重版本 | 关键考虑因素 |
+    | 场景 | 部署模式 | *NPU 总数 | 权重版本 | 关键考虑因素 |
     |----------|----------------|-------------|----------------|---------------------|
-    | 高吞吐 | 单节点 (TP4, DP4) | 16 (A3) | W8A8 | DP 和 TP 将 MoE 专家分布到 16 个 NPU 上，实现最大吞吐 |
-    | 高吞吐 | PD 分离 (3 节点) | 48 (3×A3) | W8A8 | 3 节点 PD 分离平衡 prefill 和 decode 资源，实现高吞吐 |
-    | 低延迟 | 单节点 (TP16) | 16 (A3) | W8A8 | 16 NPU TP 配合投机解码，最小化每 token 延迟 |
-    | 长上下文 | 单节点 (TP8, CP2) | 16 (A3) | W8A8 | 16 NPU TP 配合 Context Parallelism，根据 `max_model_len` 和 YaRN `yarn_factor` 扩展上下文 |
+    | 高吞吐 | 单节点（TP4, DP4） | 16（A3） | W8A8 | DP 和 TP 将 MoE 专家分布到 16 个 NPU 上，以实现最大吞吐 |
+    | 高吞吐 | PD 分离（3 节点） | 48（3×A3） | W8A8 | 3 节点 PD 分离平衡预填充和解码资源，以实现高吞吐 |
+    | 低延迟 | 单节点（TP16） | 16（A3） | W8A8 | 16-NPU TP 配合投机解码最小化每 token 延迟 |
+    | 长上下文 | 单节点（TP8, CP2） | 16（A3） | W8A8 | 16-NPU TP 结合上下文并行，根据 `max_model_len` 和 YaRN `yarn_factor` 扩展上下文 |
 
-    > `*总 NPU 数` 表示所有节点使用的 NPU 总数。
+    > `*NPU 总数` 表示所有节点使用的 NPU 总数。
 
     #### 表 2：详细节点配置
 
-    | 场景 | 配置 | #NPUs | TP | DP | MTP 投机数量 | FUSED_MC2 | EP 开关 | 异步调度 |
+    | 场景 | 配置 | #NPU | TP | DP | MTP 投机数量 | FUSED_MC2 | EP 开关 | 异步调度 |
     |----------|---------------|-------|----|-------------|--------------------|-----------|-----------|--------------|
-    | 高吞吐 | 单节点 | 16 | 4 | 4 | none | On | On | On |
-    | 低延迟 | 单节点 | 16 | 16 | 1 | 3 | Off | On | On |
-    | 长上下文 | 单节点 | 16 | 8 | 1 | none | On | On | Off |
+    | 高吞吐 | 单节点 | 16 | 4 | 4 | 无 | 开 | 开 | 开 |
+    | 低延迟 | 单节点 | 16 | 16 | 1 | 3 | 关 | 开 | 开 |
+    | 长上下文 | 单节点 | 16 | 8 | 1 | 无 | 开 | 开 | 关 |
 
     > 更多参数详情，请参考 [第 5.1 节](#51-single-node-online-deployment) 中的部署示例。
 tuning: |-
@@ -1129,31 +1129,31 @@ tuning: |-
   关于调优方法，请参考 [公开性能调优文档](https://docs.vllm.ai/projects/ascend/zh-cn/latest/developer_guide/performance_and_debug/optimization_and_tuning.html)。
   关于特性详细描述，请参考 [特性指南](https://docs.vllm.ai/projects/ascend/zh-cn/latest/user_guide/support_matrix/feature_matrix.html)。
 faq: |-
-  关于常见的环境、安装和通用参数问题，请参考 [vLLM-Ascend FAQ](https://docs.vllm.ai/projects/ascend/zh-cn/latest/faqs.html)。本节仅涵盖 Qwen3-235B-A22B 特有的问题。
+  对于常见的环境、安装和一般参数问题，请参考 [vLLM-Ascend 常见问题](https://docs.vllm.ai/projects/ascend/en/latest/faqs.html)。本节仅涵盖 Qwen3-235B-A22B 特有的问题。
 
-  ### Q: Qwen3-235B-A22B 需要什么硬件？
+  ### 问：Qwen3-235B-A22B 需要什么硬件？
 
-  对于 BF16：1 台 Atlas 800I A3（64G × 16）节点、1 台 Atlas 800I A2（64G × 8）节点，或 2 台 Atlas 800I A2（32G × 8）节点。对于 W8A8 量化版本，硬件要求类似。
+  对于 BF16：1 个 Atlas 800I A3（64G × 16）节点、1 个 Atlas 800I A2（64G × 8）节点或 2 个 Atlas 800I A2（32G × 8）节点。对于 W8A8 量化版本，硬件要求类似。
 
-  ### Q: 如何启用超过 40K 的长上下文？
+  ### 问：如何启用超过 40K 的长上下文？
 
-  选择“长上下文”场景，并将 `max_model_len` 设置为所需的输入 + 输出 token 总长度。通过 `--hf-overrides '{"rope_parameters": {"rope_type":"yarn","rope_theta":1000000,"factor":<yarn_factor>,"original_max_position_embeddings":32768}}'` 使用 YaRN rope-scaling；页面会暴露 `yarn_factor` 供配置。对于旧版本 vLLM，使用 `--rope_scaling`。Qwen3-235B-A22B-Instruct-2507 等模型变体原生支持长上下文，无需此参数。
+  选择长上下文用例，并将 `max_model_len` 设置为所需的输入 + 输出长度。通过 `--hf-overrides '{"rope_parameters": {"rope_type":"yarn","rope_theta":1000000,"factor":<yarn_factor>,"original_max_position_embeddings":32768}}'` 使用 YaRN 旋转位置编码缩放；页面将 `yarn_factor` 作为可配置值暴露。对于较旧的 vLLM 版本，请使用 `--rope_scaling`。像 Qwen3-235B-A22B-Instruct-2507 这样的模型变体原生支持长上下文，不需要此参数。
 
-  ### Q: 什么时候使用 PD 分离 vs 单节点部署？
+  ### 问：何时应使用 PD 分离与单节点部署？
 
-  单节点部署更简单，在模型能放入单个节点时推荐使用。PD 分离将 Prefill 和 Decode 拆分到不同节点，可为大规模服务提供更高的吞吐量。对于 Qwen3-235B-A22B，使用 PD 分离的三个 A3 节点可实现约 3 倍于单节点部署的吞吐量。
+  单节点部署更简单，当模型适合单个节点时推荐使用。PD 分离将预填充和解码分离到不同节点，从而实现大规模服务的高吞吐量。对于 Qwen3-235B-A22B，使用 PD 分离的三个 A3 节点可以实现约单节点部署 3 倍的吞吐量。
 
-  ### Q: `enable_fused_mc2=1` 和 `=2` 有什么区别？
+  ### 问：`enable_fused_mc2=1` 和 `=2` 有什么区别？
 
-  值 `1` 启用基础 MoE 融合算子，适用于典型的 EP 配置。值 `2` 启用针对大规模 EP（例如 PD 分离场景中的 EP32）优化的替代融合策略。两者均为实验性功能，目前仅在 Atlas A3 服务器上支持 W8A8 量化。
+  值 `1` 启用基础的 MoE 融合算子，适用于典型的 EP 配置。值 `2` 启用针对大规模 EP（例如 PD 分离场景中的 EP32）优化的替代融合策略。两者都是实验性的，目前仅在 Atlas A3 服务器上支持 W8A8 量化。
 
-  ### Q: 什么时候应该使用 Expert Parallelism？
+  ### 问：何时应使用专家并行？
 
-  对于 Qwen3-235B-A22B（MoE 模型），应始终通过 `--enable-expert-parallel` 启用 Expert Parallelism (EP)。它将 FFN 专家分布到各个 NPU 上以减少每个设备的计算量。EP 与 TP 协同工作，MoE 层使用 EP，非 MoE 层使用 TP。
+  对于 Qwen3-235B-A22B（MoE 模型），应始终通过 `--enable-expert-parallel` 启用专家并行（EP）。它将 FFN 专家分布到多个 NPU 上，以减少每设备计算量。EP 与 TP 协同工作，其中 MoE 层使用 EP，非 MoE 层使用 TP。
 
-  ### Q: 如何在 Context Parallelism 和 PD Disaggregation 之间选择？
+  ### 问：如何在上下文并行和 PD 分离之间选择？
 
-  Context Parallelism (CP) 将单个请求的 KV 缓存拆分到多个 NPU 上，适用于单节点长上下文场景。PD Disaggregation 将 Prefill 和 Decode 分离到不同节点，适用于高并发请求的高吞吐服务。
+  上下文并行（CP）将单个请求的 KV 缓存拆分到多个 NPU 上，适用于单节点上的长上下文场景。PD 分离将预填充和解码分离到不同节点，适用于具有许多并发请求的高吞吐量服务。
 references:
 - title: vllm-ascend 文档
   url: https://docs.vllm.ai/projects/ascend/zh-cn/latest/tutorials/models/Qwen3-235B-A22B.html

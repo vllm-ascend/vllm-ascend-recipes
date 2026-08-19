@@ -89,7 +89,7 @@ performance_model_names:
   - "GLM-4.6"
   - "GLM-4.7"
 overview: |-
-  GLM-4.x（GLM-4.5/4.6/4.7）是智谱 AI（THUDM）推出的混合专家（MoE）基础模型，专为智能体应用设计。
+  GLM-4.x（GLM-4.5/4.6/4.7）是智谱AI（THUDM）推出的混合专家（MoE）基础模型，专为智能体应用设计。
 weight_download:
 - weight_version: GLM-4.5 BF16
   sources:
@@ -329,7 +329,7 @@ scenarios:
   steps:
   - title: 启动服务
     content: |-
-      GLM-4.7 W8A8 量化模型在 Atlas 800I A3 上的单节点部署。该选项适用于长上下文高并发（>4）场景，推荐 `dp2 tp8`。
+      在Atlas 800I A3上单节点部署GLM-4.7 W8A8量化模型。此选项面向长上下文高并发（>4）场景，推荐使用`dp2 tp8`。
 
       ```bash
       export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15
@@ -359,17 +359,17 @@ scenarios:
           --port 8000
       ```
 
-      > - `--quantization ascend`：W8A8 量化模型必需。使用 BF16 权重时请移除此参数。
-      > - `--speculative-config`：配置 MTP 投机解码以加速推理。
-      > - `fusion_ops_gmmswigluquant`：当 NPU 总数 <= 16 时应设为 `false`，以避免性能下降。
-      > - 长上下文低并发（<=4）场景推荐 `dp1 tp16`；长上下文高并发（>4）、低延迟短序列和高吞吐短序列推荐 `dp2 tp8`。
-      > - `max-model-len` 和 `max-num-seqs` 需要根据实际使用场景设置。
+      > - `--quantization ascend`：W8A8量化模型必需。使用BF16权重时请移除该参数。
+      > - `--speculative-config`：配置MTP投机解码以加速推理。
+      > - `fusion_ops_gmmswigluquant`：当NPU总数<=16时应设为`false`，以避免性能下降。
+      > - 对于长上下文低并发（<=4）场景，推荐`dp1 tp16`；对于长上下文高并发（>4）、低延迟短序列和高吞吐短序列场景，推荐`dp2 tp8`。
+      > - `max-model-len`和`max-num-seqs`应根据实际场景设置。
 
       参数详情请参考：
 
-      - [vLLM CLI 文档](https://docs.vllm.ai/en/stable/cli/) — 标准服务参数
-      - [环境变量](https://docs.vllm.ai/projects/ascend/zh-cn/latest/user_guide/configuration/env_vars.html) — 昇腾专用环境变量
-      - [附加配置](https://docs.vllm.ai/projects/ascend/zh-cn/latest/user_guide/configuration/additional_config.html) — `--additional-config` 格式和选项
+      - [vLLM CLI文档](https://docs.vllm.ai/en/stable/cli/) — 标准serve参数
+      - [环境变量](https://docs.vllm.ai/projects/ascend/en/latest/user_guide/configuration/env_vars.html) — Ascend特定环境变量
+      - [附加配置](https://docs.vllm.ai/projects/ascend/en/latest/user_guide/configuration/additional_config.html) — `--additional-config`格式和选项
   - title: 服务验证
     content: |-
       服务启动后，通过发送提示词验证服务是否正常运行。请参考下方的验证示例。
@@ -395,7 +395,7 @@ scenarios:
   steps:
   - title: 启动服务
     content: |-
-      GLM-4.7 W8A8 量化模型在 Atlas 800I A3 上的长上下文低并发部署，推荐 `dp1 tp16`。
+      在Atlas 800I A3上对GLM-4.7 W8A8量化模型进行长上下文低并发部署，使用推荐的`dp1 tp16`布局。
 
       ```bash
       export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15
@@ -425,16 +425,16 @@ scenarios:
           --port 8000
       ```
 
-      > - `--quantization ascend`：W8A8 量化模型必需。使用 BF16 权重时请移除此参数。
-      > - `--speculative-config`：配置 MTP 投机解码以加速推理。
-      > - `fusion_ops_gmmswigluquant`：当 NPU 总数 <= 16 时应设为 `false`，以避免性能下降。
-      > - `max-model-len` 和 `max-num-seqs` 需要根据实际使用场景设置。
+      > - `--quantization ascend`：W8A8量化模型必需。使用BF16权重时请移除该参数。
+      > - `--speculative-config`：配置MTP投机解码以加速推理。
+      > - `fusion_ops_gmmswigluquant`：当NPU总数<=16时应设为`false`，以避免性能下降。
+      > - `max-model-len`和`max-num-seqs`应根据实际场景设置。
   - title: 服务验证
     content: |-
       服务启动后，通过发送提示词验证服务是否正常运行。请参考下方的验证示例。
 - npu: Atlas 800I A3
   precision: W8A8
-  deployment: 单节点-多卡
+  deployment: 单节点
   case: 低延迟短序列
   default_configs:
   - fusion_ops_gmmswigluquant
@@ -450,7 +450,7 @@ scenarios:
   steps:
   - title: 启动服务
     content: |-
-      GLM-4.7 W8A8 量化模型在 Atlas 800I A3 上的低延迟短序列部署，推荐 `dp2 tp8`。
+      在 Atlas 800I A3 上部署 GLM-4.7 W8A8 量化模型的低延迟短序列场景，推荐使用 `dp2 tp8` 布局。
 
       ```bash
       export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15
@@ -480,8 +480,8 @@ scenarios:
           --port 8000
       ```
 
-      > - 低延迟短序列推荐 `dp2 tp8`。
-      > - `max-model-len` 和 `max-num-seqs` 需要根据实际使用场景设置。
+      > - 低延迟短序列场景推荐使用 `dp2 tp8`。
+      > - `max-model-len` 和 `max-num-seqs` 应根据实际场景进行设置。
   - title: 服务验证
     content: |-
       服务启动后，通过发送提示词验证服务是否正常运行。请参考下方的验证示例。

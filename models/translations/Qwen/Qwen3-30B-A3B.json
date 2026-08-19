@@ -4,8 +4,8 @@
     "zh": "Qwen3 系列中的 MoE（混合专家）模型，总参数量 30.5B，每 token 激活 3.3B 参数。稀疏 MoE 架构实现高效训练与推理，在推理、指令遵循和智能体能力方面表现优异，同时相比同等能力的稠密模型具有更低的计算成本。"
   },
   "meta.performance_headline": {
-    "en": "Single-node deployment on Atlas 800 A2/A3 with W8A8 precision",
-    "zh": "Atlas 800 A2/A3 单节点部署，支持 W8A8 精度"
+    "en": "Single-node deployment on Atlas 800 A2/A3 with BF16 and W8A8 precision",
+    "zh": "在 Atlas 800 A2/A3 上以 BF16 和 W8A8 精度进行单节点部署"
   },
   "model.install.docker.note": {
     "en": "Official Ascend image; full device/driver mounts are covered in env_setup.container.",
@@ -68,8 +68,8 @@
     "zh": "KV cache 可用的显存比例"
   },
   "overview": {
-    "en": "Qwen3-30B-A3B is a Mixture-of-Experts (MoE) model in the Qwen3 series, featuring 30.5B total parameters with 3.3B activated per token. The sparse MoE architecture enables efficient training and inference, delivering strong performance across reasoning, instruction-following, and agent capabilities while maintaining lower computational cost compared to dense models of similar capability.\n\nThis document will demonstrate the main validation steps for Qwen3-30B-A3B in the vLLM-Ascend environment, including supported features, environment preparation, single-node deployment, as well as accuracy and performance evaluation.\n\nThe Qwen3-30B-A3B model is first supported in v0.8.4rc2. This document is validated and written based on **vLLM-Ascend v0.22.1rc**. All **v0.22.1rc and later versions** can run stably. To use the latest features, it is recommended to use the latest release candidate or official version.",
-    "zh": "Qwen3-30B-A3B 是 Qwen3 系列中的混合专家（MoE）模型，总参数量 30.5B，每 token 激活 3.3B 参数。稀疏 MoE 架构实现了高效的训练和推理，在推理、指令遵循和智能体能力方面表现出色，同时相比同等能力的稠密模型保持了更低的计算成本。\n\n本文档将演示 Qwen3-30B-A3B 在 vLLM-Ascend 环境中的主要验证步骤，包括支持的特性、环境准备、单节点部署，以及精度和性能评估。\n\nQwen3-30B-A3B 模型首次在 v0.8.4rc2 中支持。本文档基于 **vLLM-Ascend v0.22.1rc** 验证并编写。所有 **v0.22.1rc 及更高版本**均可稳定运行。如需使用最新特性，建议使用最新的候选版本或正式版本。"
+    "en": "Qwen3-30B-A3B is a Mixture-of-Experts (MoE) model in the Qwen3 series, featuring 30.5B total parameters with 3.3B activated per token. The sparse MoE architecture enables efficient training and inference, delivering strong performance across reasoning, instruction-following, and agent capabilities while maintaining lower computational cost compared to dense models of similar capability.",
+    "zh": "Qwen3-30B-A3B 是 Qwen3 系列中的混合专家（MoE）模型，总参数量为 30.5B，每个 token 激活 3.3B 参数。稀疏的 MoE 架构实现了高效的训练和推理，在推理、指令遵循和智能体能力方面表现出色，同时与类似能力的稠密模型相比，计算成本更低。"
   },
   "weight_download[0].weight_version": {
     "en": "BF16",
@@ -80,6 +80,10 @@
     "zh": "W8A8（预量化）"
   },
   "weight_download[2].weight_version": {
+    "en": "W8A8 QuaRot-310 (Atlas 300I DUO)",
+    "zh": "W8A8 QuaRot-310 (Atlas 300I DUO)"
+  },
+  "weight_download[3].weight_version": {
     "en": "Eagle3 Draft Model",
     "zh": "Eagle3 Draft Model（投机解码用）"
   },
@@ -92,8 +96,8 @@
     "zh": "模型权重"
   },
   "prerequisites[0].content": {
-    "en": "The following model variants are available. It is recommended to download the model weight to a shared directory accessible to all nodes.\n\n| Model                | Hardware Requirement                                                                             | Download                                                                 |\n| -------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------ |\n| Qwen3-30B-A3B (BF16) | Atlas 800I A3 (64G, 1~2 cards)<br>Atlas 800I A2 (64G, 2~4 cards) | [Download](https://www.modelscope.cn/models/Qwen/Qwen3-30B-A3B)          |\n| Qwen3-30B-A3B-W8A8   | Atlas 800I A3 (64G, 1~2 cards)<br>Atlas 800I A2 (64G, 2~4 cards)                               | [Download](https://www.modelscope.cn/models/Eco-Tech/Qwen3-30B-A3B-w8a8) |\n| Eagle3 Draft Model   | NA                                                                                               | [Download](https://huggingface.co/AngelSlim/Qwen3-a3B_eagle3)            |\n\nThese are the recommended numbers of cards, which can be adjusted according to the actual situation.",
-    "zh": "以下模型变体可供使用。建议将模型权重下载到所有节点均可访问的共享目录中。\n\n| 模型                  | 硬件需求                                                                                         | 下载                                                                     |\n| -------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------ |\n| Qwen3-30B-A3B (BF16) | Atlas 800I A3 (64G, 1~2 卡)<br>Atlas 800I A2 (64G, 2~4 卡) | [下载](https://www.modelscope.cn/models/Qwen/Qwen3-30B-A3B)              |\n| Qwen3-30B-A3B-W8A8   | Atlas 800I A3 (64G, 1~2 卡)<br>Atlas 800I A2 (64G, 2~4 卡)                                     | [下载](https://www.modelscope.cn/models/Eco-Tech/Qwen3-30B-A3B-w8a8)     |\n| Eagle3 Draft Model   | 不适用                                                                                           | [下载](https://huggingface.co/AngelSlim/Qwen3-a3B_eagle3)                |\n\n以上为推荐卡数，可根据实际情况调整。"
+    "en": "The following model variants are available. It is recommended to download the model weight to a shared directory accessible to all nodes.\n\n| Model                | Hardware Requirement                                                                             | Download                                                                 |\n| -------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------ |\n| Qwen3-30B-A3B (BF16) | Atlas 800I A3 (64GB, 1~2 cards)<br>Atlas 800I A2 (64GB, 2~4 cards) | [Download](https://www.modelscope.cn/models/Qwen/Qwen3-30B-A3B)          |\n| Qwen3-30B-A3B-W8A8   | Atlas 800I A3 (64GB, 1~2 cards)<br>Atlas 800I A2 (64GB, 2~4 cards)                               | [Download](https://www.modelscope.cn/models/Eco-Tech/Qwen3-30B-A3B-w8a8) |\n| Eagle3 Draft Model   | NA                                                                                               | [Download](https://huggingface.co/AngelSlim/Qwen3-a3B_eagle3)            |\n\n**Quantized version for Atlas 300I DUO:**\n\n| Model                               | Quantization | Hardware Requirement   | Download                                                                     |\n| ----------------------------------- | ------------ | ---------------------- | ---------------------------------------------------------------------------- |\n| Qwen3-30B-A3B-w8a8-QuaRot-310       | W8A8         | Atlas 300I DUO (TP2)   | [Download](https://www.modelscope.cn/models/Eco-Tech/Qwen3-30B-A3B-w8a8-QuaRot-310) |\n\nThese are the recommended numbers of cards, which can be adjusted according to the actual situation.",
+    "zh": "以下模型变体可用。建议将模型权重下载到所有节点均可访问的共享目录中。\n\n| 模型                | 硬件要求                                                                             | 下载                                                                 |\n| -------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------ |\n| Qwen3-30B-A3B (BF16) | Atlas 800I A3 (64GB, 1~2 卡)<br>Atlas 800I A2 (64GB, 2~4 卡) | [下载](https://www.modelscope.cn/models/Qwen/Qwen3-30B-A3B)          |\n| Qwen3-30B-A3B-W8A8   | Atlas 800I A3 (64GB, 1~2 卡)<br>Atlas 800I A2 (64GB, 2~4 卡)                               | [下载](https://www.modelscope.cn/models/Eco-Tech/Qwen3-30B-A3B-w8a8) |\n| Eagle3 Draft Model   | NA                                                                                               | [下载](https://huggingface.co/AngelSlim/Qwen3-a3B_eagle3)            |\n\n**适用于 Atlas 300I DUO 的量化版本：**\n\n| 模型                               | 量化方式 | 硬件要求   | 下载                                                                     |\n| ----------------------------------- | ------------ | ---------------------- | ---------------------------------------------------------------------------- |\n| Qwen3-30B-A3B-w8a8-QuaRot-310       | W8A8         | Atlas 300I DUO (TP2)   | [下载](https://www.modelscope.cn/models/Eco-Tech/Qwen3-30B-A3B-w8a8-QuaRot-310) |\n\n以上为推荐的卡数，可根据实际情况进行调整。"
   },
   "prerequisites[1].title": {
     "en": "Model Quantization",
@@ -232,10 +236,14 @@
     "zh": "ModelScope 模型下载（W8A8）"
   },
   "references[3].title": {
+    "en": "ModelScope Model Download (W8A8 QuaRot-310)",
+    "zh": "ModelScope 模型下载 (W8A8 QuaRot-310)"
+  },
+  "references[4].title": {
     "en": "Eagle3 Draft Model",
     "zh": "Eagle3 Draft Model"
   },
-  "references[4].title": {
+  "references[5].title": {
     "en": "vllm-ascend GitHub",
     "zh": "vllm-ascend GitHub"
   }

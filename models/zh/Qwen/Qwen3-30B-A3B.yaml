@@ -4,7 +4,7 @@ meta:
   provider: "Qwen"
   description: "Qwen3 系列中的 MoE（混合专家）模型，总参数量 30.5B，每 token 激活 3.3B 参数。稀疏 MoE 架构实现高效训练与推理，在推理、指令遵循和智能体能力方面表现优异，同时相比同等能力的稠密模型具有更低的计算成本。"
   date_added: 2026-07-07
-  performance_headline: "Atlas 800 A2/A3 单节点部署，支持 BF16 与 W8A8 精度"
+  performance_headline: "在 Atlas 800 A2/A3 上以 BF16 和 W8A8 精度进行单节点部署"
   date_updated: 2026-08-17
   difficulty: intermediate
   related_recipes:
@@ -129,7 +129,7 @@ config_params:
     description: "KV cache 可用的显存比例"
 
 overview: |-
-  Qwen3-30B-A3B 是 Qwen3 系列中的混合专家（MoE）模型，总参数量 30.5B，每 token 激活 3.3B 参数。稀疏 MoE 架构实现了高效的训练和推理，在推理、指令遵循和智能体能力方面表现出色，同时相比同等能力的稠密模型保持了更低的计算成本。
+  Qwen3-30B-A3B 是 Qwen3 系列中的混合专家（MoE）模型，总参数量为 30.5B，每个 token 激活 3.3B 参数。稀疏的 MoE 架构实现了高效的训练和推理，在推理、指令遵循和智能体能力方面表现出色，同时与类似能力的稠密模型相比，计算成本更低。
 weight_download:
 - weight_version: BF16
   sources:
@@ -178,7 +178,7 @@ weight_download:
   - source: GitCode
     url: ''
     command: ''
-- weight_version: W8A8 QuaRot-310（Atlas 300I DUO）
+- weight_version: W8A8 QuaRot-310 (Atlas 300I DUO)
   sources:
   - source: ModelScope
     url: https://www.modelscope.cn/models/Eco-Tech/Qwen3-30B-A3B-w8a8-QuaRot-310
@@ -227,21 +227,21 @@ quantization:
 prerequisites:
 - title: 模型权重
   content: |-
-    以下模型变体可供使用。建议将模型权重下载到所有节点均可访问的共享目录中。
+    以下模型变体可用。建议将模型权重下载到所有节点均可访问的共享目录中。
 
-    | 模型                  | 硬件需求                                                                                         | 下载                                                                     |
+    | 模型                | 硬件要求                                                                             | 下载                                                                 |
     | -------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------ |
-    | Qwen3-30B-A3B (BF16) | Atlas 800I A3 (64GB, 1~2 卡)<br>Atlas 800I A2 (64GB, 2~4 卡) | [下载](https://www.modelscope.cn/models/Qwen/Qwen3-30B-A3B)              |
-    | Qwen3-30B-A3B-W8A8   | Atlas 800I A3 (64GB, 1~2 卡)<br>Atlas 800I A2 (64GB, 2~4 卡)                                     | [下载](https://www.modelscope.cn/models/Eco-Tech/Qwen3-30B-A3B-w8a8)     |
-    | Eagle3 Draft Model   | 不适用                                                                                           | [下载](https://huggingface.co/AngelSlim/Qwen3-a3B_eagle3)                |
+    | Qwen3-30B-A3B (BF16) | Atlas 800I A3 (64GB, 1~2 卡)<br>Atlas 800I A2 (64GB, 2~4 卡) | [下载](https://www.modelscope.cn/models/Qwen/Qwen3-30B-A3B)          |
+    | Qwen3-30B-A3B-W8A8   | Atlas 800I A3 (64GB, 1~2 卡)<br>Atlas 800I A2 (64GB, 2~4 卡)                               | [下载](https://www.modelscope.cn/models/Eco-Tech/Qwen3-30B-A3B-w8a8) |
+    | Eagle3 Draft Model   | NA                                                                                               | [下载](https://huggingface.co/AngelSlim/Qwen3-a3B_eagle3)            |
 
     **适用于 Atlas 300I DUO 的量化版本：**
 
-    | 模型                                | 量化方式 | 硬件要求                 | 下载地址                                                                     |
-    | ----------------------------------- | -------- | ------------------------ | ---------------------------------------------------------------------------- |
-    | Qwen3-30B-A3B-w8a8-QuaRot-310       | W8A8     | Atlas 300I DUO (TP2)     | [下载](https://www.modelscope.cn/models/Eco-Tech/Qwen3-30B-A3B-w8a8-QuaRot-310) |
+    | 模型                               | 量化方式 | 硬件要求   | 下载                                                                     |
+    | ----------------------------------- | ------------ | ---------------------- | ---------------------------------------------------------------------------- |
+    | Qwen3-30B-A3B-w8a8-QuaRot-310       | W8A8         | Atlas 300I DUO (TP2)   | [下载](https://www.modelscope.cn/models/Eco-Tech/Qwen3-30B-A3B-w8a8-QuaRot-310) |
 
-    以上为推荐卡数，可根据实际情况调整。
+    以上为推荐的卡数，可根据实际情况进行调整。
 - title: 模型量化
   content: |-
     请参考上方的量化部分。
@@ -900,7 +900,7 @@ references:
   url: https://www.modelscope.cn/models/Qwen/Qwen3-30B-A3B
 - title: ModelScope 模型下载（W8A8）
   url: https://www.modelscope.cn/models/Eco-Tech/Qwen3-30B-A3B-w8a8
-- title: ModelScope 模型下载（W8A8 QuaRot-310）
+- title: ModelScope 模型下载 (W8A8 QuaRot-310)
   url: https://www.modelscope.cn/models/Eco-Tech/Qwen3-30B-A3B-w8a8-QuaRot-310
 - title: Eagle3 Draft Model
   url: https://huggingface.co/AngelSlim/Qwen3-a3B_eagle3

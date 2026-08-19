@@ -7,9 +7,21 @@
     "en": "Multi-node deployment on Atlas 800 A2/A3 with W8A8 and W4A8C8 precision",
     "zh": "Atlas 800 A2/A3 多节点部署，支持 W8A8 与 W4A8C8 精度"
   },
+  "variants.default.description": {
+    "en": "W8A8 pre-quantized weights - 1x Atlas 800I A3 or 2x Atlas 800I A2",
+    "zh": "W8A8 预量化权重 —— 1 台 Atlas 800I A3 或 2 台 Atlas 800I A2"
+  },
+  "variants.w4a8c8.description": {
+    "en": "W4A8C8 compressed weights - 1x Atlas 800I A3 or 2x Atlas 800I A2",
+    "zh": "W4A8C8 压缩权重 —— 1 台 Atlas 800I A3 或 2 台 Atlas 800I A2"
+  },
+  "variants.bf16.description": {
+    "en": "Full BF16 weights - 2x Atlas 800I A3 or 4x Atlas 800I A2",
+    "zh": "BF16 全精度权重 —— 2 台 Atlas 800I A3 或 4 台 Atlas 800I A2"
+  },
   "overview": {
-    "en": "GLM-5.2 is a Mixture-of-Experts (MoE) model from Zhipu AI (THUDM) with 753B total parameters, targeting complex systems engineering and long-horizon agentic tasks. It supports Multi-Token Prediction (MTP) speculative decoding with up to 5 speculative tokens, async scheduling, dynamic EPLB, and Prefill-Decode disaggregation on Ascend NPUs.\n\nThis document demonstrates the main validation steps for GLM-5.2 in the vLLM-Ascend environment, including supported features, environment preparation, single-node and multi-node deployment, as well as accuracy and performance evaluation.\n\nThis document is validated and written based on **vLLM-Ascend v0.22.1rc**. All **v0.22.1rc and later versions** can run stably. To use the latest features, it is recommended to use the latest release candidate or official version.",
-    "zh": "GLM-5.2 是智谱 AI（THUDM）推出的混合专家（MoE）模型，总参数量 753B，面向复杂系统工程和长周期智能体任务。支持最多 5 个投机 Token 的多 Token 预测（MTP）投机解码、异步调度、动态 EPLB 和 Prefill-Decode 分离部署于昇腾 NPU。\n\n本文档将演示 GLM-5.2 在 vLLM-Ascend 环境中的主要验证步骤，包括支持的特性、环境准备、单节点和多节点部署，以及精度和性能评估。\n\n本文档基于 **vLLM-Ascend v0.22.1rc** 验证并编写。所有 **v0.22.1rc 及更高版本**均可稳定运行。如需使用最新特性，建议使用最新的候选版本或正式版本。"
+    "en": "GLM-5.2 is a Mixture-of-Experts (MoE) model from Zhipu AI (THUDM) with 753B total parameters, targeting complex systems engineering and long-horizon agentic tasks.",
+    "zh": "GLM-5.2 是智谱AI（THUDM）推出的混合专家（MoE）模型，总参数量为753B，面向复杂系统工程和长周期智能体任务。"
   },
   "weight_download[0].weight_version": {
     "en": "BF16",
@@ -19,13 +31,17 @@
     "en": "W8A8 (Pre-quantized)",
     "zh": "W8A8（预量化）"
   },
+  "weight_download[2].weight_version": {
+    "en": "W4A8C8 (Pre-quantized)",
+    "zh": "W4A8C8（预量化）"
+  },
   "prerequisites[0].title": {
     "en": "Model Weight",
     "zh": "模型权重"
   },
   "prerequisites[0].content": {
-    "en": "The following model variants are available. It is recommended to download the model weight to a shared directory accessible to all nodes.\n\n| Model | Hardware Requirement | Download |\n|-------|---------------------|----------|\n| GLM-5.2 (BF16) | Atlas 800I A3 × 2<br>Atlas 800I A2 × 4 | [Download](https://www.modelscope.cn/models/ZhipuAI/GLM-5.2) |\n| GLM-5.2-w8a8 | Atlas 800I A3 × 1<br>Atlas 800I A2 × 2 | [Download](https://www.modelscope.cn/models/Eco-Tech/GLM-5.2-w8a8) |\n\nThese are the recommended numbers of cards, which can be adjusted according to the actual situation.",
-    "zh": "以下模型变体可用。建议将模型权重下载到所有节点可访问的共享目录。\n\n| 模型 | 硬件需求 | 下载 |\n|------|---------|------|\n| GLM-5.2（BF16） | Atlas 800I A3 × 2<br>Atlas 800I A2 × 4 | [下载](https://www.modelscope.cn/models/ZhipuAI/GLM-5.2) |\n| GLM-5.2-w8a8 | Atlas 800I A3 × 1<br>Atlas 800I A2 × 2 | [下载](https://www.modelscope.cn/models/Eco-Tech/GLM-5.2-w8a8) |\n\n以上为推荐卡数，可根据实际情况调整。"
+    "en": "The following model variants are available. It is recommended to download the model weight to a shared directory accessible to all nodes.\n\n| Model | Hardware Requirement | Download |\n|-------|---------------------|----------|\n| GLM-5.2 (BF16) | Atlas 800I A3 × 2<br>Atlas 800I A2 × 4 | [Download](https://www.modelscope.cn/models/ZhipuAI/GLM-5.2) |\n| GLM-5.2-w8a8 | Atlas 800I A3 × 1<br>Atlas 800I A2 × 2 | [Download](https://www.modelscope.cn/models/Eco-Tech/GLM-5.2-w8a8) |\n| GLM-5.2-w4a8c8 | Atlas 800I A3 × 1<br>Atlas 800I A2 × 2 | [Download](https://www.modelscope.cn/models/Eco-Tech/GLM-5.2-w4a8c8) |\n\nYou can also quantize the model directly with [msmodelslim](https://gitcode.com/Ascend/msmodelslim). It is recommended to download the weights to a multi-node shared directory, such as `/root/.cache/`.",
+    "zh": "以下模型变体可用。建议将模型权重下载到所有节点均可访问的共享目录。\n\n| 模型 | 硬件要求 | 下载 |\n|-------|---------------------|----------|\n| GLM-5.2 (BF16) | Atlas 800I A3 × 2<br>Atlas 800I A2 × 4 | [下载](https://www.modelscope.cn/models/ZhipuAI/GLM-5.2) |\n| GLM-5.2-w8a8 | Atlas 800I A3 × 1<br>Atlas 800I A2 × 2 | [下载](https://www.modelscope.cn/models/Eco-Tech/GLM-5.2-w8a8) |\n| GLM-5.2-w4a8c8 | Atlas 800I A3 × 1<br>Atlas 800I A2 × 2 | [下载](https://www.modelscope.cn/models/Eco-Tech/GLM-5.2-w4a8c8) |\n\n您也可以直接使用 [msmodelslim](https://gitcode.com/Ascend/msmodelslim) 对模型进行量化。建议将权重下载到多节点共享目录，例如 `/root/.cache/`。"
   },
   "prerequisites[1].title": {
     "en": "Verify Multi-node Communication",
@@ -52,136 +68,136 @@
     "zh": "量化"
   },
   "scenario_selector_labels.deployment": {
-    "en": "Sequence",
-    "zh": "序列"
+    "en": "Deployment Mode",
+    "zh": "部署模式"
   },
   "scenario_selector_labels.case": {
     "en": "Scenario",
     "zh": "场景"
   },
   "scenarios[0].deployment": {
-    "en": "20K",
-    "zh": "20K"
+    "en": "Dual-Node Co-Located",
+    "zh": "双节点共置"
   },
   "scenarios[0].case": {
+    "en": "Low Latency 64K",
+    "zh": "低延迟 64K"
+  },
+  "scenarios[0].steps[0].title": {
+    "en": "Scenario Overview",
+    "zh": "场景概述"
+  },
+  "scenarios[0].steps[0].content": {
+    "en": "Low-latency 64K-input serving is recommended with W4A8C8 weights and dual-node co-located deployment.\n\n|Deployment Mode|Total NPUs|Weight Version|Key Considerations|\n|---------------|----------|--------------|------------------|\n|Dual-node co-located (A3), [Multi-Node Co-Located Deployment](https://docs.vllm.ai/projects/ascend/en/latest/tutorials/models/GLM5.2.html#5112-multi-node-co-located-deployment)|32 (A3)|w4a8c8|dp2 tp16, MTP3, max-num-seqs 8, max-model-len 135000, FlashComm1, DSA CP|",
+    "zh": "低延迟64K输入推理建议使用W4A8C8权重和双节点共置部署。\n\n|部署模式|总NPU数|权重版本|关键考虑因素|\n|---------------|----------|--------------|------------------|\n|双节点共置（A3），[多节点共置部署](https://docs.vllm.ai/projects/ascend/en/latest/tutorials/models/GLM5.2.html#5112-multi-node-co-located-deployment)|32（A3）|w4a8c8|dp2 tp16, MTP3, max-num-seqs 8, max-model-len 135000, FlashComm1, DSA CP|"
+  },
+  "scenarios[0].steps[1].title": {
+    "en": "Detailed Node Configuration",
+    "zh": "详细节点配置"
+  },
+  "scenarios[0].steps[1].content": {
+    "en": "TP/DP columns show the per-node values used by the deployment scripts; each A3 node uses 16 NPUs.\n\n|Configuration|NPUs per node|TP|DP per node|Max Num Seqs|Max Num Batched Tokens|Max Model Len|MTP Spec Num|\n|-------------|-------------|--|-----------|------------|----------------------|-------------|------------|\n|Dual-Node (per node)|16|16|1|8|8192|135000|3|\n\n`max-model-len` and `max-num-seqs` should be tuned for your actual input/output lengths, prefix-cache hit rate, and serving concurrency.",
+    "zh": "TP/DP列显示部署脚本使用的每节点值；每个A3节点使用16个NPU。\n\n|配置|每节点NPU数|TP|每节点DP|最大序列数|最大批处理令牌数|最大模型长度|MTP推测数|\n|-------------|-------------|--|-----------|------------|----------------------|-------------|------------|\n|双节点（每节点）|16|16|1|8|8192|135000|3|\n\n`max-model-len` 和 `max-num-seqs` 应根据实际输入/输出长度、前缀缓存命中率和推理并发度进行调整。"
+  },
+  "scenarios[1].deployment": {
+    "en": "Dual-Node Co-Located",
+    "zh": "双节点共置"
+  },
+  "scenarios[1].case": {
+    "en": "Low Latency 128K",
+    "zh": "低延迟 128K"
+  },
+  "scenarios[1].steps[0].title": {
+    "en": "Scenario Overview",
+    "zh": "场景概述"
+  },
+  "scenarios[1].steps[0].content": {
+    "en": "Low-latency 128K-input serving is recommended with W4A8C8 weights and dual-node co-located deployment.\n\n|Deployment Mode|Total NPUs|Weight Version|Key Considerations|\n|---------------|----------|--------------|------------------|\n|Dual-node co-located (A3), [Multi-Node Co-Located Deployment](https://docs.vllm.ai/projects/ascend/en/latest/tutorials/models/GLM5.2.html#5112-multi-node-co-located-deployment)|32 (A3)|w4a8c8|dp2 tp16, MTP3, max-num-seqs 8, max-model-len 135000, FlashComm1, DSA CP|",
+    "zh": "低延迟128K输入推理建议使用W4A8C8权重和双节点共置部署。\n\n|部署模式|总NPU数|权重版本|关键考虑因素|\n|---------------|----------|--------------|------------------|\n|双节点共置（A3），[多节点共置部署](https://docs.vllm.ai/projects/ascend/en/latest/tutorials/models/GLM5.2.html#5112-multi-node-co-located-deployment)|32（A3）|w4a8c8|dp2 tp16, MTP3, max-num-seqs 8, max-model-len 135000, FlashComm1, DSA CP|"
+  },
+  "scenarios[1].steps[1].title": {
+    "en": "Detailed Node Configuration",
+    "zh": "详细节点配置"
+  },
+  "scenarios[1].steps[1].content": {
+    "en": "TP/DP columns show the per-node values used by the deployment scripts; each A3 node uses 16 NPUs.\n\n|Configuration|NPUs per node|TP|DP per node|Max Num Seqs|Max Num Batched Tokens|Max Model Len|MTP Spec Num|\n|-------------|-------------|--|-----------|------------|----------------------|-------------|------------|\n|Dual-Node (per node)|16|16|1|8|8192|135000|3|\n\nFor latency-oriented serving, keep `max-num-seqs` small and reserve KV-cache memory according to the expected output length.",
+    "zh": "TP/DP列显示部署脚本使用的每节点值；每个A3节点使用16个NPU。\n\n|配置|每节点NPU数|TP|每节点DP|最大序列数|最大批处理令牌数|最大模型长度|MTP推测数|\n|-------------|-------------|--|-----------|------------|----------------------|-------------|------------|\n|双节点（每节点）|16|16|1|8|8192|135000|3|\n\n对于延迟导向的推理，请保持 `max-num-seqs` 较小，并根据预期输出长度预留KV缓存内存。"
+  },
+  "scenarios[2].deployment": {
+    "en": "Dual-Node Co-Located",
+    "zh": "双节点共置"
+  },
+  "scenarios[2].case": {
+    "en": "High Throughput 64K",
+    "zh": "高吞吐 64K"
+  },
+  "scenarios[2].steps[0].title": {
+    "en": "Scenario Overview",
+    "zh": "场景概述"
+  },
+  "scenarios[2].steps[0].content": {
+    "en": "High-throughput 64K-input serving is recommended with W4A8C8 weights and dual-node co-located deployment.\n\n|Deployment Mode|Total NPUs|Weight Version|Key Considerations|\n|---------------|----------|--------------|------------------|\n|Dual-node co-located (A3), [Multi-Node Co-Located Deployment](https://docs.vllm.ai/projects/ascend/en/latest/tutorials/models/GLM5.2.html#5112-multi-node-co-located-deployment)|32 (A3)|w4a8c8|dp4 tp8, fused MC2, MTP3, max-num-seqs 16, max-model-len 66000, FlashComm1, DSA CP|",
+    "zh": "高吞吐64K输入推理建议使用W4A8C8权重和双节点共置部署。\n\n|部署模式|总NPU数|权重版本|关键考虑因素|\n|---------------|----------|--------------|------------------|\n|双节点共置（A3），[多节点共置部署](https://docs.vllm.ai/projects/ascend/en/latest/tutorials/models/GLM5.2.html#5112-multi-node-co-located-deployment)|32（A3）|w4a8c8|dp4 tp8, fused MC2, MTP3, max-num-seqs 16, max-model-len 66000, FlashComm1, DSA CP|"
+  },
+  "scenarios[2].steps[1].title": {
+    "en": "Detailed Node Configuration",
+    "zh": "详细节点配置"
+  },
+  "scenarios[2].steps[1].content": {
+    "en": "TP/DP columns show the per-node values used by the deployment scripts; each A3 node uses 16 NPUs.\n\n|Configuration|NPUs per node|TP|DP per node|Max Num Seqs|Max Num Batched Tokens|Max Model Len|MTP Spec Num|\n|-------------|-------------|--|-----------|------------|----------------------|-------------|------------|\n|Dual-Node (per node)|16|8|2|16|8192|66000|3|\n\nFor throughput-oriented serving, `dp4 tp8` improves concurrency capacity and pairs with FlashComm1 plus DSA CP for long-context prefill.",
+    "zh": "TP/DP列显示部署脚本使用的每节点值；每个A3节点使用16个NPU。\n\n|配置|每节点NPU数|TP|每节点DP|最大序列数|最大批处理令牌数|最大模型长度|MTP推测数|\n|-------------|-------------|--|-----------|------------|----------------------|-------------|------------|\n|双节点（每节点）|16|8|2|16|8192|66000|3|\n\n对于吞吐导向的推理，`dp4 tp8` 可提高并发能力，并与FlashComm1和DSA CP配合用于长上下文预填充。"
+  },
+  "scenarios[3].deployment": {
+    "en": "PD Disaggregation",
+    "zh": "PD分离"
+  },
+  "scenarios[3].case": {
     "en": "High Throughput",
     "zh": "高吞吐"
   },
-  "scenarios[0].steps[0].title": {
-    "en": "Start the server",
-    "zh": "启动服务"
-  },
-  "scenarios[0].steps[0].content": {
-    "en": "Single-node high-throughput configuration.\n\n```bash\nexport ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15\nexport HCCL_OP_EXPANSION_MODE=\"AIV\"\nexport HCCL_BUFFSIZE=200\nexport OMP_PROC_BIND=false\nexport OMP_NUM_THREADS=1\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\nexport VLLM_ASCEND_BALANCE_SCHEDULING=1\nexport VLLM_ASCEND_ENABLE_FLASHCOMM1=1\nexport VLLM_ASCEND_ENABLE_MLAPO=1\n\nvllm serve your_model_path \\\n    --served-model-name glm-52 \\\n    --trust-remote-code \\\n    --max-num-seqs 48 \\\n    --max-model-len 20480 \\\n    --max-num-batched-tokens 4096 \\\n    --data-parallel-size 2 \\\n    --tensor-parallel-size 8 \\\n    --enable-expert-parallel \\\n    --quantization ascend \\\n    --gpu-memory-utilization 0.95 \\\n    --async-scheduling \\\n    --additional-config '{\"multistream_overlap_shared_expert\": true}' \\\n    --compilation-config '{\"cudagraph_mode\": \"FULL_DECODE_ONLY\"}' \\\n    --speculative-config '{\"num_speculative_tokens\": 3, \"method\": \"deepseek_mtp\"}' \\\n    --seed 1024 \\\n    --port 8000\n```",
-    "zh": "单节点高吞吐配置。\n\n```bash\nexport ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15\nexport HCCL_OP_EXPANSION_MODE=\"AIV\"\nexport HCCL_BUFFSIZE=200\nexport OMP_PROC_BIND=false\nexport OMP_NUM_THREADS=1\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\nexport VLLM_ASCEND_BALANCE_SCHEDULING=1\nexport VLLM_ASCEND_ENABLE_FLASHCOMM1=1\nexport VLLM_ASCEND_ENABLE_MLAPO=1\n\nvllm serve your_model_path \\\n    --served-model-name glm-52 \\\n    --trust-remote-code \\\n    --max-num-seqs 48 \\\n    --max-model-len 20480 \\\n    --max-num-batched-tokens 4096 \\\n    --data-parallel-size 2 \\\n    --tensor-parallel-size 8 \\\n    --enable-expert-parallel \\\n    --quantization ascend \\\n    --gpu-memory-utilization 0.95 \\\n    --async-scheduling \\\n    --additional-config '{\"multistream_overlap_shared_expert\": true}' \\\n    --compilation-config '{\"cudagraph_mode\": \"FULL_DECODE_ONLY\"}' \\\n    --speculative-config '{\"num_speculative_tokens\": 3, \"method\": \"deepseek_mtp\"}' \\\n    --seed 1024 \\\n    --port 8000\n```"
-  },
-  "scenarios[0].steps[1].title": {
-    "en": "Service Verification",
-    "zh": "服务验证"
-  },
-  "scenarios[0].steps[1].content": {
-    "en": "After the service is started, verify it by sending a prompt. Refer to the verification section below for an example.",
-    "zh": "服务启动后，通过发送提示词验证服务是否正常运行。请参考下方的验证示例。"
-  },
-  "scenarios[1].deployment": {
-    "en": "20K",
-    "zh": "20K"
-  },
-  "scenarios[1].case": {
-    "en": "Low Latency",
-    "zh": "低延迟"
-  },
-  "scenarios[1].steps[0].title": {
-    "en": "Start the server",
-    "zh": "启动服务"
-  },
-  "scenarios[1].steps[0].content": {
-    "en": "Single-node low-latency configuration.\n\n```bash\nexport ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15\nexport HCCL_OP_EXPANSION_MODE=\"AIV\"\nexport HCCL_BUFFSIZE=200\nexport OMP_PROC_BIND=false\nexport OMP_NUM_THREADS=1\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\nexport VLLM_ASCEND_BALANCE_SCHEDULING=1\nexport VLLM_ASCEND_ENABLE_MLAPO=1\n\nvllm serve your_model_path \\\n    --served-model-name glm-52 \\\n    --trust-remote-code \\\n    --max-num-seqs 8 \\\n    --max-model-len 20480 \\\n    --max-num-batched-tokens 4096 \\\n    --data-parallel-size 1 \\\n    --tensor-parallel-size 16 \\\n    --quantization ascend \\\n    --gpu-memory-utilization 0.95 \\\n    --async-scheduling \\\n    --compilation-config '{\"cudagraph_mode\": \"FULL_DECODE_ONLY\"}' \\\n    --speculative-config '{\"num_speculative_tokens\": 3, \"method\": \"deepseek_mtp\"}' \\\n    --seed 1024 \\\n    --port 8000\n```",
-    "zh": "单节点低延迟配置。\n\n```bash\nexport ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15\nexport HCCL_OP_EXPANSION_MODE=\"AIV\"\nexport HCCL_BUFFSIZE=200\nexport OMP_PROC_BIND=false\nexport OMP_NUM_THREADS=1\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\nexport VLLM_ASCEND_BALANCE_SCHEDULING=1\nexport VLLM_ASCEND_ENABLE_MLAPO=1\n\nvllm serve your_model_path \\\n    --served-model-name glm-52 \\\n    --trust-remote-code \\\n    --max-num-seqs 8 \\\n    --max-model-len 20480 \\\n    --max-num-batched-tokens 4096 \\\n    --data-parallel-size 1 \\\n    --tensor-parallel-size 16 \\\n    --quantization ascend \\\n    --gpu-memory-utilization 0.95 \\\n    --async-scheduling \\\n    --compilation-config '{\"cudagraph_mode\": \"FULL_DECODE_ONLY\"}' \\\n    --speculative-config '{\"num_speculative_tokens\": 3, \"method\": \"deepseek_mtp\"}' \\\n    --seed 1024 \\\n    --port 8000\n```"
-  },
-  "scenarios[1].steps[1].title": {
-    "en": "Service Verification",
-    "zh": "服务验证"
-  },
-  "scenarios[1].steps[1].content": {
-    "en": "After the service is started, verify it by sending a prompt. Refer to the verification section below for an example.",
-    "zh": "服务启动后，通过发送提示词验证服务是否正常运行。请参考下方的验证示例。"
-  },
-  "scenarios[2].deployment": {
-    "en": "64K",
-    "zh": "64K"
-  },
-  "scenarios[2].case": {
-    "en": "Long Context",
-    "zh": "长上下文"
-  },
-  "scenarios[2].steps[0].title": {
-    "en": "Start the server",
-    "zh": "启动服务"
-  },
-  "scenarios[2].steps[0].content": {
-    "en": "Two-node long-context configuration.\n\n**Node 0:**\n\n```bash\nexport ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15\nexport HCCL_OP_EXPANSION_MODE=\"AIV\"\nexport HCCL_BUFFSIZE=200\nexport OMP_PROC_BIND=false\nexport OMP_NUM_THREADS=1\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\nexport VLLM_ASCEND_BALANCE_SCHEDULING=1\nexport VLLM_ASCEND_ENABLE_FLASHCOMM1=1\nexport VLLM_ASCEND_ENABLE_MLAPO=1\nexport HCCL_IF_IP=<node0_ip>\nexport GLOO_SOCKET_IFNAME=<nic_name>\nexport TP_SOCKET_IFNAME=<nic_name>\nexport HCCL_SOCKET_IFNAME=<nic_name>\n\nvllm serve your_model_path \\\n    --served-model-name glm-52 \\\n    --trust-remote-code \\\n    --max-num-seqs 32 \\\n    --max-model-len 64000 \\\n    --max-num-batched-tokens 4096 \\\n    --data-parallel-size 2 \\\n    --data-parallel-size-local 1 \\\n    --data-parallel-address <node0_ip> \\\n    --data-parallel-rpc-port 12890 \\\n    --tensor-parallel-size 16 \\\n    --enable-expert-parallel \\\n    --quantization ascend \\\n    --gpu-memory-utilization 0.93 \\\n    --enable-prefix-caching \\\n    --additional-config '{\"multistream_overlap_shared_expert\": true}' \\\n    --compilation-config '{\"cudagraph_mode\": \"FULL_DECODE_ONLY\"}' \\\n    --speculative-config '{\"num_speculative_tokens\": 5, \"method\": \"deepseek_mtp\"}' \\\n    --seed 1024 \\\n    --port 8000\n```\n\n**Node 1:**\n\n```bash\nexport ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15\nexport HCCL_OP_EXPANSION_MODE=\"AIV\"\nexport HCCL_BUFFSIZE=200\nexport OMP_PROC_BIND=false\nexport OMP_NUM_THREADS=1\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\nexport VLLM_ASCEND_BALANCE_SCHEDULING=1\nexport VLLM_ASCEND_ENABLE_FLASHCOMM1=1\nexport VLLM_ASCEND_ENABLE_MLAPO=1\nexport HCCL_IF_IP=<node1_ip>\nexport GLOO_SOCKET_IFNAME=<nic_name>\nexport TP_SOCKET_IFNAME=<nic_name>\nexport HCCL_SOCKET_IFNAME=<nic_name>\n\nvllm serve your_model_path \\\n    --served-model-name glm-52 \\\n    --trust-remote-code \\\n    --max-num-seqs 32 \\\n    --max-model-len 64000 \\\n    --max-num-batched-tokens 4096 \\\n    --data-parallel-size 2 \\\n    --data-parallel-size-local 1 \\\n    --data-parallel-start-rank 1 \\\n    --data-parallel-address <node0_ip> \\\n    --data-parallel-rpc-port 12890 \\\n    --tensor-parallel-size 16 \\\n    --enable-expert-parallel \\\n    --headless \\\n    --quantization ascend \\\n    --gpu-memory-utilization 0.93 \\\n    --enable-prefix-caching \\\n    --additional-config '{\"multistream_overlap_shared_expert\": true}' \\\n    --compilation-config '{\"cudagraph_mode\": \"FULL_DECODE_ONLY\"}' \\\n    --speculative-config '{\"num_speculative_tokens\": 5, \"method\": \"deepseek_mtp\"}' \\\n    --seed 1024 \\\n    --port 8000\n```",
-    "zh": "两节点长上下文配置。\n\n**节点 0：**\n\n```bash\nexport ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15\nexport HCCL_OP_EXPANSION_MODE=\"AIV\"\nexport HCCL_BUFFSIZE=200\nexport OMP_PROC_BIND=false\nexport OMP_NUM_THREADS=1\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\nexport VLLM_ASCEND_BALANCE_SCHEDULING=1\nexport VLLM_ASCEND_ENABLE_FLASHCOMM1=1\nexport VLLM_ASCEND_ENABLE_MLAPO=1\nexport HCCL_IF_IP=<node0_ip>\nexport GLOO_SOCKET_IFNAME=<nic_name>\nexport TP_SOCKET_IFNAME=<nic_name>\nexport HCCL_SOCKET_IFNAME=<nic_name>\n\nvllm serve your_model_path \\\n    --served-model-name glm-52 \\\n    --trust-remote-code \\\n    --max-num-seqs 32 \\\n    --max-model-len 64000 \\\n    --max-num-batched-tokens 4096 \\\n    --data-parallel-size 2 \\\n    --data-parallel-size-local 1 \\\n    --data-parallel-address <node0_ip> \\\n    --data-parallel-rpc-port 12890 \\\n    --tensor-parallel-size 16 \\\n    --enable-expert-parallel \\\n    --quantization ascend \\\n    --gpu-memory-utilization 0.93 \\\n    --enable-prefix-caching \\\n    --additional-config '{\"multistream_overlap_shared_expert\": true}' \\\n    --compilation-config '{\"cudagraph_mode\": \"FULL_DECODE_ONLY\"}' \\\n    --speculative-config '{\"num_speculative_tokens\": 5, \"method\": \"deepseek_mtp\"}' \\\n    --seed 1024 \\\n    --port 8000\n```\n\n**节点 1：**\n\n```bash\nexport ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15\nexport HCCL_OP_EXPANSION_MODE=\"AIV\"\nexport HCCL_BUFFSIZE=200\nexport OMP_PROC_BIND=false\nexport OMP_NUM_THREADS=1\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\nexport VLLM_ASCEND_BALANCE_SCHEDULING=1\nexport VLLM_ASCEND_ENABLE_FLASHCOMM1=1\nexport VLLM_ASCEND_ENABLE_MLAPO=1\nexport HCCL_IF_IP=<node1_ip>\nexport GLOO_SOCKET_IFNAME=<nic_name>\nexport TP_SOCKET_IFNAME=<nic_name>\nexport HCCL_SOCKET_IFNAME=<nic_name>\n\nvllm serve your_model_path \\\n    --served-model-name glm-52 \\\n    --trust-remote-code \\\n    --max-num-seqs 32 \\\n    --max-model-len 64000 \\\n    --max-num-batched-tokens 4096 \\\n    --data-parallel-size 2 \\\n    --data-parallel-size-local 1 \\\n    --data-parallel-start-rank 1 \\\n    --data-parallel-address <node0_ip> \\\n    --data-parallel-rpc-port 12890 \\\n    --tensor-parallel-size 16 \\\n    --enable-expert-parallel \\\n    --headless \\\n    --quantization ascend \\\n    --gpu-memory-utilization 0.93 \\\n    --enable-prefix-caching \\\n    --additional-config '{\"multistream_overlap_shared_expert\": true}' \\\n    --compilation-config '{\"cudagraph_mode\": \"FULL_DECODE_ONLY\"}' \\\n    --speculative-config '{\"num_speculative_tokens\": 5, \"method\": \"deepseek_mtp\"}' \\\n    --seed 1024 \\\n    --port 8000\n```"
-  },
-  "scenarios[2].steps[1].title": {
-    "en": "Service Verification",
-    "zh": "服务验证"
-  },
-  "scenarios[2].steps[1].content": {
-    "en": "After the service is started, verify it by sending a prompt. Refer to the verification section below for an example.",
-    "zh": "服务启动后，通过发送提示词验证服务是否正常运行。请参考下方的验证示例。"
-  },
-  "scenarios[3].deployment": {
-    "en": "135K",
-    "zh": "135K"
-  },
-  "scenarios[3].case": {
-    "en": "PD Separation",
-    "zh": "PD 分离"
-  },
   "scenarios[3].steps[0].title": {
-    "en": "Start the server",
-    "zh": "启动服务"
+    "en": "Scenario Overview",
+    "zh": "场景概述"
   },
   "scenarios[3].steps[0].content": {
-    "en": "A3 multi-node PD configuration.\n\n```bash\n# Prefill nodes\nexport ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15\nexport VLLM_ASCEND_ENABLE_FLASHCOMM1=1\n\nvllm serve your_model_path \\\n    --served-model-name glm-52-prefill \\\n    --trust-remote-code \\\n    --port 8100 \\\n    --max-model-len 135000 \\\n    --max-num-seqs 32 \\\n    --data-parallel-size 2 \\\n    --tensor-parallel-size 16 \\\n    --enable-expert-parallel \\\n    --quantization ascend \\\n    --enable-prefix-caching \\\n    --speculative-config '{\"num_speculative_tokens\": 5, \"method\": \"deepseek_mtp\"}' \\\n    --kv-transfer-config '{\"kv_connector\": \"MooncakeConnectorV1\", \"kv_role\": \"kv_producer\", \"kv_port\": \"30400\"}'\n\n# Decode nodes\nexport ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15\nexport VLLM_ASCEND_ENABLE_MLAPO=1\nexport DYNAMIC_EPLB=1\n\nvllm serve your_model_path \\\n    --served-model-name glm-52 \\\n    --trust-remote-code \\\n    --port 8000 \\\n    --max-model-len 135000 \\\n    --max-num-seqs 32 \\\n    --data-parallel-size 8 \\\n    --tensor-parallel-size 4 \\\n    --enable-expert-parallel \\\n    --quantization ascend \\\n    --speculative-config '{\"num_speculative_tokens\": 5, \"method\": \"deepseek_mtp\"}' \\\n    --kv-transfer-config '{\"kv_connector\": \"MooncakeConnectorV1\", \"kv_role\": \"kv_consumer\", \"kv_port\": \"30400\"}' \\\n    --additional-config '{\"multistream_overlap_shared_expert\": true, \"recompute_scheduler_enable\": true}'\n```",
-    "zh": "A3 多节点 PD 分离配置。\n\n```bash\n# Prefill 节点\nexport ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15\nexport VLLM_ASCEND_ENABLE_FLASHCOMM1=1\n\nvllm serve your_model_path \\\n    --served-model-name glm-52-prefill \\\n    --trust-remote-code \\\n    --port 8100 \\\n    --max-model-len 135000 \\\n    --max-num-seqs 32 \\\n    --data-parallel-size 2 \\\n    --tensor-parallel-size 16 \\\n    --enable-expert-parallel \\\n    --quantization ascend \\\n    --enable-prefix-caching \\\n    --speculative-config '{\"num_speculative_tokens\": 5, \"method\": \"deepseek_mtp\"}' \\\n    --kv-transfer-config '{\"kv_connector\": \"MooncakeConnectorV1\", \"kv_role\": \"kv_producer\", \"kv_port\": \"30400\"}'\n\n# Decode 节点\nexport ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15\nexport VLLM_ASCEND_ENABLE_MLAPO=1\nexport DYNAMIC_EPLB=1\n\nvllm serve your_model_path \\\n    --served-model-name glm-52 \\\n    --trust-remote-code \\\n    --port 8000 \\\n    --max-model-len 135000 \\\n    --max-num-seqs 32 \\\n    --data-parallel-size 8 \\\n    --tensor-parallel-size 4 \\\n    --enable-expert-parallel \\\n    --quantization ascend \\\n    --speculative-config '{\"num_speculative_tokens\": 5, \"method\": \"deepseek_mtp\"}' \\\n    --kv-transfer-config '{\"kv_connector\": \"MooncakeConnectorV1\", \"kv_role\": \"kv_consumer\", \"kv_port\": \"30400\"}' \\\n    --additional-config '{\"multistream_overlap_shared_expert\": true, \"recompute_scheduler_enable\": true}'\n```"
+    "en": "High-throughput PD disaggregation is recommended with dedicated P/D node pools and Mooncake KV transfer.\n\n|Deployment Mode|Total NPUs|Weight Version|Key Considerations|\n|---------------|----------|--------------|------------------|\n|PD disaggregation (A3), [Prefill-Decode Disaggregation](https://docs.vllm.ai/projects/ascend/en/latest/tutorials/models/GLM5.2.html#5113-prefill-decode-disaggregation)|4 nodes (A3)|w4a8c8|P: dp4 tp8 (max-num-seqs 64, max-num-batched-tokens 8192, MTP1); D: dp32 tp1 (max-num-seqs 32, max-num-batched-tokens 164, MTP5), max-model-len 133120, dedicated P/D nodes, Mooncake KV transfer|",
+    "zh": "高吞吐PD分离建议使用专用的P/D节点池和Mooncake KV传输。\n\n|部署模式|总NPU数|权重版本|关键考虑因素|\n|---------------|----------|--------------|------------------|\n|PD分离（A3），[预填充-解码分离](https://docs.vllm.ai/projects/ascend/en/latest/tutorials/models/GLM5.2.html#5113-prefill-decode-disaggregation)|4节点（A3）|w4a8c8|P: dp4 tp8 (max-num-seqs 64, max-num-batched-tokens 8192, MTP1); D: dp32 tp1 (max-num-seqs 32, max-num-batched-tokens 164, MTP5), max-model-len 133120, 专用P/D节点, Mooncake KV传输|"
   },
   "scenarios[3].steps[1].title": {
-    "en": "Service Verification",
-    "zh": "服务验证"
+    "en": "Detailed Node Configuration",
+    "zh": "详细节点配置"
   },
   "scenarios[3].steps[1].content": {
-    "en": "After all PD services are started, verify through the proxy endpoint that Prefill and Decode nodes work together.",
-    "zh": "PD 分离服务完全启动后，通过 proxy 入口验证 Prefill 和 Decode 节点是否正常协同工作。"
+    "en": "TP/DP columns show the per-node values used by the deployment scripts; each A3 node uses 16 NPUs.\n\n|Node Role|NPUs per node|TP|DP per node|Max Num Seqs|Max Num Batched Tokens|Max Model Len|MTP Spec Num|\n|---------|-------------|--|-----------|------------|----------------------|-------------|------------|\n|PD - Server-P Node|16|8|2|64|8192|133120|1|\n|PD - Server-D Node|16|1|16|32|164|133120|5|\n\nOn PD decode nodes, `max-num-batched-tokens` is configured as `(MTP Spec Num + 1) * Max Num Seqs`.",
+    "zh": "TP/DP 列显示部署脚本使用的每节点值；每个 A3 节点使用 16 个 NPU。\n\n|节点角色|每节点 NPU 数|TP|每节点 DP|最大序列数|最大批处理 Token 数|最大模型长度|MTP 推测数|\n|---------|-------------|--|-----------|------------|----------------------|-------------|------------|\n|PD - Server-P 节点|16|8|2|64|8192|133120|1|\n|PD - Server-D 节点|16|1|16|32|164|133120|5|\n\n在 PD 解码节点上，`max-num-batched-tokens` 配置为 `(MTP Spec Num + 1) * Max Num Seqs`。"
   },
   "scenarios[4].deployment": {
-    "en": "135K",
-    "zh": "135K"
+    "en": "PD Disaggregation",
+    "zh": "PD 分离部署"
   },
   "scenarios[4].case": {
-    "en": "PD Separation",
-    "zh": "PD 分离"
+    "en": "Long Context 1M",
+    "zh": "长上下文 1M"
   },
   "scenarios[4].steps[0].title": {
-    "en": "Start the server",
-    "zh": "启动服务"
+    "en": "Scenario Overview",
+    "zh": "场景概述"
   },
   "scenarios[4].steps[0].content": {
-    "en": "A2 multi-node PD configuration.\n\n```bash\n# Prefill nodes\nexport ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7\nexport VLLM_ASCEND_ENABLE_FLASHCOMM1=1\n\nvllm serve your_model_path \\\n    --served-model-name glm-52-prefill \\\n    --trust-remote-code \\\n    --port 8100 \\\n    --max-model-len 115168 \\\n    --max-num-seqs 16 \\\n    --data-parallel-size 4 \\\n    --tensor-parallel-size 8 \\\n    --enable-expert-parallel \\\n    --quantization ascend \\\n    --block-size 128 \\\n    --speculative-config '{\"num_speculative_tokens\": 3, \"method\": \"deepseek_mtp\"}' \\\n    --kv-transfer-config '{\"kv_connector\": \"MooncakeConnectorV1\", \"kv_role\": \"kv_producer\", \"kv_port\": \"30400\"}'\n\n# Decode nodes\nexport ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7\nexport VLLM_ASCEND_ENABLE_MLAPO=1\nexport DYNAMIC_EPLB=1\n\nvllm serve your_model_path \\\n    --served-model-name glm-52 \\\n    --trust-remote-code \\\n    --port 8000 \\\n    --max-model-len 135168 \\\n    --max-num-seqs 16 \\\n    --data-parallel-size 8 \\\n    --tensor-parallel-size 4 \\\n    --enable-expert-parallel \\\n    --quantization ascend \\\n    --block-size 128 \\\n    --speculative-config '{\"num_speculative_tokens\": 3, \"method\": \"deepseek_mtp\"}' \\\n    --kv-transfer-config '{\"kv_connector\": \"MooncakeConnectorV1\", \"kv_role\": \"kv_consumer\", \"kv_port\": \"30400\"}' \\\n    --additional-config '{\"multistream_overlap_shared_expert\": true, \"recompute_scheduler_enable\": true}'\n```",
-    "zh": "A2 多节点 PD 分离配置。\n\n```bash\n# Prefill 节点\nexport ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7\nexport VLLM_ASCEND_ENABLE_FLASHCOMM1=1\n\nvllm serve your_model_path \\\n    --served-model-name glm-52-prefill \\\n    --trust-remote-code \\\n    --port 8100 \\\n    --max-model-len 115168 \\\n    --max-num-seqs 16 \\\n    --data-parallel-size 4 \\\n    --tensor-parallel-size 8 \\\n    --enable-expert-parallel \\\n    --quantization ascend \\\n    --block-size 128 \\\n    --speculative-config '{\"num_speculative_tokens\": 3, \"method\": \"deepseek_mtp\"}' \\\n    --kv-transfer-config '{\"kv_connector\": \"MooncakeConnectorV1\", \"kv_role\": \"kv_producer\", \"kv_port\": \"30400\"}'\n\n# Decode 节点\nexport ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7\nexport VLLM_ASCEND_ENABLE_MLAPO=1\nexport DYNAMIC_EPLB=1\n\nvllm serve your_model_path \\\n    --served-model-name glm-52 \\\n    --trust-remote-code \\\n    --port 8000 \\\n    --max-model-len 135168 \\\n    --max-num-seqs 16 \\\n    --data-parallel-size 8 \\\n    --tensor-parallel-size 4 \\\n    --enable-expert-parallel \\\n    --quantization ascend \\\n    --block-size 128 \\\n    --speculative-config '{\"num_speculative_tokens\": 3, \"method\": \"deepseek_mtp\"}' \\\n    --kv-transfer-config '{\"kv_connector\": \"MooncakeConnectorV1\", \"kv_role\": \"kv_consumer\", \"kv_port\": \"30400\"}' \\\n    --additional-config '{\"multistream_overlap_shared_expert\": true, \"recompute_scheduler_enable\": true}'\n```"
+    "en": "1M-context serving is recommended with W4A8C8 weights, PD disaggregation, and DCP8.\n\n|Deployment Mode|Total NPUs|Weight Version|Key Considerations|\n|---------------|----------|--------------|------------------|\n|PD disaggregation (A3), [PD Disaggregation 1M Deployment](https://docs.vllm.ai/projects/ascend/en/latest/tutorials/models/GLM5.2.html#523-pd-disaggregation-1m-deployment)|4 nodes (A3)|w4a8c8|P/D: dp4 tp8, DCP8, max-model-len 1040000, Mooncake KV transfer|",
+    "zh": "1M 上下文服务推荐使用 W4A8C8 权重、PD 分离部署和 DCP8。\n\n|部署模式|总 NPU 数|权重版本|关键考虑因素|\n|---------------|----------|--------------|------------------|\n|PD 分离部署（A3），[PD 分离部署 1M 部署](https://docs.vllm.ai/projects/ascend/en/latest/tutorials/models/GLM5.2.html#523-pd-disaggregation-1m-deployment)|4 节点（A3）|w4a8c8|P/D：dp4 tp8，DCP8，max-model-len 1040000，Mooncake KV 传输|"
   },
   "scenarios[4].steps[1].title": {
-    "en": "Service Verification",
-    "zh": "服务验证"
+    "en": "Detailed Node Configuration",
+    "zh": "详细节点配置"
   },
   "scenarios[4].steps[1].content": {
-    "en": "After all PD services are started, verify through the proxy endpoint that Prefill and Decode nodes work together.",
-    "zh": "PD 分离服务完全启动后，通过 proxy 入口验证 Prefill 和 Decode 节点是否正常协同工作。"
+    "en": "TP/DP columns show the per-node values used by the deployment scripts; each A3 node uses 16 NPUs.\n\n|Node Role|NPUs per node|TP|DP per node|Max Num Seqs|Max Num Batched Tokens|Max Model Len|MTP Spec Num|\n|---------|-------------|--|-----------|------------|----------------------|-------------|------------|\n|PD - Server-P Node|16|8|2|8|16384|1040000|1|\n|PD - Server-D Node|16|8|2|32|128|1040000|3|\n\nThe 1M scenario must reserve memory for a very large KV cache, so prefill/co-located nodes usually need lower `gpu-memory-utilization` values (around 0.75-0.80).",
+    "zh": "TP/DP 列显示部署脚本使用的每节点值；每个 A3 节点使用 16 个 NPU。\n\n|节点角色|每节点 NPU 数|TP|每节点 DP|最大序列数|最大批处理 Token 数|最大模型长度|MTP 推测数|\n|---------|-------------|--|-----------|------------|----------------------|-------------|------------|\n|PD - Server-P 节点|16|8|2|8|16384|1040000|1|\n|PD - Server-D 节点|16|8|2|32|128|1040000|3|\n\n1M 场景必须为非常大的 KV 缓存预留内存，因此 prefill/共置节点通常需要较低的 `gpu-memory-utilization` 值（约 0.75-0.80）。"
   },
   "scenarios[5].deployment": {
-    "en": "250K",
-    "zh": "250K"
+    "en": "20K",
+    "zh": "20K"
   },
   "scenarios[5].case": {
     "en": "High Throughput",
@@ -192,8 +208,8 @@
     "zh": "启动服务"
   },
   "scenarios[5].steps[0].content": {
-    "en": "A2 W4A8C8 high-throughput 250K configuration.\n\n```bash\n# Prefill nodes\nvllm serve your_w4a8c8_model_path \\\n    --served-model-name glm-52-prefill \\\n    --trust-remote-code \\\n    --port 8100 \\\n    --max-model-len 250000 \\\n    --data-parallel-size 4 \\\n    --tensor-parallel-size 8 \\\n    --enable-expert-parallel \\\n    --quantization ascend \\\n    --speculative-config '{\"num_speculative_tokens\": 3, \"method\": \"deepseek_mtp\"}' \\\n    --kv-transfer-config '{\"kv_connector\": \"MooncakeConnectorV1\", \"kv_role\": \"kv_producer\", \"kv_port\": \"30400\"}'\n\n# Decode nodes\nvllm serve your_w4a8c8_model_path \\\n    --served-model-name glm-52 \\\n    --trust-remote-code \\\n    --port 8000 \\\n    --max-model-len 250000 \\\n    --data-parallel-size 8 \\\n    --tensor-parallel-size 4 \\\n    --enable-expert-parallel \\\n    --quantization ascend \\\n    --speculative-config '{\"num_speculative_tokens\": 3, \"method\": \"deepseek_mtp\"}' \\\n    --kv-transfer-config '{\"kv_connector\": \"MooncakeConnectorV1\", \"kv_role\": \"kv_consumer\", \"kv_port\": \"30400\"}'\n```",
-    "zh": "A2 W4A8C8 高吞吐 250K 配置。\n\n```bash\n# Prefill 节点\nvllm serve your_w4a8c8_model_path \\\n    --served-model-name glm-52-prefill \\\n    --trust-remote-code \\\n    --port 8100 \\\n    --max-model-len 250000 \\\n    --data-parallel-size 4 \\\n    --tensor-parallel-size 8 \\\n    --enable-expert-parallel \\\n    --quantization ascend \\\n    --speculative-config '{\"num_speculative_tokens\": 3, \"method\": \"deepseek_mtp\"}' \\\n    --kv-transfer-config '{\"kv_connector\": \"MooncakeConnectorV1\", \"kv_role\": \"kv_producer\", \"kv_port\": \"30400\"}'\n\n# Decode 节点\nvllm serve your_w4a8c8_model_path \\\n    --served-model-name glm-52 \\\n    --trust-remote-code \\\n    --port 8000 \\\n    --max-model-len 250000 \\\n    --data-parallel-size 8 \\\n    --tensor-parallel-size 4 \\\n    --enable-expert-parallel \\\n    --quantization ascend \\\n    --speculative-config '{\"num_speculative_tokens\": 3, \"method\": \"deepseek_mtp\"}' \\\n    --kv-transfer-config '{\"kv_connector\": \"MooncakeConnectorV1\", \"kv_role\": \"kv_consumer\", \"kv_port\": \"30400\"}'\n```"
+    "en": "Single-node high-throughput configuration.\n\n```bash\nexport ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15\nexport HCCL_OP_EXPANSION_MODE=\"AIV\"\nexport HCCL_BUFFSIZE=200\nexport OMP_PROC_BIND=false\nexport OMP_NUM_THREADS=1\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\nexport VLLM_ASCEND_BALANCE_SCHEDULING=1\nexport VLLM_ASCEND_ENABLE_FLASHCOMM1=1\nexport VLLM_ASCEND_ENABLE_MLAPO=1\n\nvllm serve your_model_path \\\n    --served-model-name glm-52 \\\n    --trust-remote-code \\\n    --max-num-seqs 48 \\\n    --max-model-len 20480 \\\n    --max-num-batched-tokens 4096 \\\n    --data-parallel-size 2 \\\n    --tensor-parallel-size 8 \\\n    --enable-expert-parallel \\\n    --quantization ascend \\\n    --gpu-memory-utilization 0.95 \\\n    --async-scheduling \\\n    --additional-config '{\"multistream_overlap_shared_expert\": true}' \\\n    --compilation-config '{\"cudagraph_mode\": \"FULL_DECODE_ONLY\"}' \\\n    --speculative-config '{\"num_speculative_tokens\": 3, \"method\": \"deepseek_mtp\"}' \\\n    --seed 1024 \\\n    --port 8000\n```",
+    "zh": "单节点高吞吐配置。\n\n```bash\nexport ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15\nexport HCCL_OP_EXPANSION_MODE=\"AIV\"\nexport HCCL_BUFFSIZE=200\nexport OMP_PROC_BIND=false\nexport OMP_NUM_THREADS=1\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\nexport VLLM_ASCEND_BALANCE_SCHEDULING=1\nexport VLLM_ASCEND_ENABLE_FLASHCOMM1=1\nexport VLLM_ASCEND_ENABLE_MLAPO=1\n\nvllm serve your_model_path \\\n    --served-model-name glm-52 \\\n    --trust-remote-code \\\n    --max-num-seqs 48 \\\n    --max-model-len 20480 \\\n    --max-num-batched-tokens 4096 \\\n    --data-parallel-size 2 \\\n    --tensor-parallel-size 8 \\\n    --enable-expert-parallel \\\n    --quantization ascend \\\n    --gpu-memory-utilization 0.95 \\\n    --async-scheduling \\\n    --additional-config '{\"multistream_overlap_shared_expert\": true}' \\\n    --compilation-config '{\"cudagraph_mode\": \"FULL_DECODE_ONLY\"}' \\\n    --speculative-config '{\"num_speculative_tokens\": 3, \"method\": \"deepseek_mtp\"}' \\\n    --seed 1024 \\\n    --port 8000\n```"
   },
   "scenarios[5].steps[1].title": {
     "en": "Service Verification",
@@ -204,20 +220,20 @@
     "zh": "服务启动后，通过发送提示词验证服务是否正常运行。请参考下方的验证示例。"
   },
   "scenarios[6].deployment": {
-    "en": "1M",
-    "zh": "1M"
+    "en": "20K",
+    "zh": "20K"
   },
   "scenarios[6].case": {
-    "en": "High Throughput",
-    "zh": "高吞吐"
+    "en": "Low Latency",
+    "zh": "低延迟"
   },
   "scenarios[6].steps[0].title": {
     "en": "Start the server",
     "zh": "启动服务"
   },
   "scenarios[6].steps[0].content": {
-    "en": "A2 W4A8C8 high-throughput 1M configuration.\n\n```bash\n# Prefill nodes\nvllm serve your_w4a8c8_model_path \\\n    --served-model-name glm-52-prefill \\\n    --trust-remote-code \\\n    --port 8100 \\\n    --max-model-len 1024000 \\\n    --data-parallel-size 4 \\\n    --tensor-parallel-size 8 \\\n    --enable-expert-parallel \\\n    --quantization ascend \\\n    --speculative-config '{\"num_speculative_tokens\": 3, \"method\": \"deepseek_mtp\"}' \\\n    --kv-transfer-config '{\"kv_connector\": \"MooncakeConnectorV1\", \"kv_role\": \"kv_producer\", \"kv_port\": \"30400\"}'\n\n# Decode nodes\nvllm serve your_w4a8c8_model_path \\\n    --served-model-name glm-52 \\\n    --trust-remote-code \\\n    --port 8000 \\\n    --max-model-len 1024000 \\\n    --data-parallel-size 4 \\\n    --tensor-parallel-size 8 \\\n    --enable-expert-parallel \\\n    --quantization ascend \\\n    --speculative-config '{\"num_speculative_tokens\": 3, \"method\": \"deepseek_mtp\"}' \\\n    --kv-transfer-config '{\"kv_connector\": \"MooncakeConnectorV1\", \"kv_role\": \"kv_consumer\", \"kv_port\": \"30400\"}'\n```",
-    "zh": "A2 W4A8C8 高吞吐 1M 配置。\n\n```bash\n# Prefill 节点\nvllm serve your_w4a8c8_model_path \\\n    --served-model-name glm-52-prefill \\\n    --trust-remote-code \\\n    --port 8100 \\\n    --max-model-len 1024000 \\\n    --data-parallel-size 4 \\\n    --tensor-parallel-size 8 \\\n    --enable-expert-parallel \\\n    --quantization ascend \\\n    --speculative-config '{\"num_speculative_tokens\": 3, \"method\": \"deepseek_mtp\"}' \\\n    --kv-transfer-config '{\"kv_connector\": \"MooncakeConnectorV1\", \"kv_role\": \"kv_producer\", \"kv_port\": \"30400\"}'\n\n# Decode 节点\nvllm serve your_w4a8c8_model_path \\\n    --served-model-name glm-52 \\\n    --trust-remote-code \\\n    --port 8000 \\\n    --max-model-len 1024000 \\\n    --data-parallel-size 4 \\\n    --tensor-parallel-size 8 \\\n    --enable-expert-parallel \\\n    --quantization ascend \\\n    --speculative-config '{\"num_speculative_tokens\": 3, \"method\": \"deepseek_mtp\"}' \\\n    --kv-transfer-config '{\"kv_connector\": \"MooncakeConnectorV1\", \"kv_role\": \"kv_consumer\", \"kv_port\": \"30400\"}'\n```"
+    "en": "Single-node low-latency configuration.\n\n```bash\nexport ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15\nexport HCCL_OP_EXPANSION_MODE=\"AIV\"\nexport HCCL_BUFFSIZE=200\nexport OMP_PROC_BIND=false\nexport OMP_NUM_THREADS=1\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\nexport VLLM_ASCEND_BALANCE_SCHEDULING=1\nexport VLLM_ASCEND_ENABLE_MLAPO=1\n\nvllm serve your_model_path \\\n    --served-model-name glm-52 \\\n    --trust-remote-code \\\n    --max-num-seqs 8 \\\n    --max-model-len 20480 \\\n    --max-num-batched-tokens 4096 \\\n    --data-parallel-size 1 \\\n    --tensor-parallel-size 16 \\\n    --quantization ascend \\\n    --gpu-memory-utilization 0.95 \\\n    --async-scheduling \\\n    --compilation-config '{\"cudagraph_mode\": \"FULL_DECODE_ONLY\"}' \\\n    --speculative-config '{\"num_speculative_tokens\": 3, \"method\": \"deepseek_mtp\"}' \\\n    --seed 1024 \\\n    --port 8000\n```",
+    "zh": "单节点低延迟配置。\n\n```bash\nexport ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15\nexport HCCL_OP_EXPANSION_MODE=\"AIV\"\nexport HCCL_BUFFSIZE=200\nexport OMP_PROC_BIND=false\nexport OMP_NUM_THREADS=1\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\nexport VLLM_ASCEND_BALANCE_SCHEDULING=1\nexport VLLM_ASCEND_ENABLE_MLAPO=1\n\nvllm serve your_model_path \\\n    --served-model-name glm-52 \\\n    --trust-remote-code \\\n    --max-num-seqs 8 \\\n    --max-model-len 20480 \\\n    --max-num-batched-tokens 4096 \\\n    --data-parallel-size 1 \\\n    --tensor-parallel-size 16 \\\n    --quantization ascend \\\n    --gpu-memory-utilization 0.95 \\\n    --async-scheduling \\\n    --compilation-config '{\"cudagraph_mode\": \"FULL_DECODE_ONLY\"}' \\\n    --speculative-config '{\"num_speculative_tokens\": 3, \"method\": \"deepseek_mtp\"}' \\\n    --seed 1024 \\\n    --port 8000\n```"
   },
   "scenarios[6].steps[1].title": {
     "en": "Service Verification",
@@ -228,26 +244,146 @@
     "zh": "服务启动后，通过发送提示词验证服务是否正常运行。请参考下方的验证示例。"
   },
   "scenarios[7].deployment": {
-    "en": "135K",
-    "zh": "135K"
+    "en": "64K",
+    "zh": "64K"
   },
   "scenarios[7].case": {
-    "en": "PD Separation",
-    "zh": "PD 分离"
+    "en": "Long Context",
+    "zh": "长上下文"
   },
   "scenarios[7].steps[0].title": {
     "en": "Start the server",
     "zh": "启动服务"
   },
   "scenarios[7].steps[0].content": {
-    "en": "A3 W4A8C8 1P1D configuration.\n\n```bash\n# Prefill node\nvllm serve your_w4a8c8_model_path \\\n    --served-model-name glm-52-prefill \\\n    --trust-remote-code \\\n    --port 8100 \\\n    --max-model-len 135000 \\\n    --data-parallel-size 1 \\\n    --tensor-parallel-size 8 \\\n    --enable-expert-parallel \\\n    --quantization ascend \\\n    --speculative-config '{\"num_speculative_tokens\": 5, \"method\": \"deepseek_mtp\"}' \\\n    --kv-transfer-config '{\"kv_connector\": \"MooncakeConnectorV1\", \"kv_role\": \"kv_producer\", \"kv_port\": \"30400\"}'\n\n# Decode node\nvllm serve your_w4a8c8_model_path \\\n    --served-model-name glm-52 \\\n    --trust-remote-code \\\n    --port 8000 \\\n    --max-model-len 135000 \\\n    --data-parallel-size 1 \\\n    --tensor-parallel-size 8 \\\n    --enable-expert-parallel \\\n    --quantization ascend \\\n    --speculative-config '{\"num_speculative_tokens\": 5, \"method\": \"deepseek_mtp\"}' \\\n    --kv-transfer-config '{\"kv_connector\": \"MooncakeConnectorV1\", \"kv_role\": \"kv_consumer\", \"kv_port\": \"30400\"}'\n```",
-    "zh": "A3 W4A8C8 1P1D 配置。\n\n```bash\n# Prefill 节点\nvllm serve your_w4a8c8_model_path \\\n    --served-model-name glm-52-prefill \\\n    --trust-remote-code \\\n    --port 8100 \\\n    --max-model-len 135000 \\\n    --data-parallel-size 1 \\\n    --tensor-parallel-size 8 \\\n    --enable-expert-parallel \\\n    --quantization ascend \\\n    --speculative-config '{\"num_speculative_tokens\": 5, \"method\": \"deepseek_mtp\"}' \\\n    --kv-transfer-config '{\"kv_connector\": \"MooncakeConnectorV1\", \"kv_role\": \"kv_producer\", \"kv_port\": \"30400\"}'\n\n# Decode 节点\nvllm serve your_w4a8c8_model_path \\\n    --served-model-name glm-52 \\\n    --trust-remote-code \\\n    --port 8000 \\\n    --max-model-len 135000 \\\n    --data-parallel-size 1 \\\n    --tensor-parallel-size 8 \\\n    --enable-expert-parallel \\\n    --quantization ascend \\\n    --speculative-config '{\"num_speculative_tokens\": 5, \"method\": \"deepseek_mtp\"}' \\\n    --kv-transfer-config '{\"kv_connector\": \"MooncakeConnectorV1\", \"kv_role\": \"kv_consumer\", \"kv_port\": \"30400\"}'\n```"
+    "en": "Two-node long-context configuration.\n\n**Node 0:**\n\n```bash\nexport ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15\nexport HCCL_OP_EXPANSION_MODE=\"AIV\"\nexport HCCL_BUFFSIZE=200\nexport OMP_PROC_BIND=false\nexport OMP_NUM_THREADS=1\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\nexport VLLM_ASCEND_BALANCE_SCHEDULING=1\nexport VLLM_ASCEND_ENABLE_FLASHCOMM1=1\nexport VLLM_ASCEND_ENABLE_MLAPO=1\nexport HCCL_IF_IP=<node0_ip>\nexport GLOO_SOCKET_IFNAME=<nic_name>\nexport TP_SOCKET_IFNAME=<nic_name>\nexport HCCL_SOCKET_IFNAME=<nic_name>\n\nvllm serve your_model_path \\\n    --served-model-name glm-52 \\\n    --trust-remote-code \\\n    --max-num-seqs 32 \\\n    --max-model-len 64000 \\\n    --max-num-batched-tokens 4096 \\\n    --data-parallel-size 2 \\\n    --data-parallel-size-local 1 \\\n    --data-parallel-address <node0_ip> \\\n    --data-parallel-rpc-port 12890 \\\n    --tensor-parallel-size 16 \\\n    --enable-expert-parallel \\\n    --quantization ascend \\\n    --gpu-memory-utilization 0.93 \\\n    --enable-prefix-caching \\\n    --additional-config '{\"multistream_overlap_shared_expert\": true}' \\\n    --compilation-config '{\"cudagraph_mode\": \"FULL_DECODE_ONLY\"}' \\\n    --speculative-config '{\"num_speculative_tokens\": 5, \"method\": \"deepseek_mtp\"}' \\\n    --seed 1024 \\\n    --port 8000\n```\n\n**Node 1:**\n\n```bash\nexport ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15\nexport HCCL_OP_EXPANSION_MODE=\"AIV\"\nexport HCCL_BUFFSIZE=200\nexport OMP_PROC_BIND=false\nexport OMP_NUM_THREADS=1\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\nexport VLLM_ASCEND_BALANCE_SCHEDULING=1\nexport VLLM_ASCEND_ENABLE_FLASHCOMM1=1\nexport VLLM_ASCEND_ENABLE_MLAPO=1\nexport HCCL_IF_IP=<node1_ip>\nexport GLOO_SOCKET_IFNAME=<nic_name>\nexport TP_SOCKET_IFNAME=<nic_name>\nexport HCCL_SOCKET_IFNAME=<nic_name>\n\nvllm serve your_model_path \\\n    --served-model-name glm-52 \\\n    --trust-remote-code \\\n    --max-num-seqs 32 \\\n    --max-model-len 64000 \\\n    --max-num-batched-tokens 4096 \\\n    --data-parallel-size 2 \\\n    --data-parallel-size-local 1 \\\n    --data-parallel-start-rank 1 \\\n    --data-parallel-address <node0_ip> \\\n    --data-parallel-rpc-port 12890 \\\n    --tensor-parallel-size 16 \\\n    --enable-expert-parallel \\\n    --headless \\\n    --quantization ascend \\\n    --gpu-memory-utilization 0.93 \\\n    --enable-prefix-caching \\\n    --additional-config '{\"multistream_overlap_shared_expert\": true}' \\\n    --compilation-config '{\"cudagraph_mode\": \"FULL_DECODE_ONLY\"}' \\\n    --speculative-config '{\"num_speculative_tokens\": 5, \"method\": \"deepseek_mtp\"}' \\\n    --seed 1024 \\\n    --port 8000\n```",
+    "zh": "双节点长上下文配置。\n\n**节点 0：**\n\n```bash\nexport ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15\nexport HCCL_OP_EXPANSION_MODE=\"AIV\"\nexport HCCL_BUFFSIZE=200\nexport OMP_PROC_BIND=false\nexport OMP_NUM_THREADS=1\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\nexport VLLM_ASCEND_BALANCE_SCHEDULING=1\nexport VLLM_ASCEND_ENABLE_FLASHCOMM1=1\nexport VLLM_ASCEND_ENABLE_MLAPO=1\nexport HCCL_IF_IP=<node0_ip>\nexport GLOO_SOCKET_IFNAME=<nic_name>\nexport TP_SOCKET_IFNAME=<nic_name>\nexport HCCL_SOCKET_IFNAME=<nic_name>\n\nvllm serve your_model_path \\\n    --served-model-name glm-52 \\\n    --trust-remote-code \\\n    --max-num-seqs 32 \\\n    --max-model-len 64000 \\\n    --max-num-batched-tokens 4096 \\\n    --data-parallel-size 2 \\\n    --data-parallel-size-local 1 \\\n    --data-parallel-address <node0_ip> \\\n    --data-parallel-rpc-port 12890 \\\n    --tensor-parallel-size 16 \\\n    --enable-expert-parallel \\\n    --quantization ascend \\\n    --gpu-memory-utilization 0.93 \\\n    --enable-prefix-caching \\\n    --additional-config '{\"multistream_overlap_shared_expert\": true}' \\\n    --compilation-config '{\"cudagraph_mode\": \"FULL_DECODE_ONLY\"}' \\\n    --speculative-config '{\"num_speculative_tokens\": 5, \"method\": \"deepseek_mtp\"}' \\\n    --seed 1024 \\\n    --port 8000\n```\n\n**节点 1：**\n\n```bash\nexport ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15\nexport HCCL_OP_EXPANSION_MODE=\"AIV\"\nexport HCCL_BUFFSIZE=200\nexport OMP_PROC_BIND=false\nexport OMP_NUM_THREADS=1\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\nexport VLLM_ASCEND_BALANCE_SCHEDULING=1\nexport VLLM_ASCEND_ENABLE_FLASHCOMM1=1\nexport VLLM_ASCEND_ENABLE_MLAPO=1\nexport HCCL_IF_IP=<node1_ip>\nexport GLOO_SOCKET_IFNAME=<nic_name>\nexport TP_SOCKET_IFNAME=<nic_name>\nexport HCCL_SOCKET_IFNAME=<nic_name>\n\nvllm serve your_model_path \\\n    --served-model-name glm-52 \\\n    --trust-remote-code \\\n    --max-num-seqs 32 \\\n    --max-model-len 64000 \\\n    --max-num-batched-tokens 4096 \\\n    --data-parallel-size 2 \\\n    --data-parallel-size-local 1 \\\n    --data-parallel-start-rank 1 \\\n    --data-parallel-address <node0_ip> \\\n    --data-parallel-rpc-port 12890 \\\n    --tensor-parallel-size 16 \\\n    --enable-expert-parallel \\\n    --headless \\\n    --quantization ascend \\\n    --gpu-memory-utilization 0.93 \\\n    --enable-prefix-caching \\\n    --additional-config '{\"multistream_overlap_shared_expert\": true}' \\\n    --compilation-config '{\"cudagraph_mode\": \"FULL_DECODE_ONLY\"}' \\\n    --speculative-config '{\"num_speculative_tokens\": 5, \"method\": \"deepseek_mtp\"}' \\\n    --seed 1024 \\\n    --port 8000\n```"
   },
   "scenarios[7].steps[1].title": {
     "en": "Service Verification",
     "zh": "服务验证"
   },
   "scenarios[7].steps[1].content": {
+    "en": "After the service is started, verify it by sending a prompt. Refer to the verification section below for an example.",
+    "zh": "服务启动后，通过发送提示词进行验证。示例请参见下方的验证部分。"
+  },
+  "scenarios[8].deployment": {
+    "en": "135K",
+    "zh": "135K"
+  },
+  "scenarios[8].case": {
+    "en": "PD Separation",
+    "zh": "PD 分离"
+  },
+  "scenarios[8].steps[0].title": {
+    "en": "Start the server",
+    "zh": "启动服务"
+  },
+  "scenarios[8].steps[0].content": {
+    "en": "A3 multi-node PD configuration.\n\n```bash\n# Prefill nodes\nexport ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15\nexport VLLM_ASCEND_ENABLE_FLASHCOMM1=1\n\nvllm serve your_model_path \\\n    --served-model-name glm-52-prefill \\\n    --trust-remote-code \\\n    --port 8100 \\\n    --max-model-len 135000 \\\n    --max-num-seqs 32 \\\n    --data-parallel-size 2 \\\n    --tensor-parallel-size 16 \\\n    --enable-expert-parallel \\\n    --quantization ascend \\\n    --enable-prefix-caching \\\n    --speculative-config '{\"num_speculative_tokens\": 5, \"method\": \"deepseek_mtp\"}' \\\n    --kv-transfer-config '{\"kv_connector\": \"MooncakeConnectorV1\", \"kv_role\": \"kv_producer\", \"kv_port\": \"30400\"}'\n\n# Decode nodes\nexport ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15\nexport VLLM_ASCEND_ENABLE_MLAPO=1\nexport DYNAMIC_EPLB=1\n\nvllm serve your_model_path \\\n    --served-model-name glm-52 \\\n    --trust-remote-code \\\n    --port 8000 \\\n    --max-model-len 135000 \\\n    --max-num-seqs 32 \\\n    --data-parallel-size 8 \\\n    --tensor-parallel-size 4 \\\n    --enable-expert-parallel \\\n    --quantization ascend \\\n    --speculative-config '{\"num_speculative_tokens\": 5, \"method\": \"deepseek_mtp\"}' \\\n    --kv-transfer-config '{\"kv_connector\": \"MooncakeConnectorV1\", \"kv_role\": \"kv_consumer\", \"kv_port\": \"30400\"}' \\\n    --additional-config '{\"multistream_overlap_shared_expert\": true, \"recompute_scheduler_enable\": true}'\n```",
+    "zh": "A3 多节点 PD 分离配置。\n\n```bash\n# Prefill 节点\nexport ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15\nexport VLLM_ASCEND_ENABLE_FLASHCOMM1=1\n\nvllm serve your_model_path \\\n    --served-model-name glm-52-prefill \\\n    --trust-remote-code \\\n    --port 8100 \\\n    --max-model-len 135000 \\\n    --max-num-seqs 32 \\\n    --data-parallel-size 2 \\\n    --tensor-parallel-size 16 \\\n    --enable-expert-parallel \\\n    --quantization ascend \\\n    --enable-prefix-caching \\\n    --speculative-config '{\"num_speculative_tokens\": 5, \"method\": \"deepseek_mtp\"}' \\\n    --kv-transfer-config '{\"kv_connector\": \"MooncakeConnectorV1\", \"kv_role\": \"kv_producer\", \"kv_port\": \"30400\"}'\n\n# Decode 节点\nexport ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15\nexport VLLM_ASCEND_ENABLE_MLAPO=1\nexport DYNAMIC_EPLB=1\n\nvllm serve your_model_path \\\n    --served-model-name glm-52 \\\n    --trust-remote-code \\\n    --port 8000 \\\n    --max-model-len 135000 \\\n    --max-num-seqs 32 \\\n    --data-parallel-size 8 \\\n    --tensor-parallel-size 4 \\\n    --enable-expert-parallel \\\n    --quantization ascend \\\n    --speculative-config '{\"num_speculative_tokens\": 5, \"method\": \"deepseek_mtp\"}' \\\n    --kv-transfer-config '{\"kv_connector\": \"MooncakeConnectorV1\", \"kv_role\": \"kv_consumer\", \"kv_port\": \"30400\"}' \\\n    --additional-config '{\"multistream_overlap_shared_expert\": true, \"recompute_scheduler_enable\": true}'\n```"
+  },
+  "scenarios[8].steps[1].title": {
+    "en": "Service Verification",
+    "zh": "服务验证"
+  },
+  "scenarios[8].steps[1].content": {
+    "en": "After all PD services are started, verify through the proxy endpoint that Prefill and Decode nodes work together.",
+    "zh": "PD 分离服务完全启动后，通过 proxy 入口验证 Prefill 和 Decode 节点是否正常协同工作。"
+  },
+  "scenarios[9].deployment": {
+    "en": "135K",
+    "zh": "135K"
+  },
+  "scenarios[9].case": {
+    "en": "PD Separation",
+    "zh": "PD 分离"
+  },
+  "scenarios[9].steps[0].title": {
+    "en": "Start the server",
+    "zh": "启动服务"
+  },
+  "scenarios[9].steps[0].content": {
+    "en": "A2 multi-node PD configuration.\n\n```bash\n# Prefill nodes\nexport ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7\nexport VLLM_ASCEND_ENABLE_FLASHCOMM1=1\n\nvllm serve your_model_path \\\n    --served-model-name glm-52-prefill \\\n    --trust-remote-code \\\n    --port 8100 \\\n    --max-model-len 115168 \\\n    --max-num-seqs 16 \\\n    --data-parallel-size 4 \\\n    --tensor-parallel-size 8 \\\n    --enable-expert-parallel \\\n    --quantization ascend \\\n    --block-size 128 \\\n    --speculative-config '{\"num_speculative_tokens\": 3, \"method\": \"deepseek_mtp\"}' \\\n    --kv-transfer-config '{\"kv_connector\": \"MooncakeConnectorV1\", \"kv_role\": \"kv_producer\", \"kv_port\": \"30400\"}'\n\n# Decode nodes\nexport ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7\nexport VLLM_ASCEND_ENABLE_MLAPO=1\nexport DYNAMIC_EPLB=1\n\nvllm serve your_model_path \\\n    --served-model-name glm-52 \\\n    --trust-remote-code \\\n    --port 8000 \\\n    --max-model-len 135168 \\\n    --max-num-seqs 16 \\\n    --data-parallel-size 8 \\\n    --tensor-parallel-size 4 \\\n    --enable-expert-parallel \\\n    --quantization ascend \\\n    --block-size 128 \\\n    --speculative-config '{\"num_speculative_tokens\": 3, \"method\": \"deepseek_mtp\"}' \\\n    --kv-transfer-config '{\"kv_connector\": \"MooncakeConnectorV1\", \"kv_role\": \"kv_consumer\", \"kv_port\": \"30400\"}' \\\n    --additional-config '{\"multistream_overlap_shared_expert\": true, \"recompute_scheduler_enable\": true}'\n```",
+    "zh": "A2 多节点 PD 分离配置。\n\n```bash\n# Prefill 节点\nexport ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7\nexport VLLM_ASCEND_ENABLE_FLASHCOMM1=1\n\nvllm serve your_model_path \\\n    --served-model-name glm-52-prefill \\\n    --trust-remote-code \\\n    --port 8100 \\\n    --max-model-len 115168 \\\n    --max-num-seqs 16 \\\n    --data-parallel-size 4 \\\n    --tensor-parallel-size 8 \\\n    --enable-expert-parallel \\\n    --quantization ascend \\\n    --block-size 128 \\\n    --speculative-config '{\"num_speculative_tokens\": 3, \"method\": \"deepseek_mtp\"}' \\\n    --kv-transfer-config '{\"kv_connector\": \"MooncakeConnectorV1\", \"kv_role\": \"kv_producer\", \"kv_port\": \"30400\"}'\n\n# Decode 节点\nexport ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7\nexport VLLM_ASCEND_ENABLE_MLAPO=1\nexport DYNAMIC_EPLB=1\n\nvllm serve your_model_path \\\n    --served-model-name glm-52 \\\n    --trust-remote-code \\\n    --port 8000 \\\n    --max-model-len 135168 \\\n    --max-num-seqs 16 \\\n    --data-parallel-size 8 \\\n    --tensor-parallel-size 4 \\\n    --enable-expert-parallel \\\n    --quantization ascend \\\n    --block-size 128 \\\n    --speculative-config '{\"num_speculative_tokens\": 3, \"method\": \"deepseek_mtp\"}' \\\n    --kv-transfer-config '{\"kv_connector\": \"MooncakeConnectorV1\", \"kv_role\": \"kv_consumer\", \"kv_port\": \"30400\"}' \\\n    --additional-config '{\"multistream_overlap_shared_expert\": true, \"recompute_scheduler_enable\": true}'\n```"
+  },
+  "scenarios[9].steps[1].title": {
+    "en": "Service Verification",
+    "zh": "服务验证"
+  },
+  "scenarios[9].steps[1].content": {
+    "en": "After all PD services are started, verify through the proxy endpoint that Prefill and Decode nodes work together.",
+    "zh": "PD 分离服务完全启动后，通过 proxy 入口验证 Prefill 和 Decode 节点是否正常协同工作。"
+  },
+  "scenarios[10].deployment": {
+    "en": "250K",
+    "zh": "250K"
+  },
+  "scenarios[10].case": {
+    "en": "High Throughput",
+    "zh": "高吞吐"
+  },
+  "scenarios[10].steps[0].title": {
+    "en": "Start the server",
+    "zh": "启动服务"
+  },
+  "scenarios[10].steps[0].content": {
+    "en": "A2 W4A8C8 high-throughput 250K configuration.\n\n```bash\n# Prefill nodes\nvllm serve your_w4a8c8_model_path \\\n    --served-model-name glm-52-prefill \\\n    --trust-remote-code \\\n    --port 8100 \\\n    --max-model-len 250000 \\\n    --data-parallel-size 4 \\\n    --tensor-parallel-size 8 \\\n    --enable-expert-parallel \\\n    --quantization ascend \\\n    --speculative-config '{\"num_speculative_tokens\": 3, \"method\": \"deepseek_mtp\"}' \\\n    --kv-transfer-config '{\"kv_connector\": \"MooncakeConnectorV1\", \"kv_role\": \"kv_producer\", \"kv_port\": \"30400\"}'\n\n# Decode nodes\nvllm serve your_w4a8c8_model_path \\\n    --served-model-name glm-52 \\\n    --trust-remote-code \\\n    --port 8000 \\\n    --max-model-len 250000 \\\n    --data-parallel-size 8 \\\n    --tensor-parallel-size 4 \\\n    --enable-expert-parallel \\\n    --quantization ascend \\\n    --speculative-config '{\"num_speculative_tokens\": 3, \"method\": \"deepseek_mtp\"}' \\\n    --kv-transfer-config '{\"kv_connector\": \"MooncakeConnectorV1\", \"kv_role\": \"kv_consumer\", \"kv_port\": \"30400\"}'\n```",
+    "zh": "A2 W4A8C8 高吞吐 250K 配置。\n\n```bash\n# Prefill 节点\nvllm serve your_w4a8c8_model_path \\\n    --served-model-name glm-52-prefill \\\n    --trust-remote-code \\\n    --port 8100 \\\n    --max-model-len 250000 \\\n    --data-parallel-size 4 \\\n    --tensor-parallel-size 8 \\\n    --enable-expert-parallel \\\n    --quantization ascend \\\n    --speculative-config '{\"num_speculative_tokens\": 3, \"method\": \"deepseek_mtp\"}' \\\n    --kv-transfer-config '{\"kv_connector\": \"MooncakeConnectorV1\", \"kv_role\": \"kv_producer\", \"kv_port\": \"30400\"}'\n\n# Decode 节点\nvllm serve your_w4a8c8_model_path \\\n    --served-model-name glm-52 \\\n    --trust-remote-code \\\n    --port 8000 \\\n    --max-model-len 250000 \\\n    --data-parallel-size 8 \\\n    --tensor-parallel-size 4 \\\n    --enable-expert-parallel \\\n    --quantization ascend \\\n    --speculative-config '{\"num_speculative_tokens\": 3, \"method\": \"deepseek_mtp\"}' \\\n    --kv-transfer-config '{\"kv_connector\": \"MooncakeConnectorV1\", \"kv_role\": \"kv_consumer\", \"kv_port\": \"30400\"}'\n```"
+  },
+  "scenarios[10].steps[1].title": {
+    "en": "Service Verification",
+    "zh": "服务验证"
+  },
+  "scenarios[10].steps[1].content": {
+    "en": "After the service is started, verify it by sending a prompt. Refer to the verification section below for an example.",
+    "zh": "服务启动后，通过发送提示词验证服务是否正常运行。请参考下方的验证示例。"
+  },
+  "scenarios[11].deployment": {
+    "en": "1M",
+    "zh": "1M"
+  },
+  "scenarios[11].case": {
+    "en": "High Throughput",
+    "zh": "高吞吐"
+  },
+  "scenarios[11].steps[0].title": {
+    "en": "Start the server",
+    "zh": "启动服务"
+  },
+  "scenarios[11].steps[0].content": {
+    "en": "A2 W4A8C8 high-throughput 1M configuration.\n\n```bash\n# Prefill nodes\nvllm serve your_w4a8c8_model_path \\\n    --served-model-name glm-52-prefill \\\n    --trust-remote-code \\\n    --port 8100 \\\n    --max-model-len 1024000 \\\n    --data-parallel-size 4 \\\n    --tensor-parallel-size 8 \\\n    --enable-expert-parallel \\\n    --quantization ascend \\\n    --speculative-config '{\"num_speculative_tokens\": 3, \"method\": \"deepseek_mtp\"}' \\\n    --kv-transfer-config '{\"kv_connector\": \"MooncakeConnectorV1\", \"kv_role\": \"kv_producer\", \"kv_port\": \"30400\"}'\n\n# Decode nodes\nvllm serve your_w4a8c8_model_path \\\n    --served-model-name glm-52 \\\n    --trust-remote-code \\\n    --port 8000 \\\n    --max-model-len 1024000 \\\n    --data-parallel-size 4 \\\n    --tensor-parallel-size 8 \\\n    --enable-expert-parallel \\\n    --quantization ascend \\\n    --speculative-config '{\"num_speculative_tokens\": 3, \"method\": \"deepseek_mtp\"}' \\\n    --kv-transfer-config '{\"kv_connector\": \"MooncakeConnectorV1\", \"kv_role\": \"kv_consumer\", \"kv_port\": \"30400\"}'\n```",
+    "zh": "A2 W4A8C8 高吞吐 1M 配置。\n\n```bash\n# Prefill 节点\nvllm serve your_w4a8c8_model_path \\\n    --served-model-name glm-52-prefill \\\n    --trust-remote-code \\\n    --port 8100 \\\n    --max-model-len 1024000 \\\n    --data-parallel-size 4 \\\n    --tensor-parallel-size 8 \\\n    --enable-expert-parallel \\\n    --quantization ascend \\\n    --speculative-config '{\"num_speculative_tokens\": 3, \"method\": \"deepseek_mtp\"}' \\\n    --kv-transfer-config '{\"kv_connector\": \"MooncakeConnectorV1\", \"kv_role\": \"kv_producer\", \"kv_port\": \"30400\"}'\n\n# Decode 节点\nvllm serve your_w4a8c8_model_path \\\n    --served-model-name glm-52 \\\n    --trust-remote-code \\\n    --port 8000 \\\n    --max-model-len 1024000 \\\n    --data-parallel-size 4 \\\n    --tensor-parallel-size 8 \\\n    --enable-expert-parallel \\\n    --quantization ascend \\\n    --speculative-config '{\"num_speculative_tokens\": 3, \"method\": \"deepseek_mtp\"}' \\\n    --kv-transfer-config '{\"kv_connector\": \"MooncakeConnectorV1\", \"kv_role\": \"kv_consumer\", \"kv_port\": \"30400\"}'\n```"
+  },
+  "scenarios[11].steps[1].title": {
+    "en": "Service Verification",
+    "zh": "服务验证"
+  },
+  "scenarios[11].steps[1].content": {
+    "en": "After the service is started, verify it by sending a prompt. Refer to the verification section below for an example.",
+    "zh": "服务启动后，通过发送提示词验证服务是否正常运行。请参考下方的验证示例。"
+  },
+  "scenarios[12].deployment": {
+    "en": "135K",
+    "zh": "135K"
+  },
+  "scenarios[12].case": {
+    "en": "PD Separation",
+    "zh": "PD 分离"
+  },
+  "scenarios[12].steps[0].title": {
+    "en": "Start the server",
+    "zh": "启动服务"
+  },
+  "scenarios[12].steps[0].content": {
+    "en": "A3 W4A8C8 1P1D configuration.\n\n```bash\n# Prefill node\nvllm serve your_w4a8c8_model_path \\\n    --served-model-name glm-52-prefill \\\n    --trust-remote-code \\\n    --port 8100 \\\n    --max-model-len 135000 \\\n    --data-parallel-size 1 \\\n    --tensor-parallel-size 8 \\\n    --enable-expert-parallel \\\n    --quantization ascend \\\n    --speculative-config '{\"num_speculative_tokens\": 5, \"method\": \"deepseek_mtp\"}' \\\n    --kv-transfer-config '{\"kv_connector\": \"MooncakeConnectorV1\", \"kv_role\": \"kv_producer\", \"kv_port\": \"30400\"}'\n\n# Decode node\nvllm serve your_w4a8c8_model_path \\\n    --served-model-name glm-52 \\\n    --trust-remote-code \\\n    --port 8000 \\\n    --max-model-len 135000 \\\n    --data-parallel-size 1 \\\n    --tensor-parallel-size 8 \\\n    --enable-expert-parallel \\\n    --quantization ascend \\\n    --speculative-config '{\"num_speculative_tokens\": 5, \"method\": \"deepseek_mtp\"}' \\\n    --kv-transfer-config '{\"kv_connector\": \"MooncakeConnectorV1\", \"kv_role\": \"kv_consumer\", \"kv_port\": \"30400\"}'\n```",
+    "zh": "A3 W4A8C8 1P1D 配置。\n\n```bash\n# Prefill 节点\nvllm serve your_w4a8c8_model_path \\\n    --served-model-name glm-52-prefill \\\n    --trust-remote-code \\\n    --port 8100 \\\n    --max-model-len 135000 \\\n    --data-parallel-size 1 \\\n    --tensor-parallel-size 8 \\\n    --enable-expert-parallel \\\n    --quantization ascend \\\n    --speculative-config '{\"num_speculative_tokens\": 5, \"method\": \"deepseek_mtp\"}' \\\n    --kv-transfer-config '{\"kv_connector\": \"MooncakeConnectorV1\", \"kv_role\": \"kv_producer\", \"kv_port\": \"30400\"}'\n\n# Decode 节点\nvllm serve your_w4a8c8_model_path \\\n    --served-model-name glm-52 \\\n    --trust-remote-code \\\n    --port 8000 \\\n    --max-model-len 135000 \\\n    --data-parallel-size 1 \\\n    --tensor-parallel-size 8 \\\n    --enable-expert-parallel \\\n    --quantization ascend \\\n    --speculative-config '{\"num_speculative_tokens\": 5, \"method\": \"deepseek_mtp\"}' \\\n    --kv-transfer-config '{\"kv_connector\": \"MooncakeConnectorV1\", \"kv_role\": \"kv_consumer\", \"kv_port\": \"30400\"}'\n```"
+  },
+  "scenarios[12].steps[1].title": {
+    "en": "Service Verification",
+    "zh": "服务验证"
+  },
+  "scenarios[12].steps[1].content": {
     "en": "After all PD services are started, verify through the proxy endpoint that Prefill and Decode nodes work together.",
     "zh": "PD 分离服务完全启动后，通过 proxy 入口验证 Prefill 和 Decode 节点是否正常协同工作。"
   },
@@ -264,8 +400,8 @@
     "zh": "### 推荐配置\n\n推荐配置已迁移到上方“部署指南”的选项中。请选择 NPU 型号、量化、序列和场景查看对应命令。\n\n> **注意**：这些配置在特定测试环境中验证，仅供参考。最优配置取决于最大输入/输出长度、前缀缓存命中率、精度要求和部署机器配比等因素。"
   },
   "tuning": {
-    "en": "### Tuning Guidelines\n\nPlease refer to the [Public Performance Tuning Documentation](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/performance_and_debug/optimization_and_tuning.html) for tuning methods.\nPlease refer to the [Feature Guide](https://docs.vllm.ai/projects/ascend/en/latest/user_guide/support_matrix/feature_matrix.html) for detailed feature descriptions.\n\n**Key tuning notes for GLM-5.2:**\n\n- For single-node low-latency scenarios, recommend `dp1 tp16` with expert parallel disabled.\n- `VLLM_ASCEND_ENABLE_FLASHCOMM1=1` should be disabled for long-sequence (>=16k) and low-concurrency (<=8 batch size) scenarios.\n- `VLLM_ASCEND_ENABLE_MLAPO=1` is required for W8A8 quantized models on the decode side.\n- `DYNAMIC_EPLB=1` enables dynamic expert parallel load balancing on decode nodes.\n- For 200k context window, use co-located 4-node configuration with dp4 tp8.",
-    "zh": "### 调优指南\n\n请参考 [公开性能调优文档](https://docs.vllm.ai/projects/ascend/zh-cn/latest/developer_guide/performance_and_debug/optimization_and_tuning.html) 了解调优方法。\n请参考 [功能指南](https://docs.vllm.ai/projects/ascend/zh-cn/latest/user_guide/support_matrix/feature_matrix.html) 了解详细功能描述。\n\n**GLM-5.2 关键调优说明：**\n\n- 单节点低延迟场景推荐 `dp1 tp16` 并禁用专家并行。\n- `VLLM_ASCEND_ENABLE_FLASHCOMM1=1` 在长序列（>=16k）和低并发（<=8 batch size）场景下应禁用。\n- `VLLM_ASCEND_ENABLE_MLAPO=1` 在 W8A8 量化模型的 Decode 端必需。\n- `DYNAMIC_EPLB=1` 在 Decode 节点启用动态专家并行负载均衡。\n- 200k 上下文窗口请使用共置 4 节点配置，dp4 tp8。"
+    "en": "### Tuning Guidelines\n\nPlease refer to the [Public Performance Tuning Documentation](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/performance_and_debug/optimization_and_tuning.html) for tuning methods.\nPlease refer to the [Feature Guide](https://docs.vllm.ai/projects/ascend/en/latest/user_guide/support_matrix/feature_matrix.html) for detailed feature descriptions.\n\n**Key tuning notes for GLM-5.2:**\n\n|Parameter|Low Latency|High Throughput|Long Context|Description|\n|---------|-----------|---------------|------------|-----------|\n|`--max-num-batched-tokens`|Lower (4096-8192)|Higher on prefill (8192)|Higher on prefill (16384)|Controls per-step batch size. Lower values reduce per-step latency; higher values improve prefill throughput.|\n|`--gpu-memory-utilization`|0.92-0.95|0.90-0.95|0.75-0.93|NPU memory ratio. The 1M scenario must reserve memory for a huge KV cache, so prefill/co-located nodes use lower values (0.75-0.80).|\n|`num_speculative_tokens` (MTP)|3-5|3-5|1 (prefill) / 3 (decode)|MTP speculative token count. Higher values improve decode throughput at the cost of draft-model KV cache memory; PD prefill nodes use 1.|\n|`enable_dsa_cp`|Optional|Enabled (prefill nodes)|Enabled (prefill nodes)|DSA context parallelism accelerates long-context prefill and has been decoupled from FlashComm1 since v0.21.0.|\n|`enable_sparse_sfa_c8` / `enable_sparse_li_c8`|false / true|true / true (PD)|false / true|`enable_sparse_sfa_c8` is an experimental SFA optimization for C8 quantized models; do not combine it with DCP in v0.23.0. `enable_sparse_li_c8` is independent and still recommended.|\n|`enable_balance_scheduling`|Enabled (single-node)|Enabled|Disabled for PD|Improves output throughput and lowers TPOT in the v1 scheduler. TTFT may regress in some scenarios; it is not recommended for prefill-decode disaggregation.|\n|`VLLM_ASCEND_ENABLE_FLASHCOMM1`|1|1 (prefill nodes)|1 (prefill nodes)|Communication optimization. Conflicts with `layer_sharding` that includes `o_proj`.|\n|`VLLM_ASCEND_ENABLE_MLAPO`|-|1 (A2 P/D nodes)|-|Fused operator that can significantly improve performance while consuming more NPU memory; on A3 it is used only on decode nodes.|\n|`cudagraph_mode`|FULL_DECODE_ONLY|FULL_DECODE_ONLY (decode)|FULL_DECODE_ONLY (decode)|Captures only the decode phase. PD prefill nodes use `--enforce-eager` instead.|",
+    "zh": "### 调优指南\n\n调优方法请参考[公共性能调优文档](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/performance_and_debug/optimization_and_tuning.html)。\n详细功能描述请参考[功能指南](https://docs.vllm.ai/projects/ascend/en/latest/user_guide/support_matrix/feature_matrix.html)。\n\n**GLM-5.2 关键调优说明：**\n\n|参数|低延迟|高吞吐|长上下文|描述|\n|---------|-----------|---------------|------------|-----------|\n|`--max-num-batched-tokens`|较低（4096-8192）|预填充较高（8192）|预填充较高（16384）|控制每步批大小。较低的值降低每步延迟；较高的值提升预填充吞吐。|\n|`--gpu-memory-utilization`|0.92-0.95|0.90-0.95|0.75-0.93|NPU 内存比例。1M 场景必须为大型 KV 缓存预留内存，因此预填充/共置节点使用较低值（0.75-0.80）。|\n|`num_speculative_tokens`（MTP）|3-5|3-5|1（预填充）/ 3（解码）|MTP 投机令牌数。较高的值提升解码吞吐，但消耗草稿模型 KV 缓存内存；PD 预填充节点使用 1。|\n|`enable_dsa_cp`|可选|启用（预填充节点）|启用（预填充节点）|DSA 上下文并行加速长上下文预填充，自 v0.21.0 起已与 FlashComm1 解耦。|\n|`enable_sparse_sfa_c8` / `enable_sparse_li_c8`|false / true|true / true（PD）|false / true|`enable_sparse_sfa_c8` 是针对 C8 量化模型的实验性 SFA 优化；在 v0.23.0 中不要与 DCP 结合使用。`enable_sparse_li_c8` 独立且仍推荐启用。|\n|`enable_balance_scheduling`|启用（单节点）|启用|PD 禁用|在 v1 调度器中提升输出吞吐并降低 TPOT。某些场景下 TTFT 可能回退；不建议用于预填充-解码分离。|\n|`VLLM_ASCEND_ENABLE_FLASHCOMM1`|1|1（预填充节点）|1（预填充节点）|通信优化。与包含 `o_proj` 的 `layer_sharding` 冲突。|\n|`VLLM_ASCEND_ENABLE_MLAPO`|-|1（A2 P/D 节点）|-|融合算子，可显著提升性能但消耗更多 NPU 内存；在 A3 上仅用于解码节点。|\n|`cudagraph_mode`|FULL_DECODE_ONLY|FULL_DECODE_ONLY（解码）|FULL_DECODE_ONLY（解码）|仅捕获解码阶段。PD 预填充节点使用 `--enforce-eager` 代替。|"
   },
   "faq": {
     "en": "For common environment, installation, and general parameter issues, please refer to the [Public FAQ](https://docs.vllm.ai/projects/ascend/en/latest/faqs.html). This chapter only covers model-specific issues.\n\n**Q: How to enable function calling?**\n\nAdd the following flags to the `vllm serve` command:\n\n```bash\n--tool-call-parser glm47 --reasoning-parser glm45 --enable-auto-tool-choice\n```\n\n**Q: How to optimize for single-node low-latency?**\n\nUse `dp1 tp16` configuration and disable expert parallel.\n\n**Q: How to deploy 200k context window?**\n\nUse co-located 4-node configuration with dp4 tp8 and `--max-model-len 200000`.",
@@ -284,6 +420,10 @@
     "zh": "ModelScope 模型下载（GLM-5.2 W8A8）"
   },
   "references[3].title": {
+    "en": "ModelScope Model Download (GLM-5.2 W4A8C8)",
+    "zh": "ModelScope 模型下载（GLM-5.2 W4A8C8）"
+  },
+  "references[4].title": {
     "en": "vllm-ascend GitHub",
     "zh": "vllm-ascend GitHub"
   }

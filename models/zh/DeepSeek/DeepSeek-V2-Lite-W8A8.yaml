@@ -90,7 +90,7 @@ config_params:
     description: "最大并发序列数"
 
 overview: |-
-  DeepSeek-V2-Lite 是 DeepSeek-V2 的 16B 总参 / 2.4B 激活 MoE 轻量版。
+  DeepSeek-V2-Lite 是 DeepSeek-V2 的 16B 总参数量 / 2.4B 激活参数的 MoE 兄弟模型。
 weight_download:
 - weight_version: W8A8(预量化)
   sources:

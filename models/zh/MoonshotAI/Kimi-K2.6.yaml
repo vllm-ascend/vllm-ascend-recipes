@@ -172,7 +172,7 @@ overview: |-
   token 上持续预训练而来。它融合了视觉与语言理解，具备先进的智能体能力、即时与思考两种
   模式，以及对话与智能体两种范式。
 weight_download:
-- weight_version: W4A8 (Pre-quantized)
+- weight_version: W4A8（预量化）
   sources:
   - source: ModelScope
     url: https://www.modelscope.cn/models/Eco-Tech/Kimi-K2.6-W4A8
@@ -181,7 +181,7 @@ weight_download:
       pip install modelscope
       modelscope download --model Eco-Tech/Kimi-K2.6-W4A8
       ```
-- weight_version: Eagle3 MTP (draft model)
+- weight_version: Eagle3 MTP（草稿模型）
   sources:
   - source: HuggingFace
     url: https://huggingface.co/lightseekorg/kimi-k2.6-eagle3
@@ -189,7 +189,7 @@ weight_download:
       ```bash
       huggingface-cli download lightseekorg/kimi-k2.6-eagle3
       ```
-- weight_version: DFlash (speculative decoding)
+- weight_version: DFlash（投机解码）
   sources:
   - source: HuggingFace
     url: https://huggingface.co/z-lab/Kimi-K2.5-DFlash
@@ -199,14 +199,14 @@ weight_download:
       ```
 
 prerequisites:
-- title: Model Weight
+- title: 模型权重
   content: |-
     - `Kimi-K2.6-w4a8`（W4A8 量化版本）：需要 1 台 Atlas 800 A3（64GB × 16）或 2 台 Atlas 800 A2（64GB × 8）。[下载模型权重](https://www.modelscope.cn/models/Eco-Tech/Kimi-K2.6-W4A8)。
     - `kimi-k2.6-eagle3`（用于加速 Kimi-K2.6 推理的 Eagle3 MTP 草稿模型）：[下载模型权重](https://huggingface.co/lightseekorg/kimi-k2.6-eagle3)。
     - `Kimi-K2.5-DFlash`（利用轻量级块扩散模型做并行草稿生成的投机解码框架）：[下载模型权重](https://huggingface.co/z-lab/Kimi-K2.5-DFlash)。
 
     建议将模型权重下载到多节点共享目录，例如 `/root/.cache/`。
-- title: Verify Multi-node Communication
+- title: 验证多节点通信
   content: |-
     如需部署多机环境，请按照[多机通信环境验证](https://docs.vllm.ai/projects/ascend/zh-cn/latest/installation.html#verify-multi-node-communication)验证多机通信。
 

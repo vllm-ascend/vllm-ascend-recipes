@@ -127,7 +127,7 @@ config_params:
     description: "KV cache 可用的显存比例"
 
 overview: |-
-  GLM-5 和 GLM-5.1 是智谱 AI（THUDM）推出的混合专家（MoE）模型，面向复杂系统工程和长周期智能体任务。模型总参数量 744B。
+  GLM-5 和 GLM-5.1 是智谱AI（THUDM）推出的混合专家（MoE）模型，面向复杂系统工程和长周期智能体任务，总参数量达744B。
 weight_download:
 - weight_version: BF16
   sources:

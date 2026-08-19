@@ -127,7 +127,7 @@ config_params:
     description: "KV cache 可用的显存比例"
 
 overview: |-
-  Qwen3.5-27B 与 Qwen3.6-27B 是 Qwen3.5/Qwen3.6 系列的稠密混合 Mamba-Transformer 语言模型。两者共享相同的混合注意力设计（GDN + 全注意力）和 MTP 头设计，适用于对话、内容创作、代码生成等通用文本生成任务。
+  Qwen3.5-27B 和 Qwen3.6-27B 是 Qwen3.5/Qwen3.6 系列中的密集混合 Mamba-Transformer 语言模型。两者共享相同的混合注意力设计（GDN + 全注意力）和相同的 MTP 头设计。它们适用于通用文本生成任务，如对话、内容创作和代码生成。
 weight_download:
 # ---- Qwen3.5-27B BF16 ----
 - weight_version: Qwen3.5-27B BF16

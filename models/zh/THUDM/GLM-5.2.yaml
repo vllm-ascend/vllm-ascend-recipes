@@ -41,7 +41,7 @@ guide: ""
 performance_model_names:
   - "GLM-5.2"
 overview: |-
-  GLM-5.2 是智谱 AI（THUDM）推出的混合专家（MoE）模型，总参数量 753B，面向复杂系统工程和长周期智能体任务。
+  GLM-5.2 是智谱AI（THUDM）推出的混合专家（MoE）模型，总参数量为753B，面向复杂系统工程和长周期智能体任务。
 weight_download:
 - weight_version: BF16
   sources:
@@ -80,15 +80,15 @@ weight_download:
 prerequisites:
 - title: 模型权重
   content: |-
-    以下模型变体可用。建议将模型权重下载到所有节点可访问的共享目录。
+    以下模型变体可用。建议将模型权重下载到所有节点均可访问的共享目录。
 
-    | 模型 | 硬件需求 | 下载 |
-    |------|---------|------|
-    | GLM-5.2（BF16） | Atlas 800I A3 × 2<br>Atlas 800I A2 × 4 | [下载](https://www.modelscope.cn/models/ZhipuAI/GLM-5.2) |
+    | 模型 | 硬件要求 | 下载 |
+    |-------|---------------------|----------|
+    | GLM-5.2 (BF16) | Atlas 800I A3 × 2<br>Atlas 800I A2 × 4 | [下载](https://www.modelscope.cn/models/ZhipuAI/GLM-5.2) |
     | GLM-5.2-w8a8 | Atlas 800I A3 × 1<br>Atlas 800I A2 × 2 | [下载](https://www.modelscope.cn/models/Eco-Tech/GLM-5.2-w8a8) |
     | GLM-5.2-w4a8c8 | Atlas 800I A3 × 1<br>Atlas 800I A2 × 2 | [下载](https://www.modelscope.cn/models/Eco-Tech/GLM-5.2-w4a8c8) |
 
-    您也可以使用 [msmodelslim](https://gitcode.com/Ascend/msmodelslim) 直接对模型进行量化。建议将模型权重下载到多节点共享目录中，例如 `/root/.cache/`。
+    您也可以直接使用 [msmodelslim](https://gitcode.com/Ascend/msmodelslim) 对模型进行量化。建议将权重下载到多节点共享目录，例如 `/root/.cache/`。
 - title: 验证多节点通信
   content: |-
     如需部署多节点环境，请按照 [验证多节点通信环境](https://docs.vllm.ai/projects/ascend/zh-cn/latest/installation.html#verify-multi-node-communication) 进行验证。
@@ -247,112 +247,112 @@ scenarios:
   deployment: 双节点共置
   case: 低延迟 64K
   steps:
-  - title: 场景概览
+  - title: 场景概述
     content: |-
-      低延迟 64K 输入场景推荐使用 W4A8C8 权重和双节点共置部署。
+      低延迟64K输入推理建议使用W4A8C8权重和双节点共置部署。
 
-      |部署模式|NPU 总数|权重版本|关键考虑因素|
-      |--------|--------|--------|------------|
-      |双节点共置（A3），[多节点共置部署](https://docs.vllm.ai/projects/ascend/zh-cn/latest/tutorials/models/GLM5.2.html#5112-multi-node-co-located-deployment)|32（A3）|w4a8c8|dp2 tp16, MTP3, max-num-seqs 8, max-model-len 135000, FlashComm1, DSA CP|
+      |部署模式|总NPU数|权重版本|关键考虑因素|
+      |---------------|----------|--------------|------------------|
+      |双节点共置（A3），[多节点共置部署](https://docs.vllm.ai/projects/ascend/en/latest/tutorials/models/GLM5.2.html#5112-multi-node-co-located-deployment)|32（A3）|w4a8c8|dp2 tp16, MTP3, max-num-seqs 8, max-model-len 135000, FlashComm1, DSA CP|
   - title: 详细节点配置
     content: |-
-      TP/DP 列为部署脚本中的每节点配置；每个 A3 节点使用 16 个 NPU。
+      TP/DP列显示部署脚本使用的每节点值；每个A3节点使用16个NPU。
 
-      |配置|NPU（每节点）|TP|DP（每节点）|Max Num Seqs|Max Num Batched Tokens|Max Model Len|MTP Spec Num|
-      |----|-------------|--|------------|------------|----------------------|-------------|------------|
-      |Dual-Node（每节点）|16|16|1|8|8192|135000|3|
+      |配置|每节点NPU数|TP|每节点DP|最大序列数|最大批处理令牌数|最大模型长度|MTP推测数|
+      |-------------|-------------|--|-----------|------------|----------------------|-------------|------------|
+      |双节点（每节点）|16|16|1|8|8192|135000|3|
 
-      `max-model-len` 和 `max-num-seqs` 需要根据实际输入输出长度、前缀缓存命中率和服务并发调整。
+      `max-model-len` 和 `max-num-seqs` 应根据实际输入/输出长度、前缀缓存命中率和推理并发度进行调整。
 - npu: Atlas 800I A3
   precision: W4A8C8
   deployment: 双节点共置
   case: 低延迟 128K
   steps:
-  - title: 场景概览
+  - title: 场景概述
     content: |-
-      低延迟 128K 输入场景推荐使用 W4A8C8 权重和双节点共置部署。
+      低延迟128K输入推理建议使用W4A8C8权重和双节点共置部署。
 
-      |部署模式|NPU 总数|权重版本|关键考虑因素|
-      |--------|--------|--------|------------|
-      |双节点共置（A3），[多节点共置部署](https://docs.vllm.ai/projects/ascend/zh-cn/latest/tutorials/models/GLM5.2.html#5112-multi-node-co-located-deployment)|32（A3）|w4a8c8|dp2 tp16, MTP3, max-num-seqs 8, max-model-len 135000, FlashComm1, DSA CP|
+      |部署模式|总NPU数|权重版本|关键考虑因素|
+      |---------------|----------|--------------|------------------|
+      |双节点共置（A3），[多节点共置部署](https://docs.vllm.ai/projects/ascend/en/latest/tutorials/models/GLM5.2.html#5112-multi-node-co-located-deployment)|32（A3）|w4a8c8|dp2 tp16, MTP3, max-num-seqs 8, max-model-len 135000, FlashComm1, DSA CP|
   - title: 详细节点配置
     content: |-
-      TP/DP 列为部署脚本中的每节点配置；每个 A3 节点使用 16 个 NPU。
+      TP/DP列显示部署脚本使用的每节点值；每个A3节点使用16个NPU。
 
-      |配置|NPU（每节点）|TP|DP（每节点）|Max Num Seqs|Max Num Batched Tokens|Max Model Len|MTP Spec Num|
-      |----|-------------|--|------------|------------|----------------------|-------------|------------|
-      |Dual-Node（每节点）|16|16|1|8|8192|135000|3|
+      |配置|每节点NPU数|TP|每节点DP|最大序列数|最大批处理令牌数|最大模型长度|MTP推测数|
+      |-------------|-------------|--|-----------|------------|----------------------|-------------|------------|
+      |双节点（每节点）|16|16|1|8|8192|135000|3|
 
-      延迟优先时建议保持较小的 `max-num-seqs`，并按实际输出长度预留 KV cache。
+      对于延迟导向的推理，请保持 `max-num-seqs` 较小，并根据预期输出长度预留KV缓存内存。
 - npu: Atlas 800I A3
   precision: W4A8C8
   deployment: 双节点共置
   case: 高吞吐 64K
   steps:
-  - title: 场景概览
+  - title: 场景概述
     content: |-
-      高吞吐 64K 输入场景推荐使用 W4A8C8 权重和双节点共置部署。
+      高吞吐64K输入推理建议使用W4A8C8权重和双节点共置部署。
 
-      |部署模式|NPU 总数|权重版本|关键考虑因素|
-      |--------|--------|--------|------------|
-      |双节点共置（A3），[多节点共置部署](https://docs.vllm.ai/projects/ascend/zh-cn/latest/tutorials/models/GLM5.2.html#5112-multi-node-co-located-deployment)|32（A3）|w4a8c8|dp4 tp8, fused MC2, MTP3, max-num-seqs 16, max-model-len 66000, FlashComm1, DSA CP|
+      |部署模式|总NPU数|权重版本|关键考虑因素|
+      |---------------|----------|--------------|------------------|
+      |双节点共置（A3），[多节点共置部署](https://docs.vllm.ai/projects/ascend/en/latest/tutorials/models/GLM5.2.html#5112-multi-node-co-located-deployment)|32（A3）|w4a8c8|dp4 tp8, fused MC2, MTP3, max-num-seqs 16, max-model-len 66000, FlashComm1, DSA CP|
   - title: 详细节点配置
     content: |-
-      TP/DP 列为部署脚本中的每节点配置；每个 A3 节点使用 16 个 NPU。
+      TP/DP列显示部署脚本使用的每节点值；每个A3节点使用16个NPU。
 
-      |配置|NPU（每节点）|TP|DP（每节点）|Max Num Seqs|Max Num Batched Tokens|Max Model Len|MTP Spec Num|
-      |----|-------------|--|------------|------------|----------------------|-------------|------------|
-      |Dual-Node（每节点）|16|8|2|16|8192|66000|3|
+      |配置|每节点NPU数|TP|每节点DP|最大序列数|最大批处理令牌数|最大模型长度|MTP推测数|
+      |-------------|-------------|--|-----------|------------|----------------------|-------------|------------|
+      |双节点（每节点）|16|8|2|16|8192|66000|3|
 
-      吞吐优先时通过 `dp4 tp8` 提高并发容量，并配合 FlashComm1 与 DSA CP 优化长上下文预填充。
+      对于吞吐导向的推理，`dp4 tp8` 可提高并发能力，并与FlashComm1和DSA CP配合用于长上下文预填充。
 - npu: Atlas 800I A3
   precision: W4A8C8
-  deployment: PD 分离
+  deployment: PD分离
   case: 高吞吐
   tags: [pd-multinode]
   strategy: pd_cluster
   steps:
-  - title: 场景概览
+  - title: 场景概述
     content: |-
-      高吞吐 PD 分离场景推荐使用专用 P/D 节点池和 Mooncake KV 传输。
+      高吞吐PD分离建议使用专用的P/D节点池和Mooncake KV传输。
 
-      |部署模式|NPU 总数|权重版本|关键考虑因素|
-      |--------|--------|--------|------------|
-      |PD 分离（A3），[预填充-解码分离](https://docs.vllm.ai/projects/ascend/zh-cn/latest/tutorials/models/GLM5.2.html#5113-prefill-decode-disaggregation)|4 节点（A3）|w4a8c8|P：dp4 tp8（max-num-seqs 64, max-num-batched-tokens 8192, MTP1）；D：dp32 tp1（max-num-seqs 32, max-num-batched-tokens 164, MTP5），max-model-len 133120，专用 P/D 节点，Mooncake KV 传输|
+      |部署模式|总NPU数|权重版本|关键考虑因素|
+      |---------------|----------|--------------|------------------|
+      |PD分离（A3），[预填充-解码分离](https://docs.vllm.ai/projects/ascend/en/latest/tutorials/models/GLM5.2.html#5113-prefill-decode-disaggregation)|4节点（A3）|w4a8c8|P: dp4 tp8 (max-num-seqs 64, max-num-batched-tokens 8192, MTP1); D: dp32 tp1 (max-num-seqs 32, max-num-batched-tokens 164, MTP5), max-model-len 133120, 专用P/D节点, Mooncake KV传输|
   - title: 详细节点配置
     content: |-
-      TP/DP 列为部署脚本中的每节点配置；每个 A3 节点使用 16 个 NPU。
+      TP/DP 列显示部署脚本使用的每节点值；每个 A3 节点使用 16 个 NPU。
 
-      |节点角色|NPU（每节点）|TP|DP（每节点）|Max Num Seqs|Max Num Batched Tokens|Max Model Len|MTP Spec Num|
-      |--------|-------------|--|------------|------------|----------------------|-------------|------------|
-      |PD - Server-P Node|16|8|2|64|8192|133120|1|
-      |PD - Server-D Node|16|1|16|32|164|133120|5|
+      |节点角色|每节点 NPU 数|TP|每节点 DP|最大序列数|最大批处理 Token 数|最大模型长度|MTP 推测数|
+      |---------|-------------|--|-----------|------------|----------------------|-------------|------------|
+      |PD - Server-P 节点|16|8|2|64|8192|133120|1|
+      |PD - Server-D 节点|16|1|16|32|164|133120|5|
 
       在 PD 解码节点上，`max-num-batched-tokens` 配置为 `(MTP Spec Num + 1) * Max Num Seqs`。
 - npu: Atlas 800I A3
   precision: W4A8C8
-  deployment: PD 分离
+  deployment: PD 分离部署
   case: 长上下文 1M
   tags: [pd-multinode]
   strategy: pd_cluster
   steps:
-  - title: 场景概览
+  - title: 场景概述
     content: |-
-      1M 长上下文场景推荐使用 W4A8C8 权重、PD 分离和 DCP8。
+      1M 上下文服务推荐使用 W4A8C8 权重、PD 分离部署和 DCP8。
 
-      |部署模式|NPU 总数|权重版本|关键考虑因素|
-      |--------|--------|--------|------------|
-      |PD 分离（A3），[PD 分离 1M 部署](https://docs.vllm.ai/projects/ascend/zh-cn/latest/tutorials/models/GLM5.2.html#523-pd-disaggregation-1m-deployment)|4 节点（A3）|w4a8c8|P/D：dp4 tp8, DCP8, max-model-len 1040000, Mooncake KV 传输|
+      |部署模式|总 NPU 数|权重版本|关键考虑因素|
+      |---------------|----------|--------------|------------------|
+      |PD 分离部署（A3），[PD 分离部署 1M 部署](https://docs.vllm.ai/projects/ascend/en/latest/tutorials/models/GLM5.2.html#523-pd-disaggregation-1m-deployment)|4 节点（A3）|w4a8c8|P/D：dp4 tp8，DCP8，max-model-len 1040000，Mooncake KV 传输|
   - title: 详细节点配置
     content: |-
-      TP/DP 列为部署脚本中的每节点配置；每个 A3 节点使用 16 个 NPU。
+      TP/DP 列显示部署脚本使用的每节点值；每个 A3 节点使用 16 个 NPU。
 
-      |节点角色|NPU（每节点）|TP|DP（每节点）|Max Num Seqs|Max Num Batched Tokens|Max Model Len|MTP Spec Num|
-      |--------|-------------|--|------------|------------|----------------------|-------------|------------|
-      |PD - Server-P Node|16|8|2|8|16384|1040000|1|
-      |PD - Server-D Node|16|8|2|32|128|1040000|3|
+      |节点角色|每节点 NPU 数|TP|每节点 DP|最大序列数|最大批处理 Token 数|最大模型长度|MTP 推测数|
+      |---------|-------------|--|-----------|------------|----------------------|-------------|------------|
+      |PD - Server-P 节点|16|8|2|8|16384|1040000|1|
+      |PD - Server-D 节点|16|8|2|32|128|1040000|3|
 
-      1M 场景必须为巨大的 KV cache 预留内存，预填充/共置节点通常需要较低的 `gpu-memory-utilization`（约 0.75-0.80）。
+      1M 场景必须为非常大的 KV 缓存预留内存，因此 prefill/共置节点通常需要较低的 `gpu-memory-utilization` 值（约 0.75-0.80）。
 - npu: Atlas 800I A3
   precision: W8A8
   deployment: 20K
@@ -439,7 +439,7 @@ scenarios:
   steps:
   - title: 启动服务
     content: |-
-      两节点长上下文配置。
+      双节点长上下文配置。
 
       **节点 0：**
 
@@ -522,7 +522,7 @@ scenarios:
       ```
   - title: 服务验证
     content: |-
-      服务启动后，通过发送提示词验证服务是否正常运行。请参考下方的验证示例。
+      服务启动后，通过发送提示词进行验证。示例请参见下方的验证部分。
 - npu: Atlas 800I A3
   precision: W8A8
   deployment: 135K
@@ -789,22 +789,22 @@ performance:
 tuning: |-
   ### 调优指南
 
-  请参考 [公开性能调优文档](https://docs.vllm.ai/projects/ascend/zh-cn/latest/developer_guide/performance_and_debug/optimization_and_tuning.html) 了解调优方法。
-  请参考 [功能指南](https://docs.vllm.ai/projects/ascend/zh-cn/latest/user_guide/support_matrix/feature_matrix.html) 了解详细功能描述。
+  调优方法请参考[公共性能调优文档](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/performance_and_debug/optimization_and_tuning.html)。
+  详细功能描述请参考[功能指南](https://docs.vllm.ai/projects/ascend/en/latest/user_guide/support_matrix/feature_matrix.html)。
 
   **GLM-5.2 关键调优说明：**
 
-  |参数|低延迟|高吞吐|长上下文|说明|
-  |----|------|------|--------|----|
-  |`--max-num-batched-tokens`|较低（4096-8192）|预填充较高（8192）|预填充较高（16384）|控制每步的批处理大小。较低的值降低每步延迟；较高的值提升预填充吞吐。|
-  |`--gpu-memory-utilization`|0.92-0.95|0.90-0.95|0.75-0.93|NPU 内存比例。1M 场景必须为巨大 KV cache 预留内存，因此预填充/共置节点使用较低值（0.75-0.80）。|
-  |`num_speculative_tokens`（MTP）|3-5|3-5|1（预填充）/ 3（解码）|MTP 推测数量。较高的值以草稿模型 KV cache 内存为代价提升解码吞吐；PD 模式下预填充节点使用 1。|
-  |`enable_dsa_cp`|可选|启用（预填充节点）|启用（预填充节点）|DSA 上下文并行加速长上下文预填充，自 v0.21.0 起与 FlashComm1 解耦。|
-  |`enable_sparse_sfa_c8` / `enable_sparse_li_c8`|false / true|true / true（PD）|false / true|`enable_sparse_sfa_c8` 是 C8 量化模型的实验性 SFA 优化；v0.23.0 中请勿与 DCP 组合。`enable_sparse_li_c8` 独立且仍推荐启用。|
-  |`enable_balance_scheduling`|启用（单节点）|启用|PD 模式下禁用|在 v1 调度器中提升输出吞吐并降低 TPOT。部分场景 TTFT 可能劣化；预填充-解码分离时不推荐。|
+  |参数|低延迟|高吞吐|长上下文|描述|
+  |---------|-----------|---------------|------------|-----------|
+  |`--max-num-batched-tokens`|较低（4096-8192）|预填充较高（8192）|预填充较高（16384）|控制每步批大小。较低的值降低每步延迟；较高的值提升预填充吞吐。|
+  |`--gpu-memory-utilization`|0.92-0.95|0.90-0.95|0.75-0.93|NPU 内存比例。1M 场景必须为大型 KV 缓存预留内存，因此预填充/共置节点使用较低值（0.75-0.80）。|
+  |`num_speculative_tokens`（MTP）|3-5|3-5|1（预填充）/ 3（解码）|MTP 投机令牌数。较高的值提升解码吞吐，但消耗草稿模型 KV 缓存内存；PD 预填充节点使用 1。|
+  |`enable_dsa_cp`|可选|启用（预填充节点）|启用（预填充节点）|DSA 上下文并行加速长上下文预填充，自 v0.21.0 起已与 FlashComm1 解耦。|
+  |`enable_sparse_sfa_c8` / `enable_sparse_li_c8`|false / true|true / true（PD）|false / true|`enable_sparse_sfa_c8` 是针对 C8 量化模型的实验性 SFA 优化；在 v0.23.0 中不要与 DCP 结合使用。`enable_sparse_li_c8` 独立且仍推荐启用。|
+  |`enable_balance_scheduling`|启用（单节点）|启用|PD 禁用|在 v1 调度器中提升输出吞吐并降低 TPOT。某些场景下 TTFT 可能回退；不建议用于预填充-解码分离。|
   |`VLLM_ASCEND_ENABLE_FLASHCOMM1`|1|1（预填充节点）|1（预填充节点）|通信优化。与包含 `o_proj` 的 `layer_sharding` 冲突。|
-  |`VLLM_ASCEND_ENABLE_MLAPO`|-|1（A2 P/D 节点）|-|融合算子，显著提升性能但消耗更多 NPU 内存；A3 上仅用于解码节点。|
-  |`cudagraph_mode`|FULL_DECODE_ONLY|FULL_DECODE_ONLY（解码）|FULL_DECODE_ONLY（解码）|仅对解码阶段进行图捕获。PD 模式下的预填充节点改用 `--enforce-eager`。|
+  |`VLLM_ASCEND_ENABLE_MLAPO`|-|1（A2 P/D 节点）|-|融合算子，可显著提升性能但消耗更多 NPU 内存；在 A3 上仅用于解码节点。|
+  |`cudagraph_mode`|FULL_DECODE_ONLY|FULL_DECODE_ONLY（解码）|FULL_DECODE_ONLY（解码）|仅捕获解码阶段。PD 预填充节点使用 `--enforce-eager` 代替。|
 faq: |-
   常见环境、安装和通用参数问题请参考 [公开 FAQ](https://docs.vllm.ai/projects/ascend/zh-cn/latest/faqs.html)。本章仅涵盖模型特定问题。
 
