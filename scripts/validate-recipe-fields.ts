@@ -218,7 +218,9 @@ function checkRecipe(file: string, data: AnyRecord): string[] {
   });
 
   // weight_download non-empty with sources
-  const weightDownload = (data.weight_download ?? []) as AnyRecord[];
+  const weightDownload: AnyRecord[] = Array.isArray(data.weight_download)
+    ? (data.weight_download as AnyRecord[])
+    : [];
   if (weightDownload.length && weightDownload.some((w) => !w.sources || !w.sources.length)) {
     errors.push('weight_download entries must have non-empty sources');
   }
