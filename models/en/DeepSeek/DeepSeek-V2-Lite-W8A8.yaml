@@ -4,7 +4,7 @@ meta:
   provider: "DeepSeek"
   description: "DeepSeek-V2-Lite MoE (16B total / 2.4B active) served as a multi-node PD-separated deployment (1P1D) with W8A8 quantization and Mooncake KV transfer."
   date_added: "2026-08-07"
-  date_updated: "2026-08-07"
+  date_updated: "2026-08-20"
   difficulty: advanced
   tasks:
     - text
