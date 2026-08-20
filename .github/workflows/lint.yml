@@ -64,6 +64,9 @@ jobs:
       - name: Validate model YAML
         run: pnpm validate
 
+      - name: Validate recipe fields
+        run: pnpm check:recipes
+
   frontend:
     needs: detect
     if: needs.detect.outputs.src == 'true' || needs.detect.outputs.config == 'true'

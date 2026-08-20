@@ -110,6 +110,9 @@ jobs:
       - name: Validate YAML
         run: pnpm validate
 
+      - name: Validate recipe fields
+        run: pnpm check:recipes
+
       - name: Check i18n pairing
         run: |
           echo "=== Checking en/zh recipe pairing ==="

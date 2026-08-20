@@ -101,6 +101,7 @@ compatible_strategies:
   - single_node_A3
   - single_node_A2
   - single_node_310p
+  - multi_node_dp
 
 hardware_overrides: {}
 strategy_overrides: {}

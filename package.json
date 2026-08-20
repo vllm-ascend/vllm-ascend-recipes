@@ -12,6 +12,7 @@
     "preview": "astro preview",
     "astro": "astro",
     "validate": "npx tsx scripts/validate-yaml.ts",
+    "check:recipes": "npx tsx scripts/validate-recipe-fields.ts",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write \"src/**/*.{ts,tsx,astro,css}\" \"scripts/**/*.ts\" \"*.mjs\"",
