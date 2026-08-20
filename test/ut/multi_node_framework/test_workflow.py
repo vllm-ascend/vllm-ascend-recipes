@@ -101,45 +101,53 @@ def render_lws() -> dict[str, object]:
 class MultiNodeWorkflowTests(unittest.TestCase):
     def test_entry_workflow_declares_only_case_identity(self) -> None:
         value = workflow(ENTRY_WORKFLOW)
-        job = value["jobs"]["verify"]
 
         self.assertEqual(set(value["on"]), {"pull_request", "workflow_dispatch"})
-        self.assertEqual(
-            job["strategy"]["matrix"]["include"],
-            [
-                {
-                    "name": "deepseek-v2-lite-pd-2n2c",
-                    "recipe": "models/en/DeepSeek/template_pd.yaml",
-                    "test_id": "pd-2n2c",
-                },
-                {
-                    "name": "deepseek-v2-lite-recipe-pd-2n2c",
-                    "recipe": "models/en/DeepSeek/DeepSeek-V2-Lite-W8A8.yaml",
-                    "test_id": "dsv2lite-pd-2n2c",
-                },
-                {
-                    "name": "qwen3-30b-a3b-dp-2n2c",
-                    "recipe": "models/en/Qwen/template2_non_pd.yaml",
-                    "test_id": "dp-2n2c",
-                },
-            ],
-        )
-        self.assertEqual(job["needs"], "prepare")
-        self.assertEqual(
-            job["with"],
-            {
-                "name": "${{ matrix.name }}",
-                "recipe": "${{ matrix.recipe }}",
-                "test_id": "${{ matrix.test_id }}",
+        # One reusable-workflow job per case; each filters itself on the
+        # prepare output that matches its recipe file.
+        expected = {
+            "verify-template-pd": {
+                "name": "deepseek-v2-lite-pd-2n2c",
+                "recipe": "models/en/DeepSeek/template_pd.yaml",
+                "test_id": "pd-2n2c",
+                "flag": "pd_template",
             },
-        )
-        # prepare collects the changed recipe YAMLs; each matrix case filters
-        # itself via contains(needs.prepare.outputs.changed, matrix.recipe).
+            "verify-v2lite": {
+                "name": "deepseek-v2-lite-recipe-pd-2n2c",
+                "recipe": "models/en/DeepSeek/DeepSeek-V2-Lite-W8A8.yaml",
+                "test_id": "dsv2lite-pd-2n2c",
+                "flag": "v2lite",
+            },
+            "verify-qwen": {
+                "name": "qwen3-30b-a3b-dp-2n2c",
+                "recipe": "models/en/Qwen/template2_non_pd.yaml",
+                "test_id": "dp-2n2c",
+                "flag": "qwen",
+            },
+        }
+        for job_id, case in expected.items():
+            job = value["jobs"][job_id]
+            self.assertEqual(job["uses"], "./.github/workflows/_verify_multi_node.yaml")
+            self.assertEqual(job["needs"], "prepare")
+            self.assertEqual(
+                job["with"],
+                {
+                    "name": case["name"],
+                    "recipe": case["recipe"],
+                    "test_id": case["test_id"],
+                },
+            )
+            self.assertIn(f"needs.prepare.outputs.{case['flag']} == 'true'", job["if"])
+
+        # prepare reports which multi-node recipe YAMLs changed (en or zh).
         prepare = value["jobs"]["prepare"]
-        self.assertEqual(prepare["outputs"]["changed"], "${{ steps.select.outputs.changed }}")
-        self.assertIn(
-            "contains(needs.prepare.outputs.changed, matrix.recipe)",
-            job["if"],
+        self.assertEqual(
+            prepare["outputs"],
+            {
+                "pd_template": "${{ steps.select.outputs.pd_template }}",
+                "v2lite": "${{ steps.select.outputs.v2lite }}",
+                "qwen": "${{ steps.select.outputs.qwen }}",
+            },
         )
         self.assertEqual(
             job["uses"], "./.github/workflows/_verify_multi_node.yaml"
