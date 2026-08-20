@@ -18,7 +18,6 @@ interface ModelItem {
   precisions: string[];
   deployments: string[];
   _model_slug?: string;
-  _is_template?: boolean;
 }
 
 interface SearchBarProps {
@@ -161,11 +160,6 @@ export default function SearchBar({ modelsEn, modelsZh }: SearchBarProps) {
                   className="status-dot hidden w-1.5 h-1.5 rounded-full bg-zinc-500 ring-1 ring-zinc-700 ml-1.5 inline-block align-middle"
                   aria-hidden="true"
                 />
-                {m._is_template && (
-                  <span className="ml-1.5 rounded bg-accent-500/10 text-accent-400 border border-accent-500/20 px-1">
-                    Template
-                  </span>
-                )}
               </span>
             </div>
             <p className="text-xs text-ink-500 line-clamp-2 mb-3 leading-relaxed">
