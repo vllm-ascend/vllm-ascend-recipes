@@ -105,8 +105,24 @@ class MultiNodeWorkflowTests(unittest.TestCase):
 
         self.assertEqual(set(value["on"]), {"pull_request", "workflow_dispatch"})
         self.assertEqual(
-            job["strategy"]["matrix"],
-            "${{ fromJSON(needs.prepare.outputs.cases) }}",
+            job["strategy"]["matrix"]["include"],
+            [
+                {
+                    "name": "deepseek-v2-lite-pd-2n2c",
+                    "recipe": "models/en/DeepSeek/template_pd.yaml",
+                    "test_id": "pd-2n2c",
+                },
+                {
+                    "name": "deepseek-v2-lite-recipe-pd-2n2c",
+                    "recipe": "models/en/DeepSeek/DeepSeek-V2-Lite-W8A8.yaml",
+                    "test_id": "dsv2lite-pd-2n2c",
+                },
+                {
+                    "name": "qwen3-30b-a3b-dp-2n2c",
+                    "recipe": "models/en/Qwen/template2_non_pd.yaml",
+                    "test_id": "dp-2n2c",
+                },
+            ],
         )
         self.assertEqual(job["needs"], "prepare")
         self.assertEqual(
@@ -117,9 +133,14 @@ class MultiNodeWorkflowTests(unittest.TestCase):
                 "test_id": "${{ matrix.test_id }}",
             },
         )
-        # prepare selects cases from the changed recipe YAMLs.
+        # prepare collects the changed recipe YAMLs; each matrix case filters
+        # itself via contains(needs.prepare.outputs.changed, matrix.recipe).
         prepare = value["jobs"]["prepare"]
-        self.assertEqual(prepare["outputs"]["cases"], "${{ steps.select.outputs.cases }}")
+        self.assertEqual(prepare["outputs"]["changed"], "${{ steps.select.outputs.changed }}")
+        self.assertIn(
+            "contains(needs.prepare.outputs.changed, matrix.recipe)",
+            job["if"],
+        )
         self.assertEqual(
             job["uses"], "./.github/workflows/_verify_multi_node.yaml"
         )

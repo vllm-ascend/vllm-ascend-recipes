@@ -17,57 +17,59 @@ jobs:
   prepare:
     runs-on: ubuntu-latest
     outputs:
-      cases: ${{ steps.select.outputs.cases }}
+      changed: ${{ steps.select.outputs.changed }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Select cases by changed recipe YAML
+      - name: Collect changed multi-node recipe YAMLs
         id: select
         run: |
-          # case name -> recipe -> test_id, keyed by the recipe file that owns it
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             CHANGED=$(git diff --name-only "${{ github.event.pull_request.base.sha }}" "${{ github.sha }}" -- 'models/**/*.yaml' || true)
-            SELECTED='[]'
-            append_case() {
-              # $1 = a full JSON case object
-              if [ "$SELECTED" = "[]" ]; then
-                SELECTED="[$1]"
-              else
-                SELECTED=$(python3 -c "import json,sys; a=json.loads(sys.argv[1]); a.append(json.loads(sys.argv[2])); print(json.dumps(a))" "$SELECTED" "$1")
-              fi
-            }
+            # Normalize zh mirrors to their en owner so `contains()` below works
+            # for either language. Space-separated en recipe paths.
+            SELECTED=''
             if echo "$CHANGED" | grep -q 'models/.*/DeepSeek/template_pd\.yaml'; then
-              append_case '{"name":"deepseek-v2-lite-pd-2n2c","recipe":"models/en/DeepSeek/template_pd.yaml","test_id":"pd-2n2c"}'
+              SELECTED="$SELECTED models/en/DeepSeek/template_pd.yaml"
             fi
             if echo "$CHANGED" | grep -q 'models/.*/DeepSeek/DeepSeek-V2-Lite-W8A8\.yaml'; then
-              append_case '{"name":"deepseek-v2-lite-recipe-pd-2n2c","recipe":"models/en/DeepSeek/DeepSeek-V2-Lite-W8A8.yaml","test_id":"dsv2lite-pd-2n2c"}'
+              SELECTED="$SELECTED models/en/DeepSeek/DeepSeek-V2-Lite-W8A8.yaml"
             fi
             if echo "$CHANGED" | grep -q 'models/.*/Qwen/template2_non_pd\.yaml'; then
-              append_case '{"name":"qwen3-30b-a3b-dp-2n2c","recipe":"models/en/Qwen/template2_non_pd.yaml","test_id":"dp-2n2c"}'
+              SELECTED="$SELECTED models/en/Qwen/template2_non_pd.yaml"
             fi
-            echo "Selected cases: $SELECTED"
+            echo "Changed multi-node recipes:$SELECTED"
           else
-            SELECTED='[
-              {"name":"deepseek-v2-lite-pd-2n2c","recipe":"models/en/DeepSeek/template_pd.yaml","test_id":"pd-2n2c"},
-              {"name":"deepseek-v2-lite-recipe-pd-2n2c","recipe":"models/en/DeepSeek/DeepSeek-V2-Lite-W8A8.yaml","test_id":"dsv2lite-pd-2n2c"},
-              {"name":"qwen3-30b-a3b-dp-2n2c","recipe":"models/en/Qwen/template2_non_pd.yaml","test_id":"dp-2n2c"}
-            ]'
+            # workflow_dispatch: every matrix case runs.
+            SELECTED=''
           fi
-          echo "cases=$SELECTED" >> "$GITHUB_OUTPUT"
+          echo "changed=$SELECTED" >> "$GITHUB_OUTPUT"
 
   verify:
     needs: prepare
     name: multi-node (${{ matrix.name }})
     # pull_request workflows cannot safely expose cluster credentials to forks.
+    # Each static matrix case runs only when its recipe YAML changed (or on
+    # workflow_dispatch); unrelated cases are skipped.
     if: >
       (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
-      && needs.prepare.outputs.cases != '[]'
+      && (github.event_name == 'workflow_dispatch' || contains(needs.prepare.outputs.changed, matrix.recipe))
     strategy:
       fail-fast: false
-      matrix: ${{ fromJSON(needs.prepare.outputs.cases) }}
+      matrix:
+        include:
+          - name: deepseek-v2-lite-pd-2n2c
+            recipe: models/en/DeepSeek/template_pd.yaml
+            test_id: pd-2n2c
+          - name: deepseek-v2-lite-recipe-pd-2n2c
+            recipe: models/en/DeepSeek/DeepSeek-V2-Lite-W8A8.yaml
+            test_id: dsv2lite-pd-2n2c
+          - name: qwen3-30b-a3b-dp-2n2c
+            recipe: models/en/Qwen/template2_non_pd.yaml
+            test_id: dp-2n2c
     uses: ./.github/workflows/_verify_multi_node.yaml
     with:
       name: ${{ matrix.name }}
