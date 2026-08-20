@@ -969,10 +969,7 @@ export default function CascadeSelector({
 
   const runtimeVars = useMemo(() => {
     if (!currentStep) return [];
-    const expandedContent = expandScenarioScripts(
-      currentStep.content,
-      currentScenario?.scripts,
-    );
+    const expandedContent = expandScenarioScripts(currentStep.content, currentScenario?.scripts);
     return runtimeEnvVarsOf(expandedContent);
   }, [currentStep, currentScenario]);
 
