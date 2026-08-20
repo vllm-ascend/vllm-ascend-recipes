@@ -204,7 +204,9 @@ const { modelSlug, title } = Astro.props;
       ],
       [
         'Run logs',
-        `<a href="${freshest.workflow_run_url}" target="_blank" rel="noopener">open Actions run</a> (conclusion: ${escapeHtml(freshest.conclusion)})`,
+        freshest.status === 'skip'
+          ? `<a href="${freshest.workflow_run_url}" target="_blank" rel="noopener">open Actions run</a> <span style="color:#71717a">(recipe skipped — not verified)</span>`
+          : `<a href="${freshest.workflow_run_url}" target="_blank" rel="noopener">open Actions run</a> (conclusion: ${escapeHtml(freshest.conclusion)})`,
       ],
       [
         'Date',
