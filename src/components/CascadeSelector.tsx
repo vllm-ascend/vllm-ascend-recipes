@@ -441,6 +441,44 @@ function runtimeEnvVarsOf(content: string): string[] {
   return [...vars].sort();
 }
 
+/** Human-readable description of a runtime env var (en/zh). */
+function runtimeEnvVarDescription(name: string, lang: string): string {
+  const roleDoc: Array<[RegExp, string, string]> = [
+    [/^PREFILL_NODE_(\d+)_IP/, 'Prefill node $1 IP address', 'Prefill 节点 $1 的 IP 地址'],
+    [/^DECODE_NODE_(\d+)_IP/, 'Decode node $1 IP address', 'Decode 节点 $1 的 IP 地址'],
+    [
+      /^GATEWAY_NODE_(\d+)_IP/,
+      'Gateway (load-balance proxy) node $1 IP',
+      'Gateway（负载均衡代理）节点 $1 的 IP',
+    ],
+    [
+      /^API_NODE_(\d+)_IP/,
+      'Internal-DP API node $1 IP address',
+      'internal DP API 节点 $1 的 IP 地址',
+    ],
+    [
+      /^HEADLESS_NODE_(\d+)_IP/,
+      'Internal-DP headless node $1 IP address',
+      'internal DP headless 节点 $1 的 IP 地址',
+    ],
+  ];
+  for (const [re, en, zh] of roleDoc) {
+    const m = name.match(re);
+    if (m) {
+      const idx = m[1];
+      return lang === 'zh' ? zh.replace('$1', idx) : en.replace('$1', idx);
+    }
+  }
+  if (name.endsWith('_DEVICES') || name === 'ASCEND_RT_VISIBLE_DEVICES') {
+    return lang === 'zh'
+      ? '该节点选用的 NPU 设备列表（如 0,1）'
+      : 'NPU device list selected for this node (e.g. 0,1)';
+  }
+  return lang === 'zh'
+    ? '由多节点部署环境注入的运行时变量'
+    : 'Runtime variable injected by the multi-node deployment environment';
+}
+
 export function renderMarkdown(md: string): string {
   let html = md;
 
@@ -1342,14 +1380,21 @@ export default function CascadeSelector({
               {runtimeVars.length > 0 && (
                 <div className="ml-[22px] mt-4 rounded-md border border-ink-800/60 bg-ink-900/40 px-3 py-2 text-[11px] font-mono text-ink-400">
                   <span className="text-accent-400">
-                    {lang === 'zh' ? '运行时环境变量' : 'Runtime environment variables'}:
-                  </span>{' '}
-                  {runtimeVars.join(', ')}
-                  <span className="block mt-0.5 text-ink-600">
-                    {lang === 'zh'
-                      ? '由多节点部署环境注入；具体取值见 “Topology and variables” 步骤。'
-                      : 'Injected by the multi-node deployment environment; see the "Topology and variables" step for details.'}
+                    {lang === 'zh' ? '运行时环境变量' : 'Runtime environment variables'}
                   </span>
+                  <ul className="mt-1.5 space-y-0.5">
+                    {runtimeVars.map((v) => (
+                      <li key={v}>
+                        <code className="text-accent-400/90">{v}</code>
+                        <span className="text-ink-500"> — {runtimeEnvVarDescription(v, lang)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="mt-1.5 text-ink-600">
+                    {lang === 'zh'
+                      ? '网卡（NIC）由 HCCL 自动发现，无需手动设置；完整取值见 “Topology and variables” 步骤。'
+                      : 'The network interface (NIC) is auto-discovered by HCCL — no manual setup needed. See the "Topology and variables" step for the full values.'}
+                  </p>
                 </div>
               )}
             </div>
