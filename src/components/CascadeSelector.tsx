@@ -431,6 +431,16 @@ function stripRenderMarkers(content: string): string {
     .replace(/%%HL:\w[\w-]*%%|%%\/HL:\w[\w-]*%%/g, '');
 }
 
+/** Runtime env vars referenced by a step (`$FOO` / `${FOO}`, uppercase).
+ *  Positional params ($1/$2) and lowercase shell vars are ignored. */
+function runtimeEnvVarsOf(content: string): string[] {
+  const vars = new Set<string>();
+  for (const m of content.matchAll(/\$(\{)?([A-Z][A-Z0-9_]*)(\})?/g)) {
+    vars.add(m[2]);
+  }
+  return [...vars].sort();
+}
+
 export function renderMarkdown(md: string): string {
   let html = md;
 
@@ -957,6 +967,15 @@ export default function CascadeSelector({
     return applyColorHighlights(mdHtml, effectiveConfigs);
   }, [rawContent, effectiveConfigs]);
 
+  const runtimeVars = useMemo(() => {
+    if (!currentStep) return [];
+    const expandedContent = expandScenarioScripts(
+      currentStep.content,
+      currentScenario?.scripts,
+    );
+    return runtimeEnvVarsOf(expandedContent);
+  }, [currentStep, currentScenario]);
+
   if (npus.length === 0) return null;
 
   // ---- Filter rows (vllm recipes-style: status dots, VRAM badges, hover info) ----
@@ -1323,6 +1342,19 @@ export default function CascadeSelector({
                 </h3>
               </div>
               <div className="ml-[22px] prose" dangerouslySetInnerHTML={{ __html: renderedHtml }} />
+              {runtimeVars.length > 0 && (
+                <div className="ml-[22px] mt-4 rounded-md border border-ink-800/60 bg-ink-900/40 px-3 py-2 text-[11px] font-mono text-ink-400">
+                  <span className="text-accent-400">
+                    {lang === 'zh' ? '运行时环境变量' : 'Runtime environment variables'}:
+                  </span>{' '}
+                  {runtimeVars.join(', ')}
+                  <span className="block mt-0.5 text-ink-600">
+                    {lang === 'zh'
+                      ? '由多节点部署环境注入；具体取值见 “Topology and variables” 步骤。'
+                      : 'Injected by the multi-node deployment environment; see the "Topology and variables" step for details.'}
+                  </span>
+                </div>
+              )}
             </div>
           )}
         </div>
