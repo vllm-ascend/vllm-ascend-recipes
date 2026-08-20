@@ -990,6 +990,8 @@ faq: |-
 references:
 - title: vllm-ascend 文档
   url: https://docs.vllm.ai/projects/ascend/zh-cn/latest/tutorials/models/Qwen3-30B-A3B.html
+- title: 附加配置
+  url: https://docs.vllm.ai/projects/ascend/en/latest/user_guide/configuration/additional_config.html
 - title: ModelScope 模型下载（BF16）
   url: https://www.modelscope.cn/models/Qwen/Qwen3-30B-A3B
 - title: ModelScope 模型下载（W8A8）

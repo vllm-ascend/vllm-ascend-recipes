@@ -826,6 +826,8 @@ faq: |-
 references:
 - title: vllm-ascend 文档
   url: https://docs.vllm.ai/projects/ascend/zh-cn/latest/tutorials/models/GLM5.2.html
+- title: 附加配置
+  url: https://docs.vllm.ai/projects/ascend/en/latest/user_guide/configuration/additional_config.html
 - title: ModelScope 模型下载（GLM-5.2 BF16）
   url: https://www.modelscope.cn/models/ZhipuAI/GLM-5.2
 - title: ModelScope 模型下载（GLM-5.2 W8A8）

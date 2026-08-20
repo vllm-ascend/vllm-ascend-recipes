@@ -299,6 +299,8 @@ scenarios:
 references:
 - title: ModelScope Model Download
   url: https://www.modelscope.cn/models/vllm-ascend/DeepSeek-V2-Lite-W8A8
+- title: Additional Configuration
+  url: https://docs.vllm.ai/projects/ascend/en/latest/user_guide/configuration/additional_config.html
 - title: PD Disaggregation Guide (Mooncake)
   url: https://docs.vllm.ai/projects/ascend/en/latest/tutorials/features/pd_disaggregation_mooncake_multi_node.html
 - title: vllm-ascend GitHub

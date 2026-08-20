@@ -826,6 +826,8 @@ faq: |-
 references:
 - title: vllm-ascend Documentation
   url: https://docs.vllm.ai/projects/ascend/en/latest/tutorials/models/GLM5.2.html
+- title: Additional Configuration
+  url: https://docs.vllm.ai/projects/ascend/en/latest/user_guide/configuration/additional_config.html
 - title: ModelScope Model Download (GLM-5.2 BF16)
   url: https://www.modelscope.cn/models/ZhipuAI/GLM-5.2
 - title: ModelScope Model Download (GLM-5.2 W8A8)

@@ -809,6 +809,8 @@ faq: |-
 references:
 - title: Qwen3.5-27B ModelScope
   url: https://modelscope.cn/models/Qwen/Qwen3.5-27B
+- title: Additional Configuration
+  url: https://docs.vllm.ai/projects/ascend/en/latest/user_guide/configuration/additional_config.html
 - title: Qwen3.5-27B-w8a8-mtp (Eco-Tech)
   url: https://www.modelscope.cn/models/Eco-Tech/Qwen3.5-27B-w8a8-mtp
 - title: Qwen3.6-27B ModelScope
@@ -818,7 +820,7 @@ references:
 - title: vllm-ascend docs (release v0.23.0)
   url: https://github.com/vllm-project/vllm-ascend/tree/releases/v0.23.0/docs/source/tutorials/models/Qwen3.5-27B-Qwen3.6-27B.md
 - title: Mooncake multi-node PD disaggregation guide
-  url: https://github.com/vllm-project/vllm-ascend/blob/main/docs/source/features/pd_disaggregation_mooncake_multi_node.md
+  url: https://docs.vllm.ai/projects/ascend/en/latest/tutorials/features/pd_disaggregation_mooncake_multi_node.html
 - title: launch_online_dp.py (vllm-ascend examples)
   url: https://github.com/vllm-project/vllm-ascend/blob/main/examples/external_online_dp/launch_online_dp.py
 - title: run_dp_template.sh (vllm-ascend examples)

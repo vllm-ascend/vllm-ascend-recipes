@@ -798,5 +798,7 @@ references:
   url: https://docs.vllm.ai/projects/ascend/zh-cn/latest/tutorials/features/pd_disaggregation_mooncake_multi_node.html
 - title: vllm-ascend 文档
   url: https://docs.vllm.ai/projects/ascend/zh-cn/latest/tutorials/models/Kimi-K2.6.html
+- title: 附加配置
+  url: https://docs.vllm.ai/projects/ascend/en/latest/user_guide/configuration/additional_config.html
 - title: vllm-ascend GitHub
   url: https://github.com/vllm-project/vllm-ascend
