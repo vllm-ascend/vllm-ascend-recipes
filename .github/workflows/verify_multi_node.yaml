@@ -5,12 +5,9 @@ on:
     branches: [main]
     types: [opened, synchronize, reopened]
     paths:
-      - .github/workflows/verify_multi_node.yaml
-      - .github/workflows/_verify_multi_node.yaml
-      - test/recipe/multi_node/**
-      - models/en/DeepSeek/template_pd.yaml
-      - models/en/DeepSeek/DeepSeek-V2-Lite-W8A8.yaml
-      - models/en/Qwen/template2_non_pd.yaml
+      # Only recipe YAML changes trigger the multi-node framework on PRs;
+      # framework/workflow changes are validated by workflow_dispatch / UT.
+      - 'models/**/*.yaml'
   workflow_dispatch:
 
 permissions:
