@@ -178,14 +178,15 @@ export const scenarioSchema = z
       }
       const deployment = String(scenario.deployment ?? '').toLowerCase();
       const isPd = deployment === 'pd' || (deployment !== 'non-pd' && deployment.includes('pd'));
-      const isNonPd = deployment === 'non-pd';
+      const isNonPd = deployment === 'non-pd' || (!isPd && deployment.length > 0);
       if (!isPd && !isNonPd) {
         ctx.addIssue({
           code: 'custom',
           path: ['deployment'],
           message:
             'script-backed scenarios require deployment to be "pd", "non-pd", ' +
-            'or a legacy value carrying PD semantics (e.g. "Multi-Node PD Separation")',
+            'or a legacy value carrying PD semantics (e.g. "Multi-Node PD Separation") ' +
+            'or non-PD semantics (e.g. "Multi-Node")',
         });
       } else {
         const validCase =

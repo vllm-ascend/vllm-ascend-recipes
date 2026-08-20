@@ -531,6 +531,99 @@ scenarios:
   - title: 服务验证
     content: |-
       服务启动后，通过发送 prompt 验证其运行状态。使用示例请参考下方的验证部分。
+- npu: Atlas 800I A2
+  precision: bf16
+  deployment: 多节点
+  case: 2-node
+  tags: [multi-node-dp]
+  strategy: multi_node_dp
+  test_id: qwen30b-dp-2n2c
+  npu_per_node: 2
+  aisbench: [accuracy, performance]
+  scripts:
+    api-0:
+      language: bash
+      content: |-
+        export OMP_PROC_BIND=false
+        export OMP_NUM_THREADS=10
+        export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+        export HCCL_BUFFSIZE=1024
+        export VLLM_USE_MODELSCOPE=true
+        export ASCEND_RT_VISIBLE_DEVICES="${ASCEND_RT_VISIBLE_DEVICES:-0,1}"
+
+        vllm serve Qwen/Qwen3-30B-A3B \
+            --host "$API_NODE_0_IP" \
+            --port 7100 \
+            --served-model-name qwen3 \
+            --data-parallel-size 4 \
+            --data-parallel-size-local 2 \
+            --data-parallel-address "$API_NODE_0_IP" \
+            --data-parallel-rpc-port 12321 \
+            --tensor-parallel-size 1 \
+            --max-model-len {{max_model_len}} \
+            --max-num-seqs {{max_num_seqs}} \
+            --max-num-batched-tokens 4096 \
+            --gpu-memory-utilization {{gpu_memory_utilization}} \
+            --trust-remote-code \
+            --enable-expert-parallel \
+            --no-enable-prefix-caching \
+            --enforce-eager
+    headless-0:
+      language: bash
+      content: |-
+        export OMP_PROC_BIND=false
+        export OMP_NUM_THREADS=10
+        export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+        export HCCL_BUFFSIZE=1024
+        export VLLM_USE_MODELSCOPE=true
+        export ASCEND_RT_VISIBLE_DEVICES="${ASCEND_RT_VISIBLE_DEVICES:-0,1}"
+
+        vllm serve Qwen/Qwen3-30B-A3B \
+            --headless \
+            --data-parallel-size 4 \
+            --data-parallel-size-local 2 \
+            --data-parallel-start-rank 2 \
+            --data-parallel-address "$API_NODE_0_IP" \
+            --data-parallel-rpc-port 12321 \
+            --tensor-parallel-size 1 \
+            --max-model-len {{max_model_len}} \
+            --max-num-seqs {{max_num_seqs}} \
+            --max-num-batched-tokens 4096 \
+            --gpu-memory-utilization {{gpu_memory_utilization}} \
+            --trust-remote-code \
+            --enable-expert-parallel \
+            --no-enable-prefix-caching \
+            --enforce-eager
+    service-check:
+      language: bash
+      content: |-
+        response=$(curl --fail --silent --show-error \
+          "http://${API_NODE_0_IP}:7100/v1/completions" \
+          -H 'Content-Type: application/json' \
+          -d '{"model":"qwen3","prompt":"The future of AI is","max_tokens":50,"temperature":0}')
+
+        python3 -c 'import json, sys; assert json.load(sys.stdin)["choices"]' <<<"$response"
+  steps:
+  - title: 拓扑与变量
+    content: |-
+      `2-node` 表示两节点非 PD 部署。API 节点 0 承载 internal-DP rank 0 和 1；
+      Headless 节点 0 承载 rank 2 和 3。每节点使用 2 张 NPU，全局 `DP=4`、`TP=1`。
+      设置 API 节点地址与设备：
+
+      ```bash
+      export API_NODE_0_IP="${API_NODE_0_IP:-<api_node_0_ip>}"
+      export ASCEND_RT_VISIBLE_DEVICES="${ASCEND_RT_VISIBLE_DEVICES:-0,1}"
+      ```
+  - title: 启动 API 节点 0
+    content: |-
+      {{script:api-0}}
+  - title: 启动 Headless 节点 0
+    content: |-
+      {{script:headless-0}}
+  - title: 验证服务
+    content: |-
+      {{script:service-check}}
+
 - npu: Atlas 300I DUO
   precision: W8A8
   deployment: 单节点-多卡

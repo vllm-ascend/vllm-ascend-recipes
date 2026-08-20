@@ -30,6 +30,9 @@ _SUPPORTED_CASES = {
         _REPOSITORY_ROOT / "models/en/DeepSeek/DeepSeek-V2-Lite-W8A8.yaml"
     ).resolve(): "dsv2lite-pd-2n2c",
     (
+        _REPOSITORY_ROOT / "models/en/Qwen/Qwen3-30B-A3B.yaml"
+    ).resolve(): "qwen30b-dp-2n2c",
+    (
         _REPOSITORY_ROOT / "models/en/Qwen/template2_non_pd.yaml"
     ).resolve(): "dp-2n2c",
 }

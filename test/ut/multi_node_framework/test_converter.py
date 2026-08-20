@@ -56,6 +56,15 @@ CASES = (
         ("prefill", "decode"),
         True,
     ),
+    (
+        ROOT / "models/en/Qwen/Qwen3-30B-A3B.yaml",
+        "qwen30b-dp-2n2c",
+        "qwen3-30b-a3b-qwen30b-dp-2n2c",
+        "Qwen/Qwen3-30B-A3B",
+        "qwen3",
+        ("api", "headless"),
+        False,
+    ),
 )
 
 

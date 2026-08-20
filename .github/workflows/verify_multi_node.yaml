@@ -20,6 +20,7 @@ jobs:
       pd_template: ${{ steps.select.outputs.pd_template }}
       v2lite: ${{ steps.select.outputs.v2lite }}
       qwen: ${{ steps.select.outputs.qwen }}
+      qwen30b: ${{ steps.select.outputs.qwen30b }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -40,13 +41,17 @@ jobs:
             if echo "$CHANGED" | grep -q 'models/.*/Qwen/template2_non_pd\.yaml'; then
               echo "qwen=true" >> "$GITHUB_OUTPUT"
             fi
+            if echo "$CHANGED" | grep -q 'models/.*/Qwen/Qwen3-30B-A3B\.yaml'; then
+              echo "qwen30b=true" >> "$GITHUB_OUTPUT"
+            fi
             echo "Changed multi-node recipes (en or zh):"
-            echo "$CHANGED" | grep -E 'template_pd|V2-Lite|template2_non_pd' || echo "(none)"
+            echo "$CHANGED" | grep -E 'template_pd|V2-Lite|template2_non_pd|Qwen3-30B-A3B' || echo "(none)"
           else
             # workflow_dispatch: every matrix case runs.
             echo "pd_template=true" >> "$GITHUB_OUTPUT"
             echo "v2lite=true" >> "$GITHUB_OUTPUT"
             echo "qwen=true" >> "$GITHUB_OUTPUT"
+            echo "qwen30b=true" >> "$GITHUB_OUTPUT"
           fi
 
   verify-template-pd:
@@ -87,6 +92,20 @@ jobs:
       name: qwen3-30b-a3b-dp-2n2c
       recipe: models/en/Qwen/template2_non_pd.yaml
       test_id: dp-2n2c
+    secrets:
+      KUBECONFIG_B64: ${{ secrets.KUBECONFIG_B64 }}
+      OBS_AK: ${{ secrets.OBS_AK }}
+      OBS_SK: ${{ secrets.OBS_SK }}
+
+  verify-qwen30b:
+    needs: prepare
+    name: multi-node (qwen3-30b-a3b-recipe-dp-2n2c)
+    if: github.event_name == 'workflow_dispatch' || (github.event.pull_request.head.repo.full_name == github.repository && needs.prepare.outputs.qwen30b == 'true')
+    uses: ./.github/workflows/_verify_multi_node.yaml
+    with:
+      name: qwen3-30b-a3b-recipe-dp-2n2c
+      recipe: models/en/Qwen/Qwen3-30B-A3B.yaml
+      test_id: qwen30b-dp-2n2c
     secrets:
       KUBECONFIG_B64: ${{ secrets.KUBECONFIG_B64 }}
       OBS_AK: ${{ secrets.OBS_AK }}

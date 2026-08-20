@@ -199,14 +199,18 @@ def read_scenario(path: Path, test_id: str) -> ScenarioSource:
 
     deployment = _text(scenario["deployment"], "scenario.deployment")
     d = deployment.strip().lower()
-    if d not in _DEPLOYMENTS and "pd" not in d:
-        raise ConversionError(
-            "scenario.deployment must be 'pd', 'non-pd', or a legacy value "
-            "carrying PD semantics (e.g. 'Multi-Node PD Separation')"
-        )
 
     case = _text(scenario["case"], "scenario.case")
     is_pd = d == "pd" or (d != "non-pd" and "pd" in d)
+    if d not in _DEPLOYMENTS and not is_pd:
+        # Non-PD legacy display values (e.g. "Multi-Node") are accepted when
+        # the case still matches the canonical <N>-node form.
+        if _CASE_PATTERN.fullmatch(case) is None:
+            raise ConversionError(
+                "scenario.deployment must be 'pd', 'non-pd', or a legacy value "
+                "with PD semantics (e.g. 'Multi-Node PD Separation'); non-PD "
+                "legacy values require a '<positive integer>-node' case"
+            )
     if is_pd:
         case_ok = (
             _CASE_PATTERN.fullmatch(case) is not None

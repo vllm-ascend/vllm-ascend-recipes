@@ -124,6 +124,12 @@ class MultiNodeWorkflowTests(unittest.TestCase):
                 "test_id": "dp-2n2c",
                 "flag": "qwen",
             },
+            "verify-qwen30b": {
+                "name": "qwen3-30b-a3b-recipe-dp-2n2c",
+                "recipe": "models/en/Qwen/Qwen3-30B-A3B.yaml",
+                "test_id": "qwen30b-dp-2n2c",
+                "flag": "qwen30b",
+            },
         }
         for job_id, case in expected.items():
             job = value["jobs"][job_id]
@@ -147,6 +153,7 @@ class MultiNodeWorkflowTests(unittest.TestCase):
                 "pd_template": "${{ steps.select.outputs.pd_template }}",
                 "v2lite": "${{ steps.select.outputs.v2lite }}",
                 "qwen": "${{ steps.select.outputs.qwen }}",
+                "qwen30b": "${{ steps.select.outputs.qwen30b }}",
             },
         )
         self.assertEqual(
