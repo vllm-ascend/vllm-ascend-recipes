@@ -186,6 +186,9 @@ export interface Model {
   _provider_slug: string;
   _model_slug: string;
   _yaml_path: string;
+  /** True for converter input templates (template_*.yaml) — excluded from
+   *  browse/provider listings but still reachable at their direct URL. */
+  _is_template?: boolean;
 }
 
 export interface ModelListItem {

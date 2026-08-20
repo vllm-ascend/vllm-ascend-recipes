@@ -26,6 +26,7 @@ function loadGlob(lang: 'en' | 'zh') {
         _provider_slug: providerSlug,
         _model_slug: modelSlug,
         _yaml_path: path,
+        _is_template: modelSlug.startsWith('template'),
       } as Model;
     }),
   );
@@ -53,7 +54,7 @@ export async function getModel(
 }
 
 export async function getProviders(lang: 'en' | 'zh' = 'en'): Promise<ProviderInfo[]> {
-  const all = await getAllModels(lang);
+  const all = (await getAllModels(lang)).filter((m) => !m._is_template);
   const map = new Map<string, ProviderInfo>();
 
   for (const m of all) {
@@ -68,7 +69,7 @@ export async function getProviders(lang: 'en' | 'zh' = 'en'): Promise<ProviderIn
 }
 
 export async function getModelList(lang: 'en' | 'zh' = 'en'): Promise<ModelListItem[]> {
-  const all = await getAllModels(lang);
+  const all = (await getAllModels(lang)).filter((m) => !m._is_template);
   return all.map((m) => {
     const npus = [...new Set(m.scenarios.map((s) => s.npu))];
     const precisions = [...new Set(m.scenarios.map((s) => s.precision))];
