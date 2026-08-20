@@ -86,6 +86,15 @@ export function substitutePdContent(
     },
   );
 
+  // Launch references ($PREFILL_NODE_0_IP etc.) — fill with the same cluster
+  // env values so the rendered command shows the actual addresses instead of
+  // leaving shell variables that were only exported in a previous step.
+  text = text.replace(/\$(PREFILL|DECODE|GATEWAY)_NODE_(\d+)_IP\b/g, (match, role, idx) => {
+    const key = role === 'GATEWAY' ? 'PREFILL_NODE_1' : `${role}_NODE_${Number(idx) + 1}`;
+    const ip = endpoints[key];
+    return ip ? ip : match;
+  });
+
   if (endpoints.IFACE_NAME) {
     text = text.replace(/(nic_name\s*=\s*)"[^"]*"/, `$1"${endpoints.IFACE_NAME}"`);
   }
