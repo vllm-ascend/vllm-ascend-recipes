@@ -4,7 +4,7 @@ meta:
   provider: "DeepSeek"
   description: "DeepSeek-V2-Lite MoE(总参 16B / 激活 2.4B)以多节点 PD 分离拓扑(1P1D)部署,W8A8 量化 + Mooncake KV 传输。"
   date_added: "2026-08-07"
-  date_updated: "2026-08-20"
+  date_updated: "2026-08-21"
   difficulty: advanced
   tasks:
     - text
