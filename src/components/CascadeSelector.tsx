@@ -768,11 +768,12 @@ export default function CascadeSelector({
 
   const deployments = useMemo(() => {
     const set = new Set<string>();
-    scenarios
-      .filter((s) => s.npu === selectedNpu && s.precision === effectivePrecision)
-      .forEach((s) => set.add(s.deployment));
+    // Deployment options are per NPU (not per precision): a multi-node case
+    // may use a different precision than the single-node cases on the same
+    // NPU, and hiding it behind the precision filter makes it undiscoverable.
+    scenarios.filter((s) => s.npu === selectedNpu).forEach((s) => set.add(s.deployment));
     return Array.from(set);
-  }, [scenarios, selectedNpu, effectivePrecision]);
+  }, [scenarios, selectedNpu]);
 
   const [selectedDeployment, setSelectedDeployment] = useState(deployments[0] || '');
   const effectiveDeployment = deployments.includes(selectedDeployment)
@@ -1025,7 +1026,15 @@ export default function CascadeSelector({
     deployments.map((opt) => (
       <Tooltip key={opt} content={deploymentInfo(opt, lang)}>
         <button
-          onClick={() => setSelectedDeployment(opt)}
+          onClick={() => {
+            setSelectedDeployment(opt);
+            // Sync precision to a scenario that actually offers this
+            // deployment, so the cascading selectors always resolve.
+            const match = scenarios.find((s) => s.npu === selectedNpu && s.deployment === opt);
+            if (match && match.precision !== effectivePrecision) {
+              setSelectedPrecision(match.precision);
+            }
+          }}
           className={chipClass(effectiveDeployment === opt)}
         >
           <span className="font-semibold">{deploymentLabel(opt, lang)}</span>
