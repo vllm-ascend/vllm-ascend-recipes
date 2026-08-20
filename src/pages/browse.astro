@@ -9,11 +9,13 @@ const providers = await getProviders('en');
 const base = import.meta.env.BASE_URL;
 const basePrefix = base.endsWith('/') ? base : base + '/';
 
-// Converter input templates (template_*.yaml) are not user-facing: their
-// content lives in the migrated recipes. They stay out of the browse list
-// entirely (direct URLs still resolve).
+// Converter input templates (template_*.yaml) stay discoverable on browse:
+// they live in a dedicated sidebar group and are appended at the end of the
+// card grid (not interleaved with vendor models), tagged with a Template chip.
 const regularModelsEn = modelsEn.filter((m) => !m._is_template);
 const regularModelsZh = modelsZh.filter((m) => !m._is_template);
+const templatesEn = modelsEn.filter((m) => m._is_template);
+const templatesZh = modelsZh.filter((m) => m._is_template);
 
 const enWithBase = regularModelsEn.map((m) => ({
   ...m,
@@ -26,6 +28,14 @@ const zhWithBase = regularModelsZh.map((m) => ({
   url: `${basePrefix}${m.url.replace(/^\//, '')}`,
   json: `${basePrefix}${m.json.replace(/^\//, '')}`,
 }));
+
+// Templates appended at the end so the vendor grid stays clean.
+const templatesWithBase = (list: typeof templatesEn) =>
+  list.map((m) => ({
+    ...m,
+    url: `${basePrefix}${m.url.replace(/^\//, '')}`,
+    json: `${basePrefix}${m.json.replace(/^\//, '')}`,
+  }));
 
 // Group models by provider for the sidebar
 const providerMap = new Map<
@@ -49,6 +59,9 @@ for (const m of regularModelsEn) {
   }
 }
 const providerGroups = Array.from(providerMap.values());
+
+const allEnWithBase = [...enWithBase, ...templatesWithBase(templatesEn)];
+const allZhWithBase = [...zhWithBase, ...templatesWithBase(templatesZh)];
 ---
 
 <BaseLayout title="Browse | vLLM-Ascend Recipes">
@@ -64,6 +77,34 @@ const providerGroups = Array.from(providerMap.values());
             Providers
           </h2>
           <nav class="space-y-1">
+            {
+              templatesEn.length > 0 && (
+                <div class="mb-3">
+                  <a
+                    href={`${basePrefix}browse`}
+                    class="flex items-center justify-between px-2 py-1.5 rounded-md text-sm font-medium text-ink-300 hover:text-accent-400 hover:bg-accent-500/5 transition-colors"
+                  >
+                    <span>Templates</span>
+                    <span class="text-[10px] font-mono text-ink-600">{templatesEn.length}</span>
+                  </a>
+                  <ul class="ml-2 mt-0.5 space-y-0.5 border-l border-ink-800/60 pl-2">
+                    {templatesEn.map((m) => {
+                      const parts = m.url.split('/').filter(Boolean);
+                      return (
+                        <li>
+                          <a
+                            href={`${basePrefix}${parts[0]}/${parts[1]}`}
+                            class="block px-2 py-1 rounded text-xs text-ink-500 hover:text-accent-400 hover:bg-accent-500/5 transition-colors truncate"
+                          >
+                            {m.title}
+                          </a>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              )
+            }
             {
               providerGroups.map((group) => (
                 <div class="mb-3">
@@ -110,7 +151,7 @@ const providerGroups = Array.from(providerMap.values());
           </p>
         </div>
 
-        <SearchBar client:load modelsEn={enWithBase} modelsZh={zhWithBase} />
+        <SearchBar client:load modelsEn={allEnWithBase} modelsZh={allZhWithBase} />
       </div>
     </div>
   </div>
