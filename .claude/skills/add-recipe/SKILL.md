@@ -16,7 +16,7 @@ Recipes are YAML files at `models/en/<Provider>/<Model>.yaml` (English, source o
    **Reference the official tutorial** — pull `docs/source/tutorials/models/<Model>.md` from the matching vllm-ascend tag (e.g. `v0.23.0rc1`) and use it as the single source of truth for the recipe: scenario division (single-node / multi-node DP / PD separation / request forwarding), serve flags, env vars and per-scenario parameters must match the tutorial. Do not invent scenarios or parameters the tutorial doesn't cover.
 5. **Author `models/en/...`.** Follow the schema below. Use an existing recipe (e.g. `models/en/Qwen/Qwen3-30B-A3B.yaml` or `models/en/DeepSeek/DeepSeek-V4-Flash.yaml`) as a template. Keep the tutorial content in our fields (`overview` / `prerequisites` / `env_setup` / `scenarios`); leave `guide` empty.
 6. **Mirror to `models/zh/...` 1:1.** Same field structure (meta/model/features/variants/strategies/overrides/dependencies/config_params/scenarios/extra_config), only descriptions in Chinese. If the zh file is missing, the site falls back to English.
-7. **Validate.** Run `pnpm validate` (fails fast on schema + interlock errors), then `./scripts/format.sh` (validate + typecheck + lint + prettier, mirrors CI). Preview with `pnpm dev` at `/{provider}/{model}`.
+7. **Validate.** Run `pnpm validate` (zod schema + interlock errors), then `pnpm check:recipes` (field-level / upstream-alignment rules, see "Validation" below), then `./scripts/format.sh` (validate + typecheck + lint + prettier, mirrors CI). Preview with `pnpm dev` at `/{provider}/{model}`.
 8. **Commit.** Stage only the recipe YAML(s) — never `public/` or generated files. Message: `feat(recipe): add <Provider>/<Model>` (or `fix(recipe): ...` for updates).
 
 ## YAML schema (top-level, 总-分)
@@ -210,8 +210,37 @@ The zod schema (`src/lib/schema.ts`) enforces, besides field types, these interl
 4. step `{{name}}` placeholders resolve to `config_params` or `features`;
 5. `%%CONFIG:key%%` markers resolve to an `extra_config` key or feature.
 
+### Field-level validation (pnpm check:recipes)
+
+`scripts/validate-recipe-fields.ts` runs on every PR, push to main, and the
+nightly prepare stage (before any cluster is touched). It checks what the zod
+schema cannot express:
+
+1. **Required sections**: `meta` (title/slug/provider/description/date_added),
+   `model`, `overview`, `weight_download` (non-empty sources), `env_setup`,
+   `scenarios`, `references`.
+2. **Upstream-aligned model fields**: `model_id` must be `<org>/<name>`;
+   `architecture` ∈ dense|moe; `variants` → `default` exists and every variant
+   has `precision`; every `feature` has `args` or `env`; `opt_in_features ⊆
+   features`; `config_params.type` ∈ number|string|bool.
+3. **Strategy & Ascend conventions**: `scenario.strategy` must be listed in
+   `compatible_strategies`; `guide == ""`; `model.install.pip === false`
+   (docker-only).
+4. **Scenario / step fields**: each scenario has npu/precision/deployment/case;
+   non-empty steps with title+content; `{{name}}` placeholders resolve to the
+   top-level **or scenario-level** `config_params` / `features`;
+   `%%CONFIG:key%%` resolves to `extra_config` / `features`; script-backed
+   scenarios require `test_id` / `npu_per_node` / `service-check` and every
+   `{{script:x}}` reference must exist.
+5. **en/zh parity**: the zh mirror must have the same field-path structure as
+   the en file.
+
+Run it locally after editing a recipe — a real example it caught:
+`Qwen3-30B-A3B` used `strategy: multi_node_dp` without listing it in
+`compatible_strategies`.
+
 ## Commit checklist
 
-- `pnpm validate` + `./scripts/format.sh` green;
+- `pnpm validate` + `pnpm check:recipes` + `./scripts/format.sh` green;
 - `zh/` mirror committed with the `en/` change;
 - No `public/` or generated files staged.
