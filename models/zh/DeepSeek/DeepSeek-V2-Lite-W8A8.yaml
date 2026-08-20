@@ -150,105 +150,150 @@ scenarios:
   case: 1P1D(1 个 Prefill 节点 + 1 个 Decode 节点)
   tags: [pd-multinode]
   strategy: pd_cluster
+  test_id: dsv2lite-pd-2n2c
+  npu_per_node: 2
+  aisbench: [accuracy, performance]
+  scripts:
+    prefill-0-template:
+      language: bash
+      content: |-
+        # NIC: auto-injected by the deployment runtime (HCCL_SOCKET_IFNAME).
+        # To pin a specific interface, set it in hosts.yaml or export it
+        # before launch; GLOO/TP use the same NIC.
+        export GLOO_SOCKET_IFNAME="${GLOO_SOCKET_IFNAME:-$HCCL_SOCKET_IFNAME}"
+        export TP_SOCKET_IFNAME="${TP_SOCKET_IFNAME:-$HCCL_SOCKET_IFNAME}"
+        export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+        export OMP_PROC_BIND=false
+        export OMP_NUM_THREADS=10
+        export TASK_QUEUE_ENABLE=1
+        export HCCL_BUFFSIZE=256
+        # launch_online_dp.py passes logical device indexes; map them onto the
+        # container's assigned physical devices (ASCEND_RT_VISIBLE_DEVICES).
+        IFS=',' read -r -a selected_devices <<< "${ASCEND_RT_VISIBLE_DEVICES:-0,1}"
+        export ASCEND_RT_VISIBLE_DEVICES="${selected_devices[$1]}"
+        export VLLM_ASCEND_ENABLE_FLASHCOMM1=0
+
+        vllm serve vllm-ascend/DeepSeek-V2-Lite-W8A8 \
+            --host 0.0.0.0 \
+            --port $2 \
+            --served-model-name dsv2 \
+            --data-parallel-size $3 \
+            --data-parallel-rank $4 \
+            --data-parallel-address $5 \
+            --data-parallel-rpc-port $6 \
+            --tensor-parallel-size $7 \
+            --trust-remote-code \
+            --enable-expert-parallel \
+            --quantization ascend \
+            --max-model-len {{max_model_len}} \
+            --max-num-seqs {{max_num_seqs}} \
+            --kv-transfer-config '{"kv_connector": "MooncakeConnectorV1", "kv_role": "kv_producer", "kv_port": "30000", "engine_id": "0", "kv_connector_extra_config": {"prefill": {"dp_size": 2, "tp_size": 1}, "decode": {"dp_size": 2, "tp_size": 1}}}'
+    decode-0-template:
+      language: bash
+      content: |-
+        # NIC: auto-injected by the deployment runtime (HCCL_SOCKET_IFNAME).
+        # To pin a specific interface, set it in hosts.yaml or export it
+        # before launch; GLOO/TP use the same NIC.
+        export GLOO_SOCKET_IFNAME="${GLOO_SOCKET_IFNAME:-$HCCL_SOCKET_IFNAME}"
+        export TP_SOCKET_IFNAME="${TP_SOCKET_IFNAME:-$HCCL_SOCKET_IFNAME}"
+        export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+        export OMP_PROC_BIND=false
+        export OMP_NUM_THREADS=10
+        export TASK_QUEUE_ENABLE=1
+        export HCCL_BUFFSIZE=256
+        # launch_online_dp.py passes logical device indexes; map them onto the
+        # container's assigned physical devices (ASCEND_RT_VISIBLE_DEVICES).
+        IFS=',' read -r -a selected_devices <<< "${ASCEND_RT_VISIBLE_DEVICES:-0,1}"
+        export ASCEND_RT_VISIBLE_DEVICES="${selected_devices[$1]}"
+        export VLLM_ASCEND_ENABLE_FLASHCOMM1=0
+
+        vllm serve vllm-ascend/DeepSeek-V2-Lite-W8A8 \
+            --host 0.0.0.0 \
+            --port $2 \
+            --served-model-name dsv2 \
+            --data-parallel-size $3 \
+            --data-parallel-rank $4 \
+            --data-parallel-address $5 \
+            --data-parallel-rpc-port $6 \
+            --tensor-parallel-size $7 \
+            --trust-remote-code \
+            --enable-expert-parallel \
+            --quantization ascend \
+            --max-model-len {{max_model_len}} \
+            --max-num-seqs {{max_num_seqs}} \
+            --kv-transfer-config '{"kv_connector": "MooncakeConnectorV1", "kv_role": "kv_consumer", "kv_port": "30000", "engine_id": "0", "kv_connector_extra_config": {"prefill": {"dp_size": 2, "tp_size": 1}, "decode": {"dp_size": 2, "tp_size": 1}}}'
+    prefill-0-launch:
+      language: bash
+      content: |-
+        python /vllm-workspace/vllm-ascend/examples/external_online_dp/launch_online_dp.py \
+          --dp-size 2 --tp-size 1 --dp-size-local 2 --dp-rank-start 0 \
+          --dp-address "$PREFILL_NODE_0_IP" --dp-rpc-port 12321 --vllm-start-port 7100
+    decode-0-launch:
+      language: bash
+      content: |-
+        python /vllm-workspace/vllm-ascend/examples/external_online_dp/launch_online_dp.py \
+          --dp-size 2 --tp-size 1 --dp-size-local 2 --dp-rank-start 0 \
+          --dp-address "$DECODE_NODE_0_IP" --dp-rpc-port 12321 --vllm-start-port 7100
+    gateway-0:
+      language: bash
+      content: |-
+        python /vllm-workspace/vllm-ascend/examples/disaggregated_prefill_v1/load_balance_proxy_server_example.py \
+          --host "$GATEWAY_NODE_0_IP" \
+          --port 38085 \
+          --prefiller-hosts "$PREFILL_NODE_0_IP" "$PREFILL_NODE_0_IP" \
+          --prefiller-ports 7100 7101 \
+          --decoder-hosts "$DECODE_NODE_0_IP" "$DECODE_NODE_0_IP" \
+          --decoder-ports 7100 7101
+    service-check:
+      language: bash
+      content: |-
+        response=$(curl --fail --silent --show-error \
+          "http://${GATEWAY_NODE_0_IP}:38085/v1/completions" \
+          -H 'Content-Type: application/json' \
+          -d '{"model":"dsv2","prompt":"The future of AI is","max_tokens":50,"temperature":0}')
+
+        python3 -c 'import json, sys; assert json.load(sys.stdin)["choices"]' <<<"$response"
   steps:
-  - title: 概述
+  - title: 拓扑与变量
     content: |-
-      使用 **2 台 Atlas 800 A2 节点**——1 个 Prefill 节点、1 个 Decode 节点。每个节点运行
-      `TP=1 + DP=2`,使用 2 张 NPU。这是最轻量的 PD 拓扑:1P1D、每节点 2 卡,
-      由 `launch_online_dp.py` 外部 DP 驱动(Mooncake KV 传输)。
+      `1P1D` 表示 1 个 Prefill 节点 + 1 个 Decode 节点。每个节点运行两个
+      external-DP rank，使用 2 张 NPU（`DP=2`、`TP=1`）。设置节点地址并可按需
+      覆盖所选设备：
+
+      ```bash
+      export PREFILL_NODE_0_IP="${PREFILL_NODE_0_IP:-<prefill_node_0_ip>}"
+      export DECODE_NODE_0_IP="${DECODE_NODE_0_IP:-<decode_node_0_ip>}"
+      export GATEWAY_NODE_0_IP="${GATEWAY_NODE_0_IP:-$PREFILL_NODE_0_IP}"
+      export PREFILL_NODE_0_DEVICES="${PREFILL_NODE_0_DEVICES:-0,1}"
+      export DECODE_NODE_0_DEVICES="${DECODE_NODE_0_DEVICES:-0,1}"
+      ```
 
   - title: 准备 run_dp_template.sh – Prefill 节点
     content: |-
-      Prefill 节点:
-
-      ```shell
-      # HCCL 会自动发现 HCCN 网卡。不要强制把 HCCL_IF_IP / socket ifname
-      # 绑定到管理网卡——否则会在 vllm 引擎中报 HCCL "ERR02005 DIST internal error"。
-      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
-      export OMP_PROC_BIND=false
-      export OMP_NUM_THREADS=10
-      export TASK_QUEUE_ENABLE=1
-      export HCCL_BUFFSIZE=256
-      # launch_online_dp.py 传入逻辑设备索引;映射到容器分配的实际物理设备
-      # (ASCEND_RT_VISIBLE_DEVICES)。
-      IFS=',' read -r -a selected_devices <<< "${ASCEND_RT_VISIBLE_DEVICES:-0,1}"
-      export ASCEND_RT_VISIBLE_DEVICES="${selected_devices[$1]}"
-      export VLLM_ASCEND_ENABLE_FLASHCOMM1=0
-
-      vllm serve your_model_path \
-          --host 0.0.0.0 \
-          --port $2 \
-          --served-model-name dsv2 \
-          --data-parallel-size $3 \
-          --data-parallel-rank $4 \
-          --data-parallel-address $5 \
-          --data-parallel-rpc-port $6 \
-          --tensor-parallel-size $7 \
-          --trust-remote-code \
-          --enable-expert-parallel \
-          --quantization ascend \
-          --max-model-len {{max_model_len}} \
-          --max-num-seqs {{max_num_seqs}} \
-          --kv-transfer-config '{"kv_connector": "MooncakeConnectorV1", "kv_role": "kv_producer", "kv_port": "30000", "engine_id": "0", "kv_connector_extra_config": {"prefill": {"dp_size": 2, "tp_size": 1}, "decode": {"dp_size": 2, "tp_size": 1}}}'
-      ```
+      {{script:prefill-0-template}}
 
   - title: 准备 run_dp_template.sh – Decode 节点
     content: |-
-      Decode 节点:
-
-      ```shell
-      # HCCL 会自动发现 HCCN 网卡。不要强制把 HCCL_IF_IP / socket ifname
-      # 绑定到管理网卡——否则会在 vllm 引擎中报 HCCL "ERR02005 DIST internal error"。
-      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
-      export OMP_PROC_BIND=false
-      export OMP_NUM_THREADS=10
-      export TASK_QUEUE_ENABLE=1
-      export HCCL_BUFFSIZE=256
-      # launch_online_dp.py 传入逻辑设备索引;映射到容器分配的实际物理设备
-      # (ASCEND_RT_VISIBLE_DEVICES)。
-      IFS=',' read -r -a selected_devices <<< "${ASCEND_RT_VISIBLE_DEVICES:-0,1}"
-      export ASCEND_RT_VISIBLE_DEVICES="${selected_devices[$1]}"
-      export VLLM_ASCEND_ENABLE_FLASHCOMM1=0
-
-      vllm serve your_model_path \
-          --host 0.0.0.0 \
-          --port $2 \
-          --served-model-name dsv2 \
-          --data-parallel-size $3 \
-          --data-parallel-rank $4 \
-          --data-parallel-address $5 \
-          --data-parallel-rpc-port $6 \
-          --tensor-parallel-size $7 \
-          --trust-remote-code \
-          --enable-expert-parallel \
-          --quantization ascend \
-          --max-model-len {{max_model_len}} \
-          --max-num-seqs {{max_num_seqs}} \
-          --kv-transfer-config '{"kv_connector": "MooncakeConnectorV1", "kv_role": "kv_consumer", "kv_port": "30000", "engine_id": "0", "kv_connector_extra_config": {"prefill": {"dp_size": 2, "tp_size": 1}, "decode": {"dp_size": 2, "tp_size": 1}}}'
-      ```
+      {{script:decode-0-template}}
 
   - title: 启动服务
     content: |-
       ```bash
-      # p0(Prefill 节点 0)
-      python launch_online_dp.py --dp-size 2 --tp-size 1 --dp-size-local 2 --dp-rank-start 0 \
-        --dp-address 141.xx.xx.1 --dp-rpc-port 12321 --vllm-start-port 7100
-      # d0(Decode 节点 0)
-      python launch_online_dp.py --dp-size 2 --tp-size 1 --dp-size-local 2 --dp-rank-start 0 \
-        --dp-address 141.xx.xx.2 --dp-rpc-port 12321 --vllm-start-port 7100
+      unset ftp_proxy
+      unset https_proxy
+      unset http_proxy
       ```
 
-  - title: 服务验证
+      {{script:prefill-0-launch}}
+
+      {{script:decode-0-launch}}
+
+      两个 rank 服务就绪后启动 gateway：
+
+      {{script:gateway-0}}
+  - title: 验证服务
     content: |-
-      ```bash
-      # 查询 Prefill 节点的 OpenAI 兼容端点(或已部署的代理)
-      curl -s http://<node0_ip>:7100/v1/models
-      # 发送 chat completion 确认 prefill/decode 协同工作
-      curl -s http://<node0_ip>:7100/v1/chat/completions \
-        -H 'Content-Type: application/json' \
-        -d '{"model": "dsv2", "messages": [{"role": "user", "content": "hello"}], "max_tokens": 16}'
-      ```
-
+      {{script:service-check}}
 references:
 - title: ModelScope 模型下载
   url: https://www.modelscope.cn/models/vllm-ascend/DeepSeek-V2-Lite-W8A8

@@ -37,6 +37,9 @@ from .shell import (
 
 
 _PD_CASE = re.compile(r"^(?P<prefill>[1-9]\d*)p(?P<decode>[1-9]\d*)d$")
+_PD_CASE_LEGACY = re.compile(
+    r"^(?P<prefill>[1-9]\d*)[pP](?P<decode>[1-9]\d*)[dD]"
+)
 _NON_PD_CASE = re.compile(r"^(?P<nodes>[1-9]\d*)-node$")
 _SCRIPT_NAME = re.compile(
     r"^(?P<role>prefill|decode)-(?P<index>\d+)-(?P<kind>template|launch)$"
@@ -68,6 +71,38 @@ exec python3 "$MULTI_NODE_REPOSITORY_ROOT/test/recipe/multi_node/scripts/aisbenc
 def _fail(message: str) -> ConversionError:
     """Create the single user-facing error type exposed by this layer."""
     return ConversionError(message)
+
+
+def _deployment_kind(deployment: str) -> str:
+    """Classify a deployment into the runtime's pd / non-pd contract.
+
+    The canonical values are "pd" and "non-pd"; legacy recipes carry display
+    values such as "Multi-Node PD Separation" (pd) or "多节点-PD分离" (pd).
+    """
+    d = deployment.strip().lower()
+    if d == "pd":
+        return "pd"
+    if d == "non-pd":
+        return "non-pd"
+    if "pd" in d:
+        return "pd"
+    return "non-pd"
+
+
+def _parse_pd_case(deployment: str, case: str) -> re.Match[str] | None:
+    """Parse a PD case into (prefill, decode) node counts.
+
+    Canonical "1p1d" is preferred; legacy display cases such as
+    "1P1D (1 Prefill node + 1 Decode node)" are accepted via a prefix match.
+    """
+    m = _PD_CASE.fullmatch(case)
+    if m is not None:
+        return m
+    if _deployment_kind(deployment) == "pd" and case:
+        m = _PD_CASE_LEGACY.match(case)
+        if m is not None:
+            return m
+    return None
 
 
 def _script(source: ScenarioSource, name: str) -> str:
@@ -706,14 +741,17 @@ def plan_scenario(
         raise _fail("scenario requires service-check")
 
     gateway: GatewaySpec | None
-    if source.deployment == "pd":
-        case = _PD_CASE.fullmatch(source.case)
+    if _deployment_kind(source.deployment) == "pd":
+        case = _parse_pd_case(source.deployment, source.case)
         if case is None:
-            raise _fail("PD case must use the exact <P>p<D>d form")
+            raise _fail(
+                "PD case must use the exact <P>p<D>d form "
+                "(or a legacy form like '1P1D (1 Prefill node + 1 Decode node)')"
+            )
         counts = {key: int(case.group(key)) for key in ("prefill", "decode")}
         nodes, gateway, files, serves = _plan_pd(source, counts)
         endpoint_port = gateway.port
-    elif source.deployment == "non-pd":
+    elif _deployment_kind(source.deployment) == "non-pd":
         case = _NON_PD_CASE.fullmatch(source.case)
         if case is None:
             raise _fail("non-PD case must use the exact <N>-node form")

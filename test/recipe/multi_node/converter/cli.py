@@ -27,6 +27,9 @@ _GENERATED_ROOT = _MULTI_NODE_ROOT / ".generated"
 _SUPPORTED_CASES = {
     (_REPOSITORY_ROOT / "models/en/DeepSeek/template_pd.yaml").resolve(): "pd-2n2c",
     (
+        _REPOSITORY_ROOT / "models/en/DeepSeek/DeepSeek-V2-Lite-W8A8.yaml"
+    ).resolve(): "dsv2lite-pd-2n2c",
+    (
         _REPOSITORY_ROOT / "models/en/Qwen/template2_non_pd.yaml"
     ).resolve(): "dp-2n2c",
 }

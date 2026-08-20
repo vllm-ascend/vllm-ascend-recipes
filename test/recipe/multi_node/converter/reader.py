@@ -13,6 +13,7 @@ from .model import ConversionError, ParameterValue, ScenarioSource, ScriptSource
 
 
 _CASE_PATTERN = re.compile(r"(?:[1-9]\d*)p(?:[1-9]\d*)d|(?:[1-9]\d*)-node")
+_PD_CASE_LEGACY = re.compile(r"^(?:[1-9]\d*)[pP](?:[1-9]\d*)[dD]")
 _TEST_ID_PATTERN = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
 _PARAMETER_NAME_PATTERN = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 _DEPLOYMENTS = {"pd", "non-pd"}
@@ -197,13 +198,26 @@ def read_scenario(path: Path, test_id: str) -> ScenarioSource:
         )
 
     deployment = _text(scenario["deployment"], "scenario.deployment")
-    if deployment not in _DEPLOYMENTS:
-        raise ConversionError("scenario.deployment must be exactly 'pd' or 'non-pd'")
+    d = deployment.strip().lower()
+    if d not in _DEPLOYMENTS and "pd" not in d:
+        raise ConversionError(
+            "scenario.deployment must be 'pd', 'non-pd', or a legacy value "
+            "carrying PD semantics (e.g. 'Multi-Node PD Separation')"
+        )
 
     case = _text(scenario["case"], "scenario.case")
-    if _CASE_PATTERN.fullmatch(case) is None:
+    is_pd = d == "pd" or (d != "non-pd" and "pd" in d)
+    if is_pd:
+        case_ok = (
+            _CASE_PATTERN.fullmatch(case) is not None
+            or _PD_CASE_LEGACY.match(case) is not None
+        )
+    else:
+        case_ok = _CASE_PATTERN.fullmatch(case) is not None
+    if not case_ok:
         raise ConversionError(
             "scenario.case must be '<positive integer>p<positive integer>d' "
+            "(or a legacy form like '1P1D (1 Prefill node + 1 Decode node)'), "
             "or '<positive integer>-node'"
         )
 

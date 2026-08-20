@@ -113,6 +113,11 @@ class MultiNodeWorkflowTests(unittest.TestCase):
                     "test_id": "pd-2n2c",
                 },
                 {
+                    "name": "deepseek-v2-lite-recipe-pd-2n2c",
+                    "recipe": "models/en/DeepSeek/DeepSeek-V2-Lite-W8A8.yaml",
+                    "test_id": "dsv2lite-pd-2n2c",
+                },
+                {
                     "name": "qwen3-30b-a3b-dp-2n2c",
                     "recipe": "models/en/Qwen/template2_non_pd.yaml",
                     "test_id": "dp-2n2c",

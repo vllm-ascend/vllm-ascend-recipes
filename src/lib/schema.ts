@@ -176,23 +176,32 @@ export const scenarioSchema = z
           message: 'script-backed scenarios require a service-check script',
         });
       }
-      if (scenario.deployment !== 'pd' && scenario.deployment !== 'non-pd') {
+      const deployment = String(scenario.deployment ?? '').toLowerCase();
+      const isPd =
+        deployment === 'pd' ||
+        (deployment !== 'non-pd' && deployment.includes('pd'));
+      const isNonPd = deployment === 'non-pd';
+      if (!isPd && !isNonPd) {
         ctx.addIssue({
           code: 'custom',
           path: ['deployment'],
-          message: 'script-backed scenarios require deployment to be exactly pd or non-pd',
+          message:
+            'script-backed scenarios require deployment to be "pd", "non-pd", ' +
+            'or a legacy value carrying PD semantics (e.g. "Multi-Node PD Separation")',
         });
       } else {
         const validCase =
-          scenario.deployment === 'pd'
+          deployment === 'pd'
             ? /^[1-9]\d*p[1-9]\d*d$/.test(scenario.case)
-            : /^[1-9]\d*-node$/.test(scenario.case);
+            : isPd
+              ? /^[1-9]\d*[pP][1-9]\d*[dD]/.test(scenario.case)
+              : /^[1-9]\d*-node$/.test(scenario.case);
         if (!validCase) {
           ctx.addIssue({
             code: 'custom',
             path: ['case'],
             message:
-              scenario.deployment === 'pd'
+              isPd
                 ? 'pd cases must match <positive integer>p<positive integer>d'
                 : 'non-pd cases must match <positive integer>-node',
           });

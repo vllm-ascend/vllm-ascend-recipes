@@ -47,6 +47,15 @@ CASES = (
         ("api", "headless"),
         False,
     ),
+    (
+        ROOT / "models/en/DeepSeek/DeepSeek-V2-Lite-W8A8.yaml",
+        "dsv2lite-pd-2n2c",
+        "deepseek-v2-lite-w8a8-dsv2lite-pd-2n2c",
+        "vllm-ascend/DeepSeek-V2-Lite-W8A8",
+        "dsv2",
+        ("prefill", "decode"),
+        True,
+    ),
 )
 
 
@@ -156,7 +165,7 @@ class ConverterPipelineTests(unittest.TestCase):
 
     def test_cli_rejects_recipe_outside_template_allowlist(self) -> None:
         recipe, test_id, plan_name, *_ = CASES[0]
-        existing_recipe = ROOT / "models/en/DeepSeek/DeepSeek-V2-Lite-W8A8.yaml"
+        existing_recipe = ROOT / "models/en/DeepSeek/DeepSeek-V4-Flash.yaml"
         with tempfile.TemporaryDirectory() as tmp:
             stderr = io.StringIO()
             with contextlib.redirect_stderr(stderr):
