@@ -177,9 +177,7 @@ export const scenarioSchema = z
         });
       }
       const deployment = String(scenario.deployment ?? '').toLowerCase();
-      const isPd =
-        deployment === 'pd' ||
-        (deployment !== 'non-pd' && deployment.includes('pd'));
+      const isPd = deployment === 'pd' || (deployment !== 'non-pd' && deployment.includes('pd'));
       const isNonPd = deployment === 'non-pd';
       if (!isPd && !isNonPd) {
         ctx.addIssue({
@@ -200,10 +198,9 @@ export const scenarioSchema = z
           ctx.addIssue({
             code: 'custom',
             path: ['case'],
-            message:
-              isPd
-                ? 'pd cases must match <positive integer>p<positive integer>d'
-                : 'non-pd cases must match <positive integer>-node',
+            message: isPd
+              ? 'pd cases must match <positive integer>p<positive integer>d'
+              : 'non-pd cases must match <positive integer>-node',
           });
         }
       }
