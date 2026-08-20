@@ -119,7 +119,6 @@ jobs:
       recipe_files: ${{ needs.prepare.outputs.a2_recipes }}
       trigger_type: nightly
       head_sha: ${{ github.sha }}
-      started_at_iso: ${{ github.event.repository.updated_at }}
     secrets:
       obs_ak: ${{ secrets.obs_ak }}
       obs_sk: ${{ secrets.obs_sk }}

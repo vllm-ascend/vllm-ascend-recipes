@@ -186,6 +186,8 @@ export interface Model {
   _provider_slug: string;
   _model_slug: string;
   _yaml_path: string;
+  /** True for converter input templates (template_*.yaml). */
+  _is_template?: boolean;
 }
 
 export interface ModelListItem {
@@ -206,6 +208,8 @@ export interface ModelListItem {
   deployments: string[];
   /** Optional internal slug used by VerifyBadge / status hydration. */
   _model_slug?: string;
+  /** True for converter input templates (shown separately on browse). */
+  _is_template?: boolean;
   /** Optional absolute URL to `status/<slug>.json` (filled at JSON endpoint build time). */
   _status_url?: string;
 }

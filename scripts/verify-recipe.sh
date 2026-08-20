@@ -266,6 +266,8 @@ if [[ "$ACTION" == "skip" ]]; then
   $PYTHON - <<'PYEOF' || log_warn "  Failed to write minimal params.json for skipped recipe"
 import sys, json, os
 out = os.path.join(os.environ['RUN_PARAMS_DIR'], f"{os.environ['RECIPE_SLUG']}.params.json")
+import datetime as _dt
+_started_at = os.environ.get('STARTED_AT_ISO', '') or _dt.datetime.now(_dt.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
 with open(out, 'w') as f:
     json.dump({
         'recipe_path': os.environ['RECIPE'],
@@ -274,7 +276,7 @@ with open(out, 'w') as f:
         'head_sha': os.environ.get('HEAD_SHA', ''),
         'trigger_type': os.environ.get('TRIGGER_TYPE', 'nightly'),
         'image': os.environ.get('VLLM_ASCEND_IMAGE', ''),
-        'started_at': os.environ.get('STARTED_AT_ISO', ''),
+        'started_at': _started_at,
         'scenarios': [],
         'skip_reason': os.environ['REASON'],
     }, f, indent=2, ensure_ascii=False)
@@ -361,7 +363,8 @@ params_doc = {
     'head_sha': HEAD_SHA,
     'trigger_type': TRIGGER_TYPE,
     'image': VLLM_IMAGE,
-    'started_at': os.environ.get('STARTED_AT_ISO', ''),
+    'started_at': os.environ.get('STARTED_AT_ISO', '')
+    or __import__('datetime').datetime.now(__import__('datetime').timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
     'scenarios': out_scenarios,
 }
 

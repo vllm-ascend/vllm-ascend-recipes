@@ -198,13 +198,6 @@ const { modelSlug, title } = Astro.props;
 
     const dl = document.createElement('dl');
     const rows: [string, string | null | undefined][] = [
-      ['Trigger', freshest.kind === 'pr' ? 'Pull Request' : 'Scheduled nightly'],
-      [
-        'Source',
-        freshest.kind === 'pr' && freshest.pr_number
-          ? `<a href="${freshest.pr_url}" target="_blank" rel="noopener">PR #${freshest.pr_number} · ${escapeHtml(freshest.pr_title ?? '')}</a><br><span style="color:#71717a">by @${escapeHtml(freshest.pr_author ?? '')}</span>`
-          : `scheduled nightly run`,
-      ],
       [
         'Commit',
         `<a href="${freshest.head_sha_url}" target="_blank" rel="noopener"><code>${escapeHtml(freshest.head_sha.slice(0, 7))}</code></a>`,
@@ -214,17 +207,11 @@ const { modelSlug, title } = Astro.props;
         `<a href="${freshest.workflow_run_url}" target="_blank" rel="noopener">open Actions run</a> (conclusion: ${escapeHtml(freshest.conclusion)})`,
       ],
       [
-        'Recipe (locked)',
-        freshest.recipe_yaml_url
-          ? `<a href="${freshest.recipe_yaml_url}" target="_blank" rel="noopener"><code>${escapeHtml(shortPath(freshest.recipe_path))}</code></a>`
-          : '<span style="color:#71717a">—</span>',
+        'Date',
+        `<span style="color:#71717a">${escapeHtml((freshest.started_at ?? '').slice(0, 19).replace('T', ' '))} → ${escapeHtml((freshest.finished_at ?? '').slice(0, 19).replace('T', ' '))} (UTC)</span>`,
       ],
       [
-        'Started · Finished',
-        `${escapeHtml(freshest.started_at)} → ${escapeHtml(freshest.finished_at)}`,
-      ],
-      [
-        'vllm-ascend params',
+        'param.json',
         `<a href="${freshest.params_url}" target="_blank" rel="noopener">view params.json</a>
          <span style="color:#71717a"> · image <code>${escapeHtml(extractImage(freshest.params_url))}</code></span>`,
       ],
@@ -253,12 +240,6 @@ const { modelSlug, title } = Astro.props;
               ? '&quot;'
               : '&#39;',
     );
-  }
-
-  function shortPath(p: string): string {
-    const parts = p.split('/');
-    if (parts.length <= 3) return p;
-    return parts.slice(-3).join('/');
   }
 
   function extractImage(_url: string): string {

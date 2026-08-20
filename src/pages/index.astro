@@ -3,7 +3,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 import ModelCard from '../components/ModelCard.astro';
 import { getAllModels, getProviders } from '../lib/models';
 
-const allModels = await getAllModels('en');
+const allModels = (await getAllModels('en')).filter((m) => !m._is_template);
 const providers = await getProviders('en');
 const latestModels = allModels.slice(0, 8);
 const base = import.meta.env.BASE_URL;

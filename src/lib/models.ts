@@ -26,6 +26,7 @@ function loadGlob(lang: 'en' | 'zh') {
         _provider_slug: providerSlug,
         _model_slug: modelSlug,
         _yaml_path: path,
+        _is_template: modelSlug.startsWith('template'),
       } as Model;
     }),
   );
@@ -88,6 +89,7 @@ export async function getModelList(lang: 'en' | 'zh' = 'en'): Promise<ModelListI
       url: `/${m._provider_slug}/${m._model_slug}`,
       json: `/${m._provider_slug}/${m._model_slug}.json`,
       _model_slug: m._model_slug,
+      _is_template: !!m._is_template,
       _status_url: `/status/${m._model_slug}.json`, // resolved to absolute URL by JSON endpoint
       npus,
       precisions,
