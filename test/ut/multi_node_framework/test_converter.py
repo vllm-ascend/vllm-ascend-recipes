@@ -65,6 +65,24 @@ CASES = (
         ("api", "headless"),
         False,
     ),
+    (
+        ROOT / "models/en/THUDM/GLM-5.yaml",
+        "glm5-dp-2n-a3",
+        "glm-5-glm5-dp-2n-a3",
+        "vllm-ascend/GLM5-bf16",
+        "glm-5",
+        ("api", "headless"),
+        False,
+    ),
+    (
+        ROOT / "models/en/THUDM/GLM-5.yaml",
+        "glm5-pd-cluster",
+        "glm-5-glm5-pd-cluster",
+        "vllm-ascend/GLM5-w8a8",
+        "glm-5",
+        ("prefill", "prefill", "decode", "decode", "decode", "decode"),
+        True,
+    ),
 )
 
 
@@ -206,7 +224,7 @@ class ConverterPipelineTests(unittest.TestCase):
                 ]
             )
         self.assertEqual(status, 2)
-        self.assertIn("only supports --test-id 'pd-2n2c'", stderr.getvalue())
+        self.assertIn("supports --test-id ['pd-2n2c']", stderr.getvalue())
 
     def test_cli_rejects_output_outside_generated_tree(self) -> None:
         recipe, test_id, *_ = CASES[0]
