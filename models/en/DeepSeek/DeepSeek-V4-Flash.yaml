@@ -47,7 +47,7 @@ model:
   docker_image:
     atlas_800_a2: "quay.io/ascend/vllm-ascend:v0.23.0rc1"
     atlas_800_a3: "quay.io/ascend/vllm-ascend:v0.23.0rc1-a3"
-    ascend_950dt: "quay.io/ascend/vllm-ascend:v0.23.0rc1-a5"
+    ascend_950dt: "swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/vllm-ascend:v0.23.0-a5"
   nightly_required: false
   install:
     # Ascend recommends Docker; pip requires source build (no official wheel), so the pip tab is hidden.
@@ -306,10 +306,10 @@ env_setup:
         After a successful docker run, you can verify the running container service by executing the `docker ps` command.
     A5:
       content: |-
-        Use the A5 image on the `linux-aarch64-a5-4` runner.
+        Use the A5 image on the `linux-aarch64-a5-8` runner.
 
         ```bash
-        export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0rc1-a5
+        export IMAGE=swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/vllm-ascend:v0.23.0-a5
         docker run --rm \
             --name vllm-ascend \
             --shm-size=512g \
@@ -519,7 +519,7 @@ scenarios:
   steps:
   - title: Start the server
     content: |-
-      A5 single-node deployment runs the original DeepSeek-V4-Flash weights on one Ascend 950DT server. The A5 verification uses runner `linux-aarch64-a5-4` and four NPUs with data parallelism.
+      A5 single-node deployment runs the original DeepSeek-V4-Flash weights on one Ascend 950DT server. The A5 verification uses runner `linux-aarch64-a5-8` and four NPUs with data parallelism.
 
       ```shell
       export OMP_PROC_BIND=false

@@ -160,9 +160,9 @@ jobs:
     if: needs.prepare.outputs.should_run == 'true' && needs.prepare.outputs.a5_count != '0'
     uses: ./.github/workflows/_recipe_verify.yml
     with:
-      runner: linux-aarch64-a5-4
+      runner: linux-aarch64-a5-8
       hardware_key: ascend_950dt
-      image: swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/vllm-ascend:v0.23.0rc1-a5
+      image: swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/vllm-ascend:v0.23.0-a5
       recipe_files: ${{ needs.prepare.outputs.a5_recipes }}
       trigger_type: nightly
       head_sha: ${{ github.sha }}

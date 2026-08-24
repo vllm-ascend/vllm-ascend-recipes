@@ -234,7 +234,7 @@ jobs:
     with:
       runner: linux-aarch64-a5-8
       hardware_key: ascend_950dt
-      image: swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/vllm-ascend:v0.23.0rc1-a5
+      image: swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/vllm-ascend:v0.23.0-a5
       recipe_files: ${{ needs.detect.outputs.a5_recipe_files }}
       trigger_type: pr
       head_sha: ${{ github.event.pull_request.head.sha }}
