@@ -5,3 +5,4 @@
 # recipes not matching any pattern are skipped on pull_request triggers
 # (manual workflow_dispatch always runs the recipe selected by the caller).
 models/en/Qwen/
+models/en/DeepSeek/DeepSeek-V4-Flash.yaml

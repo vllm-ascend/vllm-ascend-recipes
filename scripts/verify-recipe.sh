@@ -80,7 +80,7 @@ if hw_status == 'unsupported':
 # Extract env_setup (pip install)
 env_setup = data.get('env_setup', {})
 pip_content = env_setup.get('pip', {}).get('content', '')
-hw_to_container = {'atlas_800_a2': 'A2', 'atlas_800_a3': 'A3'}
+hw_to_container = {'atlas_800_a2': 'A2', 'atlas_800_a3': 'A3', 'ascend_950dt': 'A5'}
 container_content = env_setup.get('container', {}).get(hw_to_container.get(hw_key, 'A2'), {}).get('content', '')
 
 # Extract global verification (curl commands shared across scenarios)
@@ -151,27 +151,37 @@ except Exception as e:
     print(json.dumps({'action': 'skip', 'reason': f'cache_paths 文件解析失败: {e}'}))
     sys.exit(0)
 CACHE_DIR_BY_MODEL = {a['model_id']: a['cache_dir'] for a in aliases}
-if model_id_for_path not in CACHE_DIR_BY_MODEL:
+if hw_key == 'ascend_950dt' and model_id_for_path == 'deepseek-ai/DeepSeek-V4-Flash':
+    a5_candidate = '/root/.cache/DeepSeek-V4-Flash'
+    CACHE_PATH = a5_candidate if os.path.isdir(a5_candidate) else None
+    if CACHE_PATH is None:
+        print(json.dumps({
+            'action': 'skip',
+            'reason': f'A5 runner 未预装原始权重 (目录={a5_candidate})',
+        }))
+        sys.exit(0)
+elif model_id_for_path not in CACHE_DIR_BY_MODEL:
     print(json.dumps({
         'action': 'skip',
         'reason': f'未提前下载权重，请联系maintainer下载权重 (model_id={model_id_for_path})',
     }))
     sys.exit(0)
-cache_dir = CACHE_DIR_BY_MODEL[model_id_for_path]
-CACHE_PATH = None
-for prefix in CACHE_PREFIXES:
-    candidate = os.path.join(CACHE_BASE, prefix, cache_dir)
-    if os.path.isdir(candidate):
-        CACHE_PATH = candidate
-        if prefix != CACHE_PREFIXES[0]:
-            print(f"DEBUG: cache resolved under non-default prefix '{prefix}/' for {model_id_for_path}", file=sys.stderr)
-        break
-if CACHE_PATH is None:
-    print(json.dumps({
-        'action': 'skip',
-        'reason': f'镜像未预装该权重 (model_id={model_id_for_path}, 目录={cache_dir}, 已尝试 {list(CACHE_PREFIXES)})',
-    }))
-    sys.exit(0)
+else:
+    cache_dir = CACHE_DIR_BY_MODEL[model_id_for_path]
+    CACHE_PATH = None
+    for prefix in CACHE_PREFIXES:
+        candidate = os.path.join(CACHE_BASE, prefix, cache_dir)
+        if os.path.isdir(candidate):
+            CACHE_PATH = candidate
+            if prefix != CACHE_PREFIXES[0]:
+                print(f"DEBUG: cache resolved under non-default prefix '{prefix}/' for {model_id_for_path}", file=sys.stderr)
+            break
+    if CACHE_PATH is None:
+        print(json.dumps({
+            'action': 'skip',
+            'reason': f'镜像未预装该权重 (model_id={model_id_for_path}, 目录={cache_dir}, 已尝试 {list(CACHE_PREFIXES)})',
+        }))
+        sys.exit(0)
 
 # Extract scenarios
 scenarios = data.get('scenarios', [])
@@ -183,9 +193,17 @@ for s in scenarios:
     # A2 runners, and Atlas 300I DUO (310p) scenarios anywhere (they need the
     # inference-device image / TP-only path, not the a2b4 runners).
     npu_name = s.get('npu', '')
-    if hw_key == 'atlas_800_a2' and ('A3' in npu_name or '300I' in npu_name):
+    if hw_key == 'atlas_800_a2' and ('A3' in npu_name or '950DT' in npu_name or '300I' in npu_name):
         import sys
         print(f"DEBUG: Skipping scenario '{npu_name}/{s.get('precision','')}' on A2 hardware", file=sys.stderr)
+        continue
+    if hw_key == 'atlas_800_a3' and ('A2' in npu_name or '950DT' in npu_name or '300I' in npu_name):
+        import sys
+        print(f"DEBUG: Skipping scenario '{npu_name}/{s.get('precision','')}' on A3 hardware", file=sys.stderr)
+        continue
+    if hw_key == 'ascend_950dt' and '950DT' not in npu_name:
+        import sys
+        print(f"DEBUG: Skipping scenario '{npu_name}/{s.get('precision','')}' on A5 hardware", file=sys.stderr)
         continue
 
     for step in s.get('steps', []):

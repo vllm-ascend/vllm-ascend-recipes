@@ -31,3 +31,6 @@ aliases:
 
   - model_id: vllm-ascend/DeepSeek-V2-Lite-W8A8
     cache_dir: vllm-ascend/DeepSeek-V2-Lite-W8A8
+
+  - model_id: deepseek-ai/DeepSeek-V4-Flash
+    cache_dir: DeepSeek-V4-Flash-w8a8-mtp
