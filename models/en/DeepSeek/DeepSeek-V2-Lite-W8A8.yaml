@@ -145,6 +145,7 @@ env_setup:
       If you don't want to use the docker image as above, install `vllm-ascend` from source on each node, refer to [installation](../../installation.md).
 
 scenarios:
+
 - npu: Atlas 800I A2
   precision: W8A8
   deployment: Multi-Node PD Separation

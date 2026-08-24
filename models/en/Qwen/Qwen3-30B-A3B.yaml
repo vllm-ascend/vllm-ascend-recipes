@@ -423,6 +423,7 @@ env_setup:
 
       For more details, please refer to the [Installation Guide](https://docs.vllm.ai/projects/ascend/en/latest/installation.html).
 scenarios:
+
 - npu: Atlas 800I A3
   precision: W8A8
   deployment: Single-Node
