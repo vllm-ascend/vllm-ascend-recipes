@@ -437,17 +437,23 @@ SCRIPT_HEREDOC
   bash "$VLLM_SCRIPT" &
   SERVE_PID=$!
 
+  # Recipes may use a non-default API port. Keep readiness checks and
+  # benchmark configuration aligned with the port passed to vllm serve.
+  SERVER_PORT=$(printf '%s\n' "$SERVE_CMD" | sed -nE 's/.*--port[[:space:]]+([0-9]+).*/\1/p' | tail -1)
+  SERVER_PORT=${SERVER_PORT:-8000}
+
   # Wait for /v1/models to become ready
-  log_info "  Waiting for server ready..."
+  log_info "  Waiting for server ready on port ${SERVER_PORT}..."
   READY=0
   for i in $(seq 1 300); do
-    if curl -sf http://localhost:8000/v1/models > /dev/null 2>&1; then
+    if curl -sf "http://localhost:${SERVER_PORT}/v1/models" > /dev/null 2>&1; then
       READY=1
       log_info "  Server ready after ${i}s"
       break
     fi
     if [[ $((i % 30)) -eq 0 ]]; then
       log_info "  Still waiting... (${i}s elapsed)"
+      npu-smi info || true
     fi
     sleep 2
   done
@@ -460,7 +466,7 @@ SCRIPT_HEREDOC
   fi
 
   # Verify /v1/models returns expected content
-  MODELS_RESP=$(curl -sf http://localhost:8000/v1/models)
+  MODELS_RESP=$(curl -sf "http://localhost:${SERVER_PORT}/v1/models")
   if echo "$MODELS_RESP" | grep -qi "model"; then
     log_info "  /v1/models OK"
   else
@@ -498,7 +504,7 @@ SCRIPT_HEREDOC
     AIS_CFG="/usr/local/python3.12.13/lib/python3.12/site-packages/ais_bench/benchmark/configs/models/vllm_api/vllm_api_stream_chat.py"
     if [[ -f "$AIS_CFG" ]]; then
       sed -i "s|path=\".*\"|path=\"${CACHE_PATH}\"|" "$AIS_CFG"
-      sed -i 's|host_port=8080|host_port=8000|' "$AIS_CFG"
+      sed -i "s|host_port=8080|host_port=${SERVER_PORT}|" "$AIS_CFG"
       log_info "  Patched ais_bench model config (path + port)"
     fi
     BENCH_OUTPUT=$(ais_bench --models vllm_api_stream_chat --datasets synthetic_gen --mode perf --debug --num-prompts 50 2>&1 || echo "AISBENCH_FAILED")
