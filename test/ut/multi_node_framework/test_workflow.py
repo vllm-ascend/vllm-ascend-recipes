@@ -103,6 +103,22 @@ class MultiNodeWorkflowTests(unittest.TestCase):
         value = workflow(ENTRY_WORKFLOW)
 
         self.assertEqual(set(value["on"]), {"pull_request", "workflow_dispatch"})
+        self.assertEqual(
+            value["on"]["workflow_dispatch"]["inputs"]["case"],
+            {
+                "description": "Framework case to run",
+                "required": "true",
+                "type": "choice",
+                "default": "all",
+                "options": [
+                    "all",
+                    "deepseek-template-pd",
+                    "deepseek-v2-lite-pd",
+                    "qwen-template-non-pd",
+                    "qwen3-30b-a3b-non-pd",
+                ],
+            },
+        )
         # One reusable-workflow job per case; each filters itself on the
         # prepare output that matches its recipe file.
         expected = {
@@ -134,7 +150,6 @@ class MultiNodeWorkflowTests(unittest.TestCase):
         for job_id, case in expected.items():
             job = value["jobs"][job_id]
             self.assertEqual(job["uses"], "./.github/workflows/_verify_multi_node.yaml")
-            self.assertEqual(job["needs"], "prepare")
             self.assertEqual(
                 job["with"],
                 {
@@ -144,6 +159,21 @@ class MultiNodeWorkflowTests(unittest.TestCase):
                 },
             )
             self.assertIn(f"needs.prepare.outputs.{case['flag']} == 'true'", job["if"])
+            self.assertIn("always()", job["if"])
+
+        self.assertEqual(value["jobs"]["verify-template-pd"]["needs"], "prepare")
+        self.assertEqual(
+            value["jobs"]["verify-v2lite"]["needs"],
+            ["prepare", "verify-template-pd"],
+        )
+        self.assertEqual(
+            value["jobs"]["verify-qwen"]["needs"],
+            ["prepare", "verify-template-pd", "verify-v2lite"],
+        )
+        self.assertEqual(
+            value["jobs"]["verify-qwen30b"]["needs"],
+            ["prepare", "verify-template-pd", "verify-v2lite", "verify-qwen"],
+        )
 
         # prepare reports which multi-node recipe YAMLs changed (en or zh).
         prepare = value["jobs"]["prepare"]

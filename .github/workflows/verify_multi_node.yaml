@@ -9,6 +9,18 @@ on:
       # framework/workflow changes are validated by workflow_dispatch / UT.
       - 'models/**/*.yaml'
   workflow_dispatch:
+    inputs:
+      case:
+        description: Framework case to run
+        required: true
+        type: choice
+        default: all
+        options:
+          - all
+          - deepseek-template-pd
+          - deepseek-v2-lite-pd
+          - qwen-template-non-pd
+          - qwen3-30b-a3b-non-pd
 
 permissions:
   contents: read
@@ -47,18 +59,26 @@ jobs:
             echo "Changed multi-node recipes (en or zh):"
             echo "$CHANGED" | grep -E 'template_pd|V2-Lite|template2_non_pd|Qwen3-30B-A3B' || echo "(none)"
           else
-            # workflow_dispatch: every matrix case runs.
-            echo "pd_template=true" >> "$GITHUB_OUTPUT"
-            echo "v2lite=true" >> "$GITHUB_OUTPUT"
-            echo "qwen=true" >> "$GITHUB_OUTPUT"
-            echo "qwen30b=true" >> "$GITHUB_OUTPUT"
+            selected_case='${{ inputs.case }}'
+            if [[ "$selected_case" == all || "$selected_case" == deepseek-template-pd ]]; then
+              echo "pd_template=true" >> "$GITHUB_OUTPUT"
+            fi
+            if [[ "$selected_case" == all || "$selected_case" == deepseek-v2-lite-pd ]]; then
+              echo "v2lite=true" >> "$GITHUB_OUTPUT"
+            fi
+            if [[ "$selected_case" == all || "$selected_case" == qwen-template-non-pd ]]; then
+              echo "qwen=true" >> "$GITHUB_OUTPUT"
+            fi
+            if [[ "$selected_case" == all || "$selected_case" == qwen3-30b-a3b-non-pd ]]; then
+              echo "qwen30b=true" >> "$GITHUB_OUTPUT"
+            fi
           fi
 
   verify-template-pd:
     needs: prepare
     name: multi-node (deepseek-v2-lite-pd-2n2c)
     # pull_request workflows cannot safely expose cluster credentials to forks.
-    if: github.event_name == 'workflow_dispatch' || (github.event.pull_request.head.repo.full_name == github.repository && needs.prepare.outputs.pd_template == 'true')
+    if: always() && needs.prepare.outputs.pd_template == 'true' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
     uses: ./.github/workflows/_verify_multi_node.yaml
     with:
       name: deepseek-v2-lite-pd-2n2c
@@ -70,9 +90,9 @@ jobs:
       OBS_SK: ${{ secrets.OBS_SK }}
 
   verify-v2lite:
-    needs: prepare
+    needs: [prepare, verify-template-pd]
     name: multi-node (deepseek-v2-lite-recipe-pd-2n2c)
-    if: github.event_name == 'workflow_dispatch' || (github.event.pull_request.head.repo.full_name == github.repository && needs.prepare.outputs.v2lite == 'true')
+    if: always() && needs.prepare.outputs.v2lite == 'true' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
     uses: ./.github/workflows/_verify_multi_node.yaml
     with:
       name: deepseek-v2-lite-recipe-pd-2n2c
@@ -84,9 +104,9 @@ jobs:
       OBS_SK: ${{ secrets.OBS_SK }}
 
   verify-qwen:
-    needs: prepare
+    needs: [prepare, verify-template-pd, verify-v2lite]
     name: multi-node (qwen3-30b-a3b-dp-2n2c)
-    if: github.event_name == 'workflow_dispatch' || (github.event.pull_request.head.repo.full_name == github.repository && needs.prepare.outputs.qwen == 'true')
+    if: always() && needs.prepare.outputs.qwen == 'true' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
     uses: ./.github/workflows/_verify_multi_node.yaml
     with:
       name: qwen3-30b-a3b-dp-2n2c
@@ -98,9 +118,9 @@ jobs:
       OBS_SK: ${{ secrets.OBS_SK }}
 
   verify-qwen30b:
-    needs: prepare
+    needs: [prepare, verify-template-pd, verify-v2lite, verify-qwen]
     name: multi-node (qwen3-30b-a3b-recipe-dp-2n2c)
-    if: github.event_name == 'workflow_dispatch' || (github.event.pull_request.head.repo.full_name == github.repository && needs.prepare.outputs.qwen30b == 'true')
+    if: always() && needs.prepare.outputs.qwen30b == 'true' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
     uses: ./.github/workflows/_verify_multi_node.yaml
     with:
       name: qwen3-30b-a3b-recipe-dp-2n2c
