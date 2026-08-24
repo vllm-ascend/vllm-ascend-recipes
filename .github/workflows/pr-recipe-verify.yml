@@ -222,8 +222,9 @@ jobs:
       head_sha: ${{ github.event.pull_request.head.sha }}
       started_at_iso: ${{ github.event.pull_request.updated_at }}
 
-  # A5-capable recipes are verified separately so the legacy A2/A3 path keeps
-  # its existing runner and image while the A5 scenario runs on real hardware.
+  # DeepSeek-V4-Flash is routed separately from the legacy recipe list. The
+  # runner is temporarily A2 to diagnose container initialization; the A5
+  # hardware scenario and image remain unchanged for this experiment.
   verify-a5:
     needs: [detect, validate]
     if: |
@@ -232,7 +233,7 @@ jobs:
       needs.validate.result == 'success'
     uses: ./.github/workflows/_recipe_verify.yml
     with:
-      runner: linux-aarch64-a5-4
+      runner: linux-aarch64-a2b4-8
       hardware_key: ascend_950dt
       image: swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/vllm-ascend:v0.23.0rc1-a5
       recipe_files: ${{ needs.detect.outputs.a5_recipe_files }}
