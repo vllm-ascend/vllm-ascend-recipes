@@ -31,6 +31,8 @@ jobs:
       has_config_changes: ${{ steps.filter.outputs.config }}
       recipe_files: ${{ steps.recipes.outputs.files }}
       recipe_count: ${{ steps.recipes.outputs.count }}
+      a5_recipe_files: ${{ steps.recipes.outputs.a5_files }}
+      a5_recipe_count: ${{ steps.recipes.outputs.a5_count }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -70,11 +72,33 @@ jobs:
           # multi-node workflow reads the same global whitelist.
           VERIFY_RECIPES=$(echo "$LEGACY_RECIPES" | grep -E -f <(grep -vE '^\s*(#|$)' .github/recipe-verify-whitelist.txt) || true)
           if [ -n "$VERIFY_RECIPES" ]; then
-            COUNT=$(echo "$VERIFY_RECIPES" | wc -l)
+            # DeepSeek-V4-Flash supports both A2 and A5 in its recipe, but
+            # the current A2 runner cannot execute it. Route this recipe to
+            # the A5 runner while keeping other recipes on the legacy A2/A3
+            # runner.
+            A5_RECIPES=$(echo "$VERIFY_RECIPES" | grep -E '^models/en/DeepSeek/DeepSeek-V4-Flash\.yaml$' || true)
+            LEGACY_VERIFY_RECIPES=$(echo "$VERIFY_RECIPES" | grep -v -E '^models/en/DeepSeek/DeepSeek-V4-Flash\.yaml$' || true)
+
+            if [ -n "$LEGACY_VERIFY_RECIPES" ]; then
+              COUNT=$(echo "$LEGACY_VERIFY_RECIPES" | wc -l)
+              FILES=$(echo "$LEGACY_VERIFY_RECIPES" | jq -R -s -c 'split("\n") | map(select(length > 0))')
+            else
+              COUNT=0
+              FILES=[]
+            fi
+            if [ -n "$A5_RECIPES" ]; then
+              A5_COUNT=$(echo "$A5_RECIPES" | wc -l)
+              A5_FILES=$(echo "$A5_RECIPES" | jq -R -s -c 'split("\n") | map(select(length > 0))')
+            else
+              A5_COUNT=0
+              A5_FILES=[]
+            fi
             echo "count=$COUNT" >> "$GITHUB_OUTPUT"
-            FILES=$(echo "$VERIFY_RECIPES" | jq -R -s -c 'split("\n") | map(select(length > 0))')
             echo "files=$FILES" >> "$GITHUB_OUTPUT"
-            echo "Verification recipes ($COUNT): $VERIFY_RECIPES"
+            echo "a5_count=$A5_COUNT" >> "$GITHUB_OUTPUT"
+            echo "a5_files=$A5_FILES" >> "$GITHUB_OUTPUT"
+            echo "Legacy verification recipes ($COUNT): $LEGACY_VERIFY_RECIPES"
+            echo "A5 verification recipes ($A5_COUNT): $A5_RECIPES"
             SKIPPED_RECIPES=$(echo "$LEGACY_RECIPES" | grep -v -E -f <(grep -vE '^\s*(#|$)' .github/recipe-verify-whitelist.txt) || true)
             if [ -n "$SKIPPED_RECIPES" ]; then
               echo "Skipped (not in whitelist): $SKIPPED_RECIPES"
@@ -82,6 +106,8 @@ jobs:
           else
             echo "count=0" >> "$GITHUB_OUTPUT"
             echo "files=[]" >> "$GITHUB_OUTPUT"
+            echo "a5_count=0" >> "$GITHUB_OUTPUT"
+            echo "a5_files=[]" >> "$GITHUB_OUTPUT"
             echo "No models/en/ recipe files changed"
           fi
 
@@ -202,15 +228,14 @@ jobs:
     needs: [detect, validate]
     if: |
       needs.detect.outputs.has_model_changes == 'true' &&
-      needs.detect.outputs.recipe_count != '0' &&
-      needs.validate.result == 'success' &&
-      contains(needs.detect.outputs.recipe_files, 'DeepSeek-V4-Flash.yaml')
+      needs.detect.outputs.a5_recipe_count != '0' &&
+      needs.validate.result == 'success'
     uses: ./.github/workflows/_recipe_verify.yml
     with:
       runner: linux-aarch64-a5-4
       hardware_key: ascend_950dt
       image: swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/vllm-ascend:v0.23.0rc1-a5
-      recipe_files: ${{ needs.detect.outputs.recipe_files }}
+      recipe_files: ${{ needs.detect.outputs.a5_recipe_files }}
       trigger_type: pr
       head_sha: ${{ github.event.pull_request.head.sha }}
       started_at_iso: ${{ github.event.pull_request.updated_at }}
