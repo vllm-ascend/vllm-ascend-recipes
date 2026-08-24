@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { useLang } from '../lib/useLang';
 import { statusUrlForSlug, type ModelStatus } from '../lib/status';
 import { pickFreshestRun } from '../lib/status';
+import { modelCardKey } from '../lib/model-card-key';
 
 interface ModelItem {
   hf_id: string;
@@ -145,7 +146,7 @@ export default function SearchBar({ modelsEn, modelsZh }: SearchBarProps) {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {filtered.map((m) => (
           <a
-            key={m.hf_id}
+            key={modelCardKey(m)}
             href={m.url}
             className="group relative block p-5 rounded-lg border border-ink-800/60 hover:border-accent-500/30 bg-ink-900/40 hover:bg-ink-900/60 transition-all duration-200 overflow-hidden"
             data-status-url={m._model_slug ? statusUrlForSlug(m._model_slug) : undefined}
