@@ -213,14 +213,14 @@ weight_download:
   - source: Hugging Face
     url: https://huggingface.co/deepseek-ai/DeepSeek-V4-Flash
     command: |-
-      将原始 `DeepSeek-V4-Flash` 权重下载到 `/root/.cache/DeepSeek-V4-Flash`。
+      将原始 `DeepSeek-V4-Flash` 权重下载到 `/mnt/share/modelscope/hub/models/modes--deepseek-ai--DeepSeek-V4-Flash`。
 prerequisites:
 - title: 模型权重
   content: |-
     - `DeepSeek-V4-Flash-w8a8-mtp`（量化版本）：需要 1 个 Atlas 800 A3（128G × 8）节点或 1 个 Atlas 800 A2（64G × 8）节点。[下载模型权重](https://www.modelscope.cn/models/Eco-Tech/DeepSeek-V4-Flash-w8a8-mtp)
     - A5 使用原始 `DeepSeek-V4-Flash` 权重：需要 1 个 Ascend 950DT（96G × 8）节点。[下载模型权重](https://huggingface.co/deepseek-ai/DeepSeek-V4-Flash)
 
-    建议将模型权重下载到多个节点的共享目录中，例如 `/root/.cache/`。
+    A5 原始权重下载到共享目录 `/mnt/share/modelscope/hub/models/modes--deepseek-ai--DeepSeek-V4-Flash`。
 - title: 验证多节点通信
   content: |-
     如果您需要部署多节点环境，请根据[验证多节点通信环境](https://docs.vllm.ai/projects/ascend/zh-cn/latest/installation.html#verify-multi-node-communication)验证多节点通信。
@@ -521,7 +521,7 @@ scenarios:
       export HCCL_BUFFSIZE=1024
       export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3
 
-      vllm serve /root/.cache/DeepSeek-V4-Flash \
+      vllm serve /mnt/share/modelscope/hub/models/modes--deepseek-ai--DeepSeek-V4-Flash \
           --max-model-len {{max_model_len}} \
           --safetensors-load-strategy prefetch \
           --max-num-batched-tokens 4096 \

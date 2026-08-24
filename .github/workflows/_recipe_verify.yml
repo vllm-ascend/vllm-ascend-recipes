@@ -45,6 +45,11 @@ on:
         type: string
         default: ''
         description: 'ISO8601 timestamp the run started, propagated into params.json'
+      mount_share:
+        required: false
+        type: boolean
+        default: false
+        description: 'Mount the runner host /mnt/share directory into the job container'
     secrets:
       obs_ak:
         required: false
@@ -66,6 +71,7 @@ jobs:
     timeout-minutes: 240
     container:
       image: ${{ inputs.image }}
+      options: ${{ inputs.mount_share && '--volume /mnt/share:/mnt/share' || '' }}
       env:
         VLLM_LOGGING_LEVEL: ERROR
         VLLM_USE_MODELSCOPE: True

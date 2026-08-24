@@ -163,6 +163,7 @@ jobs:
       runner: linux-aarch64-a5-8
       hardware_key: ascend_950dt
       image: swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/vllm-ascend:v0.23.0-a5
+      mount_share: true
       recipe_files: ${{ needs.prepare.outputs.a5_recipes }}
       trigger_type: nightly
       head_sha: ${{ github.sha }}
