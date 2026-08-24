@@ -49,7 +49,7 @@ on:
         required: false
         type: boolean
         default: false
-        description: 'Mount the runner host /mnt/share directory into the job container'
+        description: 'Mount runner host /mnt/share at /root/.cache in the job container'
     secrets:
       obs_ak:
         required: false
@@ -71,7 +71,7 @@ jobs:
     timeout-minutes: 240
     container:
       image: ${{ inputs.image }}
-      options: ${{ inputs.mount_share && '--volume /mnt/share:/mnt/share' || '' }}
+      options: ${{ inputs.mount_share && '--volume /mnt/share:/root/.cache' || '' }}
       env:
         VLLM_LOGGING_LEVEL: ERROR
         VLLM_USE_MODELSCOPE: True

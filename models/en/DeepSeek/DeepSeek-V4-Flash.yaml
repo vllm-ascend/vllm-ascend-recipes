@@ -215,14 +215,14 @@ weight_download:
   - source: Hugging Face
     url: https://huggingface.co/deepseek-ai/DeepSeek-V4-Flash
     command: |-
-      Download the original `DeepSeek-V4-Flash` weights to `/mnt/share/modelscope/hub/models/modes--deepseek-ai--DeepSeek-V4-Flash`.
+      Place the original `DeepSeek-V4-Flash` weights on the runner host at `/mnt/share/modelscope/hub/models/modes--deepseek-ai--DeepSeek-V4-Flash`. The A5 container mounts this location at `/root/.cache/modelscope/hub/models/modes--deepseek-ai--DeepSeek-V4-Flash`.
 prerequisites:
 - title: Model Weight
   content: |-
     - `DeepSeek-V4-Flash-w8a8-mtp` (Quantized version): requires 1 Atlas 800 A3 (128G × 8) node or 1 Atlas 800 A2 (64G × 8) node. [Download model weight](https://www.modelscope.cn/models/Eco-Tech/DeepSeek-V4-Flash-w8a8-mtp)
     - Original `DeepSeek-V4-Flash` weights for A5: require 1 Ascend 950DT (96G × 8) node. [Download model weight](https://huggingface.co/deepseek-ai/DeepSeek-V4-Flash)
 
-    Download the A5 original weights to the shared directory `/mnt/share/modelscope/hub/models/modes--deepseek-ai--DeepSeek-V4-Flash`.
+    Download the A5 original weights to the runner shared directory `/mnt/share/modelscope/hub/models/modes--deepseek-ai--DeepSeek-V4-Flash`; it is mounted as `/root/.cache` inside the A5 container.
 - title: Verify Multi-node Communication
   content: |-
     If you want to deploy a multi-node environment, you need to verify multi-node communication according to [verify multi-node communication environment](https://docs.vllm.ai/projects/ascend/en/latest/installation.html#verify-multi-node-communication).
@@ -330,7 +330,7 @@ env_setup:
             -v /etc/ascend_install.info:/etc/ascend_install.info \
             -v /etc/hccl_rootinfo.json:/etc/hccl_rootinfo.json \
             -v /etc/hixlep/:/etc/hixlep/ \
-            -v /root/.cache:/root/.cache \
+            -v /mnt/share:/root/.cache \
             -v /usr/local/sbin:/usr/local/sbin \
             -v /usr/local/dcmi:/usr/local/dcmi \
             -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
@@ -528,7 +528,7 @@ scenarios:
       export HCCL_BUFFSIZE=1024
       export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3
 
-      vllm serve /mnt/share/modelscope/hub/models/modes--deepseek-ai--DeepSeek-V4-Flash \
+      vllm serve /root/.cache/modelscope/hub/models/modes--deepseek-ai--DeepSeek-V4-Flash \
           --max-model-len {{max_model_len}} \
           --safetensors-load-strategy prefetch \
           --max-num-batched-tokens 4096 \

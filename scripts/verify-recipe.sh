@@ -152,32 +152,7 @@ except Exception as e:
     sys.exit(0)
 CACHE_DIR_BY_MODEL = {a['model_id']: a['cache_dir'] for a in aliases}
 if hw_key == 'ascend_950dt' and model_id_for_path == 'deepseek-ai/DeepSeek-V4-Flash':
-    a5_candidate = '/mnt/share/modelscope/hub/models/modes--deepseek-ai--DeepSeek-V4-Flash'
-    def print_a5_directory(path, max_entries=100):
-        print(f'[A5-DIAG] ls -la {path}', file=sys.stderr)
-        if not os.path.lexists(path):
-            print('[A5-DIAG] path does not exist', file=sys.stderr)
-            return
-        if not os.path.isdir(path):
-            print(f'[A5-DIAG] path exists but is not a directory: {os.path.realpath(path)}', file=sys.stderr)
-            return
-        try:
-            entries = sorted(os.listdir(path))
-        except OSError as e:
-            print(f'[A5-DIAG] cannot list directory: {e}', file=sys.stderr)
-            return
-        for entry in entries[:max_entries]:
-            child = os.path.join(path, entry)
-            kind = 'd' if os.path.isdir(child) else 'f'
-            print(f'[A5-DIAG] {kind} {child}', file=sys.stderr)
-        if len(entries) > max_entries:
-            print(f'[A5-DIAG] ... {len(entries) - max_entries} more entries', file=sys.stderr)
-
-    print_a5_directory('/mnt/share')
-    print_a5_directory('/mnt/share/modelscope')
-    print_a5_directory('/mnt/share/modelscope/hub')
-    print_a5_directory('/mnt/share/modelscope/hub/models')
-    print_a5_directory(a5_candidate)
+    a5_candidate = '/root/.cache/modelscope/hub/models/modes--deepseek-ai--DeepSeek-V4-Flash'
     CACHE_PATH = a5_candidate if os.path.isdir(a5_candidate) else None
     if CACHE_PATH is None:
         print(json.dumps({
@@ -286,11 +261,6 @@ PYEOF
 }
 
 RECIPE_INFO=$(parse_recipe 2>/tmp/recipe-parse-debug.log || echo '{"action":"skip","reason":"parse error"}')
-
-if [[ -s /tmp/recipe-parse-debug.log ]]; then
-  log_info "Recipe parse diagnostics:"
-  cat /tmp/recipe-parse-debug.log
-fi
 
 ACTION=$(echo "$RECIPE_INFO" | $PYTHON -c "import sys,json; print(json.loads(sys.stdin.read()).get('action','skip'))" 2>/dev/null || echo "skip")
 
