@@ -152,7 +152,7 @@ except Exception as e:
     sys.exit(0)
 CACHE_DIR_BY_MODEL = {a['model_id']: a['cache_dir'] for a in aliases}
 if hw_key == 'ascend_950dt' and model_id_for_path == 'deepseek-ai/DeepSeek-V4-Flash':
-    a5_candidate = '/root/.cache/modelscope/hub/models/modes--deepseek-ai--DeepSeek-V4-Flash'
+    a5_candidate = '/root/.cache/modelscope/hub/models/models--deepseek-ai--DeepSeek-V4-Flash'
     CACHE_PATH = a5_candidate if os.path.isdir(a5_candidate) else None
     if CACHE_PATH is None:
         print(json.dumps({
