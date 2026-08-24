@@ -2,14 +2,9 @@
 
 ## 1. 两类场景
 
-仓库中的 `scenarios` 同时服务两种互不兼容的用途：
-
-1. 既有模型文档场景继续使用原来的页面内容和 `tags`、`strategy`，由旧 workflow 与
-   `scripts/multinode/` 处理。
-2. 新多节点框架只读取两份独立模板中的 script-backed 场景。
-
-新 Converter 不读取或兼容既有模型场景。前端 schema 同时接受两种形状，只是为了两类文档都能
-正常渲染，并不表示两套 CI 会互相消费。
+仓库中的 `scenarios` 用于模型文档和页面渲染；多节点 CI 只读取独立模板中的 script-backed 场景。
+新 Converter 不读取或兼容既有模型文档场景。前端 schema 同时接受两种形状，是为了页面正常渲染，
+不表示普通模型场景会被多节点 CI 自动消费。
 
 当前 Converter 只支持：
 
@@ -187,4 +182,4 @@ network 和固定服务端口，共用 concurrency 可以避免不同 case 的�
 5. 为新拓扑扩展独立 Converter analyzer/planner 和负例测试；
 6. Converter 明确接受新模板后，再把 `name`、`recipe`、`test_id` 加入 workflow matrix。
 
-不要通过给现有模型文档增加兼容分支来扩展新 Converter，也不要让旧 workflow 开始解析新模板。
+不要通过给现有模型文档增加兼容分支来扩展新 Converter。

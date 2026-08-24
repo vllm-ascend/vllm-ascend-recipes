@@ -419,7 +419,6 @@ Pushes to `main` trigger GitHub Actions:
 - [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) — builds the static site and deploys to GitHub Pages.
 - [`.github/workflows/preview-build.yml`](.github/workflows/preview-build.yml) + [`preview-deploy.yml`](.github/workflows/preview-deploy.yml) — every PR gets a Netlify preview URL posted as a comment (artifacts expire in 3 days).
 - [`.github/workflows/pr-recipe-verify.yml`](.github/workflows/pr-recipe-verify.yml) — PR recipe validation (detect → validate → build).
-- [`.github/workflows/multinode-recipe-verify.yml`](.github/workflows/multinode-recipe-verify.yml) — legacy multi-node PD verification, routed by `scenario.strategy` / `tags`.
 - [`.github/workflows/verify_multi_node.yaml`](.github/workflows/verify_multi_node.yaml) — runs the current multi-node Runtime verification on eligible same-repository PRs or by manual dispatch.
 - [`.github/workflows/nightly-recipe-verify.yml`](.github/workflows/nightly-recipe-verify.yml) — scheduled full scan of all recipes, classified by hardware.
 

@@ -1,8 +1,6 @@
-# Global deployment-verify whitelist (single-node / legacy multi-node pipelines).
+# Global deployment-verify whitelist for the single-node recipe verification pipeline.
 # One extended-regex pattern per line, matched against the changed recipe path
 # (e.g. `models/en/Qwen/` whitelists every Qwen recipe).
-# Both pr-recipe-verify.yml and multinode-recipe-verify.yml read this file;
-# recipes not matching any pattern are skipped on pull_request triggers
-# (manual workflow_dispatch always runs the recipe selected by the caller).
+# Recipes not matching any pattern are skipped on pull_request triggers.
 models/en/Qwen/
 models/en/DeepSeek/DeepSeek-V4-Flash.yaml
