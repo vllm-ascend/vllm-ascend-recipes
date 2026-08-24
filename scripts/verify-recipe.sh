@@ -229,9 +229,19 @@ for s in scenarios:
             verify_cmds.append(bash_content.strip())
     
     if serve_cmd:
-        # Append global verification curl commands
+        # Local CI verifies the API inside the same container. Replace the
+        # documentation placeholders with localhost and the port selected by
+        # this scenario's vllm serve command.
+        port_match = re.search(r'--port\s+(\d+)', serve_cmd)
+        server_port = port_match.group(1) if port_match else '8000'
+        verify_cmds = [
+            cmd.replace('<node0_ip>', 'localhost').replace('<port>', server_port)
+            for cmd in verify_cmds
+        ]
+
+        # Append global verification curl commands.
         if global_verify_cmd:
-            verify_cmds.append(global_verify_cmd)
+            verify_cmds.append(global_verify_cmd.replace('<port>', server_port))
         
         commands.append({
             'npu': s.get('npu', ''),
