@@ -3,9 +3,11 @@ import test from 'node:test';
 import {
   findScenarioTarget,
   isNightlyVerified,
+  limitVerificationHistory,
   statusUrlForSlug,
   statusUrlCandidatesForSlug,
   summarizeModelVerification,
+  verificationDotPresentation,
   type RunStatus,
   type VerificationTargetStatus,
 } from '../../src/lib/status';
@@ -92,6 +94,25 @@ test('summarizes model targets as all, partial, none, or untracked', () => {
   assert.equal(summarizeModelVerification({ targets: { failing } }), 'no-pass');
   assert.equal(summarizeModelVerification({ targets: {} }), 'untracked');
   assert.equal(summarizeModelVerification(null), 'untracked');
+});
+
+test('limits verification history to the latest 20 runs without reordering it', () => {
+  const history = Array.from({ length: 25 }, (_, index) => ({
+    ...run('pass'),
+    workflow_run_id: 25 - index,
+  }));
+
+  assert.deepEqual(
+    limitVerificationHistory(history).map((entry) => entry.workflow_run_id),
+    Array.from({ length: 20 }, (_, index) => 25 - index),
+  );
+});
+
+test('maps verification summaries to green, yellow, red, and gray dot presentations', () => {
+  assert.equal(verificationDotPresentation('all-pass').color, 'green');
+  assert.equal(verificationDotPresentation('partial-pass').color, 'yellow');
+  assert.equal(verificationDotPresentation('no-pass').color, 'red');
+  assert.equal(verificationDotPresentation('untracked').color, 'gray');
 });
 
 test('tries the deployment base path before the root status fallback', () => {

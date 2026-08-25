@@ -6,6 +6,7 @@ import { expandScenarioScripts } from '../lib/scenario-scripts';
 import {
   findScenarioTarget,
   fetchModelStatus,
+  limitVerificationHistory,
   type ModelStatus,
   type RunStatus,
 } from '../lib/status';
@@ -1242,6 +1243,7 @@ export default function CascadeSelector({
     : [verificationTarget?.last_nightly_run, verificationTarget?.last_pr_run].filter(
         (run): run is RunStatus => !!run,
       );
+  const visibleVerificationHistory = limitVerificationHistory(verificationHistory);
   const runLabel = (label: string, run: RunStatus | null | undefined) => {
     const state = !run
       ? lang === 'zh'
@@ -1299,15 +1301,15 @@ export default function CascadeSelector({
         {runLabel('Nightly', verificationTarget.last_nightly_run)}
         <span className="hidden h-3 w-px bg-ink-700 sm:block" />
         {runLabel('PR', verificationTarget.last_pr_run)}
-        {verificationHistory.length > 0 && (
+        {visibleVerificationHistory.length > 0 && (
           <details className="basis-full pt-1 text-xs font-mono text-ink-400">
             <summary className="cursor-pointer text-ink-400 hover:text-ink-200">
               {lang === 'zh'
-                ? `历史记录（${verificationHistory.length}）`
-                : `History (${verificationHistory.length})`}
+                ? `历史记录（${visibleVerificationHistory.length} / ${verificationHistory.length}）`
+                : `History (${visibleVerificationHistory.length} / ${verificationHistory.length})`}
             </summary>
             <div className="mt-2 space-y-1 border-l border-ink-700 pl-3">
-              {verificationHistory.map((run, index) => (
+              {visibleVerificationHistory.map((run, index) => (
                 <div key={`${run.kind}-${run.workflow_run_id}-${index}`}>
                   {runLabel(run.kind === 'nightly' ? 'Nightly' : run.kind.toUpperCase(), run)}
                 </div>

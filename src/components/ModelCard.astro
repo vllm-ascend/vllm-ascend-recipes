@@ -21,28 +21,30 @@ const { model } = Astro.props;
   >
   </div>
 
-  <div class="flex items-start justify-between mb-2">
+  <div class="flex items-start gap-2 mb-2">
     <h3
-      class="font-display font-semibold text-sm text-ink-100 group-hover:text-accent-300 transition-colors tracking-tight"
+      class="min-w-0 font-display font-semibold text-sm text-ink-100 group-hover:text-accent-300 transition-colors tracking-tight"
     >
       {model.title}
     </h3>
-    {
-      model._model_slug && (
-        <span
-          data-model-verification
-          data-model-slug={model._model_slug}
-          class="mt-1 inline-block h-2.5 w-2.5 shrink-0 rounded-full bg-ink-600 ring-1 ring-ink-500/50"
-          title="No configuration verification"
-          aria-label="No configuration verification"
-        />
-      )
-    }
-    <span
-      class="text-[10px] font-mono uppercase tracking-wider text-ink-500 px-1.5 py-0.5 rounded border border-ink-700/50 flex items-center gap-1"
-    >
-      {model.architecture}
-    </span>
+    <div class="ml-auto flex shrink-0 items-center gap-2">
+      <span
+        class="text-[10px] font-mono uppercase tracking-wider text-ink-500 px-1.5 py-0.5 rounded border border-ink-700/50 flex items-center gap-1"
+      >
+        {model.architecture}
+      </span>
+      {
+        model._model_slug && (
+          <span
+            data-model-verification
+            data-model-slug={model._model_slug}
+            class="inline-block h-2.5 w-2.5 shrink-0 rounded-full bg-ink-600 ring-1 ring-ink-500/50"
+            title="No configuration verification"
+            aria-label="No configuration verification"
+          />
+        )
+      }
+    </div>
   </div>
 
   <p class="text-xs text-ink-500 line-clamp-2 mb-3 leading-relaxed">
@@ -78,38 +80,33 @@ const { model } = Astro.props;
 </a>
 
 <script>
-  import { fetchModelStatus, summarizeModelVerification } from '../lib/status';
+  import {
+    fetchModelStatus,
+    summarizeModelVerification,
+    verificationDotPresentation,
+  } from '../lib/status';
 
-  const styles = {
-    'all-pass': {
-      classes: ['bg-emerald-400', 'ring-emerald-300/50'],
-      label: 'All configurations passed nightly verification',
-    },
-    'partial-pass': {
-      classes: ['bg-amber-400', 'ring-amber-300/50'],
-      label: 'Some configurations passed nightly verification',
-    },
-    'no-pass': {
-      classes: ['bg-rose-400', 'ring-rose-300/50'],
-      label: 'No configuration has passed nightly verification',
-    },
-    untracked: {
-      classes: ['bg-ink-600', 'ring-ink-500/50'],
-      label: 'No configuration verification record',
-    },
-  } as const;
-  const allClasses = Object.values(styles).flatMap((style) => style.classes);
+  const allClasses = [
+    'bg-emerald-400',
+    'ring-emerald-300/50',
+    'bg-amber-400',
+    'ring-amber-300/50',
+    'bg-rose-400',
+    'ring-rose-300/50',
+    'bg-ink-600',
+    'ring-ink-500/50',
+  ];
 
   document.querySelectorAll<HTMLElement>('[data-model-verification]').forEach((dot) => {
     const slug = dot.dataset.modelSlug;
     if (!slug) return;
     fetchModelStatus(slug)
       .then((data) => {
-        const style = styles[summarizeModelVerification(data)];
+        const presentation = verificationDotPresentation(summarizeModelVerification(data));
         dot.classList.remove(...allClasses);
-        dot.classList.add(...style.classes);
-        dot.title = style.label;
-        dot.setAttribute('aria-label', style.label);
+        dot.classList.add(...presentation.classes);
+        dot.title = presentation.label;
+        dot.setAttribute('aria-label', presentation.label);
       })
       .catch(() => undefined);
   });

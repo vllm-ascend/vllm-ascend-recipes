@@ -183,6 +183,50 @@ export function isNightlyVerified(target: VerificationTargetStatus | null | unde
 
 export type ModelVerificationSummary = 'all-pass' | 'partial-pass' | 'no-pass' | 'untracked';
 
+export type VerificationDotColor = 'green' | 'yellow' | 'red' | 'gray';
+
+export interface VerificationDotPresentation {
+  color: VerificationDotColor;
+  classes: readonly string[];
+  label: string;
+}
+
+const verificationDotPresentations: Record<ModelVerificationSummary, VerificationDotPresentation> =
+  {
+    'all-pass': {
+      color: 'green',
+      classes: ['bg-emerald-400', 'ring-emerald-300/50'],
+      label: 'All configurations passed nightly verification',
+    },
+    'partial-pass': {
+      color: 'yellow',
+      classes: ['bg-amber-400', 'ring-amber-300/50'],
+      label: 'Some configurations passed nightly verification',
+    },
+    'no-pass': {
+      color: 'red',
+      classes: ['bg-rose-400', 'ring-rose-300/50'],
+      label: 'No configuration has passed nightly verification',
+    },
+    untracked: {
+      color: 'gray',
+      classes: ['bg-ink-600', 'ring-ink-500/50'],
+      label: 'No configuration verification record',
+    },
+  };
+
+/** Keep the detail-page history compact while preserving newest-first order. */
+export function limitVerificationHistory(history: RunStatus[], limit = 20): RunStatus[] {
+  return history.slice(0, limit);
+}
+
+/** Return the shared presentation for a model-level verification summary. */
+export function verificationDotPresentation(
+  summary: ModelVerificationSummary,
+): VerificationDotPresentation {
+  return verificationDotPresentations[summary];
+}
+
 /** Summarize the latest nightly result for every allowlisted configuration. */
 export function summarizeModelVerification(
   status: Pick<ModelStatus, 'targets'> | null | undefined,
