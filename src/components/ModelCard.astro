@@ -1,7 +1,6 @@
 ---
 import type { ModelListItem } from '../lib/types';
 import { formatContextLength, formatParameters } from '../lib/models';
-import { statusUrlForSlug } from '../lib/status';
 
 interface Props {
   model: ModelListItem & {
@@ -11,7 +10,6 @@ interface Props {
 }
 
 const { model } = Astro.props;
-const verificationUrl = model._model_slug ? statusUrlForSlug(model._model_slug) : undefined;
 ---
 
 <a
@@ -30,10 +28,10 @@ const verificationUrl = model._model_slug ? statusUrlForSlug(model._model_slug) 
       {model.title}
     </h3>
     {
-      verificationUrl && (
+      model._model_slug && (
         <span
           data-model-verification
-          data-status-url={verificationUrl}
+          data-model-slug={model._model_slug}
           class="mt-1 inline-block h-2.5 w-2.5 shrink-0 rounded-full bg-ink-600 ring-1 ring-ink-500/50"
           title="No configuration verification"
           aria-label="No configuration verification"
@@ -80,7 +78,7 @@ const verificationUrl = model._model_slug ? statusUrlForSlug(model._model_slug) 
 </a>
 
 <script>
-  import { summarizeModelVerification, type ModelStatus } from '../lib/status';
+  import { fetchModelStatus, summarizeModelVerification } from '../lib/status';
 
   const styles = {
     'all-pass': {
@@ -103,11 +101,10 @@ const verificationUrl = model._model_slug ? statusUrlForSlug(model._model_slug) 
   const allClasses = Object.values(styles).flatMap((style) => style.classes);
 
   document.querySelectorAll<HTMLElement>('[data-model-verification]').forEach((dot) => {
-    const url = dot.dataset.statusUrl;
-    if (!url) return;
-    fetch(url, { cache: 'no-cache' })
-      .then((response) => (response.ok ? response.json() : null))
-      .then((data: ModelStatus | null) => {
+    const slug = dot.dataset.modelSlug;
+    if (!slug) return;
+    fetchModelStatus(slug)
+      .then((data) => {
         const style = styles[summarizeModelVerification(data)];
         dot.classList.remove(...allClasses);
         dot.classList.add(...style.classes);

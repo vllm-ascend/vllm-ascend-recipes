@@ -5,7 +5,7 @@ import { resolveVllmAscendLink } from '../lib/links';
 import { expandScenarioScripts } from '../lib/scenario-scripts';
 import {
   findScenarioTarget,
-  statusUrlForSlug,
+  fetchModelStatus,
   type ModelStatus,
   type RunStatus,
 } from '../lib/status';
@@ -817,9 +817,8 @@ export default function CascadeSelector({
   useEffect(() => {
     if (!modelSlug) return;
     let cancelled = false;
-    fetch(statusUrlForSlug(modelSlug), { cache: 'no-cache' })
-      .then((response) => (response.ok ? response.json() : null))
-      .then((data: ModelStatus | null) => {
+    fetchModelStatus(modelSlug)
+      .then((data) => {
         if (!cancelled) setModelStatus(data);
       })
       .catch(() => {

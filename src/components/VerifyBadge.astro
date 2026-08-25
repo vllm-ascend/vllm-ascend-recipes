@@ -11,7 +11,6 @@
  * Rendered as a regular Astro component (no client directive) — the inner
  * <script> hydrates the component client-side.
  */
-import { statusUrlForSlug } from '../lib/status';
 
 interface Props {
   modelSlug: string;
@@ -24,7 +23,6 @@ const { modelSlug, title } = Astro.props;
 
 <div
   class="vbadge"
-  data-status-url={statusUrlForSlug(modelSlug)}
   data-model-slug={modelSlug}
   data-model-title={title ?? modelSlug}
 >
@@ -143,7 +141,7 @@ const { modelSlug, title } = Astro.props;
   // Client-side hydration: fetch the per-slug status JSON and paint a badge +
   // expandable details panel. Pure ESM so it works on a static SSG build.
   import type { ModelStatus } from '../lib/status';
-  import { pickFreshestRun } from '../lib/status';
+  import { fetchModelStatus, pickFreshestRun } from '../lib/status';
 
   function fmtDuration(start: string, end: string): string {
     if (!start || !end) return '';
@@ -251,19 +249,14 @@ const { modelSlug, title } = Astro.props;
   }
 
   async function hydrateOne(root: HTMLElement) {
-    const url = root.dataset.statusUrl;
-    if (!url) return;
+    const slug = root.dataset.modelSlug;
+    if (!slug) return;
     try {
-      const resp = await fetch(url, { cache: 'no-cache' });
-      if (!resp.ok) {
-        render(root, null, `no status yet (HTTP ${resp.status})`);
-        return;
-      }
-      const data = (await resp.json()) as ModelStatus;
+      const data = await fetchModelStatus(slug);
       render(root, data);
     } catch (err) {
       render(root, null, 'failed to fetch CI status');
-      console.warn('[VerifyBadge] fetch failed', url, err);
+      console.warn('[VerifyBadge] fetch failed', slug, err);
     }
   }
 

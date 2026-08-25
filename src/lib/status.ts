@@ -99,6 +99,28 @@ export function statusUrlForSlug(slug: string): string {
   return `${basePath()}/status/${slug}.json`;
 }
 
+/**
+ * Netlify deploy previews are served from `/`, while GitHub Pages uses the
+ * configured Astro base path. Try the configured path first, then the root
+ * copy emitted by the preview build.
+ */
+export function statusUrlCandidatesForSlug(slug: string): string[] {
+  return [...new Set([statusUrlForSlug(slug), `/status/${slug}.json`])];
+}
+
+/** Fetch a status file across both supported static-site deployment paths. */
+export async function fetchModelStatus(slug: string): Promise<ModelStatus | null> {
+  for (const url of statusUrlCandidatesForSlug(slug)) {
+    try {
+      const response = await fetch(url, { cache: 'no-cache' });
+      if (response.ok) return (await response.json()) as ModelStatus;
+    } catch {
+      // Try the next static deployment path.
+    }
+  }
+  return null;
+}
+
 export function statusIndexUrl(): string {
   return `${basePath()}/status/index.json`;
 }

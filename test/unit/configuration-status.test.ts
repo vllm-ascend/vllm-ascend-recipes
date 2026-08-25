@@ -3,6 +3,8 @@ import test from 'node:test';
 import {
   findScenarioTarget,
   isNightlyVerified,
+  statusUrlForSlug,
+  statusUrlCandidatesForSlug,
   summarizeModelVerification,
   type RunStatus,
   type VerificationTargetStatus,
@@ -90,4 +92,11 @@ test('summarizes model targets as all, partial, none, or untracked', () => {
   assert.equal(summarizeModelVerification({ targets: { failing } }), 'no-pass');
   assert.equal(summarizeModelVerification({ targets: {} }), 'untracked');
   assert.equal(summarizeModelVerification(null), 'untracked');
+});
+
+test('tries the deployment base path before the root status fallback', () => {
+  const urls = statusUrlCandidatesForSlug('Qwen3-30B-A3B');
+
+  assert.equal(urls[0], statusUrlForSlug('Qwen3-30B-A3B'));
+  assert.ok(urls.includes('/status/Qwen3-30B-A3B.json'));
 });
