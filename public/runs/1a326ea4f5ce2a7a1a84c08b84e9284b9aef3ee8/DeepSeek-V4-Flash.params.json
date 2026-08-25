@@ -1,0 +1,19 @@
+{
+  "recipe_path": "models/en/DeepSeek/DeepSeek-V4-Flash.yaml",
+  "model_id": "deepseek-ai/DeepSeek-V4-Flash",
+  "hw_key": "ascend_950dt",
+  "head_sha": "1a326ea4f5ce2a7a1a84c08b84e9284b9aef3ee8",
+  "trigger_type": "nightly",
+  "image": "swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/vllm-ascend:v0.23.0-a5",
+  "started_at": "2026-08-24T19:07:43Z",
+  "scenarios": [
+    {
+      "index": 0,
+      "npu": "Ascend 950DT",
+      "precision": "MXFP4/MXFP8",
+      "deployment": "Single-Node",
+      "case": "High Throughput",
+      "serve_cmd": "export OMP_PROC_BIND=false\nexport OMP_NUM_THREADS=10\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\nexport HCCL_BUFFSIZE=1024\nexport ASCEND_RT_VISIBLE_DEVICES=0,1,2,3\n\nvllm serve /root/.cache/modelscope/hub/models/models--deepseek-ai--DeepSeek-V4-Flash \\\n    --max-model-len 1048576 \\\n    --safetensors-load-strategy prefetch \\\n    --max-num-batched-tokens 4096 \\\n    --served-model-name dsv4 \\\n    --gpu-memory-utilization 0.9 \\\n    --enable-expert-parallel \\\n    --async-scheduling \\\n    --max-num-seqs 64 \\\n    --port 8900 \\\n    --block-size 32 \\\n    --tokenizer-mode deepseek_v4 \\\n    --tool-call-parser deepseek_v4 \\\n    --enable-auto-tool-choice \\\n    --reasoning-parser deepseek_v4 \\\n    --data-parallel-size 4 \\\n    --api-server-count 1 \\\n    --compilation-config '{\"cudagraph_mode\":\"FULL_DECODE_ONLY\"}' \\\n    --additional-config '{\"enable_cpu_binding\": true, \"multistream_overlap_shared_expert\": true, \"enable_shared_expert_dp\": true}'"
+    }
+  ]
+}
