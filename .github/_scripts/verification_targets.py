@@ -11,6 +11,7 @@ import yaml
 
 _REQUIRED = {"id", "recipe", "mode", "runner", "selector"}
 _SELECTOR_REQUIRED = {"npu", "precision", "deployment", "case"}
+_MODES = {"single-node", "multi-node"}
 
 
 def load_targets(path: Path) -> list[dict[str, Any]]:
@@ -33,6 +34,8 @@ def load_targets(path: Path) -> list[dict[str, Any]]:
             raise ValueError(f"{path}: target {index} has an invalid id")
         if target["id"] in ids:
             raise ValueError(f"{path}: duplicate target id {target['id']!r}")
+        if target["mode"] not in _MODES:
+            raise ValueError(f"{path}: target {target['id']!r} has an invalid mode")
         if not isinstance(target["selector"], dict):
             raise ValueError(f"{path}: target {target['id']!r} selector must be a mapping")
         selector_missing = _SELECTOR_REQUIRED - target["selector"].keys()

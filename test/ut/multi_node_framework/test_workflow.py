@@ -156,7 +156,11 @@ class MultiNodeWorkflowTests(unittest.TestCase):
 
         registry = yaml.safe_load(TARGET_REGISTRY.read_text(encoding="utf-8"))
         self.assertEqual(
-            {target["id"] for target in registry["targets"]},
+            {
+                target["id"]
+                for target in registry["targets"]
+                if target["mode"] == "multi-node"
+            },
             {case["target_id"] for case in expected.values()},
         )
 

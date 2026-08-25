@@ -34,6 +34,17 @@ def load_fill_module():
 
 
 class VerificationTargetTests(unittest.TestCase):
+    def test_rejects_unknown_target_mode(self) -> None:
+        targets_path = ROOT / ".github" / "verification-targets.yaml"
+        raw = yaml.safe_load(targets_path.read_text(encoding="utf-8"))
+        raw["targets"][0]["mode"] = "multi_node"
+
+        with tempfile.TemporaryDirectory() as directory:
+            invalid_path = Path(directory) / "targets.yaml"
+            invalid_path.write_text(yaml.safe_dump(raw), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "invalid mode"):
+                load_module().load_targets(invalid_path)
+
     def test_single_node_target_selectors_are_unique_per_recipe(self) -> None:
         targets_path = ROOT / ".github" / "verification-targets.yaml"
         raw = yaml.safe_load(targets_path.read_text(encoding="utf-8"))

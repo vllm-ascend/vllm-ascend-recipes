@@ -21,11 +21,7 @@ interface Props {
 const { modelSlug, title } = Astro.props;
 ---
 
-<div
-  class="vbadge"
-  data-model-slug={modelSlug}
-  data-model-title={title ?? modelSlug}
->
+<div class="vbadge" data-model-slug={modelSlug} data-model-title={title ?? modelSlug}>
   <div class="vbadge-slot">
     <span class="vbadge-loading">checking CI status…</span>
   </div>
