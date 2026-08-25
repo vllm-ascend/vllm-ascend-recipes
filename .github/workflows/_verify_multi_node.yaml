@@ -7,6 +7,10 @@ on:
         description: Human-readable case name used for jobs and artifacts
         required: true
         type: string
+      target_id:
+        description: Stable configuration-verification target id
+        required: true
+        type: string
       recipe:
         description: Multi-node template Recipe converted before execution
         required: true
@@ -49,7 +53,7 @@ jobs:
       FAILURE_SETTLE_TIMEOUT_SECONDS: 120
       # Raw Kubernetes objects contain internal infrastructure metadata. Keep
       # collection available for controlled debugging, but disabled by default.
-      MULTI_NODE_UPLOAD_K8S_DIAGNOSTICS: "false"
+      MULTI_NODE_UPLOAD_K8S_DIAGNOSTICS: 'false'
       PVC_NAME: vllm-ascend-vllm-ascend-recipes-gy001
     # 15m scheduling + 30m startup + 120m execution, with cleanup/upload margin.
     timeout-minutes: 180
@@ -284,6 +288,45 @@ jobs:
             [[ "$exit_code" == 0 ]] || failed=1
           done
           exit "$failed"
+
+      - name: Write configuration verification result
+        if: always()
+        env:
+          TARGET_ID: ${{ inputs.target_id }}
+          RECIPE: ${{ inputs.recipe }}
+          TEST_ID: ${{ inputs.test_id }}
+          STEP_OUTCOME: ${{ steps.run_framework.outcome }}
+        run: |
+          set -euo pipefail
+          status=fail
+          if [ "$STEP_OUTCOME" = "success" ]; then status=pass; fi
+          export status
+          mkdir -p /tmp/verification-target-result
+          RESULT_PATH="/tmp/verification-target-result/${TARGET_ID}.json"
+          export RESULT_PATH
+          python3 - <<'PY'
+          import json, os
+          from datetime import datetime, timezone
+
+          payload = {
+              "target_id": os.environ["TARGET_ID"],
+              "recipe": os.environ["RECIPE"],
+              "test_id": os.environ["TEST_ID"],
+              "status": os.environ["status"],
+              "started_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+          }
+          with open(os.environ["RESULT_PATH"], "w", encoding="utf-8") as out:
+              json.dump(payload, out)
+          PY
+
+      - name: Upload configuration verification result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verification-target-results-${{ github.run_id }}-${{ inputs.target_id }}
+          path: /tmp/verification-target-result/*.json
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Print Kubernetes summary
         if: always() && steps.prepare.outcome == 'success'

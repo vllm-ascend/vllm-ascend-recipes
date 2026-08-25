@@ -8,7 +8,7 @@
  * Schema mirrors what publish-status.yml emits.
  */
 
-export type RunKind = 'pr' | 'nightly';
+export type RunKind = 'pr' | 'nightly' | 'manual';
 export type RunConclusion = 'success' | 'failure' | 'cancelled' | 'skipped';
 
 export interface RunStatus {
@@ -35,10 +35,32 @@ export interface RunStatus {
   pr_author: string | null;
 }
 
+export interface ScenarioSelector {
+  test_id?: string;
+  npu: string;
+  precision: string;
+  deployment: string;
+  case: string;
+}
+
+export interface VerificationTargetStatus {
+  test_id?: string;
+  selector: ScenarioSelector;
+  runner: string;
+  mode: string;
+  last_pr_run: RunStatus | null;
+  last_nightly_run: RunStatus | null;
+  /** Latest manually-dispatched run; not displayed as PR/nightly evidence. */
+  last_manual_run?: RunStatus | null;
+}
+
 export interface ModelStatus {
   model: string;
   last_pr_run: RunStatus | null;
   last_nightly_run: RunStatus | null;
+  last_manual_run?: RunStatus | null;
+  /** Explicitly-approved, configuration-level verification results. */
+  targets?: Record<string, VerificationTargetStatus>;
 }
 
 export interface StatusIndex {
@@ -109,4 +131,28 @@ export function pickFreshestRun(
   if (Number.isNaN(ta)) return b;
   if (Number.isNaN(tb)) return a;
   return tb >= ta ? b : a;
+}
+
+/** Return the one published target matching all four selector dimensions. */
+export function findScenarioTarget(
+  status: Pick<ModelStatus, 'targets'> | null | undefined,
+  scenario: ScenarioSelector,
+): VerificationTargetStatus | null {
+  if (!status?.targets) return null;
+  return (
+    Object.values(status.targets).find((target) => {
+      if (scenario.test_id && target.test_id) return target.test_id === scenario.test_id;
+      return (
+        target.selector.npu === scenario.npu &&
+        target.selector.precision === scenario.precision &&
+        target.selector.deployment === scenario.deployment &&
+        target.selector.case === scenario.case
+      );
+    }) ?? null
+  );
+}
+
+/** Production verification is true only when the latest main nightly passed. */
+export function isNightlyVerified(target: VerificationTargetStatus | null | undefined): boolean {
+  return target?.last_nightly_run?.status === 'pass';
 }

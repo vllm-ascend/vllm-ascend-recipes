@@ -3,6 +3,14 @@ import { createPortal } from 'react-dom';
 import { useLang } from '../lib/useLang';
 import { resolveVllmAscendLink } from '../lib/links';
 import { expandScenarioScripts } from '../lib/scenario-scripts';
+import {
+  findScenarioTarget,
+  isNightlyVerified,
+  statusUrlForSlug,
+  type ModelStatus,
+  type RunStatus,
+  type VerificationTargetStatus,
+} from '../lib/status';
 import type { ScenarioScript, Variant } from '../lib/types';
 import {
   roleNodeCount,
@@ -32,6 +40,7 @@ interface ScenarioStep {
 }
 
 interface Scenario {
+  test_id?: string;
   npu: string;
   precision: string;
   deployment: string;
@@ -61,6 +70,7 @@ interface FeatureMeta {
 }
 
 interface CascadeSelectorProps {
+  modelSlug?: string;
   scenariosEn: Scenario[];
   scenariosZh: Scenario[];
   extraConfigEn?: ExtraConfigItem[];
@@ -81,6 +91,28 @@ interface CascadeSelectorProps {
     prefill?: { nodes?: number | { default?: number } };
     decode?: { nodes?: number | { default?: number } };
   };
+}
+
+function verificationTitle(target: VerificationTargetStatus, lang: string): string {
+  const describe = (label: string, run: RunStatus | null) => {
+    if (!run) return `${label}: ${lang === 'zh' ? '未运行' : 'not run'}`;
+    const state =
+      run.status === 'pass'
+        ? lang === 'zh'
+          ? '通过'
+          : 'passed'
+        : run.status === 'fail'
+          ? lang === 'zh'
+            ? '失败'
+            : 'failed'
+          : run.status;
+    return `${label}: ${state}${run.finished_at ? ` · ${run.finished_at.slice(0, 10)}` : ''}`;
+  };
+  return [
+    lang === 'zh' ? '已通过主线 nightly 验证' : 'Verified by main-branch nightly',
+    describe('Nightly', target.last_nightly_run),
+    describe(lang === 'zh' ? '最近 PR' : 'Latest PR', target.last_pr_run),
+  ].join('\n');
 }
 
 // Legacy pipeline-routing tags remain visible while the new template-driven
@@ -667,6 +699,7 @@ function applyColorHighlights(html: string, _selectedConfigs: Set<string>): stri
 
 // ---- Component ----
 export default function CascadeSelector({
+  modelSlug,
   scenariosEn,
   scenariosZh,
   extraConfigEn,
@@ -686,6 +719,7 @@ export default function CascadeSelector({
 }: CascadeSelectorProps) {
   const { lang, t } = useLang();
   const scenarios = lang === 'zh' ? scenariosZh : scenariosEn;
+  const [modelStatus, setModelStatus] = useState<ModelStatus | null>(null);
   const extraConfig =
     lang === 'zh' ? (extraConfigZh ?? extraConfigEn) : (extraConfigEn ?? extraConfigZh);
   const selectorLabels =
@@ -803,6 +837,22 @@ export default function CascadeSelector({
       s.deployment === effectiveDeployment &&
       s.case === effectiveCase,
   );
+
+  useEffect(() => {
+    if (!modelSlug) return;
+    let cancelled = false;
+    fetch(statusUrlForSlug(modelSlug), { cache: 'no-cache' })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data: ModelStatus | null) => {
+        if (!cancelled) setModelStatus(data);
+      })
+      .catch(() => {
+        if (!cancelled) setModelStatus(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [modelSlug]);
 
   const effectiveConfigParams = useMemo(
     () => ({
@@ -1055,7 +1105,7 @@ export default function CascadeSelector({
           s.deployment === effectiveDeployment &&
           s.case === opt,
       );
-      const tooltip = caseScenario
+      const baseTooltip = caseScenario
         ? [
             ...(caseScenario.deployment === 'pd'
               ? [
@@ -1067,10 +1117,25 @@ export default function CascadeSelector({
             ...caseScenario.steps.map((step, index) => `${index + 1}. ${step.title}`),
           ].join('\n')
         : undefined;
+      const target = caseScenario ? findScenarioTarget(modelStatus, caseScenario) : null;
+      const verified = isNightlyVerified(target);
+      const tooltip = [
+        baseTooltip,
+        verified && target ? verificationTitle(target, lang) : undefined,
+      ]
+        .filter(Boolean)
+        .join('\n\n');
       return (
         <Tooltip key={opt} content={tooltip}>
           <button onClick={() => setSelectedCase(opt)} className={chipClass(effectiveCase === opt)}>
             <span className="font-semibold">{opt}</span>
+            {verified && (
+              <span
+                className="ml-1.5 inline-block h-2 w-2 rounded-full bg-emerald-400 ring-1 ring-emerald-300/50"
+                role="img"
+                aria-label={lang === 'zh' ? '已通过 nightly 验证' : 'Nightly verified'}
+              />
+            )}
           </button>
         </Tooltip>
       );

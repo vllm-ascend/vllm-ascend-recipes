@@ -1,6 +1,8 @@
 name: Multi-node framework
 
 on:
+  schedule:
+    - cron: '30 18 * * *'
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened]
@@ -58,10 +60,11 @@ jobs:
     needs: prepare
     name: multi-node (deepseek-v2-lite-pd-2n2c)
     # pull_request workflows cannot safely expose cluster credentials to forks.
-    if: github.event_name == 'workflow_dispatch' || (github.event.pull_request.head.repo.full_name == github.repository && needs.prepare.outputs.pd_template == 'true')
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event.pull_request.head.repo.full_name == github.repository && needs.prepare.outputs.pd_template == 'true')
     uses: ./.github/workflows/_verify_multi_node.yaml
     with:
       name: deepseek-v2-lite-pd-2n2c
+      target_id: template-deepseek-v2-lite-pd-a2-w8a8-1p1d
       recipe: models/en/DeepSeek/template_pd.yaml
       test_id: pd-2n2c
     secrets:
@@ -72,10 +75,11 @@ jobs:
   verify-v2lite:
     needs: prepare
     name: multi-node (deepseek-v2-lite-recipe-pd-2n2c)
-    if: github.event_name == 'workflow_dispatch' || (github.event.pull_request.head.repo.full_name == github.repository && needs.prepare.outputs.v2lite == 'true')
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event.pull_request.head.repo.full_name == github.repository && needs.prepare.outputs.v2lite == 'true')
     uses: ./.github/workflows/_verify_multi_node.yaml
     with:
       name: deepseek-v2-lite-recipe-pd-2n2c
+      target_id: deepseek-v2-lite-a2-w8a8-1p1d
       recipe: models/en/DeepSeek/DeepSeek-V2-Lite-W8A8.yaml
       test_id: dsv2lite-pd-2n2c
     secrets:
@@ -86,10 +90,11 @@ jobs:
   verify-qwen:
     needs: prepare
     name: multi-node (qwen3-30b-a3b-dp-2n2c)
-    if: github.event_name == 'workflow_dispatch' || (github.event.pull_request.head.repo.full_name == github.repository && needs.prepare.outputs.qwen == 'true')
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event.pull_request.head.repo.full_name == github.repository && needs.prepare.outputs.qwen == 'true')
     uses: ./.github/workflows/_verify_multi_node.yaml
     with:
       name: qwen3-30b-a3b-dp-2n2c
+      target_id: template-qwen3-30b-a3b-a2-bf16-2node
       recipe: models/en/Qwen/template2_non_pd.yaml
       test_id: dp-2n2c
     secrets:
@@ -100,13 +105,61 @@ jobs:
   verify-qwen30b:
     needs: prepare
     name: multi-node (qwen3-30b-a3b-recipe-dp-2n2c)
-    if: github.event_name == 'workflow_dispatch' || (github.event.pull_request.head.repo.full_name == github.repository && needs.prepare.outputs.qwen30b == 'true')
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event.pull_request.head.repo.full_name == github.repository && needs.prepare.outputs.qwen30b == 'true')
     uses: ./.github/workflows/_verify_multi_node.yaml
     with:
       name: qwen3-30b-a3b-recipe-dp-2n2c
+      target_id: qwen3-30b-a3b-a2-bf16-2node
       recipe: models/en/Qwen/Qwen3-30B-A3B.yaml
       test_id: qwen30b-dp-2n2c
     secrets:
       KUBECONFIG_B64: ${{ secrets.KUBECONFIG_B64 }}
       OBS_AK: ${{ secrets.OBS_AK }}
       OBS_SK: ${{ secrets.OBS_SK }}
+
+  # A self-hosted runner can fail before the reusable workflow gets far
+  # enough to upload its own result artifact. Record those failed/cancelled
+  # targets from GitHub's job result so PR and nightly evidence never remains
+  # stale. Skipped jobs are intentionally omitted: on a PR their recipe did
+  # not change, so no verification was requested for that target.
+  finalize-target-results:
+    needs: [prepare, verify-template-pd, verify-v2lite, verify-qwen, verify-qwen30b]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Write fallback verification results
+        env:
+          TEMPLATE_PD_RESULT: ${{ needs.verify-template-pd.result }}
+          V2LITE_RESULT: ${{ needs.verify-v2lite.result }}
+          QWEN_RESULT: ${{ needs.verify-qwen.result }}
+          QWEN30B_RESULT: ${{ needs.verify-qwen30b.result }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/verification-target-fallback
+          write_result() {
+            local target_id="$1" recipe="$2" test_id="$3" result="$4"
+            case "$result" in
+              success|skipped) return ;;
+            esac
+            jq -n \
+              --arg target_id "$target_id" --arg recipe "$recipe" --arg test_id "$test_id" \
+              '{target_id:$target_id,recipe:$recipe,test_id:$test_id,status:"fail"}' \
+              > "/tmp/verification-target-fallback/fallback-${target_id}.json"
+          }
+          write_result template-deepseek-v2-lite-pd-a2-w8a8-1p1d \
+            models/en/DeepSeek/template_pd.yaml pd-2n2c "$TEMPLATE_PD_RESULT"
+          write_result deepseek-v2-lite-a2-w8a8-1p1d \
+            models/en/DeepSeek/DeepSeek-V2-Lite-W8A8.yaml dsv2lite-pd-2n2c "$V2LITE_RESULT"
+          write_result template-qwen3-30b-a3b-a2-bf16-2node \
+            models/en/Qwen/template2_non_pd.yaml dp-2n2c "$QWEN_RESULT"
+          write_result qwen3-30b-a3b-a2-bf16-2node \
+            models/en/Qwen/Qwen3-30B-A3B.yaml qwen30b-dp-2n2c "$QWEN30B_RESULT"
+
+      - name: Upload fallback verification results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verification-target-results-${{ github.run_id }}-fallback
+          path: /tmp/verification-target-fallback/*.json
+          if-no-files-found: ignore
+          retention-days: 14

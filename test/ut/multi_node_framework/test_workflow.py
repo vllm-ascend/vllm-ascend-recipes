@@ -15,6 +15,7 @@ import yaml
 ROOT = Path(__file__).resolve().parents[3]
 ENTRY_WORKFLOW = ROOT / ".github/workflows/verify_multi_node.yaml"
 REUSABLE_WORKFLOW = ROOT / ".github/workflows/_verify_multi_node.yaml"
+TARGET_REGISTRY = ROOT / ".github/verification-targets.yaml"
 LWS_TEMPLATE = ROOT / "test/recipe/multi_node/scripts/k8s/lws.yaml.tmpl"
 LWS_RENDERER = ROOT / "test/recipe/multi_node/scripts/k8s/render_lws.py"
 LWS_ADAPTER = ROOT / "test/recipe/multi_node/scripts/k8s/run_lws.sh"
@@ -102,7 +103,9 @@ class MultiNodeWorkflowTests(unittest.TestCase):
     def test_entry_workflow_declares_only_case_identity(self) -> None:
         value = workflow(ENTRY_WORKFLOW)
 
-        self.assertEqual(set(value["on"]), {"pull_request", "workflow_dispatch"})
+        self.assertEqual(
+            set(value["on"]), {"schedule", "pull_request", "workflow_dispatch"}
+        )
         # One reusable-workflow job per case; each filters itself on the
         # prepare output that matches its recipe file.
         expected = {
@@ -110,24 +113,28 @@ class MultiNodeWorkflowTests(unittest.TestCase):
                 "name": "deepseek-v2-lite-pd-2n2c",
                 "recipe": "models/en/DeepSeek/template_pd.yaml",
                 "test_id": "pd-2n2c",
+                "target_id": "template-deepseek-v2-lite-pd-a2-w8a8-1p1d",
                 "flag": "pd_template",
             },
             "verify-v2lite": {
                 "name": "deepseek-v2-lite-recipe-pd-2n2c",
                 "recipe": "models/en/DeepSeek/DeepSeek-V2-Lite-W8A8.yaml",
                 "test_id": "dsv2lite-pd-2n2c",
+                "target_id": "deepseek-v2-lite-a2-w8a8-1p1d",
                 "flag": "v2lite",
             },
             "verify-qwen": {
                 "name": "qwen3-30b-a3b-dp-2n2c",
                 "recipe": "models/en/Qwen/template2_non_pd.yaml",
                 "test_id": "dp-2n2c",
+                "target_id": "template-qwen3-30b-a3b-a2-bf16-2node",
                 "flag": "qwen",
             },
             "verify-qwen30b": {
                 "name": "qwen3-30b-a3b-recipe-dp-2n2c",
                 "recipe": "models/en/Qwen/Qwen3-30B-A3B.yaml",
                 "test_id": "qwen30b-dp-2n2c",
+                "target_id": "qwen3-30b-a3b-a2-bf16-2node",
                 "flag": "qwen30b",
             },
         }
@@ -139,11 +146,40 @@ class MultiNodeWorkflowTests(unittest.TestCase):
                 job["with"],
                 {
                     "name": case["name"],
+                    "target_id": case["target_id"],
                     "recipe": case["recipe"],
                     "test_id": case["test_id"],
                 },
             )
             self.assertIn(f"needs.prepare.outputs.{case['flag']} == 'true'", job["if"])
+            self.assertIn("github.event_name == 'schedule'", job["if"])
+
+        registry = yaml.safe_load(TARGET_REGISTRY.read_text(encoding="utf-8"))
+        self.assertEqual(
+            {target["id"] for target in registry["targets"]},
+            {case["target_id"] for case in expected.values()},
+        )
+
+        finalizer = value["jobs"]["finalize-target-results"]
+        self.assertEqual(
+            set(finalizer["needs"]),
+            {"prepare", *expected},
+        )
+        self.assertEqual(finalizer["if"], "always()")
+        finalizer_steps = {step["name"]: step for step in finalizer["steps"]}
+        self.assertIn("Write fallback verification results", finalizer_steps)
+        fallback_artifact = finalizer_steps["Upload fallback verification results"]
+        self.assertIn("verification-target-results-", fallback_artifact["with"]["name"])
+        self.assertEqual(
+            finalizer_steps["Write fallback verification results"]["env"],
+            {
+                "TEMPLATE_PD_RESULT": "${{ needs.verify-template-pd.result }}",
+                "V2LITE_RESULT": "${{ needs.verify-v2lite.result }}",
+                "QWEN_RESULT": "${{ needs.verify-qwen.result }}",
+                "QWEN30B_RESULT": "${{ needs.verify-qwen30b.result }}",
+            },
+        )
+
 
         # prepare reports which multi-node recipe YAMLs changed (en or zh).
         prepare = value["jobs"]["prepare"]
@@ -168,7 +204,7 @@ class MultiNodeWorkflowTests(unittest.TestCase):
 
         self.assertEqual(
             set(value["on"]["workflow_call"]["inputs"]),
-            {"name", "recipe", "test_id"},
+            {"name", "target_id", "recipe", "test_id"},
         )
         self.assertEqual(
             value["concurrency"]["group"],
@@ -204,6 +240,9 @@ class MultiNodeWorkflowTests(unittest.TestCase):
             'rm -rf -- "$MULTI_NODE_RUN_ROOT"',
             steps["Remove staged PVC data"]["run"],
         )
+        target_upload = steps["Upload configuration verification result"]
+        self.assertIn("verification-target-results-", target_upload["with"]["name"])
+        self.assertIn("${TARGET_ID}.json", steps["Write configuration verification result"]["run"])
 
     def test_lws_runtime_contract_and_intra_case_node_isolation(self) -> None:
         lws = render_lws()

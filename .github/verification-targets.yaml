@@ -1,0 +1,43 @@
+# Explicit configurations eligible for real CI verification. A target is the
+# only source from which the detail page may derive a green "verified" dot.
+targets:
+  - id: template-deepseek-v2-lite-pd-a2-w8a8-1p1d
+    recipe: models/en/DeepSeek/template_pd.yaml
+    test_id: pd-2n2c
+    mode: multi-node
+    runner: linux-aarch64-a2b4-1
+    selector:
+      npu: Atlas 800I A2
+      precision: W8A8
+      deployment: pd
+      case: 1p1d
+  - id: deepseek-v2-lite-a2-w8a8-1p1d
+    recipe: models/en/DeepSeek/DeepSeek-V2-Lite-W8A8.yaml
+    test_id: dsv2lite-pd-2n2c
+    mode: multi-node
+    runner: linux-aarch64-a2b4-1
+    selector:
+      npu: Atlas 800I A2
+      precision: W8A8
+      deployment: Multi-Node PD Separation
+      case: 1P1D (1 Prefill node + 1 Decode node)
+  - id: template-qwen3-30b-a3b-a2-bf16-2node
+    recipe: models/en/Qwen/template2_non_pd.yaml
+    test_id: dp-2n2c
+    mode: multi-node
+    runner: linux-aarch64-a2b4-1
+    selector:
+      npu: Atlas 800I A2
+      precision: bf16
+      deployment: non-pd
+      case: 2-node
+  - id: qwen3-30b-a3b-a2-bf16-2node
+    recipe: models/en/Qwen/Qwen3-30B-A3B.yaml
+    test_id: qwen30b-dp-2n2c
+    mode: multi-node
+    runner: linux-aarch64-a2b4-1
+    selector:
+      npu: Atlas 800I A2
+      precision: bf16
+      deployment: Multi-Node
+      case: 2-node

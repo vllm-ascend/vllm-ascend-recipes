@@ -50,7 +50,7 @@ name: 'Publish Verification Status'
 
 on:
   workflow_run:
-    workflows: ['PR Recipe Verify', 'Nightly Recipe Verify']
+    workflows: ['PR Recipe Verify', 'Nightly Recipe Verify', 'Multi-node framework']
     types: [completed]
 
 permissions:
@@ -59,11 +59,14 @@ permissions:
 
 concurrency:
   group: publish-status
-  cancel-in-progress: true
+  # Each completed run carries independent evidence; queue publishers instead
+  # of dropping an in-flight result behind a newer unrelated verification.
+  cancel-in-progress: false
 
 jobs:
   publish:
     if: >
+      github.event.workflow_run.name == 'Multi-node framework' ||
       github.event.workflow_run.conclusion == 'success' ||
       github.event.workflow_run.conclusion == 'failure'
     runs-on: ubuntu-latest
@@ -84,11 +87,22 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
         continue-on-error: true
 
+      - name: Download configuration verification results
+        uses: actions/download-artifact@v4
+        with:
+          pattern: verification-target-results-${{ github.event.workflow_run.id }}-*
+          path: target-results/
+          merge-multiple: true
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+
       - name: Resolve trigger metadata
         id: meta
         env:
           RW_API_URL: ${{ github.event.workflow_run.html_url }}
           RW_NAME: ${{ github.event.workflow_run.name }}
+          RW_EVENT: ${{ github.event.workflow_run.event }}
           RW_RUN_ID: ${{ github.event.workflow_run.id }}
           RW_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
           RW_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
@@ -96,10 +110,19 @@ jobs:
         run: |
           case "$RW_NAME" in
             *"PR Recipe Verify"*) TRIGGER="pr" ;;
+            *"Multi-node framework"*)
+              if [ "$RW_EVENT" = "schedule" ]; then
+                TRIGGER="nightly"
+              elif [ "$RW_EVENT" = "workflow_dispatch" ]; then
+                TRIGGER="manual"
+              else
+                TRIGGER="pr"
+              fi ;;
             *) TRIGGER="nightly" ;;
           esac
           {
             echo "trigger=$TRIGGER"
+            echo "workflow_name=$RW_NAME"
             echo "head_sha=$RW_HEAD_SHA"
             echo "conclusion=$RW_CONCLUSION"
             echo "run_url=$RW_API_URL"
@@ -163,6 +186,7 @@ jobs:
       - name: Build status JSON files
         env:
           TRIGGER: ${{ steps.meta.outputs.trigger }}
+          WORKFLOW_NAME: ${{ steps.meta.outputs.workflow_name }}
           HEAD_SHA: ${{ steps.meta.outputs.head_sha }}
           RUN_URL: ${{ steps.meta.outputs.run_url }}
           RUN_ID: ${{ steps.meta.outputs.run_id }}
@@ -171,6 +195,7 @@ jobs:
           PR_URL: ${{ steps.pr.outputs.pr_url }}
           PR_TITLE: ${{ steps.pr.outputs.pr_title }}
           PR_AUTHOR: ${{ steps.pr.outputs.pr_author }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
@@ -258,23 +283,127 @@ jobs:
             prev="public/status/${slug}.json"
             last_pr=$(jq -c '.last_pr_run // null' "$prev" 2>/dev/null || true)
             last_nightly=$(jq -c '.last_nightly_run // null' "$prev" 2>/dev/null || true)
+            last_manual=$(jq -c '.last_manual_run // null' "$prev" 2>/dev/null || true)
+            targets=$(jq -c '.targets // {}' "$prev" 2>/dev/null || true)
             if [ "${TRIGGER}" = "pr" ]; then
               last_pr="$status_block"
-            else
+            elif [ "${TRIGGER}" = "nightly" ]; then
               last_nightly="$status_block"
+            else
+              last_manual="$status_block"
             fi
             jq -n \
               --arg slug "${slug}" \
               --argjson last_pr "${last_pr:-null}" \
               --argjson last_nightly "${last_nightly:-null}" \
+              --argjson last_manual "${last_manual:-null}" \
+              --argjson targets "${targets:-{}}" \
               '{
                  model: $slug,
                  last_pr_run: $last_pr,
-                 last_nightly_run: $last_nightly
+                 last_nightly_run: $last_nightly,
+                 last_manual_run: $last_manual,
+                 targets: $targets
                }' > "public/status/${slug}.json"
           done
 
-          # 3) Build public/status/index.json (used by /browse & home cards).
+          # 3) A scheduled run must supersede every target's former nightly
+          #    result, even when an A2 runner never initialized and therefore
+          #    could not upload its own artifact. Preserve real artifacts and
+          #    materialize a failed record only for targets that are absent.
+          if [ "$TRIGGER" = "nightly" ] && [ "$WORKFLOW_NAME" = "Multi-node framework" ]; then
+            python3 .github/_scripts/fill_missing_target_results.py \
+              --targets .github/verification-targets.yaml \
+              --output-dir target-results
+          elif [ "$TRIGGER" = "pr" ] && [ "$WORKFLOW_NAME" = "Multi-node framework" ]; then
+            # A whole PR workflow can be cancelled before its in-workflow
+            # fallback uploads. Query the completed job results here and
+            # synthesize only targets whose job did not succeed or skip.
+            failed_target_ids=()
+            while IFS= read -r job_name; do
+              case "$job_name" in
+                "multi-node (deepseek-v2-lite-pd-2n2c)")
+                  failed_target_ids+=(template-deepseek-v2-lite-pd-a2-w8a8-1p1d) ;;
+                "multi-node (deepseek-v2-lite-recipe-pd-2n2c)")
+                  failed_target_ids+=(deepseek-v2-lite-a2-w8a8-1p1d) ;;
+                "multi-node (qwen3-30b-a3b-dp-2n2c)")
+                  failed_target_ids+=(template-qwen3-30b-a3b-a2-bf16-2node) ;;
+                "multi-node (qwen3-30b-a3b-recipe-dp-2n2c)")
+                  failed_target_ids+=(qwen3-30b-a3b-a2-bf16-2node) ;;
+              esac
+            done < <(
+              gh api "repos/${REPO}/actions/runs/${RUN_ID}/jobs?per_page=100" --paginate \
+                | jq -r '.jobs[] | select(.conclusion != "success" and .conclusion != "skipped") | .name'
+            )
+            if ((${#failed_target_ids[@]})); then
+              fill_args=()
+              for target_id in "${failed_target_ids[@]}"; do
+                fill_args+=(--target-id "$target_id")
+              done
+              python3 .github/_scripts/fill_missing_target_results.py \
+                --targets .github/verification-targets.yaml \
+                --output-dir target-results "${fill_args[@]}"
+            fi
+          fi
+
+          # 4) Merge configuration-level results emitted by the PR34-derived
+          # multi-node jobs. A green detail-page dot is driven only by the
+          # latest nightly record in this target map.
+          for f in target-results/*.json; do
+            [ -f "$f" ] || continue
+            target_id=$(jq -r '.target_id // empty' "$f")
+            recipe_path=$(jq -r '.recipe // empty' "$f")
+            test_id=$(jq -r '.test_id // empty' "$f")
+            status=$(jq -r '.status // "fail"' "$f")
+            [ -n "$target_id" ] && [ -n "$recipe_path" ] || continue
+            target=$(TARGET_ID="$target_id" python3 - <<'PY'
+          import importlib.util, json, os
+          from pathlib import Path
+
+          script = Path('.github/_scripts/verification_targets.py')
+          spec = importlib.util.spec_from_file_location('verification_targets', script)
+          module = importlib.util.module_from_spec(spec)
+          assert spec and spec.loader
+          spec.loader.exec_module(module)
+          found = module.find_target_id(module.load_targets(Path('.github/verification-targets.yaml')), os.environ['TARGET_ID'])
+          if found:
+              print(json.dumps(found))
+          PY
+            )
+            [ -n "$target" ] || { echo "Unknown verification target: $target_id" >&2; exit 1; }
+            target_recipe=$(jq -r '.recipe' <<<"$target")
+            target_test_id=$(jq -r '.test_id // empty' <<<"$target")
+            [ "$recipe_path" = "$target_recipe" ] && [ "$test_id" = "$target_test_id" ] || {
+              echo "Target artifact does not match registry: $target_id" >&2
+              exit 1
+            }
+            slug=$(basename "$target_recipe" .yaml)
+            params_url="$RUN_URL"
+            head_sha_url="https://github.com/${REPO}/commit/${HEAD_SHA}"
+            recipe_yaml_url="https://github.com/${REPO}/blob/${HEAD_SHA}/${recipe_path}"
+            concluded_iso=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+            status_block=$(jq -n \
+              --arg kind "$TRIGGER" --arg status "$status" --arg conclusion "$CONCLUSION" \
+              --arg head_sha "$HEAD_SHA" --arg head_sha_url "$head_sha_url" \
+              --arg run_id "$RUN_ID" --arg run_url "$RUN_URL" \
+              --arg recipe_path "$recipe_path" --arg recipe_yaml_url "$recipe_yaml_url" \
+              --arg params_url "$params_url" --arg started_at "$concluded_iso" --arg finished_at "$concluded_iso" \
+              --arg pr_number "$PR_NUMBER" --arg pr_url "$PR_URL" --arg pr_title "$PR_TITLE" --arg pr_author "$PR_AUTHOR" \
+              '{kind:$kind,status:$status,conclusion:$conclusion,head_sha:$head_sha,head_sha_url:$head_sha_url,workflow_run_id:($run_id|tonumber),workflow_run_url:$run_url,recipe_path:$recipe_path,recipe_yaml_url:$recipe_yaml_url,params_url:$params_url,started_at:$started_at,finished_at:$finished_at,pr_number:(if $pr_number != "" then ($pr_number|tonumber) else null end),pr_url:(if $pr_url != "" then $pr_url else null end),pr_title:(if $pr_title != "" then $pr_title else null end),pr_author:(if $pr_author != "" then $pr_author else null end)}')
+            prev="public/status/${slug}.json"
+            mkdir -p public/status
+            [ -f "$prev" ] || jq -n --arg slug "$slug" '{model:$slug,last_pr_run:null,last_nightly_run:null,last_manual_run:null,targets:{}}' > "$prev"
+            target_file=$(mktemp)
+            run_file=$(mktemp)
+            printf '%s\n' "$target" > "$target_file"
+            printf '%s\n' "$status_block" > "$run_file"
+            python3 .github/_scripts/merge_target_status.py \
+              --status-file "$prev" --target-file "$target_file" --run-file "$run_file" \
+              --trigger "$TRIGGER"
+            rm -f "$target_file" "$run_file"
+          done
+
+          # 5) Build public/status/index.json (used by /browse & home cards).
           #    IMPORTANT: exclude index.json itself — the previous glob matched
           #    it and emitted `{"slug": null}` entries on every run.
           #
