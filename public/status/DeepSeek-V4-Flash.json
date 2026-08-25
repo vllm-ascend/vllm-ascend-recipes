@@ -35,5 +35,36 @@
     "pr_url": null,
     "pr_title": null,
     "pr_author": null
+  },
+  "targets": {
+    "deepseek-v4-flash-a5-mxfp4-mxfp8-single-node-high-throughput": {
+      "test_id": null,
+      "selector": {
+        "npu": "Ascend 950DT",
+        "precision": "MXFP4/MXFP8",
+        "deployment": "Single-Node",
+        "case": "High Throughput"
+      },
+      "runner": "linux-aarch64-a5-8",
+      "mode": "single-node",
+      "last_pr_run": {
+        "kind": "pr",
+        "status": "pass",
+        "conclusion": "success",
+        "head_sha": "b934901948c8675d64abe072e27da8eace49e892",
+        "head_sha_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/commit/b934901948c8675d64abe072e27da8eace49e892",
+        "workflow_run_id": 32708111222,
+        "workflow_run_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/actions/runs/32708111222",
+        "recipe_path": "models/en/DeepSeek/DeepSeek-V4-Flash.yaml",
+        "recipe_yaml_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/blob/b934901948c8675d64abe072e27da8eace49e892/models/en/DeepSeek/DeepSeek-V4-Flash.yaml",
+        "params_url": "https://vllm-ascend.github.io/vllm-ascend-recipes/runs/b934901948c8675d64abe072e27da8eace49e892/DeepSeek-V4-Flash.params.json",
+        "started_at": "2026-08-24T08:47:41Z",
+        "finished_at": "2026-08-24T08:54:08Z",
+        "pr_number": 72,
+        "pr_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/pull/72",
+        "pr_title": "feat: add DeepSeek V4 Flash A5 single-node verification",
+        "pr_author": "chaosv598"
+      }
+    }
   }
 }

@@ -16,6 +16,8 @@ def fill_missing_results(
     """Write a failed result only when the target has no uploaded result file."""
     output_dir.mkdir(parents=True, exist_ok=True)
     for target in targets:
+        if target["mode"] != "multi-node":
+            continue
         if target_ids is not None and target["id"] not in target_ids:
             continue
         output_file = output_dir / f'{target["id"]}.json'

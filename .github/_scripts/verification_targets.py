@@ -22,6 +22,7 @@ def load_targets(path: Path) -> list[dict[str, Any]]:
     targets: list[dict[str, Any]] = []
     ids: set[str] = set()
     recipes_and_test_ids: set[tuple[str, str]] = set()
+    single_node_selectors: set[tuple[str, tuple[str, str, str, str]]] = set()
     for index, target in enumerate(raw["targets"]):
         if not isinstance(target, dict):
             raise ValueError(f"{path}: target {index} must be a mapping")
@@ -47,6 +48,14 @@ def load_targets(path: Path) -> list[dict[str, Any]]:
             if key in recipes_and_test_ids:
                 raise ValueError(f"{path}: duplicate recipe/test_id target {key!r}")
             recipes_and_test_ids.add(key)
+        elif target["mode"] == "single-node":
+            selector_key = (
+                target["recipe"],
+                tuple(str(target["selector"][field]) for field in sorted(_SELECTOR_REQUIRED)),
+            )
+            if selector_key in single_node_selectors:
+                raise ValueError(f"{path}: duplicate recipe/selector target {selector_key!r}")
+            single_node_selectors.add(selector_key)
         ids.add(target["id"])
         targets.append(target)
     return targets

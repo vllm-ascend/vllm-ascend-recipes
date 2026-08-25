@@ -1,6 +1,35 @@
 # Explicit configurations eligible for real CI verification. A target is the
 # only source from which the detail page may derive a green "verified" dot.
 targets:
+  # Single-node entries are explicitly allowlisted and kept fresh from the
+  # scenario list captured in recipe verification params.json.
+  - id: deepseek-v4-flash-a5-mxfp4-mxfp8-single-node-high-throughput
+    recipe: models/en/DeepSeek/DeepSeek-V4-Flash.yaml
+    mode: single-node
+    runner: linux-aarch64-a5-8
+    selector:
+      npu: Ascend 950DT
+      precision: MXFP4/MXFP8
+      deployment: Single-Node
+      case: High Throughput
+  - id: qwen3-30b-a3b-a2-w8a8-single-node-multi-card
+    recipe: models/en/Qwen/Qwen3-30B-A3B.yaml
+    mode: single-node
+    runner: linux-aarch64-a2b4-8
+    selector:
+      npu: Atlas 800I A2
+      precision: W8A8
+      deployment: Single-Node
+      case: Single Node Multi Card (A2)
+  - id: qwen35-27b-qwen36-27b-a2-w8a8-single-node-multi-card
+    recipe: models/en/Qwen/Qwen3.5-27B-Qwen3.6-27B.yaml
+    mode: single-node
+    runner: linux-aarch64-a2b4-8
+    selector:
+      npu: Atlas 800I A2
+      precision: W8A8
+      deployment: Single-Node
+      case: Multi Card
   - id: template-deepseek-v2-lite-pd-a2-w8a8-1p1d
     recipe: models/en/DeepSeek/template_pd.yaml
     test_id: pd-2n2c

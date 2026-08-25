@@ -17,6 +17,7 @@ jobs:
       workflows: ${{ steps.filter.outputs.workflows }}
       config: ${{ steps.filter.outputs.config }}
       multi_node: ${{ steps.filter.outputs.multi_node }}
+      configuration_status: ${{ steps.filter.outputs.configuration_status }}
     steps:
       - uses: actions/checkout@v4
       - name: Detect changed paths
@@ -33,6 +34,11 @@ jobs:
             multi_node:
               - 'test/recipe/multi_node/**'
               - 'test/ut/multi_node_framework/**'
+            configuration_status:
+              - '.github/_scripts/**'
+              - '.github/verification-targets.yaml'
+              - 'public/status/**'
+              - 'test/unit/**'
             config:
               - 'package.json'
               - 'pnpm-lock.yaml'
@@ -112,6 +118,7 @@ jobs:
     if: |
       needs.detect.outputs.models == 'true' ||
       needs.detect.outputs.multi_node == 'true' ||
+      needs.detect.outputs.configuration_status == 'true' ||
       needs.detect.outputs.workflows == 'true'
     runs-on: ubuntu-latest
     steps:
@@ -152,3 +159,6 @@ jobs:
 
       - name: Run Multi-node framework unit tests
         run: python -m unittest discover -s test/ut/multi_node_framework -v
+
+      - name: Run configuration status unit tests
+        run: python -m unittest discover -s test/unit -p '*test.py' -v

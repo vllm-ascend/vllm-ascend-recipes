@@ -307,7 +307,15 @@ jobs:
                }' > "public/status/${slug}.json"
           done
 
-          # 3) A scheduled run must supersede every target's former nightly
+          # 3) Match recipe-verification params to the explicit single-node
+          #    allowlist. This also refreshes historic pass/fail evidence
+          #    without inventing a result for skipped or empty scenarios.
+          python3 .github/_scripts/sync_single_node_target_status.py \
+            --status-dir public/status \
+            --runs-dir public/runs \
+            --targets .github/verification-targets.yaml
+
+          # 4) A scheduled run must supersede every target's former nightly
           #    result, even when an A2 runner never initialized and therefore
           #    could not upload its own artifact. Preserve real artifacts and
           #    materialize a failed record only for targets that are absent.
@@ -346,7 +354,7 @@ jobs:
             fi
           fi
 
-          # 4) Merge configuration-level results emitted by the PR34-derived
+          # 5) Merge configuration-level results emitted by the PR34-derived
           # multi-node jobs. A green detail-page dot is driven only by the
           # latest nightly record in this target map.
           for f in target-results/*.json; do
@@ -403,7 +411,7 @@ jobs:
             rm -f "$target_file" "$run_file"
           done
 
-          # 5) Build public/status/index.json (used by /browse & home cards).
+          # 6) Build public/status/index.json (used by /browse & home cards).
           #    IMPORTANT: exclude index.json itself — the previous glob matched
           #    it and emitted `{"slug": null}` entries on every run.
           #

@@ -4,6 +4,7 @@ import importlib.util
 import json
 import tempfile
 import unittest
+from copy import deepcopy
 from pathlib import Path
 
 import yaml
@@ -33,6 +34,19 @@ def load_fill_module():
 
 
 class VerificationTargetTests(unittest.TestCase):
+    def test_single_node_target_selectors_are_unique_per_recipe(self) -> None:
+        targets_path = ROOT / ".github" / "verification-targets.yaml"
+        raw = yaml.safe_load(targets_path.read_text(encoding="utf-8"))
+        duplicate = deepcopy(next(target for target in raw["targets"] if target["mode"] == "single-node"))
+        duplicate["id"] = "duplicate-single-node-target"
+        raw["targets"].append(duplicate)
+
+        with tempfile.TemporaryDirectory() as directory:
+            duplicate_path = Path(directory) / "targets.yaml"
+            duplicate_path.write_text(yaml.safe_dump(raw), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "duplicate recipe/selector"):
+                load_module().load_targets(duplicate_path)
+
     def test_pr34_recipe_test_ids_have_unique_targets(self) -> None:
         targets = load_module().load_targets(ROOT / ".github" / "verification-targets.yaml")
 
@@ -82,7 +96,8 @@ class VerificationTargetTests(unittest.TestCase):
 
     def test_missing_nightly_target_result_is_materialized_as_failure(self) -> None:
         targets = load_module().load_targets(ROOT / ".github" / "verification-targets.yaml")
-        known = targets[0]
+        multi_node_targets = [target for target in targets if target["mode"] == "multi-node"]
+        known = multi_node_targets[0]
         with tempfile.TemporaryDirectory() as directory:
             results = Path(directory)
             existing = results / f'{known["id"]}.json'
@@ -91,20 +106,31 @@ class VerificationTargetTests(unittest.TestCase):
             load_fill_module().fill_missing_results(targets, results)
 
             self.assertEqual(json.loads(existing.read_text(encoding="utf-8"))["status"], "pass")
-            missing = json.loads((results / f'{targets[1]["id"]}.json').read_text(encoding="utf-8"))
+            missing = json.loads((results / f'{multi_node_targets[1]["id"]}.json').read_text(encoding="utf-8"))
             self.assertEqual(missing["status"], "fail")
-            self.assertEqual(missing["recipe"], targets[1]["recipe"])
-            self.assertEqual(missing["test_id"], targets[1]["test_id"])
+            self.assertEqual(missing["recipe"], multi_node_targets[1]["recipe"])
+            self.assertEqual(missing["test_id"], multi_node_targets[1]["test_id"])
 
     def test_selected_missing_target_result_does_not_mark_skipped_targets_failed(self) -> None:
         targets = load_module().load_targets(ROOT / ".github" / "verification-targets.yaml")
+        multi_node_targets = [target for target in targets if target["mode"] == "multi-node"]
         with tempfile.TemporaryDirectory() as directory:
             results = Path(directory)
 
-            load_fill_module().fill_missing_results(targets, results, {targets[1]["id"]})
+            load_fill_module().fill_missing_results(targets, results, {multi_node_targets[1]["id"]})
 
-            self.assertTrue((results / f'{targets[1]["id"]}.json').exists())
-            self.assertFalse((results / f'{targets[0]["id"]}.json').exists())
+            self.assertTrue((results / f'{multi_node_targets[1]["id"]}.json').exists())
+            self.assertFalse((results / f'{multi_node_targets[0]["id"]}.json').exists())
+
+    def test_missing_result_fallback_excludes_single_node_targets(self) -> None:
+        targets = load_module().load_targets(ROOT / ".github" / "verification-targets.yaml")
+        with tempfile.TemporaryDirectory() as directory:
+            results = Path(directory)
+            load_fill_module().fill_missing_results(targets, results)
+
+            self.assertFalse(
+                any(target["mode"] == "single-node" and (results / f'{target["id"]}.json').exists() for target in targets)
+            )
 
     def test_status_publisher_backfills_missing_nightly_targets(self) -> None:
         publisher = (ROOT / ".github" / "workflows" / "publish-status.yml").read_text()
@@ -119,6 +145,16 @@ class VerificationTargetTests(unittest.TestCase):
         )
         self.assertIn('actions/runs/${RUN_ID}/jobs?per_page=100', publisher)
         self.assertIn('--target-id "$target_id"', publisher)
+
+    def test_configuration_status_unit_tests_are_gated_in_ci(self) -> None:
+        lint_workflow = (ROOT / ".github" / "workflows" / "lint.yml").read_text()
+
+        self.assertIn("python -m unittest discover -s test/unit -p '*test.py' -v", lint_workflow)
+        self.assertIn("configuration_status:", lint_workflow)
+        self.assertIn(".github/_scripts/**", lint_workflow)
+        self.assertIn(".github/verification-targets.yaml", lint_workflow)
+        self.assertIn("test/unit/**", lint_workflow)
+        self.assertIn("needs.detect.outputs.configuration_status == 'true'", lint_workflow)
 
 
 if __name__ == "__main__":

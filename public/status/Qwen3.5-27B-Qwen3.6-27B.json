@@ -35,5 +35,54 @@
     "pr_url": null,
     "pr_title": null,
     "pr_author": null
+  },
+  "targets": {
+    "qwen35-27b-qwen36-27b-a2-w8a8-single-node-multi-card": {
+      "test_id": null,
+      "selector": {
+        "npu": "Atlas 800I A2",
+        "precision": "W8A8",
+        "deployment": "Single-Node",
+        "case": "Multi Card"
+      },
+      "runner": "linux-aarch64-a2b4-8",
+      "mode": "single-node",
+      "last_pr_run": {
+        "kind": "pr",
+        "status": "pass",
+        "conclusion": "success",
+        "head_sha": "bc19a0766a7626041bec5d8a388adba3fdb6ba55",
+        "head_sha_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/commit/bc19a0766a7626041bec5d8a388adba3fdb6ba55",
+        "workflow_run_id": 32349469047,
+        "workflow_run_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/actions/runs/32349469047",
+        "recipe_path": "models/en/Qwen/Qwen3.5-27B-Qwen3.6-27B.yaml",
+        "recipe_yaml_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/blob/bc19a0766a7626041bec5d8a388adba3fdb6ba55/models/en/Qwen/Qwen3.5-27B-Qwen3.6-27B.yaml",
+        "params_url": "https://vllm-ascend.github.io/vllm-ascend-recipes/runs/bc19a0766a7626041bec5d8a388adba3fdb6ba55/Qwen3.5-27B-Qwen3.6-27B.params.json",
+        "started_at": "2026-08-20T08:34:09Z",
+        "finished_at": "2026-08-20T09:02:41Z",
+        "pr_number": null,
+        "pr_url": null,
+        "pr_title": null,
+        "pr_author": null
+      },
+      "last_nightly_run": {
+        "kind": "nightly",
+        "status": "pass",
+        "conclusion": "success",
+        "head_sha": "4aacf376dc4b7496aa875b9a4532efbfd990b131",
+        "head_sha_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/commit/4aacf376dc4b7496aa875b9a4532efbfd990b131",
+        "workflow_run_id": 32657969454,
+        "workflow_run_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/actions/runs/32657969454",
+        "recipe_path": "models/en/Qwen/Qwen3.5-27B-Qwen3.6-27B.yaml",
+        "recipe_yaml_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/blob/4aacf376dc4b7496aa875b9a4532efbfd990b131/models/en/Qwen/Qwen3.5-27B-Qwen3.6-27B.yaml",
+        "params_url": "https://vllm-ascend.github.io/vllm-ascend-recipes/runs/4aacf376dc4b7496aa875b9a4532efbfd990b131/Qwen3.5-27B-Qwen3.6-27B.params.json",
+        "started_at": "2026-08-23T18:39:32Z",
+        "finished_at": "2026-08-23T18:54:43Z",
+        "pr_number": null,
+        "pr_url": null,
+        "pr_title": null,
+        "pr_author": null
+      }
+    }
   }
 }
