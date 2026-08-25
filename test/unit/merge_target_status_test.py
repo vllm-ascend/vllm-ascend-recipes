@@ -46,6 +46,22 @@ class MergeTargetStatusTests(unittest.TestCase):
         self.assertEqual(merged["targets"]["qwen-a2"]["test_id"], "qwen30b-dp-2n2c")
         self.assertEqual(merged["targets"]["qwen-a2"]["last_pr_run"], {"status": "pass"})
         self.assertEqual(merged["targets"]["qwen-a2"]["last_nightly_run"], run)
+        self.assertEqual(merged["targets"]["qwen-a2"]["history"], [run])
+
+    def test_merging_same_workflow_run_does_not_duplicate_history(self) -> None:
+        target = {
+            "id": "qwen-a2",
+            "recipe": "models/en/Qwen/Qwen3-30B-A3B.yaml",
+            "runner": "linux-aarch64-a2b4-8",
+            "mode": "single-node",
+            "selector": {"npu": "Atlas 800I A2", "precision": "W8A8", "deployment": "Single-Node", "case": "Multi Card"},
+        }
+        run = {"kind": "nightly", "status": "pass", "workflow_run_id": 42, "finished_at": "2026-08-25T00:00:00Z"}
+        existing = {"targets": {"qwen-a2": {"history": [run]}}}
+
+        merged = load_module().merge_target_status(existing, target, run, "nightly")
+
+        self.assertEqual(merged["targets"]["qwen-a2"]["history"], [run])
 
 
 if __name__ == "__main__":

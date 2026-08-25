@@ -18,5 +18,22 @@
     "pr_url": null,
     "pr_title": null,
     "pr_author": null
+  },
+  "targets": {
+    "template-deepseek-v2-lite-pd-a2-w8a8-1p1d": {
+      "test_id": "pd-2n2c",
+      "selector": {
+        "npu": "Atlas 800I A2",
+        "precision": "W8A8",
+        "deployment": "pd",
+        "case": "1p1d"
+      },
+      "runner": "linux-aarch64-a2b4-1",
+      "mode": "multi-node",
+      "last_pr_run": null,
+      "last_nightly_run": null,
+      "last_manual_run": null,
+      "history": []
+    }
   }
 }

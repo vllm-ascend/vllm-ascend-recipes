@@ -52,6 +52,8 @@ export interface VerificationTargetStatus {
   last_nightly_run: RunStatus | null;
   /** Latest manually-dispatched run; not displayed as PR/nightly evidence. */
   last_manual_run?: RunStatus | null;
+  /** All exact PR/nightly evidence retained for the selected configuration. */
+  history?: RunStatus[];
 }
 
 export interface ModelStatus {
@@ -155,4 +157,18 @@ export function findScenarioTarget(
 /** Production verification is true only when the latest main nightly passed. */
 export function isNightlyVerified(target: VerificationTargetStatus | null | undefined): boolean {
   return target?.last_nightly_run?.status === 'pass';
+}
+
+export type ModelVerificationSummary = 'all-pass' | 'partial-pass' | 'no-pass' | 'untracked';
+
+/** Summarize the latest nightly result for every allowlisted configuration. */
+export function summarizeModelVerification(
+  status: Pick<ModelStatus, 'targets'> | null | undefined,
+): ModelVerificationSummary {
+  const targets = Object.values(status?.targets ?? {});
+  if (targets.length === 0) return 'untracked';
+  const passed = targets.filter((target) => isNightlyVerified(target)).length;
+  if (passed === targets.length) return 'all-pass';
+  if (passed > 0) return 'partial-pass';
+  return 'no-pass';
 }

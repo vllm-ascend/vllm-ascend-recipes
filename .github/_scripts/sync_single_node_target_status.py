@@ -45,6 +45,15 @@ def merge_target(existing: dict[str, Any], target: dict[str, Any], run: dict[str
         }
     )
     current[f"last_{trigger}_run"] = run
+    history = [entry for entry in current.get("history", []) if isinstance(entry, dict)]
+    identity = (run.get("kind"), run.get("workflow_run_id") or run.get("head_sha"), run.get("finished_at"))
+    known = {
+        (entry.get("kind"), entry.get("workflow_run_id") or entry.get("head_sha"), entry.get("finished_at"))
+        for entry in history
+    }
+    if identity not in known:
+        history.append(copy.deepcopy(run))
+    current["history"] = sorted(history, key=lambda entry: str(entry.get("finished_at", "")), reverse=True)
     targets[target["id"]] = current
     return merged
 

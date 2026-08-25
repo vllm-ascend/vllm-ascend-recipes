@@ -145,6 +145,7 @@ class VerificationTargetTests(unittest.TestCase):
         )
         self.assertIn('actions/runs/${RUN_ID}/jobs?per_page=100', publisher)
         self.assertIn('--target-id "$target_id"', publisher)
+        self.assertIn("seed_target_statuses.py", publisher)
 
     def test_configuration_status_unit_tests_are_gated_in_ci(self) -> None:
         lint_workflow = (ROOT / ".github" / "workflows" / "lint.yml").read_text()

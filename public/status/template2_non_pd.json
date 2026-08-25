@@ -18,5 +18,22 @@
     "pr_url": null,
     "pr_title": null,
     "pr_author": null
+  },
+  "targets": {
+    "template-qwen3-30b-a3b-a2-bf16-2node": {
+      "test_id": "dp-2n2c",
+      "selector": {
+        "npu": "Atlas 800I A2",
+        "precision": "bf16",
+        "deployment": "non-pd",
+        "case": "2-node"
+      },
+      "runner": "linux-aarch64-a2b4-1",
+      "mode": "multi-node",
+      "last_pr_run": null,
+      "last_nightly_run": null,
+      "last_manual_run": null,
+      "history": []
+    }
   }
 }

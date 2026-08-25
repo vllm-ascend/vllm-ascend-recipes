@@ -5,11 +5,9 @@ import { resolveVllmAscendLink } from '../lib/links';
 import { expandScenarioScripts } from '../lib/scenario-scripts';
 import {
   findScenarioTarget,
-  isNightlyVerified,
   statusUrlForSlug,
   type ModelStatus,
   type RunStatus,
-  type VerificationTargetStatus,
 } from '../lib/status';
 import type { ScenarioScript, Variant } from '../lib/types';
 import {
@@ -91,28 +89,6 @@ interface CascadeSelectorProps {
     prefill?: { nodes?: number | { default?: number } };
     decode?: { nodes?: number | { default?: number } };
   };
-}
-
-function verificationTitle(target: VerificationTargetStatus, lang: string): string {
-  const describe = (label: string, run: RunStatus | null) => {
-    if (!run) return `${label}: ${lang === 'zh' ? '未运行' : 'not run'}`;
-    const state =
-      run.status === 'pass'
-        ? lang === 'zh'
-          ? '通过'
-          : 'passed'
-        : run.status === 'fail'
-          ? lang === 'zh'
-            ? '失败'
-            : 'failed'
-          : run.status;
-    return `${label}: ${state}${run.finished_at ? ` · ${run.finished_at.slice(0, 10)}` : ''}`;
-  };
-  return [
-    lang === 'zh' ? '已通过主线 nightly 验证' : 'Verified by main-branch nightly',
-    describe('Nightly', target.last_nightly_run),
-    describe(lang === 'zh' ? '最近 PR' : 'Latest PR', target.last_pr_run),
-  ].join('\n');
 }
 
 // Legacy pipeline-routing tags remain visible while the new template-driven
@@ -719,7 +695,7 @@ export default function CascadeSelector({
 }: CascadeSelectorProps) {
   const { lang, t } = useLang();
   const scenarios = lang === 'zh' ? scenariosZh : scenariosEn;
-  const [modelStatus, setModelStatus] = useState<ModelStatus | null>(null);
+  const [modelStatus, setModelStatus] = useState<ModelStatus | null | undefined>(undefined);
   const extraConfig =
     lang === 'zh' ? (extraConfigZh ?? extraConfigEn) : (extraConfigEn ?? extraConfigZh);
   const selectorLabels =
@@ -1117,25 +1093,10 @@ export default function CascadeSelector({
             ...caseScenario.steps.map((step, index) => `${index + 1}. ${step.title}`),
           ].join('\n')
         : undefined;
-      const target = caseScenario ? findScenarioTarget(modelStatus, caseScenario) : null;
-      const verified = isNightlyVerified(target);
-      const tooltip = [
-        baseTooltip,
-        verified && target ? verificationTitle(target, lang) : undefined,
-      ]
-        .filter(Boolean)
-        .join('\n\n');
       return (
-        <Tooltip key={opt} content={tooltip}>
+        <Tooltip key={opt} content={baseTooltip}>
           <button onClick={() => setSelectedCase(opt)} className={chipClass(effectiveCase === opt)}>
             <span className="font-semibold">{opt}</span>
-            {verified && (
-              <span
-                className="ml-1.5 inline-block h-2 w-2 rounded-full bg-emerald-400 ring-1 ring-emerald-300/50"
-                role="img"
-                aria-label={lang === 'zh' ? '已通过 nightly 验证' : 'Nightly verified'}
-              />
-            )}
           </button>
         </Tooltip>
       );
@@ -1273,6 +1234,93 @@ export default function CascadeSelector({
       )
     : null;
 
+  // ---- Verification row: the selected configuration's exact CI evidence ----
+  const verificationTarget = currentScenario
+    ? findScenarioTarget(modelStatus, currentScenario)
+    : null;
+  const verificationHistory = verificationTarget?.history?.length
+    ? verificationTarget.history
+    : [verificationTarget?.last_nightly_run, verificationTarget?.last_pr_run].filter(
+        (run): run is RunStatus => !!run,
+      );
+  const runLabel = (label: string, run: RunStatus | null | undefined) => {
+    const state = !run
+      ? lang === 'zh'
+        ? '未运行'
+        : 'not run'
+      : run.status === 'pass'
+        ? lang === 'zh'
+          ? '通过'
+          : 'passed'
+        : run.status === 'fail'
+          ? lang === 'zh'
+            ? '失败'
+            : 'failed'
+          : run.status === 'unknown'
+            ? lang === 'zh'
+              ? '结果未知'
+              : 'unknown'
+            : run.status;
+    const color =
+      run?.status === 'pass' ? 'text-emerald-300' : run ? 'text-rose-300' : 'text-ink-500';
+    const date = run?.finished_at ? run.finished_at.slice(0, 10) : '';
+    return (
+      <span className="inline-flex items-center gap-1.5 text-xs font-mono">
+        <span className={color}>
+          {label} {state}
+        </span>
+        {run?.workflow_run_url && date && (
+          <a
+            href={run.workflow_run_url}
+            target="_blank"
+            rel="noreferrer"
+            className="text-accent-400 underline decoration-accent-500/40 underline-offset-2 hover:text-accent-300"
+          >
+            {date}
+          </a>
+        )}
+      </span>
+    );
+  };
+  const verificationRow = rowShell(
+    lang === 'zh' ? '验证状态' : 'Verification',
+    lang === 'zh'
+      ? '仅当该精确配置的最新主线 nightly 通过时，才会显示为通过。日期可跳转到对应的 Actions 运行。'
+      : 'Only a passing main-branch nightly verifies this exact configuration. Dates link to the Actions run.',
+    modelStatus === undefined ? (
+      <span className="text-xs font-mono text-ink-500">
+        {lang === 'zh' ? '正在加载验证状态…' : 'Loading verification status…'}
+      </span>
+    ) : !verificationTarget ? (
+      <span className="text-xs font-mono text-ink-500">
+        {lang === 'zh' ? '此配置暂无可验证记录' : 'No verification record for this configuration'}
+      </span>
+    ) : (
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        {runLabel('Nightly', verificationTarget.last_nightly_run)}
+        <span className="hidden h-3 w-px bg-ink-700 sm:block" />
+        {runLabel('PR', verificationTarget.last_pr_run)}
+        {verificationHistory.length > 0 && (
+          <details className="basis-full pt-1 text-xs font-mono text-ink-400">
+            <summary className="cursor-pointer text-ink-400 hover:text-ink-200">
+              {lang === 'zh'
+                ? `历史记录（${verificationHistory.length}）`
+                : `History (${verificationHistory.length})`}
+            </summary>
+            <div className="mt-2 space-y-1 border-l border-ink-700 pl-3">
+              {verificationHistory.map((run, index) => (
+                <div key={`${run.kind}-${run.workflow_run_id}-${index}`}>
+                  {runLabel(run.kind === 'nightly' ? 'Nightly' : run.kind.toUpperCase(), run)}
+                </div>
+              ))}
+            </div>
+          </details>
+        )}
+      </div>
+    ),
+    'verification',
+  );
+
   return (
     <div>
       {/* Filter panel */}
@@ -1283,6 +1331,7 @@ export default function CascadeSelector({
         {caseRow}
         {featuresRow}
         {configRow}
+        {verificationRow}
       </div>
 
       {/* Result panel */}

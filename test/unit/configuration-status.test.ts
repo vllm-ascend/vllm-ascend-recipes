@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   findScenarioTarget,
   isNightlyVerified,
+  summarizeModelVerification,
   type RunStatus,
   type VerificationTargetStatus,
 } from '../../src/lib/status';
@@ -78,4 +79,15 @@ test('requires a successful nightly run before rendering a green dot', () => {
     isNightlyVerified({ ...target, last_pr_run: run('pass', 'pr'), last_nightly_run: null }),
     false,
   );
+});
+
+test('summarizes model targets as all, partial, none, or untracked', () => {
+  const passing = { ...target, last_nightly_run: run('pass') };
+  const failing = { ...target, last_nightly_run: run('fail') };
+
+  assert.equal(summarizeModelVerification({ targets: { passing } }), 'all-pass');
+  assert.equal(summarizeModelVerification({ targets: { passing, failing } }), 'partial-pass');
+  assert.equal(summarizeModelVerification({ targets: { failing } }), 'no-pass');
+  assert.equal(summarizeModelVerification({ targets: {} }), 'untracked');
+  assert.equal(summarizeModelVerification(null), 'untracked');
 });
