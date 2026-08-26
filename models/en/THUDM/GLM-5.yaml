@@ -14,6 +14,7 @@ meta:
   hardware:
     atlas_800_a3: verified
     atlas_800_a2: verified
+    ascend_950dt: verified
 
 model:
   model_id: "zai-org/GLM-5"
@@ -36,6 +37,7 @@ model:
   docker_image:
     atlas_800_a2: "quay.io/ascend/vllm-ascend:v0.22.1rc"
     atlas_800_a3: "quay.io/ascend/vllm-ascend:v0.22.1rc-a3"
+    ascend_950dt: "swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/vllm-ascend:v0.23.0-a5"
   nightly_required: false
   install:
     # Ascend recommends Docker; pip requires source build (no official wheel), so the pip tab is hidden.
@@ -95,10 +97,15 @@ variants:
     precision: bf16
     vram_minimum_gb: 1786
     description: "BF16 weights — needs 2× Atlas 800 A3 (16 chips each)"
+  w4a4_a5:
+    precision: W4A4
+    vram_minimum_gb: 768
+    description: "W4A4 quantized weights for one Ascend 950DT server"
 
 compatible_strategies:
   - single_node_A3
   - single_node_A2
+  - single_node_A5
   - multi_node_dp
   - pd_cluster
 
@@ -367,6 +374,62 @@ env_setup:
 
       For more details, please refer to the [Installation Guide](https://docs.vllm.ai/projects/ascend/en/latest/installation.html).
 scenarios:
+- npu: Ascend 950DT
+  precision: W4A4
+  deployment: Single-Node
+  case: Single Node Multi Card (A5)
+  tags: [a5-single]
+  strategy: single_node_A5
+  steps:
+  - title: Start the server
+    content: |-
+      GLM-5 W4A4 runs on one Ascend 950DT server with eight NPUs. This A5 scenario uses the pre-installed `GLM5-w4a4` weights and the dedicated `linux-aarch64-a5-8` runner.
+
+      ```bash
+      export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
+      export HCCL_DFS_CONFIG="task_exception:off,inconsistent_check:off"
+      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+      export HCCL_OP_EXPANSION_MODE="AIV"
+      export VLLM_ASCEND_ENABLE_FLASHCOMM1=1
+      export VLLM_ASCEND_ENABLE_PREFETCH_MLP=1
+      export HCCL_INTRA_PCIE_ENABLE=1
+      export HCCL_INTRA_ROCE_ENABLE=0
+      export DYNAMIC_EPLB="true"
+      export OMP_PROC_BIND=false
+      export OMP_NUM_THREADS=100
+      export HCCL_BUFFSIZE=400
+
+      vllm serve your_model_path \
+          --host 0.0.0.0 \
+          --port 8077 \
+          --data-parallel-size 1 \
+          --tensor-parallel-size 8 \
+          --seed 1024 \
+          --served-model-name glm-5 \
+          --enable-expert-parallel \
+          --max-num-seqs 128 \
+          --max-model-len 202752 \
+          --max-num-batched-tokens 8192 \
+          --trust-remote-code \
+          --enable-prefix-caching \
+          --gpu-memory-utilization 0.95 \
+          --quantization ascend \
+          --enable-auto-tool-choice \
+          --tool-call-parser glm47 \
+          --reasoning-parser glm45 \
+          --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY"}' \
+          --hf-overrides '{"use_index_cache": true, "index_topk_freq": 4}' \
+          --additional-config '{"enable_cpu_binding": "True", "multistream_overlap_shared_expert": "True", "enable_sparse_c8": "True", "enable_dsa_cp": true, "eplb_config": {"dynamic_eplb": true, "expert_heat_collection_interval": 50, "algorithm_execution_interval": 5, "eplb_policy_type": 2, "num_redundant_experts": 0}}'
+      ```
+  - title: Service Verification
+    content: |-
+      ```bash
+      curl http://localhost:8077/v1/chat/completions \
+          -H 'Content-Type: application/json' \
+          -d '{"model":"glm-5","messages":[{"role":"user","content":"Who are you?"}],"max_tokens":32,"temperature":0}'
+      ```
+
+      Expected result: HTTP 200 with a response containing the `choices` field.
 - npu: Atlas 800I A3
   precision: W4A8
   deployment: Single-Node

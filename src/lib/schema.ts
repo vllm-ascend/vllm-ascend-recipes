@@ -16,6 +16,7 @@ export const metaSchema = z.object({
     .object({
       atlas_800_a3: z.enum(['verified', 'unsupported', 'experimental']).optional(),
       atlas_800_a2: z.enum(['verified', 'unsupported', 'experimental']).optional(),
+      ascend_950dt: z.enum(['verified', 'unsupported', 'experimental']).optional(),
       atlas_300i_duo: z.enum(['verified', 'unsupported', 'experimental']).optional(),
       mi300x: z.enum(['verified', 'unsupported', 'experimental']).optional(),
       mi325x: z.enum(['verified', 'unsupported', 'experimental']).optional(),

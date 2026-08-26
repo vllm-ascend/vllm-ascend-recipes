@@ -14,6 +14,7 @@ meta:
   hardware:
     atlas_800_a3: verified
     atlas_800_a2: verified
+    ascend_950dt: verified
 
 model:
   model_id: "zai-org/GLM-5"
@@ -36,6 +37,7 @@ model:
   docker_image:
     atlas_800_a2: "quay.io/ascend/vllm-ascend:v0.22.1rc"
     atlas_800_a3: "quay.io/ascend/vllm-ascend:v0.22.1rc-a3"
+    ascend_950dt: "swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/vllm-ascend:v0.23.0-a5"
   nightly_required: false
   install:
     # Ascend 推荐 Docker 方式;pip 需源码编译,不提供官方 wheel,隐藏 pip 标签。
@@ -95,10 +97,15 @@ variants:
     precision: bf16
     vram_minimum_gb: 1786
     description: "BF16 权重 — 需要 2× Atlas 800 A3(各 16 芯片)"
+  w4a4_a5:
+    precision: W4A4
+    vram_minimum_gb: 768
+    description: "适用于单台 Ascend 950DT 的 W4A4 量化权重"
 
 compatible_strategies:
   - single_node_A3
   - single_node_A2
+  - single_node_A5
   - multi_node_dp
   - pd_cluster
 
@@ -367,6 +374,62 @@ env_setup:
 
       更多详情请参考 [安装指南](https://docs.vllm.ai/projects/ascend/zh-cn/latest/installation.html)。
 scenarios:
+- npu: Ascend 950DT
+  precision: W4A4
+  deployment: 单节点
+  case: 单节点多卡（A5）
+  tags: [a5-single]
+  strategy: single_node_A5
+  steps:
+  - title: 启动服务
+    content: |-
+      GLM-5 W4A4 在单台 Ascend 950DT（8 个 NPU）上运行。此 A5 场景使用预装的 `GLM5-w4a4` 权重，并在专用 `linux-aarch64-a5-8` runner 上验证。
+
+      ```bash
+      export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
+      export HCCL_DFS_CONFIG="task_exception:off,inconsistent_check:off"
+      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+      export HCCL_OP_EXPANSION_MODE="AIV"
+      export VLLM_ASCEND_ENABLE_FLASHCOMM1=1
+      export VLLM_ASCEND_ENABLE_PREFETCH_MLP=1
+      export HCCL_INTRA_PCIE_ENABLE=1
+      export HCCL_INTRA_ROCE_ENABLE=0
+      export DYNAMIC_EPLB="true"
+      export OMP_PROC_BIND=false
+      export OMP_NUM_THREADS=100
+      export HCCL_BUFFSIZE=400
+
+      vllm serve your_model_path \
+          --host 0.0.0.0 \
+          --port 8077 \
+          --data-parallel-size 1 \
+          --tensor-parallel-size 8 \
+          --seed 1024 \
+          --served-model-name glm-5 \
+          --enable-expert-parallel \
+          --max-num-seqs 128 \
+          --max-model-len 202752 \
+          --max-num-batched-tokens 8192 \
+          --trust-remote-code \
+          --enable-prefix-caching \
+          --gpu-memory-utilization 0.95 \
+          --quantization ascend \
+          --enable-auto-tool-choice \
+          --tool-call-parser glm47 \
+          --reasoning-parser glm45 \
+          --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY"}' \
+          --hf-overrides '{"use_index_cache": true, "index_topk_freq": 4}' \
+          --additional-config '{"enable_cpu_binding": "True", "multistream_overlap_shared_expert": "True", "enable_sparse_c8": "True", "enable_dsa_cp": true, "eplb_config": {"dynamic_eplb": true, "expert_heat_collection_interval": 50, "algorithm_execution_interval": 5, "eplb_policy_type": 2, "num_redundant_experts": 0}}'
+      ```
+  - title: 服务验证
+    content: |-
+      ```bash
+      curl http://localhost:8077/v1/chat/completions \
+          -H 'Content-Type: application/json' \
+          -d '{"model":"glm-5","messages":[{"role":"user","content":"Who are you?"}],"max_tokens":32,"temperature":0}'
+      ```
+
+      预期结果：返回 HTTP 200，且响应中包含 `choices` 字段。
 - npu: Atlas 800I A3
   precision: W4A8
   deployment: 单节点-多卡

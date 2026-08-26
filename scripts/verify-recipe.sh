@@ -151,8 +151,15 @@ except Exception as e:
     print(json.dumps({'action': 'skip', 'reason': f'cache_paths 文件解析失败: {e}'}))
     sys.exit(0)
 CACHE_DIR_BY_MODEL = {a['model_id']: a['cache_dir'] for a in aliases}
-if hw_key == 'ascend_950dt' and model_id_for_path == 'deepseek-ai/DeepSeek-V4-Flash':
-    a5_candidate = '/root/.cache/modelscope/hub/models/models--deepseek-ai--DeepSeek-V4-Flash'
+if hw_key == 'ascend_950dt' and model_id_for_path in {
+    'deepseek-ai/DeepSeek-V4-Flash',
+    'zai-org/GLM-5',
+}:
+    a5_candidates = {
+        'deepseek-ai/DeepSeek-V4-Flash': '/root/.cache/modelscope/hub/models/models--deepseek-ai--DeepSeek-V4-Flash',
+        'zai-org/GLM-5': '/root/.cache/modelscope/hub/models/vllm-ascend/GLM5-w4a4',
+    }
+    a5_candidate = a5_candidates[model_id_for_path]
     CACHE_PATH = a5_candidate if os.path.isdir(a5_candidate) else None
     if CACHE_PATH is None:
         print(json.dumps({

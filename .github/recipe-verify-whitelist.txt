@@ -4,3 +4,4 @@
 # Recipes not matching any pattern are skipped on pull_request triggers.
 models/en/Qwen/
 models/en/DeepSeek/DeepSeek-V4-Flash.yaml
+models/en/THUDM/GLM-5.yaml
