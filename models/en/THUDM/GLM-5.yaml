@@ -383,7 +383,7 @@ scenarios:
   steps:
   - title: Start the server
     content: |-
-      GLM-5 W4A4 runs on one Ascend 950DT server with eight NPUs. This A5 scenario uses the pre-installed `GLM5-w4a4` weights and the dedicated `linux-aarch64-a5-8` runner.
+      GLM-5 W4A4 runs on one Ascend 950DT server with eight NPUs. This A5 scenario uses the pre-installed `GLM-5.1-w4a4c8-mxfp4` weights and the dedicated `linux-aarch64-a5-8` runner.
 
       ```bash
       export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
