@@ -1,6 +1,6 @@
 ---
 name: add-recipe
-description: Use when the user asks to add, contribute, create, update, or validate a vLLM-Ascend deployment recipe in this repo (e.g. "add a recipe for Qwen/Qwen3-XYZ", "create a recipe for <org>/<model>"). Walks through authoring the YAML at models/en/<Provider>/<Model>.yaml plus the zh 1:1 mirror, choosing upstream-aligned fields and this repo's extension fields (features / config_params / scenarios), validating with pnpm validate, and committing.
+description: Use when the user asks to add, contribute, create, update, or validate a vLLM-Ascend deployment recipe in this repo (e.g. "add a recipe for Qwen/Qwen3-XYZ", "create a recipe for {org}/{model}"). Walks through authoring the YAML at models/en/{Provider}/{Model}.yaml plus the zh 1:1 mirror, choosing upstream-aligned fields and this repo's extension fields (features / config_params / scenarios), validating with pnpm validate, and committing.
 ---
 
 # Add a new vLLM-Ascend recipe
@@ -16,8 +16,10 @@ Recipes are YAML files at `models/en/<Provider>/<Model>.yaml` (English, source o
    **Reference the official tutorial** — pull `docs/source/tutorials/models/<Model>.md` from the matching vllm-ascend tag (e.g. `v0.23.0rc1`) and use it as the single source of truth for the recipe: scenario division (single-node / multi-node DP / PD separation / request forwarding), serve flags, env vars and per-scenario parameters must match the tutorial. Do not invent scenarios or parameters the tutorial doesn't cover.
 5. **Author `models/en/...`.** Follow the schema below. Use an existing recipe (e.g. `models/en/Qwen/Qwen3-30B-A3B.yaml` or `models/en/DeepSeek/DeepSeek-V4-Flash.yaml`) as a template. Keep the tutorial content in our fields (`overview` / `prerequisites` / `env_setup` / `scenarios`); leave `guide` empty.
 6. **Mirror to `models/zh/...` 1:1.** Same field structure (meta/model/features/variants/strategies/overrides/dependencies/config_params/scenarios/extra_config), only descriptions in Chinese. If the zh file is missing, the site falls back to English.
-7. **Validate.** Run `pnpm validate` (zod schema + interlock errors), then `pnpm check:recipes` (field-level / upstream-alignment rules, see "Validation" below), then `./scripts/format.sh` (validate + typecheck + lint + prettier, mirrors CI). Preview with `pnpm dev` at `/{provider}/{model}`.
-8. **Commit.** Stage only the recipe YAML(s) — never `public/` or generated files. Message: `feat(recipe): add <Provider>/<Model>` (or `fix(recipe): ...` for updates).
+7. **Register CI verification when required.** Adding a recipe alone does not make it eligible for runtime CI or the site's verification badge. If the model/configuration is meant to be verified, add its exact recipe path, runner, mode, and four-part scenario selector to `.github/verification-targets.yaml`. Register every configuration intended to count toward the model's green/yellow/red verification summary. Do not add configurations that cannot yet be scheduled on an available runner.
+8. **Register the runner weight alias when required.** Do not put weight paths or weight files in `.github/verification-targets.yaml`. For a single-node verification target, first arrange for the weights to be baked or mounted in the runner image, then add the recipe `model.model_id` to `models/_cache_paths.yaml` with its on-runner cache directory. The verification script resolves `your_model_path` from this mapping and skips safely if the image does not actually contain the weights.
+9. **Validate.** Run `pnpm validate` (zod schema + interlock errors), then `pnpm check:recipes` (field-level / upstream-alignment rules, see "Validation" below), then `./scripts/format.sh` (validate + typecheck + lint + prettier, mirrors CI). Preview with `pnpm dev` at `/{provider}/{model}`.
+10. **Commit.** Stage the recipe YAML(s), and include `.github/verification-targets.yaml` / `models/_cache_paths.yaml` only when they were intentionally updated for CI verification. Never stage `public/` or generated files. Message: `feat(recipe): add <Provider>/<Model>` (or `fix(recipe): ...` for updates).
 
 ## YAML schema (top-level, 总-分)
 
@@ -163,6 +165,8 @@ python launch_online_dp.py --dp-size 8 --tp-size 4 --dp-size-local 4 --dp-rank-s
 - Boolean toggles live ONLY in `features`; `config_params` is values only.
 - Default state derives from `opt_in_features` (absent = on) — don't add a `default` field to features.
 - `scenario.strategy` ⊆ `compatible_strategies`; tags must match the pipeline routing (a2-single / a3-single / pd-multinode).
+- A configuration counts toward the site's verification status only after it is explicitly registered in `.github/verification-targets.yaml`; recipe `meta.hardware` and `scenarios` alone do not create a CI target.
+- Keep verification metadata separate from weights: `.github/verification-targets.yaml` selects the target and runner, while `models/_cache_paths.yaml` maps a model ID to an already available runner-cache directory.
 - Ascend install is docker-only: `install.pip: false`; `guide: ""`.
 - `en/` and `zh/` field structures must be identical.
 - The official vllm-ascend tutorial (`docs/source/tutorials/models/<Model>.md`) is the source of truth for scenario content and serve parameters; mirror it, don't improvise.
@@ -243,4 +247,5 @@ Run it locally after editing a recipe — a real example it caught:
 
 - `pnpm validate` + `pnpm check:recipes` + `./scripts/format.sh` green;
 - `zh/` mirror committed with the `en/` change;
+- If runtime verification is expected, the intended scenario selectors are registered in `.github/verification-targets.yaml`; any required runner cache alias is registered in `models/_cache_paths.yaml` only after the weights are available in that runner image;
 - No `public/` or generated files staged.
