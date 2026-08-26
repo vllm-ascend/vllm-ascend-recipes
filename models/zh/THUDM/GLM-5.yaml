@@ -383,7 +383,7 @@ scenarios:
   steps:
   - title: 启动服务
     content: |-
-      GLM-5 W4A4 在单台 Ascend 950DT（8 个 NPU）上运行。此 A5 场景使用预装的 `GLM-5.1-w4a4c8-mxfp4` 权重，并在专用 `linux-aarch64-a5-8` runner 上验证。
+      GLM-5 W4A4 在单台 Ascend 950DT（8 个 NPU）上运行。此 A5 场景使用预装的 `Eco-Tech/GLM-5.1-w4a4c8-mxfp4` 权重，并在专用 `linux-aarch64-a5-8` runner 上验证。
 
       ```bash
       export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
