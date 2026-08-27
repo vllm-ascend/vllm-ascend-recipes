@@ -37,7 +37,7 @@ jobs:
             --max-concurrency 4
             --max-retries 3
             --retry-wait-time 5
-            --exclude 'https?://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?(/|$)'
-            --exclude 'https://gitcode\\.com/.+\\.git$'
+            --exclude 'https?://(localhost|127\.0\.0\.1)(:[0-9]+)?(/|$)'
+            --exclude 'https://gitcode\.com/.+\.git$'
             'models/**/*.yaml'
           fail: true
