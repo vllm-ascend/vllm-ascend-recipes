@@ -18,5 +18,22 @@
     "pr_url": null,
     "pr_title": null,
     "pr_author": null
+  },
+  "targets": {
+    "glm5-a5-w4a4-single-node-multi-card": {
+      "test_id": null,
+      "selector": {
+        "npu": "Ascend 950DT",
+        "precision": "W4A4",
+        "deployment": "Single-Node",
+        "case": "Single Node Multi Card (A5)"
+      },
+      "runner": "linux-aarch64-a5-8",
+      "mode": "single-node",
+      "last_pr_run": null,
+      "last_nightly_run": null,
+      "last_manual_run": null,
+      "history": []
+    }
   }
 }

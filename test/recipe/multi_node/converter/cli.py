@@ -25,16 +25,21 @@ _REPOSITORY_ROOT = Path(__file__).resolve().parents[4]
 _MULTI_NODE_ROOT = Path(__file__).resolve().parents[1]
 _GENERATED_ROOT = _MULTI_NODE_ROOT / ".generated"
 _SUPPORTED_CASES = {
-    (_REPOSITORY_ROOT / "models/en/DeepSeek/template_pd.yaml").resolve(): "pd-2n2c",
+    (
+        _REPOSITORY_ROOT / "models/en/DeepSeek/template_pd.yaml"
+    ).resolve(): {"pd-2n2c"},
     (
         _REPOSITORY_ROOT / "models/en/DeepSeek/DeepSeek-V2-Lite-W8A8.yaml"
-    ).resolve(): "dsv2lite-pd-2n2c",
+    ).resolve(): {"dsv2lite-pd-2n2c"},
     (
         _REPOSITORY_ROOT / "models/en/Qwen/Qwen3-30B-A3B.yaml"
-    ).resolve(): "qwen30b-dp-2n2c",
+    ).resolve(): {"qwen30b-dp-2n2c"},
     (
         _REPOSITORY_ROOT / "models/en/Qwen/template2_non_pd.yaml"
-    ).resolve(): "dp-2n2c",
+    ).resolve(): {"dp-2n2c"},
+    (
+        _REPOSITORY_ROOT / "models/en/THUDM/GLM-5.yaml"
+    ).resolve(): {"glm5-pd-cluster", "glm5-dp-2n-a3", "glm5-dp-2n-a2"},
 }
 
 
@@ -92,8 +97,8 @@ def _load_aisbench_defaults() -> dict[str, object]:
 def _source_recipe(path: Path, test_id: str) -> Path:
     """Accept only the two isolated multi-node template contracts."""
     recipe = path.expanduser().resolve()
-    expected_test_id = _SUPPORTED_CASES.get(recipe)
-    if expected_test_id is None:
+    expected_test_ids = _SUPPORTED_CASES.get(recipe)
+    if expected_test_ids is None:
         supported = ", ".join(
             path.relative_to(_REPOSITORY_ROOT).as_posix()
             for path in _SUPPORTED_CASES
@@ -101,9 +106,9 @@ def _source_recipe(path: Path, test_id: str) -> Path:
         raise ConversionError(
             f"unsupported --recipe {recipe}; supported templates: {supported}"
         )
-    if test_id != expected_test_id:
+    if test_id not in expected_test_ids:
         raise ConversionError(
-            f"template {recipe.name} only supports --test-id {expected_test_id!r}"
+            f"template {recipe.name} supports --test-id {sorted(expected_test_ids)!r}"
         )
     return recipe
 

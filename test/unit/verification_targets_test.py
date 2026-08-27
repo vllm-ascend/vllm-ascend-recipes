@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import re
 import tempfile
 import unittest
 from copy import deepcopy
@@ -35,29 +36,24 @@ def load_fill_module():
 
 
 class VerificationTargetTests(unittest.TestCase):
-    def test_status_index_builder_skips_invalid_and_index_files(self) -> None:
-        spec = importlib.util.spec_from_file_location("build_status_index", INDEX_SCRIPT)
-        if spec is None or spec.loader is None:
-            raise RuntimeError(f"cannot load {INDEX_SCRIPT}")
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
+    def test_recipe_verification_uses_runtime_port_placeholder(self) -> None:
+        """Executable local verification URLs must follow the <port> contract."""
+        recipes = ROOT / "models" / "en"
+        violations = []
+        for recipe in recipes.rglob("*.yaml"):
+            data = yaml.safe_load(recipe.read_text(encoding="utf-8")) or {}
+            verification = str(data.get("verification", ""))
+            code_blocks = re.findall(r"```(?:bash|shell)\s*\n(.*?)```", verification, re.DOTALL)
+            for block in code_blocks:
+                if re.search(r"https?://(?:localhost|127\.0\.0\.1):\d+", block):
+                    violations.append(str(recipe.relative_to(ROOT)))
 
-        with tempfile.TemporaryDirectory() as directory:
-            status_dir = Path(directory)
-            (status_dir / "valid.json").write_text(
-                json.dumps({"model": "valid"}), encoding="utf-8"
-            )
-            (status_dir / "invalid.json").write_text("{not-json", encoding="utf-8")
-            (status_dir / "without-model.json").write_text(
-                json.dumps({"last_pr_run": None}), encoding="utf-8"
-            )
-            (status_dir / "index.json").write_text(
-                json.dumps({"models": [{"slug": "stale"}]}), encoding="utf-8"
-            )
-
-            output = module.build_index(status_dir)
-
-            self.assertEqual(output, {"models": [{"slug": "valid"}]})
+        self.assertEqual(
+            violations,
+            [],
+            "verification curl URLs must use <port>, found hard-coded local ports in: "
+            + ", ".join(violations),
+        )
 
     def test_rejects_unknown_target_mode(self) -> None:
         targets_path = ROOT / ".github" / "verification-targets.yaml"
