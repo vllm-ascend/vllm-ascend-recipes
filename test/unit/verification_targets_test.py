@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import re
 import tempfile
 import unittest
 from copy import deepcopy
@@ -34,6 +35,25 @@ def load_fill_module():
 
 
 class VerificationTargetTests(unittest.TestCase):
+    def test_recipe_verification_uses_runtime_port_placeholder(self) -> None:
+        """Executable local verification URLs must follow the <port> contract."""
+        recipes = ROOT / "models" / "en"
+        violations = []
+        for recipe in recipes.rglob("*.yaml"):
+            data = yaml.safe_load(recipe.read_text(encoding="utf-8")) or {}
+            verification = str(data.get("verification", ""))
+            code_blocks = re.findall(r"```(?:bash|shell)\s*\n(.*?)```", verification, re.DOTALL)
+            for block in code_blocks:
+                if re.search(r"https?://(?:localhost|127\.0\.0\.1):\d+", block):
+                    violations.append(str(recipe.relative_to(ROOT)))
+
+        self.assertEqual(
+            violations,
+            [],
+            "verification curl URLs must use <port>, found hard-coded local ports in: "
+            + ", ".join(violations),
+        )
+
     def test_rejects_unknown_target_mode(self) -> None:
         targets_path = ROOT / ".github" / "verification-targets.yaml"
         raw = yaml.safe_load(targets_path.read_text(encoding="utf-8"))
