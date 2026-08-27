@@ -13,6 +13,7 @@ import yaml
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / ".github" / "_scripts" / "verification_targets.py"
 FILL_SCRIPT = ROOT / ".github" / "_scripts" / "fill_missing_target_results.py"
+INDEX_SCRIPT = ROOT / ".github" / "_scripts" / "build_status_index.py"
 
 
 def load_module():
@@ -34,6 +35,30 @@ def load_fill_module():
 
 
 class VerificationTargetTests(unittest.TestCase):
+    def test_status_index_builder_skips_invalid_and_index_files(self) -> None:
+        spec = importlib.util.spec_from_file_location("build_status_index", INDEX_SCRIPT)
+        if spec is None or spec.loader is None:
+            raise RuntimeError(f"cannot load {INDEX_SCRIPT}")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+
+        with tempfile.TemporaryDirectory() as directory:
+            status_dir = Path(directory)
+            (status_dir / "valid.json").write_text(
+                json.dumps({"model": "valid"}), encoding="utf-8"
+            )
+            (status_dir / "invalid.json").write_text("{not-json", encoding="utf-8")
+            (status_dir / "without-model.json").write_text(
+                json.dumps({"last_pr_run": None}), encoding="utf-8"
+            )
+            (status_dir / "index.json").write_text(
+                json.dumps({"models": [{"slug": "stale"}]}), encoding="utf-8"
+            )
+
+            output = module.build_index(status_dir)
+
+            self.assertEqual(output, {"models": [{"slug": "valid"}]})
+
     def test_rejects_unknown_target_mode(self) -> None:
         targets_path = ROOT / ".github" / "verification-targets.yaml"
         raw = yaml.safe_load(targets_path.read_text(encoding="utf-8"))
@@ -157,6 +182,8 @@ class VerificationTargetTests(unittest.TestCase):
         self.assertIn('actions/runs/${RUN_ID}/jobs?per_page=100', publisher)
         self.assertIn('--target-id "$target_id"', publisher)
         self.assertIn("seed_target_statuses.py", publisher)
+        self.assertIn("build_status_index.py", publisher)
+        self.assertNotIn("--argjson items", publisher)
 
     def test_configuration_status_unit_tests_are_gated_in_ci(self) -> None:
         lint_workflow = (ROOT / ".github" / "workflows" / "lint.yml").read_text()
