@@ -710,7 +710,7 @@ verification: |-
       }'
   ```
 
-  > - **URL** (`http://localhost:<port>`): Replace `localhost` with your server IP and `<port>` with the `--port` value from the `vllm serve` command.
+  > - **URL**: Replace `localhost` with your server IP and use the port from the `vllm serve` command.
   > - **`model`**: Must match the `--served-model-name` value from the `vllm serve` command (e.g., `glm`).
 
   **Function Calling:**
