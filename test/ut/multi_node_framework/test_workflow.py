@@ -216,6 +216,9 @@ class MultiNodeWorkflowTests(unittest.TestCase):
         )
         self.assertEqual(job["timeout-minutes"], "180")
         self.assertEqual(job["env"]["MULTI_NODE_UPLOAD_K8S_DIAGNOSTICS"], "false")
+        self.assertEqual(
+            job["env"]["MULTI_NODE_UPLOAD_FULL_DIAGNOSTICS_ON_SUCCESS"], "false"
+        )
 
         ordered_steps = [step["name"] for step in job["steps"]]
         self.assertLess(
@@ -247,6 +250,20 @@ class MultiNodeWorkflowTests(unittest.TestCase):
         target_upload = steps["Upload configuration verification result"]
         self.assertIn("verification-target-results-", target_upload["with"]["name"])
         self.assertIn("${TARGET_ID}.json", steps["Write configuration verification result"]["run"])
+        self.assertTrue(target_upload["continue-on-error"])
+        self.assertEqual(target_upload["with"]["compression-level"], "0")
+        self.assertIn("Upload configuration verification result (retry)", steps)
+        self.assertIn("steps.upload_result.outcome != 'success'", steps["Upload configuration verification result (retry)"]["if"])
+
+        bundle = steps["Build artifact bundle"]
+        self.assertIn("FRAMEWORK_OUTCOME", bundle["env"])
+        self.assertIn("status-only", bundle["run"])
+        self.assertIn('FRAMEWORK_OUTCOME" != "success', bundle["run"])
+        self.assertIn("tar -czf", bundle["run"])
+        self.assertIn("compression-level", github_upload["with"])
+        self.assertEqual(github_upload["with"]["compression-level"], "0")
+        self.assertIn("Upload Multi-node framework bundle to GitHub (retry)", steps)
+        self.assertIn("steps.upload_bundle.outcome != 'success'", steps["Upload Multi-node framework bundle to GitHub (retry)"]["if"])
 
     def test_lws_runtime_contract_and_intra_case_node_isolation(self) -> None:
         lws = render_lws()
