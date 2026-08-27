@@ -54,6 +54,9 @@ jobs:
       # Raw Kubernetes objects contain internal infrastructure metadata. Keep
       # collection available for controlled debugging, but disabled by default.
       MULTI_NODE_UPLOAD_K8S_DIAGNOSTICS: 'false'
+      # Successful verifications only need the small target result artifact.
+      # Full framework logs are reserved for failed verifications.
+      MULTI_NODE_UPLOAD_FULL_DIAGNOSTICS_ON_SUCCESS: 'false'
       PVC_NAME: vllm-ascend-vllm-ascend-recipes-gy001
     # 15m scheduling + 30m startup + 120m execution, with cleanup/upload margin.
     timeout-minutes: 180
@@ -320,13 +323,28 @@ jobs:
           PY
 
       - name: Upload configuration verification result
+        id: upload_result
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: verification-target-results-${{ github.run_id }}-${{ inputs.target_id }}
           path: /tmp/verification-target-result/*.json
           if-no-files-found: error
           retention-days: 14
+          compression-level: 0
+
+      - name: Upload configuration verification result (retry)
+        if: always() && steps.upload_result.outcome != 'success'
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: verification-target-results-${{ github.run_id }}-${{ inputs.target_id }}
+          path: /tmp/verification-target-result/*.json
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+          overwrite: true
 
       - name: Print Kubernetes summary
         if: always() && steps.prepare.outcome == 'success'
@@ -422,22 +440,51 @@ jobs:
             --ignore-not-found=true --wait=false
 
       - name: Build artifact bundle
+        env:
+          FRAMEWORK_OUTCOME: ${{ steps.run_framework.outcome }}
         if: always()
         run: |
           set -euo pipefail
           bundle=${MULTI_NODE_BUNDLE:-/tmp/multi-node-bundle}
           mkdir -p "$bundle"
           if [[ -n "${MULTI_NODE_RUN_ROOT:-}" ]]; then
-            for directory in artifacts plogs pod-status; do
-              [[ -d "$MULTI_NODE_RUN_ROOT/$directory" ]] && \
-                cp -a "$MULTI_NODE_RUN_ROOT/$directory" "$bundle/"
-            done
+            # Keep successful diagnostic uploads small. The result JSON above
+            # is the source of truth for a successful verification; pod status
+            # is enough to diagnose a later cleanup issue.
+            [[ -d "$MULTI_NODE_RUN_ROOT/pod-status" ]] && \
+              cp -a "$MULTI_NODE_RUN_ROOT/pod-status" "$bundle/"
+            if [[ "$FRAMEWORK_OUTCOME" != "success" || \
+                  "$MULTI_NODE_UPLOAD_FULL_DIAGNOSTICS_ON_SUCCESS" == "true" ]]; then
+              for directory in artifacts plogs; do
+                [[ -d "$MULTI_NODE_RUN_ROOT/$directory" ]] && \
+                  cp -a "$MULTI_NODE_RUN_ROOT/$directory" "$bundle/"
+              done
+            else
+              printf '%s\n' "full diagnostics omitted: framework verification passed" \
+                > "$bundle/status-only.txt"
+            fi
           fi
+          # Fast gzip keeps the archive portable while avoiding unnecessary
+          # CPU time on the self-hosted runner; upload actions do not recompress
+          # this prebuilt archive when compression-level is zero.
           tar -czf /tmp/multi-node-bundle.tar.gz -C /tmp multi-node-bundle
 
       - name: Upload Multi-node framework bundle to OBS
         id: upload_obs
-        if: always()
+        if: always() && steps.run_framework.outcome != 'success'
+        continue-on-error: true
+        timeout-minutes: 15
+        uses: ascend-gha-runners/artifact/upload@v0.3
+        with:
+          access_key: ${{ secrets.OBS_AK }}
+          secret_key: ${{ secrets.OBS_SK }}
+          name: ${{ steps.initialize.outputs.artifact_name || format('diagnostics-{0}', github.run_id) }}
+          path: /tmp/multi-node-bundle.tar.gz
+          retention-days: 14
+
+      - name: Upload Multi-node framework bundle to OBS (retry)
+        id: upload_obs_retry
+        if: always() && steps.run_framework.outcome != 'success' && steps.upload_obs.outcome != 'success'
         continue-on-error: true
         timeout-minutes: 15
         uses: ascend-gha-runners/artifact/upload@v0.3
@@ -450,7 +497,8 @@ jobs:
 
       - name: Upload Multi-node framework bundle to GitHub
         id: upload_bundle
-        if: always() && steps.upload_obs.outcome != 'success'
+        if: always() && steps.run_framework.outcome != 'success' &&
+          steps.upload_obs.outcome != 'success' && steps.upload_obs_retry.outcome != 'success'
         continue-on-error: true
         timeout-minutes: 5
         uses: actions/upload-artifact@v7
@@ -460,6 +508,23 @@ jobs:
           if-no-files-found: error
           retention-days: 14
           compression-level: 0
+
+      - name: Upload Multi-node framework bundle to GitHub (retry)
+        if: >-
+          always() && steps.run_framework.outcome != 'success' &&
+          steps.upload_obs.outcome != 'success' &&
+          steps.upload_obs_retry.outcome != 'success' &&
+          steps.upload_bundle.outcome != 'success'
+        continue-on-error: true
+        timeout-minutes: 5
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.initialize.outputs.artifact_name || format('diagnostics-{0}', github.run_id) }}
+          path: /tmp/multi-node-bundle.tar.gz
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+          overwrite: true
 
       - name: Remove staged PVC data
         # Source and logs have already been copied into the local artifact

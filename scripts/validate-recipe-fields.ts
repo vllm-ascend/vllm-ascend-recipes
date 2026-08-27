@@ -60,6 +60,16 @@ function missing(obj: AnyRecord, required: string[]): string[] {
   });
 }
 
+function executableCodeBlocks(markdown: string): string[] {
+  return Array.from(markdown.matchAll(/```(?:bash|shell)\s*\n(.*?)```/gs), (match) => match[1]);
+}
+
+function hasHardcodedLocalPort(markdown: string): boolean {
+  return executableCodeBlocks(markdown).some((block) =>
+    /https?:\/\/(?:localhost|127\.0\.0\.1):\d+/.test(block),
+  );
+}
+
 function checkRecipe(file: string, data: AnyRecord): string[] {
   const errors: string[] = [];
 
@@ -159,6 +169,14 @@ function checkRecipe(file: string, data: AnyRecord): string[] {
   const install = (model.install ?? {}) as AnyRecord;
   if (Object.keys(install).length && install.pip !== false) {
     errors.push('model.install.pip should be false (Ascend is docker-only)');
+  }
+
+  // Verification commands are executed against the port parsed from the
+  // scenario's `vllm serve` command. A fixed localhost port works only by
+  // accident for recipes using the default port and breaks custom-port
+  // scenarios, so executable verification blocks must use <port>.
+  if (typeof data.verification === 'string' && hasHardcodedLocalPort(data.verification)) {
+    errors.push('verification URLs must use <port> instead of a hard-coded localhost port');
   }
 
   // ---- 4. Scenario / step fields ----

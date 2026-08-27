@@ -74,6 +74,27 @@ export function substitutePdContent(
 ): string {
   let text = fillDottedIps(content, endpoints, prefillNodes, decodeNodes);
 
+  // Named node-IP exports (GLM-5 style): fill the values the user already
+  // entered in the Cluster env panel (PREFILL_NODE_1..N / DECODE_NODE_1..N;
+  // GATEWAY falls back to PREFILL_NODE_1). Placeholders with no entry stay.
+  text = text.replace(
+    /export\s+(PREFILL|DECODE|GATEWAY)_NODE_(\d+)_IP="\$\{\1_NODE_\2_IP:-[^}]*\}"/g,
+    (match, role: string, idx: string) => {
+      const key = role === 'GATEWAY' ? 'PREFILL_NODE_1' : `${role}_NODE_${Number(idx) + 1}`;
+      const ip = endpoints[key];
+      return ip ? `export ${role}_NODE_${idx}_IP="${ip}"` : match;
+    },
+  );
+
+  // Launch references ($PREFILL_NODE_0_IP etc.) — fill with the same cluster
+  // env values so the rendered command shows the actual addresses instead of
+  // leaving shell variables that were only exported in a previous step.
+  text = text.replace(/\$(PREFILL|DECODE|GATEWAY)_NODE_(\d+)_IP\b/g, (match, role, idx) => {
+    const key = role === 'GATEWAY' ? 'PREFILL_NODE_1' : `${role}_NODE_${Number(idx) + 1}`;
+    const ip = endpoints[key];
+    return ip ? ip : match;
+  });
+
   if (endpoints.IFACE_NAME) {
     text = text.replace(/(nic_name\s*=\s*)"[^"]*"/, `$1"${endpoints.IFACE_NAME}"`);
   }

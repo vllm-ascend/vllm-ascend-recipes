@@ -428,15 +428,11 @@ jobs:
           #    CI run and re-dirty the PR's `public/status/index.json`, breaking
           #    merges in an unbreakable loop. The frontend (src/lib/status.ts)
           #    does not read `updated_at` either, so dropping it is safe.
-          index_items=$(for f in public/status/*.json; do
-            [ -f "$f" ] || continue
-            [ "$(basename "$f")" = "index.json" ] && continue
-            slug=$(jq -r '.model // empty' "$f")
-            [ -z "$slug" ] && continue
-            jq -nc --arg s "$slug" '{slug: $s}'
-          done | jq -s '.')
-          jq -n --argjson items "$index_items" \
-            '{ models: $items }' > public/status/index.json
+          # Build the aggregate index in Python so empty or malformed status
+          # files cannot be passed through a shell variable to jq --argjson.
+          python3 .github/_scripts/build_status_index.py \
+            --status-dir public/status \
+            --output public/status/index.json
           built=$(find public/status -maxdepth 1 -name '*.json' | wc -l)
           echo "Built ${built} status files + index.json"
 

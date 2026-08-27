@@ -676,7 +676,7 @@ verification: |-
 
   Smoke-test with the **Completions API**:
   ```bash
-  curl http://localhost:8000/v1/completions \
+  curl http://localhost:<port>/v1/completions \
       -H "Content-Type: application/json" \
       -d '{
           "model": "qwen3.5",
@@ -688,7 +688,7 @@ verification: |-
 
   Or with the **Chat Completions API**:
   ```bash
-  curl http://localhost:8000/v1/chat/completions \
+  curl http://localhost:<port>/v1/chat/completions \
       -H "Content-Type: application/json" \
       -d '{
           "model": "qwen3.5",

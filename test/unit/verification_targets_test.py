@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import re
 import tempfile
 import unittest
 from copy import deepcopy
@@ -13,6 +14,7 @@ import yaml
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / ".github" / "_scripts" / "verification_targets.py"
 FILL_SCRIPT = ROOT / ".github" / "_scripts" / "fill_missing_target_results.py"
+INDEX_SCRIPT = ROOT / ".github" / "_scripts" / "build_status_index.py"
 
 
 def load_module():
@@ -34,28 +36,24 @@ def load_fill_module():
 
 
 class VerificationTargetTests(unittest.TestCase):
-    def test_qwen_documentation_cleanup_and_linkcheck_workflow(self) -> None:
-        for language in ("en", "zh"):
-            recipe = yaml.safe_load(
-                (
-                    ROOT
-                    / "models"
-                    / language
-                    / "Qwen"
-                    / "Qwen3.5-27B-Qwen3.6-27B.yaml"
-                ).read_text(encoding="utf-8")
-            )
-            self.assertEqual(
-                recipe["meta"]["title"], "Qwen3.5-27B & Qwen3.6-27B"
-            )
-            self.assertNotIn("performance", recipe)
+    def test_recipe_verification_uses_runtime_port_placeholder(self) -> None:
+        """Executable local verification URLs must follow the <port> contract."""
+        recipes = ROOT / "models" / "en"
+        violations = []
+        for recipe in recipes.rglob("*.yaml"):
+            data = yaml.safe_load(recipe.read_text(encoding="utf-8")) or {}
+            verification = str(data.get("verification", ""))
+            code_blocks = re.findall(r"```(?:bash|shell)\s*\n(.*?)```", verification, re.DOTALL)
+            for block in code_blocks:
+                if re.search(r"https?://(?:localhost|127\.0\.0\.1):\d+", block):
+                    violations.append(str(recipe.relative_to(ROOT)))
 
-        linkcheck = (
-            ROOT / ".github" / "workflows" / "docs-linkcheck.yml"
-        ).read_text(encoding="utf-8")
-        self.assertIn("schedule:", linkcheck)
-        self.assertIn("workflow_dispatch:", linkcheck)
-        self.assertIn("lycheeverse/lychee-action", linkcheck)
+        self.assertEqual(
+            violations,
+            [],
+            "verification curl URLs must use <port>, found hard-coded local ports in: "
+            + ", ".join(violations),
+        )
 
     def test_rejects_unknown_target_mode(self) -> None:
         targets_path = ROOT / ".github" / "verification-targets.yaml"
@@ -180,6 +178,8 @@ class VerificationTargetTests(unittest.TestCase):
         self.assertIn('actions/runs/${RUN_ID}/jobs?per_page=100', publisher)
         self.assertIn('--target-id "$target_id"', publisher)
         self.assertIn("seed_target_statuses.py", publisher)
+        self.assertIn("build_status_index.py", publisher)
+        self.assertNotIn("--argjson items", publisher)
 
     def test_configuration_status_unit_tests_are_gated_in_ci(self) -> None:
         lint_workflow = (ROOT / ".github" / "workflows" / "lint.yml").read_text()

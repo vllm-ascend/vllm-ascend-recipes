@@ -12,6 +12,15 @@ targets:
       precision: MXFP4/MXFP8
       deployment: Single-Node
       case: High Throughput
+  - id: glm5-a5-w4a4-single-node-multi-card
+    recipe: models/en/THUDM/GLM-5.yaml
+    mode: single-node
+    runner: linux-aarch64-a5-8
+    selector:
+      npu: Ascend 950DT
+      precision: W4A4
+      deployment: Single-Node
+      case: Single Node Multi Card (A5)
   - id: qwen3-30b-a3b-a2-w8a8-single-node-multi-card
     recipe: models/en/Qwen/Qwen3-30B-A3B.yaml
     mode: single-node
