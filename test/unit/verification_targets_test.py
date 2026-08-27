@@ -34,6 +34,29 @@ def load_fill_module():
 
 
 class VerificationTargetTests(unittest.TestCase):
+    def test_qwen_documentation_cleanup_and_linkcheck_workflow(self) -> None:
+        for language in ("en", "zh"):
+            recipe = yaml.safe_load(
+                (
+                    ROOT
+                    / "models"
+                    / language
+                    / "Qwen"
+                    / "Qwen3.5-27B-Qwen3.6-27B.yaml"
+                ).read_text(encoding="utf-8")
+            )
+            self.assertEqual(
+                recipe["meta"]["title"], "Qwen3.5-27B & Qwen3.6-27B"
+            )
+            self.assertNotIn("performance", recipe)
+
+        linkcheck = (
+            ROOT / ".github" / "workflows" / "docs-linkcheck.yml"
+        ).read_text(encoding="utf-8")
+        self.assertIn("schedule:", linkcheck)
+        self.assertIn("workflow_dispatch:", linkcheck)
+        self.assertIn("lycheeverse/lychee-action", linkcheck)
+
     def test_rejects_unknown_target_mode(self) -> None:
         targets_path = ROOT / ".github" / "verification-targets.yaml"
         raw = yaml.safe_load(targets_path.read_text(encoding="utf-8"))

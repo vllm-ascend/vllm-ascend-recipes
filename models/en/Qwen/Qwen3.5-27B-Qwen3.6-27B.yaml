@@ -1,5 +1,5 @@
 meta:
-  title: "Qwen3.5-27B/Qwen3.6-27B"
+  title: "Qwen3.5-27B & Qwen3.6-27B"
   slug: "qwen3.5-27b-qwen3.6-27b"
   provider: "Qwen"
   description: "Qwen3.5-27B and Qwen3.6-27B are dense hybrid Mamba-Transformer language models in the Qwen3.5/Qwen3.6 family, integrating breakthroughs in architectural efficiency, reinforcement learning scale, and global accessibility. They share the same hybrid attention design (GDN + full attention) and the same deployment pattern on Ascend NPUs, suitable for general-purpose text generation tasks such as dialogue, content creation, and code generation."
@@ -702,16 +702,6 @@ verification: |-
   > **For Qwen3.6-27B**, set `"model": "qwen3.6"` in the request body (and use `--served-model-name qwen3.6` on the server).
 
   Expected: HTTP 200 OK with a `choices` field containing generated text.
-
-performance:
-  accuracy: |-
-    ### Using AISBench
-
-    Refer to [Using AISBench](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/evaluation/using_ais_bench.html) for details. Qwen3.5-27B-w8a8 in vllm-ascend:v0.17.0rc1 on gsm8k: **96.74 accuracy**. Qwen3.6-27B-w8a8 follows the same evaluation methodology — results not listed here, run via AISBench to obtain.
-  benchmark: |-
-    ### Using vLLM Benchmark
-
-    Refer to [vllm benchmark](https://docs.vllm.ai/en/latest/benchmarking/) for details (`latency`, `throughput` and `serve` modes).
 
 evaluation:
   accuracy:

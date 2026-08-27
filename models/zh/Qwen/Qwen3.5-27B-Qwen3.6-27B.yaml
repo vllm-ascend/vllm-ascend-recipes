@@ -1,5 +1,5 @@
 meta:
-  title: "Qwen3.5-27B/Qwen3.6-27B"
+  title: "Qwen3.5-27B & Qwen3.6-27B"
   slug: "qwen3.5-27b-qwen3.6-27b"
   provider: "Qwen"
   description: "Qwen3.5-27B 与 Qwen3.6-27B 是 Qwen3.5/Qwen3.6 系列的稠密混合 Mamba-Transformer 语言模型，在架构效率、强化学习规模和全球可访问性方面均有突破。两者共享相同的混合注意力设计（GDN + 全注意力）和 MTP 头设计，在昇腾 NPU 上的部署方式一致，适用于对话、内容创作、代码生成等通用文本生成任务。"
@@ -702,16 +702,6 @@ verification: |-
   > **跑 Qwen3.6-27B 时**，请求体中的 `"model"` 设为 `qwen3.6`（服务端 `--served-model-name` 也对应设为 `qwen3.6`）。
 
   预期：HTTP 200 OK，`choices` 字段包含生成的文本。
-
-performance:
-  accuracy: |-
-    ### 使用 AISBench
-
-    参考 [使用 AISBench](https://docs.vllm.ai/projects/ascend/zh-cn/latest/developer_guide/evaluation/using_ais_bench.html) 了解详情。Qwen3.5-27B-w8a8 在 vllm-ascend:v0.17.0rc1 上跑 gsm8k 的准确率为 **96.74**。Qwen3.6-27B-w8a8 采用相同评估方法 —— 结果未在此列出，请通过 AISBench 自行获取。
-  benchmark: |-
-    ### 使用 vLLM Benchmark
-
-    参考 [vllm benchmark](https://docs.vllm.ai/en/latest/benchmarking/) 了解详情（`latency`、`throughput` 和 `serve` 模式）。
 
 evaluation:
   accuracy:

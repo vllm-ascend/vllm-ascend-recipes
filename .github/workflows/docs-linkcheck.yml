@@ -1,0 +1,38 @@
+name: Recipe documentation link check
+
+on:
+  schedule:
+    # GitHub cron uses UTC; run weekly on Sunday at 20:00 China Standard Time.
+    - cron: '0 12 * * 0'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'models/**/*.yaml'
+      - '.github/workflows/docs-linkcheck.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-linkcheck-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linkcheck:
+    name: Check recipe documentation links
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check links in recipe documentation
+        uses: lycheeverse/lychee-action@v2
+        with:
+          args: >-
+            --verbose
+            --no-progress
+            --accept 200..=399
+            'models/**/*.yaml'
+          fail: true
