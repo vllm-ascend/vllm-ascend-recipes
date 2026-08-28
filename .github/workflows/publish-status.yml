@@ -294,16 +294,16 @@ jobs:
             fi
             jq -n \
               --arg slug "${slug}" \
-              --argjson last_pr "${last_pr:-null}" \
-              --argjson last_nightly "${last_nightly:-null}" \
-              --argjson last_manual "${last_manual:-null}" \
-              --argjson targets "${targets:-{}}" \
+              --arg last_pr "${last_pr:-}" \
+              --arg last_nightly "${last_nightly:-}" \
+              --arg last_manual "${last_manual:-}" \
+              --arg targets "${targets:-}" \
               '{
                  model: $slug,
-                 last_pr_run: $last_pr,
-                 last_nightly_run: $last_nightly,
-                 last_manual_run: $last_manual,
-                 targets: $targets
+                 last_pr_run: ($last_pr | fromjson? // null),
+                 last_nightly_run: ($last_nightly | fromjson? // null),
+                 last_manual_run: ($last_manual | fromjson? // null),
+                 targets: ($targets | fromjson? // {})
                }' > "public/status/${slug}.json"
           done
 
