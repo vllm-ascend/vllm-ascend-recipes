@@ -30,6 +30,7 @@ jobs:
       - name: Check links in recipe documentation
         uses: lycheeverse/lychee-action@v2
         with:
+          # docs.vllm.com.cn rate-limits CI requests with HTTP 429.
           args: >-
             --verbose
             --no-progress
@@ -39,7 +40,6 @@ jobs:
             --retry-wait-time 5
             --exclude 'https?://(localhost|127\.0\.0\.1)(:[0-9]+)?(/|$)'
             --exclude 'https://gitcode\.com/.+\.git$'
-            # docs.vllm.com.cn rate-limits CI requests with HTTP 429.
             --exclude 'https://docs\.vllm\.com\.cn/.*'
             'models/**/*.yaml'
           fail: true
