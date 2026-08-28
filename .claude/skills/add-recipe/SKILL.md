@@ -21,6 +21,89 @@ Recipes are YAML files at `models/en/<Provider>/<Model>.yaml` (English, source o
 9. **Validate.** Run `pnpm validate` (zod schema + interlock errors), then `pnpm check:recipes` (field-level / upstream-alignment rules, see "Validation" below), then `./scripts/format.sh` (validate + typecheck + lint + prettier, mirrors CI). Preview with `pnpm dev` at `/{provider}/{model}`.
 10. **Commit.** Stage the recipe YAML(s), and include `.github/verification-targets.yaml` / `models/_cache_paths.yaml` only when they were intentionally updated for CI verification. Never stage `public/` or generated files. Message: `feat(recipe): add <Provider>/<Model>` (or `fix(recipe): ...` for updates).
 
+## Upstream contribution mode
+
+Use this mode when the final destination is `vllm-project/recipes`. The upstream site generates user-facing commands from `taxonomy.yaml` and recipe YAML; it must not depend on private runners, mounted caches, or CI-only scenario fields.
+
+### Before editing
+
+1. Check upstream `main` for an exact recipe path. If it exists, start from that file rather than copying our `models/en` version. If it does not exist, confirm the model ID and create one file at `models/<hf_org>/<hf_repo>.yaml`.
+2. Check upstream `taxonomy.yaml` for the hardware key. Add a hardware profile first when absent; do not encode hardware names as strategy IDs. A profile must state brand, generation, display name, device count, VRAM, single-/multi-node behavior, scalability, and whether it is restricted.
+3. Confirm that the claimed hardware is tested end to end. Only tested hardware may be listed as `verified`; untested hardware stays absent.
+
+### Convert the Ascend-specific recipe
+
+- Map custom strategies such as `single_node_A2` or `single_node_A5` to upstream strategies such as `single_node_tp`, `single_node_tep`, or `single_node_dep`.
+- Put hardware-specific flags and images in `hardware_overrides.<hardware>` or `variants.<variant>.hardware_overrides.<hardware>`.
+- Represent a different checkpoint as a `variants` entry with its exact `model_id`, precision, VRAM minimum, and `supported_hardware`.
+- Keep `meta.hardware` as verification metadata, not as a substitute for a runnable command.
+- Convert private `scenarios`, runner labels, mounted weight paths, and CI-only fields into public recipe fields (`variants`, `features`, `hardware_overrides`, `strategy_overrides`, and `guide`). Never publish paths such as `/root/.cache/...` or labels such as `linux-aarch64-a5-8`.
+- Split combined or provider-specific files when upstream has separate model IDs. Do not overwrite a similarly named but different checkpoint.
+- Keep the recipe self-contained: users must be able to download the checkpoint and reproduce the command from public information.
+
+Example for a single-hardware quantized checkpoint:
+
+```yaml
+meta:
+  hardware:
+    ascend_950dt: verified
+
+variants:
+  ascend_w4a4:
+    model_id: "Eco-Tech/GLM-5.1-w4a4c8-mxfp4"
+    precision: mxfp4
+    vram_minimum_gb: 768
+    supported_hardware: [ascend_950dt]
+    hardware_overrides:
+      ascend_950dt:
+        docker_image: "<public-ascend-image>"
+        extra_args: ["--quantization", "ascend"]
+        extra_env:
+          PYTORCH_NPU_ALLOC_CONF: "expandable_segments:True"
+
+compatible_strategies:
+  - single_node_tep
+```
+
+The example is a shape guide: use values verified for the specific model and hardware, not copied defaults.
+
+### Evidence required in the PR
+
+Include the exact hardware model and device count, checkpoint, container or vLLM/vLLM-Ascend version, launch command, startup evidence, `/v1/models` response, and one successful inference request. Include feature evidence when the recipe advertises tool calling, reasoning, MTP, or quantization. If benchmarked, link the reproducible benchmark command and distinguish measured facts from recommendations.
+
+### Upstream validation and PR hygiene
+
+Run the upstream checks from an upstream checkout:
+
+```bash
+node scripts/build-recipes-api.mjs
+pnpm build
+```
+
+The generated API must parse the taxonomy and recipe without errors, the model path and `model_id` must agree, all hardware and strategy keys must exist, and the page must render a runnable command. Do not commit generated `public/` output unless upstream instructions explicitly require it.
+
+Keep a focused PR: hardware taxonomy plus one model variant is preferable to a bulk migration. Use a signed-off commit (`Signed-off-by: <GitHub author> <account email>`) if the upstream DCO check requires it. Do not merge the PR yourself; leave review and CI gates to upstream maintainers.
+
+### Community task template
+
+Copy and adapt this when assigning an upstream-oriented task:
+
+```text
+Task: Add <model> single-node support for <hardware>.
+
+Required:
+- use the upstream recipe if one already exists;
+- verify or add the hardware profile in taxonomy.yaml;
+- use upstream single_node_* strategies;
+- model checkpoint, precision, VRAM, image, flags, and env must be public and reproducible;
+- put hardware-only behavior in variants/hardware_overrides;
+- provide end-to-end evidence: startup, /v1/models, and inference;
+- run node scripts/build-recipes-api.mjs and pnpm build;
+- keep private runner labels, cache paths, and CI scenarios out of upstream files;
+- submit a focused signed-off PR and do not merge it directly.
+
+Evidence: <hardware/device count> · <checkpoint> · <software version> · <commands/logs> · <PR URL>
+```
 ## YAML schema (top-level, 总-分)
 
 ### Top-level fields
