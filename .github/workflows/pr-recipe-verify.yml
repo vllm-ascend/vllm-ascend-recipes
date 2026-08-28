@@ -92,10 +92,12 @@ jobs:
               A5_COUNT=0
               A5_FILES=[]
             fi
-            echo "count=$COUNT" >> "$GITHUB_OUTPUT"
-            echo "files=$FILES" >> "$GITHUB_OUTPUT"
-            echo "a5_count=$A5_COUNT" >> "$GITHUB_OUTPUT"
-            echo "a5_files=$A5_FILES" >> "$GITHUB_OUTPUT"
+            {
+              echo "count=$COUNT"
+              echo "files=$FILES"
+              echo "a5_count=$A5_COUNT"
+              echo "a5_files=$A5_FILES"
+            } >> "$GITHUB_OUTPUT"
             echo "Legacy verification recipes ($COUNT): $LEGACY_VERIFY_RECIPES"
             echo "A5 verification recipes ($A5_COUNT): $A5_RECIPES"
             SKIPPED_RECIPES=$(echo "$LEGACY_RECIPES" | grep -v -E -f <(grep -vE '^\s*(#|$)' .github/recipe-verify-whitelist.txt) || true)
@@ -103,11 +105,12 @@ jobs:
               echo "Skipped (not in whitelist): $SKIPPED_RECIPES"
             fi
           else
-            echo "count=0" >> "$GITHUB_OUTPUT"
-            echo "files=[]" >> "$GITHUB_OUTPUT"
-            echo "a5_count=0" >> "$GITHUB_OUTPUT"
-            echo "a5_files=[]" >> "$GITHUB_OUTPUT"
-            echo "No models/en/ recipe files changed"
+            {
+              echo "count=0"
+              echo "files=[]"
+              echo "a5_count=0"
+              echo "a5_files=[]"
+            } >> "$GITHUB_OUTPUT"            echo "No models/en/ recipe files changed"
           fi
 
   # ============================================================
