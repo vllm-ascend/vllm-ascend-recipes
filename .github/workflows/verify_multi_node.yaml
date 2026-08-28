@@ -50,11 +50,12 @@ jobs:
             echo "$CHANGED" | grep -E 'template_pd|V2-Lite|template2_non_pd|Qwen3-30B-A3B' || echo "(none)"
           else
             # workflow_dispatch: every matrix case runs.
-            echo "pd_template=true" >> "$GITHUB_OUTPUT"
-            echo "v2lite=true" >> "$GITHUB_OUTPUT"
-            echo "qwen=true" >> "$GITHUB_OUTPUT"
-            echo "qwen30b=true" >> "$GITHUB_OUTPUT"
-          fi
+            {
+              echo "pd_template=true"
+              echo "v2lite=true"
+              echo "qwen=true"
+              echo "qwen30b=true"
+            } >> "$GITHUB_OUTPUT"          fi
 
   verify-template-pd:
     needs: prepare
