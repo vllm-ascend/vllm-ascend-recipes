@@ -194,14 +194,14 @@ scenarios:
       - title: Verify image understanding
         content: |-
           ```bash
-          curl http://<server_ip>:8000/v1/chat/completions \
+          curl http://<server_ip>:<port>/v1/chat/completions \
             -H "Content-Type: application/json" \
             -d '{
               "model": "qwen3-vl-30b",
               "messages": [
                 {"role": "system", "content": "You are a helpful assistant."},
                 {"role": "user", "content": [
-                  {"type": "image_url", "image_url": {"url": "https://modelscope.oss-cn-beijing.aliyuncs.com/resource/qwen.png"}},
+                  {"type": "image_url", "image_url": {"url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="}},
                   {"type": "text", "text": "What is the text in the illustration?"}
                 ]}
               ],

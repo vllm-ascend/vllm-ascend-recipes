@@ -242,13 +242,19 @@ for s in scenarios:
         port_match = re.search(r'--port\s+(\d+)', serve_cmd)
         server_port = port_match.group(1) if port_match else '8000'
         verify_cmds = [
-            cmd.replace('<node0_ip>', 'localhost').replace('<port>', server_port)
+            cmd.replace('<node0_ip>', 'localhost')
+               .replace('<server_ip>', 'localhost')
+               .replace('<port>', server_port)
             for cmd in verify_cmds
         ]
 
         # Append global verification curl commands.
         if global_verify_cmd:
-            verify_cmds.append(global_verify_cmd.replace('<port>', server_port))
+            verify_cmds.append(
+                global_verify_cmd.replace('<node0_ip>', 'localhost')
+                .replace('<server_ip>', 'localhost')
+                .replace('<port>', server_port)
+            )
         
         commands.append({
             'npu': s.get('npu', ''),
@@ -502,9 +508,11 @@ SCRIPT_HEREDOC
     echo "set -eo pipefail" >> "$CURL_SCRIPT"
     echo "$VERIFY_CMD" >> "$CURL_SCRIPT"
     chmod +x "$CURL_SCRIPT"
-    RESP=$(bash "$CURL_SCRIPT" 2>&1 || echo "CURL_FAILED")
-    if echo "$RESP" | grep -qi "CURL_FAILED"; then
+    if ! RESP=$(bash "$CURL_SCRIPT" 2>&1); then
       log_error "  Recipe curl verification FAILED"
+      log_error "  ====== CURL FAILURE OUTPUT ======"
+      echo "$RESP" | while IFS= read -r rline; do log_error "  | $rline"; done
+      log_error "  ====== END ======"
       STATUS=1
     else
       log_info "  Recipe curl verification PASSED"
