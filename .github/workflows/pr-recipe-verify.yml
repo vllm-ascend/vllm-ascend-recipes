@@ -72,11 +72,11 @@ jobs:
           # multi-node workflow reads the same global whitelist.
           VERIFY_RECIPES=$(echo "$LEGACY_RECIPES" | grep -E -f <(grep -vE '^\s*(#|$)' .github/recipe-verify-whitelist.txt) || true)
           if [ -n "$VERIFY_RECIPES" ]; then
-            # DeepSeek-V4-Flash and GLM-5 have dedicated A5 scenarios. Route
-            # both recipes to the A5 runner while keeping other recipes on
+            # Dedicated A5 scenarios run on the A5 runner while keeping other
+            # recipes on
             # the legacy A2/A3 runner.
-            A5_RECIPES=$(echo "$VERIFY_RECIPES" | grep -E '^(models/en/DeepSeek/DeepSeek-V4-Flash|models/en/THUDM/GLM-5)\.yaml$' || true)
-            LEGACY_VERIFY_RECIPES=$(echo "$VERIFY_RECIPES" | grep -v -E '^(models/en/DeepSeek/DeepSeek-V4-Flash|models/en/THUDM/GLM-5)\.yaml$' || true)
+            A5_RECIPES=$(echo "$VERIFY_RECIPES" | grep -E '^(models/en/DeepSeek/DeepSeek-V4-Flash|models/en/THUDM/GLM-5|models/en/Qwen/Qwen3-VL-30B-A3B-Instruct)\.yaml$' || true)
+            LEGACY_VERIFY_RECIPES=$(echo "$VERIFY_RECIPES" | grep -v -E '^(models/en/DeepSeek/DeepSeek-V4-Flash|models/en/THUDM/GLM-5|models/en/Qwen/Qwen3-VL-30B-A3B-Instruct)\.yaml$' || true)
 
             if [ -n "$LEGACY_VERIFY_RECIPES" ]; then
               COUNT=$(echo "$LEGACY_VERIFY_RECIPES" | wc -l)
@@ -110,7 +110,8 @@ jobs:
               echo "files=[]"
               echo "a5_count=0"
               echo "a5_files=[]"
-            } >> "$GITHUB_OUTPUT"            echo "No models/en/ recipe files changed"
+            } >> "$GITHUB_OUTPUT"
+            echo "No models/en/ recipe files changed"
           fi
 
   # ============================================================
