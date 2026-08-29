@@ -55,7 +55,8 @@ jobs:
               echo "v2lite=true"
               echo "qwen=true"
               echo "qwen30b=true"
-            } >> "$GITHUB_OUTPUT"          fi
+            } >> "$GITHUB_OUTPUT"
+          fi
 
   verify-template-pd:
     needs: prepare
