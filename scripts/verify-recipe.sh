@@ -142,7 +142,7 @@ def resolve_placeholders(content, data):
 # failures (`max_model_len > derived`, `cudagraph_capture_sizes not
 # multiples of tp_size`, etc.).
 CACHE_BASE = '/root/.cache/modelscope/hub/models'
-CACHE_PREFIXES = ('Eco-Tech', 'models')   # tried in this order; first hit wins
+CACHE_PREFIXES = ('', 'Eco-Tech', 'models')   # tried in this order; first hit wins
 model_id_for_path = data.get('model', {}).get('model_id', 'Qwen/Qwen3-30B-A3B')
 try:
     with open(cache_paths_file, 'r') as f:

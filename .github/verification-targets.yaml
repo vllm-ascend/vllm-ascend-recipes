@@ -21,6 +21,15 @@ targets:
       precision: W4A4
       deployment: Single-Node
       case: Single Node Multi Card (A5)
+  - id: qwen3-vl-30b-a3b-a5-w8a8-image-only-online-serving
+    recipe: models/en/Qwen/Qwen3-VL-30B-A3B-Instruct.yaml
+    mode: single-node
+    runner: linux-aarch64-a5-8
+    selector:
+      npu: Ascend 950DT
+      precision: W8A8
+      deployment: Single-Node
+      case: Image-Only Online Serving (A5)
   - id: qwen3-30b-a3b-a2-w8a8-single-node-multi-card
     recipe: models/en/Qwen/Qwen3-30B-A3B.yaml
     mode: single-node

@@ -1,0 +1,247 @@
+meta:
+  title: "Qwen3-VL-30B-A3B-Instruct"
+  slug: "qwen3-vl-30b-a3b-instruct"
+  provider: "Qwen"
+  description: "Qwen3-VL-30B-A3B-Instruct 是 Qwen3-VL 系列的稀疏混合专家视觉语言模型，总参数量约 30B，每个 token 激活约 3B 参数。它支持图像理解、视频理解、多模态对话和长上下文服务。"
+  date_added: 2026-08-29
+  difficulty: intermediate
+  tasks: [multimodal]
+  performance_headline: "在 Ascend 950DT（96 GB × 8）上的单节点 W8A8 部署"
+  hardware:
+    ascend_950dt: experimental
+
+model:
+  model_id: "Eco-Tech/Qwen3-VL-30B-A3B-Instruct-w8a8-mxfp8"
+  min_vllm_version: "0.13.0"
+  architecture: moe
+  parameter_count: "30B"
+  active_parameters: "3B"
+  context_length: 262144
+  modality: multimodal
+  base_args:
+    - "--distributed-executor-backend"
+    - "mp"
+    - "--data-parallel-size"
+    - "1"
+    - "--tensor-parallel-size"
+    - "8"
+    - "--enable-expert-parallel"
+    - "--seed"
+    - "1024"
+    - "--quantization"
+    - "ascend"
+    - "--served-model-name"
+    - "qwen3-vl-30b"
+    - "--trust-remote-code"
+  base_env:
+    VLLM_USE_MODELSCOPE: "True"
+    PYTORCH_NPU_ALLOC_CONF: "expandable_segments:True"
+    HCCL_OP_EXPANSION_MODE: "AIV"
+    HCCL_BUFFSIZE: "400"
+    OMP_PROC_BIND: "false"
+    OMP_NUM_THREADS: "100"
+    TASK_QUEUE_ENABLE: "1"
+    VLLM_ASCEND_ENABLE_FLASHCOMM1: "1"
+  docker_image:
+    ascend_950dt: "quay.io/ascend/vllm-ascend:v0.23.0-a5"
+  nightly_required: false
+  install:
+    pip: false
+    docker:
+      command: "docker pull quay.io/ascend/vllm-ascend:v0.23.0-a5"
+      note: "使用公开的 v0.23.0 A5 镜像；完整的设备和驱动挂载见下文。"
+
+features:
+  expert_parallel:
+    label: "专家并行"
+    description: "在八个 NPU rank 间分布 MoE 专家。"
+    args: ["--enable-expert-parallel"]
+  flashcomm1:
+    label: "FlashComm1"
+    description: "教程基线使用的 Ascend 通信优化。"
+    env:
+      VLLM_ASCEND_ENABLE_FLASHCOMM1: "1"
+  prefix_caching:
+    label: "前缀缓存"
+    description: "图像专用教程基线默认关闭。"
+    args: ["--enable-prefix-caching"]
+    flag_when_false: "--no-enable-prefix-caching"
+  compilation_config:
+    label: "编译配置"
+    description: "教程基线使用完整 decode ACLGraph 回放。"
+    args: ["--compilation-config", "{\"cudagraph_mode\":\"FULL_DECODE_ONLY\"}"]
+
+opt_in_features: [prefix_caching]
+
+variants:
+  default:
+    precision: W8A8
+    vram_minimum_gb: 36
+    description: "适用于单台 Ascend 950DT 节点的 W8A8 量化检查点。"
+
+compatible_strategies: [single_node_A5]
+hardware_overrides: {}
+strategy_overrides: {}
+guide: ""
+
+config_params:
+  gpu_memory_utilization:
+    default: 0.9
+    type: number
+    description: "vLLM 用于计算 KV 缓存容量的 NPU 内存比例。"
+
+overview: |-
+  Qwen3-VL-30B-A3B-Instruct 是 Qwen3-VL 系列的稀疏 MoE 模型。其视觉语言架构支持图像理解、视频理解和多模态对话，每个 token 激活约 3B 参数。
+
+weight_download:
+  - weight_version: W8A8 MXFP8
+    sources:
+      - source: ModelScope
+        url: https://modelscope.cn/models/Eco-Tech/Qwen3-VL-30B-A3B-Instruct-w8a8-mxfp8
+        command: |-
+          ```bash
+          pip install modelscope
+          modelscope download --model Eco-Tech/Qwen3-VL-30B-A3B-Instruct-w8a8-mxfp8
+          ```
+
+prerequisites:
+  - title: 模型权重
+    content: |-
+      W8A8 检查点需要一台配备八张 96 GB NPU 的 Ascend 950DT 节点。启动服务前请下载公开的 ModelScope 检查点。
+
+env_setup:
+  container:
+    A5:
+      content: |-
+        拉取公开的 v0.23.0 A5 镜像，并按官方教程使用设备和驱动挂载启动容器。
+
+        ```bash
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0-a5
+        export NAME=vllm-ascend
+
+        docker run --rm \
+          --name $NAME \
+          --net=host \
+          --shm-size=1g \
+          --device /dev/davinci0 \
+          --device /dev/davinci1 \
+          --device /dev/davinci2 \
+          --device /dev/davinci3 \
+          --device /dev/davinci4 \
+          --device /dev/davinci5 \
+          --device /dev/davinci6 \
+          --device /dev/davinci7 \
+          --device /dev/davinci_manager \
+          --device /dev/hisi_hdc \
+          --device /dev/ummu \
+          --device /dev/uburma \
+          -v /usr/local/Ascend/driver:/usr/local/Ascend/driver \
+          -v /etc/ascend_install.info:/etc/ascend_install.info \
+          -v /etc/hccl_rootinfo.json:/etc/hccl_rootinfo.json \
+          -v /etc/hixlep/:/etc/hixlep/ \
+          -v /root/.cache:/root/.cache \
+          -v /usr/local/sbin:/usr/local/sbin \
+          -v /usr/local/dcmi:/usr/local/dcmi \
+          -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+          -v /usr/local/sbin/npu-smi:/usr/local/sbin/npu-smi \
+          -v /usr/lib64:/usr/lib64 \
+          -itd $IMAGE bash
+        ```
+
+scenarios:
+  - npu: Ascend 950DT
+    precision: W8A8
+    deployment: 单节点
+    case: 图像专用在线服务（A5）
+    tags: [a5-single]
+    strategy: single_node_A5
+    steps:
+      - title: 启动服务
+        content: |-
+          此 A5 单节点场景在八张 Ascend 950DT NPU 上运行量化检查点，仅接受图像输入。
+
+          ```bash
+          export VLLM_USE_MODELSCOPE=True
+          export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+          export HCCL_OP_EXPANSION_MODE="AIV"
+          export HCCL_BUFFSIZE=400
+          export OMP_PROC_BIND=false
+          export OMP_NUM_THREADS=100
+          export TASK_QUEUE_ENABLE=1
+          export VLLM_ASCEND_ENABLE_FLASHCOMM1=1
+
+          vllm serve Eco-Tech/Qwen3-VL-30B-A3B-Instruct-w8a8-mxfp8 \
+            --host 0.0.0.0 \
+            --port 8000 \
+            --distributed-executor-backend mp \
+            --data-parallel-size 1 \
+            --tensor-parallel-size 8 \
+            --enable-expert-parallel \
+            --seed 1024 \
+            --quantization ascend \
+            --served-model-name qwen3-vl-30b \
+            --max-num-seqs 32 \
+            --max-model-len 32768 \
+            --max-num-batched-tokens 8192 \
+            --trust-remote-code \
+            --no-enable-prefix-caching \
+            --mm-processor-cache-gb 0 \
+            --limit-mm-per-prompt.image 1 \
+            --limit-mm-per-prompt.video 0 \
+            --gpu-memory-utilization {{gpu_memory_utilization}} \
+            --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY"}'
+          ```
+      - title: 验证图像理解
+        content: |-
+          ```bash
+          curl http://<server_ip>:8000/v1/chat/completions \
+            -H "Content-Type: application/json" \
+            -d '{
+              "model": "qwen3-vl-30b",
+              "messages": [
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "user", "content": [
+                  {"type": "image_url", "image_url": {"url": "https://modelscope.oss-cn-beijing.aliyuncs.com/resource/qwen.png"}},
+                  {"type": "text", "text": "What is the text in the illustration?"}
+                ]}
+              ],
+              "max_completion_tokens": 100,
+              "temperature": 0
+            }'
+          ```
+
+verification: |-
+  上述图像请求应返回 HTTP 200 和包含 `choices` 字段的 JSON 响应。教程以类似 `TONGYI Qwen` 的生成文本为例。
+
+performance:
+  accuracy: |-
+    官方教程报告 AISBench 在 `mmmu_val` 上的结果为 0.58，指标为 `acc,none`，模式为 generation。评估流程请参见[使用 AISBench](https://docs.vllm.ai/projects/ascend/zh-cn/latest/developer_guide/evaluation/using_ais_bench.html)。
+  benchmark: |-
+    对服务流水线进行验证时，使用教程中的 [vLLM benchmark](https://docs.vllm.ai/en/latest/benchmarking/) 命令：
+
+    ```bash
+    export VLLM_USE_MODELSCOPE=True
+    vllm bench serve \
+      --model Eco-Tech/Qwen3-VL-30B-A3B-Instruct-w8a8-mxfp8 \
+      --served-model-name qwen3-vl-30b \
+      --dataset-name random \
+      --random-input 200 \
+      --num-prompts 200 \
+      --request-rate 1 \
+      --save-result \
+      --result-dir ./
+    ```
+
+tuning: |-
+  请从图像专用服务开始。如果启动时内存不足，请降低 `--max-model-len`、`--max-num-seqs`、`--max-num-batched-tokens` 或 `--gpu-memory-utilization`。仅在需要时启用视频，并根据实际工作负载调整多模态请求限制。
+
+faq: |-
+  如遇启动 OOM，请从禁用视频的图像专用配置开始。前缀缓存更适合重复前缀；对于图像各不相同或随机 prompt 的工作负载，应与基线配置进行对比。
+
+references:
+  - title: "官方 vLLM-Ascend 教程（v0.23.0）"
+    url: https://github.com/vllm-project/vllm-ascend/blob/v0.23.0/docs/source/tutorials/models/Qwen3-VL-30B-A3B-Instruct.md
+  - title: "ModelScope 检查点"
+    url: https://modelscope.cn/models/Eco-Tech/Qwen3-VL-30B-A3B-Instruct-w8a8-mxfp8
+  - title: "vLLM-Ascend Docker 安装"
+    url: https://docs.vllm.ai/projects/ascend/zh-cn/latest/installation.html

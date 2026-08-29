@@ -20,6 +20,9 @@
 # To add a new model: bake the W8A8 weights into the runner image (a
 # separate repo coordinates the image build), then append one entry here.
 aliases:
+  - model_id: Eco-Tech/Qwen3-VL-30B-A3B-Instruct-w8a8-mxfp8
+    cache_dir: Qwen3-VL-30B-A3B-Instruct-w8a8-mxfp8
+
   - model_id: Qwen/Qwen3-30B-A3B
     cache_dir: Qwen3-30B-A3B-w8a8
 

@@ -1,0 +1,247 @@
+meta:
+  title: "Qwen3-VL-30B-A3B-Instruct"
+  slug: "qwen3-vl-30b-a3b-instruct"
+  provider: "Qwen"
+  description: "Qwen3-VL-30B-A3B-Instruct is a sparse Mixture-of-Experts vision-language model with about 30B total parameters and about 3B active parameters per token. It supports image understanding, video understanding, multimodal dialogue, and long-context serving."
+  date_added: 2026-08-29
+  difficulty: intermediate
+  tasks: [multimodal]
+  performance_headline: "Single-node W8A8 deployment on Ascend 950DT (96 GB × 8)"
+  hardware:
+    ascend_950dt: experimental
+
+model:
+  model_id: "Eco-Tech/Qwen3-VL-30B-A3B-Instruct-w8a8-mxfp8"
+  min_vllm_version: "0.13.0"
+  architecture: moe
+  parameter_count: "30B"
+  active_parameters: "3B"
+  context_length: 262144
+  modality: multimodal
+  base_args:
+    - "--distributed-executor-backend"
+    - "mp"
+    - "--data-parallel-size"
+    - "1"
+    - "--tensor-parallel-size"
+    - "8"
+    - "--enable-expert-parallel"
+    - "--seed"
+    - "1024"
+    - "--quantization"
+    - "ascend"
+    - "--served-model-name"
+    - "qwen3-vl-30b"
+    - "--trust-remote-code"
+  base_env:
+    VLLM_USE_MODELSCOPE: "True"
+    PYTORCH_NPU_ALLOC_CONF: "expandable_segments:True"
+    HCCL_OP_EXPANSION_MODE: "AIV"
+    HCCL_BUFFSIZE: "400"
+    OMP_PROC_BIND: "false"
+    OMP_NUM_THREADS: "100"
+    TASK_QUEUE_ENABLE: "1"
+    VLLM_ASCEND_ENABLE_FLASHCOMM1: "1"
+  docker_image:
+    ascend_950dt: "quay.io/ascend/vllm-ascend:v0.23.0-a5"
+  nightly_required: false
+  install:
+    pip: false
+    docker:
+      command: "docker pull quay.io/ascend/vllm-ascend:v0.23.0-a5"
+      note: "Use the public v0.23.0 A5 image; the complete device and driver mounts are shown below."
+
+features:
+  expert_parallel:
+    label: "Expert Parallelism"
+    description: "Distributes MoE experts across the eight NPU ranks."
+    args: ["--enable-expert-parallel"]
+  flashcomm1:
+    label: "FlashComm1"
+    description: "Ascend communication optimization used by the tutorial baseline."
+    env:
+      VLLM_ASCEND_ENABLE_FLASHCOMM1: "1"
+  prefix_caching:
+    label: "Prefix Caching"
+    description: "Disabled in the image-only tutorial baseline."
+    args: ["--enable-prefix-caching"]
+    flag_when_false: "--no-enable-prefix-caching"
+  compilation_config:
+    label: "Compilation Config"
+    description: "Full decode ACLGraph replay used by the tutorial baseline."
+    args: ["--compilation-config", "{\"cudagraph_mode\":\"FULL_DECODE_ONLY\"}"]
+
+opt_in_features: [prefix_caching]
+
+variants:
+  default:
+    precision: W8A8
+    vram_minimum_gb: 36
+    description: "W8A8 quantized checkpoint for one Ascend 950DT node."
+
+compatible_strategies: [single_node_A5]
+hardware_overrides: {}
+strategy_overrides: {}
+guide: ""
+
+config_params:
+  gpu_memory_utilization:
+    default: 0.9
+    type: number
+    description: "Fraction of NPU memory vLLM uses for KV-cache capacity."
+
+overview: |-
+  Qwen3-VL-30B-A3B-Instruct is a sparse MoE model in the Qwen3-VL family. Its vision-language design supports image understanding, video understanding, and multimodal dialogue while activating about 3B parameters per token.
+
+weight_download:
+  - weight_version: W8A8 MXFP8
+    sources:
+      - source: ModelScope
+        url: https://modelscope.cn/models/Eco-Tech/Qwen3-VL-30B-A3B-Instruct-w8a8-mxfp8
+        command: |-
+          ```bash
+          pip install modelscope
+          modelscope download --model Eco-Tech/Qwen3-VL-30B-A3B-Instruct-w8a8-mxfp8
+          ```
+
+prerequisites:
+  - title: Model weight
+    content: |-
+      The W8A8 checkpoint requires one Ascend 950DT node with eight 96 GB NPUs. Download the public ModelScope checkpoint before starting the service.
+
+env_setup:
+  container:
+    A5:
+      content: |-
+        Pull the public v0.23.0 A5 image and start it with the device and driver mounts from the official tutorial.
+
+        ```bash
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0-a5
+        export NAME=vllm-ascend
+
+        docker run --rm \
+          --name $NAME \
+          --net=host \
+          --shm-size=1g \
+          --device /dev/davinci0 \
+          --device /dev/davinci1 \
+          --device /dev/davinci2 \
+          --device /dev/davinci3 \
+          --device /dev/davinci4 \
+          --device /dev/davinci5 \
+          --device /dev/davinci6 \
+          --device /dev/davinci7 \
+          --device /dev/davinci_manager \
+          --device /dev/hisi_hdc \
+          --device /dev/ummu \
+          --device /dev/uburma \
+          -v /usr/local/Ascend/driver:/usr/local/Ascend/driver \
+          -v /etc/ascend_install.info:/etc/ascend_install.info \
+          -v /etc/hccl_rootinfo.json:/etc/hccl_rootinfo.json \
+          -v /etc/hixlep/:/etc/hixlep/ \
+          -v /root/.cache:/root/.cache \
+          -v /usr/local/sbin:/usr/local/sbin \
+          -v /usr/local/dcmi:/usr/local/dcmi \
+          -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+          -v /usr/local/sbin/npu-smi:/usr/local/sbin/npu-smi \
+          -v /usr/lib64:/usr/lib64 \
+          -itd $IMAGE bash
+        ```
+
+scenarios:
+  - npu: Ascend 950DT
+    precision: W8A8
+    deployment: Single-Node
+    case: Image-Only Online Serving (A5)
+    tags: [a5-single]
+    strategy: single_node_A5
+    steps:
+      - title: Start the server
+        content: |-
+          This A5 single-node scenario runs the quantized checkpoint on eight Ascend 950DT NPUs and accepts image inputs only.
+
+          ```bash
+          export VLLM_USE_MODELSCOPE=True
+          export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+          export HCCL_OP_EXPANSION_MODE="AIV"
+          export HCCL_BUFFSIZE=400
+          export OMP_PROC_BIND=false
+          export OMP_NUM_THREADS=100
+          export TASK_QUEUE_ENABLE=1
+          export VLLM_ASCEND_ENABLE_FLASHCOMM1=1
+
+          vllm serve Eco-Tech/Qwen3-VL-30B-A3B-Instruct-w8a8-mxfp8 \
+            --host 0.0.0.0 \
+            --port 8000 \
+            --distributed-executor-backend mp \
+            --data-parallel-size 1 \
+            --tensor-parallel-size 8 \
+            --enable-expert-parallel \
+            --seed 1024 \
+            --quantization ascend \
+            --served-model-name qwen3-vl-30b \
+            --max-num-seqs 32 \
+            --max-model-len 32768 \
+            --max-num-batched-tokens 8192 \
+            --trust-remote-code \
+            --no-enable-prefix-caching \
+            --mm-processor-cache-gb 0 \
+            --limit-mm-per-prompt.image 1 \
+            --limit-mm-per-prompt.video 0 \
+            --gpu-memory-utilization {{gpu_memory_utilization}} \
+            --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY"}'
+          ```
+      - title: Verify image understanding
+        content: |-
+          ```bash
+          curl http://<server_ip>:8000/v1/chat/completions \
+            -H "Content-Type: application/json" \
+            -d '{
+              "model": "qwen3-vl-30b",
+              "messages": [
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "user", "content": [
+                  {"type": "image_url", "image_url": {"url": "https://modelscope.oss-cn-beijing.aliyuncs.com/resource/qwen.png"}},
+                  {"type": "text", "text": "What is the text in the illustration?"}
+                ]}
+              ],
+              "max_completion_tokens": 100,
+              "temperature": 0
+            }'
+          ```
+
+verification: |-
+  The image request above should return HTTP 200 and a JSON response with a `choices` field. The tutorial gives `TONGYI Qwen` as an example of similar generated text.
+
+performance:
+  accuracy: |-
+    The official tutorial reports an AISBench result of 0.58 for `mmmu_val` using `acc,none` in generation mode. See [Using AISBench](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/evaluation/using_ais_bench.html) for the evaluation workflow.
+  benchmark: |-
+    For serving-pipeline validation, run [vLLM benchmark](https://docs.vllm.ai/en/latest/benchmarking/) with the documented command:
+
+    ```bash
+    export VLLM_USE_MODELSCOPE=True
+    vllm bench serve \
+      --model Eco-Tech/Qwen3-VL-30B-A3B-Instruct-w8a8-mxfp8 \
+      --served-model-name qwen3-vl-30b \
+      --dataset-name random \
+      --random-input 200 \
+      --num-prompts 200 \
+      --request-rate 1 \
+      --save-result \
+      --result-dir ./
+    ```
+
+tuning: |-
+  Start with image-only serving. Reduce `--max-model-len`, `--max-num-seqs`, `--max-num-batched-tokens`, or `--gpu-memory-utilization` if startup runs out of memory. Enable video only when needed and tune multimodal prompt limits for the workload.
+
+faq: |-
+  For startup OOM, begin with image-only inputs and video disabled. Prefix caching benefits repeated prefixes; compare it against the baseline for workloads with unique images or random prompts.
+
+references:
+  - title: "Official vLLM-Ascend tutorial (v0.23.0)"
+    url: https://github.com/vllm-project/vllm-ascend/blob/v0.23.0/docs/source/tutorials/models/Qwen3-VL-30B-A3B-Instruct.md
+  - title: "ModelScope checkpoint"
+    url: https://modelscope.cn/models/Eco-Tech/Qwen3-VL-30B-A3B-Instruct-w8a8-mxfp8
+  - title: "vLLM-Ascend Docker installation"
+    url: https://docs.vllm.ai/projects/ascend/en/latest/installation.html
