@@ -192,6 +192,7 @@ jobs:
         with:
           access_key: ${{ secrets.obs_ak }}
           secret_key: ${{ secrets.obs_sk }}
+          bucket: mindx-package
           name: recipe-verify-results-${{ github.run_id }}
           path: /tmp/verify-results/
           retention-days: 90
