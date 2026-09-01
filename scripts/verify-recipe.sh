@@ -529,7 +529,7 @@ SCRIPT_HEREDOC
     AIS_CFG="/usr/local/python3.12.13/lib/python3.12/site-packages/ais_bench/benchmark/configs/models/vllm_api/vllm_api_stream_chat.py"
     if [[ -f "$AIS_CFG" ]]; then
       sed -i "s|path=\".*\"|path=\"${CACHE_PATH}\"|" "$AIS_CFG"
-      sed -i "s|host_port=8080|host_port=${SERVER_PORT}|" "$AIS_CFG"
+      sed -E -i "s|host_port[[:space:]]*=[[:space:]]*[0-9]+|host_port=${SERVER_PORT}|" "$AIS_CFG"
       log_info "  Patched ais_bench model config (path + port)"
     fi
     BENCH_OUTPUT=$(ais_bench --models vllm_api_stream_chat --datasets synthetic_gen --mode perf --debug --num-prompts 50 2>&1 || echo "AISBENCH_FAILED")
