@@ -175,6 +175,9 @@ jobs:
       # public/status/*.json + public/runs/<sha>/params.json on main.
       - name: Upload run-params for publish-status
         if: ${{ always() }}
+        # GitHub Artifact Blob uploads intermittently stall on self-hosted
+        # A2 runners. OBS below remains the nightly persistence path.
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: recipe-verify-results-${{ github.run_id }}
