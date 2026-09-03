@@ -1,0 +1,19 @@
+{
+  "recipe_path": "models/en/THUDM/GLM-5.yaml",
+  "model_id": "zai-org/GLM-5",
+  "hw_key": "ascend_950dt",
+  "head_sha": "2d97af544a695a6fde14f630dedf544e585292f9",
+  "trigger_type": "nightly",
+  "image": "swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/vllm-ascend:v0.23.0-a5",
+  "started_at": "2026-09-03T21:07:31Z",
+  "scenarios": [
+    {
+      "index": 0,
+      "npu": "Ascend 950DT",
+      "precision": "W4A4",
+      "deployment": "Single-Node",
+      "case": "Single Node Multi Card (A5)",
+      "serve_cmd": "export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7\nexport HCCL_DFS_CONFIG=\"task_exception:off,inconsistent_check:off\"\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\nexport HCCL_OP_EXPANSION_MODE=\"AIV\"\nexport VLLM_ASCEND_ENABLE_FLASHCOMM1=1\nexport VLLM_ASCEND_ENABLE_PREFETCH_MLP=1\nexport HCCL_INTRA_PCIE_ENABLE=1\nexport HCCL_INTRA_ROCE_ENABLE=0\nexport DYNAMIC_EPLB=\"true\"\nexport OMP_PROC_BIND=false\nexport OMP_NUM_THREADS=100\nexport HCCL_BUFFSIZE=400\n\nvllm serve /root/.cache/modelscope/hub/models/Eco-Tech/GLM-5.1-w4a4c8-mxfp4 \\\n    --host 0.0.0.0 \\\n    --port 8077 \\\n    --data-parallel-size 1 \\\n    --tensor-parallel-size 8 \\\n    --seed 1024 \\\n    --served-model-name glm-5 \\\n    --enable-expert-parallel \\\n    --max-num-seqs 128 \\\n    --max-model-len 202752 \\\n    --max-num-batched-tokens 8192 \\\n    --trust-remote-code \\\n    --enable-prefix-caching \\\n    --gpu-memory-utilization 0.95 \\\n    --quantization ascend \\\n    --enable-auto-tool-choice \\\n    --tool-call-parser glm47 \\\n    --reasoning-parser glm45 \\\n    --compilation-config '{\"cudagraph_mode\": \"FULL_DECODE_ONLY\"}' \\\n    --hf-overrides '{\"use_index_cache\": true, \"index_topk_freq\": 4}' \\\n    --additional-config '{\"enable_cpu_binding\": \"True\", \"multistream_overlap_shared_expert\": \"True\", \"enable_sparse_c8\": \"True\", \"enable_dsa_cp\": true, \"eplb_config\": {\"dynamic_eplb\": true, \"expert_heat_collection_interval\": 50, \"algorithm_execution_interval\": 5, \"eplb_policy_type\": 2, \"num_redundant_experts\": 0}}'"
+    }
+  ]
+}
