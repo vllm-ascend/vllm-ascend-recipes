@@ -12,7 +12,7 @@
     "recipe_yaml_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/blob/d4011d64313c5f39299abb62093d892e634b3a33/models/en/Qwen/Qwen3-30B-A3B.yaml",
     "params_url": "https://vllm-ascend.github.io/vllm-ascend-recipes/runs/d4011d64313c5f39299abb62093d892e634b3a33/Qwen3-30B-A3B.params.json",
     "started_at": "2026-09-02T02:43:05Z",
-    "finished_at": "2026-09-02T02:58:39Z",
+    "finished_at": "2026-09-03T04:28:45Z",
     "pr_number": 91,
     "pr_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/pull/91",
     "pr_title": "test(ci): retrigger Qwen3-30B-A3B verification",
@@ -60,7 +60,7 @@
         "recipe_yaml_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/blob/d4011d64313c5f39299abb62093d892e634b3a33/models/en/Qwen/Qwen3-30B-A3B.yaml",
         "params_url": "https://vllm-ascend.github.io/vllm-ascend-recipes/runs/d4011d64313c5f39299abb62093d892e634b3a33/Qwen3-30B-A3B.params.json",
         "started_at": "2026-09-02T02:43:05Z",
-        "finished_at": "2026-09-02T02:58:39Z",
+        "finished_at": "2026-09-03T04:28:45Z",
         "pr_number": 91,
         "pr_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/pull/91",
         "pr_title": "test(ci): retrigger Qwen3-30B-A3B verification",
@@ -85,6 +85,24 @@
         "pr_author": null
       },
       "history": [
+        {
+          "kind": "pr",
+          "status": "pass",
+          "conclusion": "success",
+          "head_sha": "d4011d64313c5f39299abb62093d892e634b3a33",
+          "head_sha_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/commit/d4011d64313c5f39299abb62093d892e634b3a33",
+          "workflow_run_id": 33584255360,
+          "workflow_run_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/actions/runs/33584255360",
+          "recipe_path": "models/en/Qwen/Qwen3-30B-A3B.yaml",
+          "recipe_yaml_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/blob/d4011d64313c5f39299abb62093d892e634b3a33/models/en/Qwen/Qwen3-30B-A3B.yaml",
+          "params_url": "https://vllm-ascend.github.io/vllm-ascend-recipes/runs/d4011d64313c5f39299abb62093d892e634b3a33/Qwen3-30B-A3B.params.json",
+          "started_at": "2026-09-02T02:43:05Z",
+          "finished_at": "2026-09-03T04:28:45Z",
+          "pr_number": 91,
+          "pr_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/pull/91",
+          "pr_title": "test(ci): retrigger Qwen3-30B-A3B verification",
+          "pr_author": "chaosv598"
+        },
         {
           "kind": "nightly",
           "status": "pass",
