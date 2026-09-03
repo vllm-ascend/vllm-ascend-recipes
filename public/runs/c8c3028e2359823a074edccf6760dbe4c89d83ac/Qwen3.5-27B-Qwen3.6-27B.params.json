@@ -1,0 +1,19 @@
+{
+  "recipe_path": "models/en/Qwen/Qwen3.5-27B-Qwen3.6-27B.yaml",
+  "model_id": "Qwen/Qwen3.6-27B",
+  "hw_key": "ascend_950dt",
+  "head_sha": "c8c3028e2359823a074edccf6760dbe4c89d83ac",
+  "trigger_type": "pr",
+  "image": "swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/vllm-ascend:v0.23.0-a5",
+  "started_at": "2026-09-03T01:50:30Z",
+  "scenarios": [
+    {
+      "index": 0,
+      "npu": "Ascend 950DT",
+      "precision": "MXFP8 / BF16",
+      "deployment": "Single-Node",
+      "case": "Multi Card",
+      "serve_cmd": "export VLLM_USE_MODELSCOPE=True\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\nexport HCCL_BUFFSIZE=512\nexport OMP_PROC_BIND=false\nexport OMP_NUM_THREADS=1\nexport TASK_QUEUE_ENABLE=1\nexport MODEL_PATH=Eco-Tech/Qwen3.6-27B-w8a8-mxfp8\n\nvllm serve $MODEL_PATH \\\n  --host 0.0.0.0 \\\n  --port 8000 \\\n  --data-parallel-size 8 \\\n  --tensor-parallel-size 1 \\\n  --seed 1024 \\\n  --quantization ascend \\\n  --served-model-name qwen3.6 \\\n  --max-num-seqs 32 \\\n  --max-model-len 262144 \\\n  --max-num-batched-tokens 16384 \\\n  --trust-remote-code \\\n  --gpu-memory-utilization 0.9 \\\n  --no-enable-prefix-caching \\\n  --compilation-config '{\"cudagraph_mode\":\"FULL_DECODE_ONLY\"}' \\\n  --async-scheduling \\\n  --additional-config '{\"enable_cpu_binding\":true}'"
+    }
+  ]
+}
