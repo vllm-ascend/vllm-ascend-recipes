@@ -6,7 +6,7 @@ meta:
   date_added: 2026-07-27
   tasks:
     - text
-  performance_headline: "Single-node deployment on Atlas 800 A2/A3 with TP=2 + DP=8 DP-first parallelism"
+  performance_headline: "Single-node deployment on Atlas 800 A2/A3/950DT with DP-first parallelism"
   date_updated: 2026-07-27
   difficulty: advanced
   related_recipes:
@@ -15,6 +15,7 @@ meta:
     atlas_800_a3: verified
     atlas_800_a2: verified
     atlas_300i_duo: verified
+    ascend_950dt: verified
 
 model:
   model_id: "Qwen/Qwen3.6-27B"
@@ -37,6 +38,7 @@ model:
     atlas_800_a2: "quay.io/ascend/vllm-ascend:v0.18.0rc1"
     atlas_800_a3: "quay.io/ascend/vllm-ascend:v0.18.0rc1-a3"
     atlas_300i_duo: "quay.io/ascend/vllm-ascend:v0.23.0rc1-310p"
+    ascend_950dt: "quay.io/ascend/vllm-ascend:v0.23.0rc1-a5"
   nightly_required: false
   install:
     # Ascend recommends Docker; pip requires source build (no official wheel), so the pip tab is hidden.
@@ -91,12 +93,20 @@ variants:
     model_id: "Qwen/Qwen3.6-27B"
     precision: bf16
     vram_minimum_gb: 65
-    description: "BF16 weights on Atlas 800 A3"
+    description: "BF16 weights on Atlas 800 A3 or Ascend 950DT"
+    supported_hardware: [atlas_800_a3, atlas_800_a2, ascend_950dt]
+  a5_mxfp8:
+    model_id: "Eco-Tech/Qwen3.6-27B-w8a8-mxfp8"
+    precision: MXFP8
+    vram_minimum_gb: 33
+    description: "Qwen3.6-27B MXFP8 weights for Ascend 950DT"
+    supported_hardware: [ascend_950dt]
 
 compatible_strategies:
   - single_node_A2
   - single_node_A3
   - single_node_310p
+  - single_node_A5
   - pd_cluster
 
 hardware_overrides: {}
@@ -253,11 +263,23 @@ weight_download:
       git clone https://gitcode.com/Eco-Tech/Qwen3.6-27B-w8a8.git
       ```
 
+# ---- Qwen3.6-27B W8A8 MXFP8 (Ascend 950DT) ----
+- weight_version: Qwen3.6-27B-w8a8-mxfp8
+  sources:
+  - source: ModelScope
+    url: https://www.modelscope.cn/models/Eco-Tech/Qwen3.6-27B-w8a8-mxfp8
+    command: |-
+      ```bash
+      pip install modelscope
+      modelscope download --model Eco-Tech/Qwen3.6-27B-w8a8-mxfp8
+      ```
+
 quantization:
   content: |-
     Both models ship with pre-quantized W8A8 versions (with MTP speculative-decoding heads) published under the `Eco-Tech/` namespace on ModelScope. Quantized versions must be started with `--quantization ascend`. To disable quantization, remove the flag.
 
     BF16 versions (under `Qwen/`) do not require the `--quantization ascend` flag.
+    On Ascend 950DT, use the Qwen3.6-27B MXFP8 checkpoint (`Qwen3.6-27B-w8a8-mxfp8`) with `--quantization ascend`.
 
 prerequisites:
 - title: Hardware
@@ -265,6 +287,7 @@ prerequisites:
     - **Atlas 800 A3** (64G × 16): 1 node minimum for single-node; 2 nodes for multi-node PD separation.
     - **Atlas 800 A2** (64G × 8): 1 node minimum; multi-node PD separation not supported on this platform.
     - **Atlas 300I DUO** (A2 300I inference etc.): at least 2 devices; only TP mode supported (TP=2 or TP=4).
+    - **Ascend 950DT** (96G × 8): 1 node minimum. Qwen3.6-27B BF16 or W8A8 MXFP8 uses TP=1 + DP=8.
 
 - title: Multi-node communication (only if using PD separation)
   content: |-
@@ -332,6 +355,22 @@ env_setup:
             -v /etc/ascend_install.info:/etc/ascend_install.info \
             -v /root/.cache:/root/.cache \
             -it $IMAGE bash
+        ```
+    "Ascend 950DT":
+      content: |-
+        Use the A5 image on an Ascend 950DT node (8 NPUs, 96G HBM each).
+
+        ```bash
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0rc1-a5
+        docker run --rm --name vllm-ascend --net=host --shm-size=1g \
+          --device /dev/davinci0 --device /dev/davinci1 --device /dev/davinci2 --device /dev/davinci3 \
+          --device /dev/davinci4 --device /dev/davinci5 --device /dev/davinci6 --device /dev/davinci7 \
+          --device /dev/davinci_manager --device /dev/hisi_hdc --device /dev/ummu --device /dev/uburma \
+          -v /usr/local/Ascend/driver:/usr/local/Ascend/driver \
+          -v /etc/ascend_install.info:/etc/ascend_install.info \
+          -v /etc/hccl_rootinfo.json:/etc/hccl_rootinfo.json \
+          -v /etc/hixlep/:/etc/hixlep/ -v /root/.cache:/root/.cache \
+          -it $IMAGE bash
         ```
     "Atlas 300I DUO":
       content: |-
@@ -666,6 +705,52 @@ scenarios:
     content: |-
       After the service is started, verify it is running by sending a prompt. Refer to the verification section below for a usage example.
 
+# ===== Ascend 950DT single-node =====
+- npu: Ascend 950DT
+  precision: MXFP8 / BF16
+  deployment: Single-Node
+  case: Multi Card
+  tags: [a5-single]
+  strategy: single_node_A5
+  steps:
+  - title: Start the server (Qwen3.6-27B)
+    content: |-
+      On Ascend 950DT, use `Qwen3.6-27B-w8a8-mxfp8` for the quantized path or `Qwen3.6-27B` for BF16. The upstream-recommended layout is TP=1 + DP=8 across all 8 NPUs.
+
+      ```bash
+      export VLLM_USE_MODELSCOPE=True
+      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+      export HCCL_BUFFSIZE=512
+      export OMP_PROC_BIND=false
+      export OMP_NUM_THREADS=1
+      export TASK_QUEUE_ENABLE=1
+      export MODEL_PATH=Eco-Tech/Qwen3.6-27B-w8a8-mxfp8
+
+      vllm serve $MODEL_PATH \
+        --host 0.0.0.0 \
+        --port 8000 \
+        --data-parallel-size 8 \
+        --tensor-parallel-size 1 \
+        --seed 1024 \
+        --quantization ascend \
+        --served-model-name qwen3.6 \
+        --max-num-seqs {{max_num_seqs}} \
+        --max-model-len 262144 \
+        --max-num-batched-tokens 16384 \
+        --trust-remote-code \
+        --gpu-memory-utilization {{gpu_memory_utilization}} \
+        --no-enable-prefix-caching \
+        {{spec_decoding}} \
+        {{compilation_config}} \
+        {{async_scheduling}} \
+        {{cpu_binding}}
+      ```
+
+      For BF16, set `MODEL_PATH=Qwen/Qwen3.6-27B` and remove `--quantization ascend`. Qwen3.5-27B uses the same hybrid runtime and MTP settings where a compatible checkpoint is available.
+  - title: Service verification
+    content: |-
+      See the `verification` section below — the service is up when the log prints `Application startup complete.`
+
 verification: |-
   After the service starts, the log should show:
   ```text
@@ -766,14 +851,18 @@ tuning: |-
 
   **Atlas 300I DUO**: only TP is supported — choose **TP=2** or **TP=4**. With **TP=4**, `--max-model-len` can support **128K** and **256K** long-sequence scenarios.
 
+  **Ascend 950DT**: Qwen3.6-27B-w8a8-mxfp8 fits on one 96G NPU. Use TP=1 + DP=8 for throughput and up to 262144 context.
+
   | Scenario | Deployment | *NPUs | Weight | Notes |
   |----------|------------|-------|--------|-------|
   | High Throughput (128K ctx) | Single-Node (A2) | 8 | Qwen3.x-27B-w8a8 | TP=2 + DP=4 — uses all 8 NPUs for parallel request batches |
   | High Throughput (128K ctx) | Single-Node (A3) | 16 | Qwen3.x-27B-w8a8 | TP=2 + DP=8 — uses all 16 NPUs for parallel request batches |
   | Low Latency (128K ctx) | Single-Node (A3) | 16 | Qwen3.x-27B-w8a8 | TP=2 + DP=8 — reduces per-layer Allreduce overhead for small interactive batches |
   | Long Context (256K+ ctx) | Single-Node (A3) | 16 | Qwen3.x-27B-w8a8 | TP=8 + DP=2 — shards KV cache across 8 NPUs to maximize context window |
+  | High Throughput (128K ctx) | Single-Node (950DT) | 8 | Qwen3.6-27B-w8a8-mxfp8 | TP=1 + DP=8 — uses all 8 NPUs for parallel request batches |
+  | Long Context (256K+ ctx) | Single-Node (950DT) | 8 | Qwen3.6-27B-w8a8-mxfp8 | TP=1 + DP=8 — supports the full 262144 context window |
 
-  *Total NPUs = 1 Atlas 800 A3 = 16 NPUs, 1 Atlas 800 A2 = 8 NPUs.
+  *Total NPUs = 1 Atlas 800 A3 = 16 NPUs, 1 Atlas 800 A2 = 8 NPUs, or 1 Ascend 950DT = 8 NPUs.
 
   | Scenario | Config | TP | DP | Max Num Seqs | Max Num Batched Tokens | Max Model Len | MTP Num | Async Scheduling |
   |----------|--------|----|----|--------------|------------------------|---------------|---------|-------------------|
@@ -781,6 +870,8 @@ tuning: |-
   | High Throughput (128K) | Single-Node A3 | 2 | 8 | 32 | 16384 | 133000 | 3 | On |
   | Low Latency (128K) | Single-Node A3 | 2 | 8 | 4 | 4096 | 133000 | 3 | On |
   | Long Context (256K+) | Single-Node A3 | 8 | 2 | 8 | 8192 | 266000 | 3 | On |
+  | High Throughput (128K) | Single-Node 950DT | 1 | 8 | 32 | 16384 | 133000 | 3 | On |
+  | Long Context (256K+) | Single-Node 950DT | 1 | 8 | 32 | 16384 | 262144 | 3 | On |
 
   ### Tuning guidelines
 
