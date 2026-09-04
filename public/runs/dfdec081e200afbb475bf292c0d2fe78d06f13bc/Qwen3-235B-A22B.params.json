@@ -1,0 +1,11 @@
+{
+  "recipe_path": "models/en/Qwen/Qwen3-235B-A22B.yaml",
+  "model_id": "",
+  "hw_key": "atlas_800_a2",
+  "head_sha": "dfdec081e200afbb475bf292c0d2fe78d06f13bc",
+  "trigger_type": "nightly",
+  "image": "swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/vllm-ascend:v0.23.0rc1",
+  "started_at": "2026-09-04T20:35:33Z",
+  "scenarios": [],
+  "skip_reason": "未提前下载权重，请联系maintainer下载权重 (model_id=Qwen/Qwen3-235B-A22B)"
+}
