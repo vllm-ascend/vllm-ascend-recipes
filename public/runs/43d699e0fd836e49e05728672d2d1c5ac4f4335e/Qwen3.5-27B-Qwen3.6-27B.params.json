@@ -1,0 +1,19 @@
+{
+  "recipe_path": "models/en/Qwen/Qwen3.5-27B-Qwen3.6-27B.yaml",
+  "model_id": "Qwen/Qwen3.6-27B",
+  "hw_key": "atlas_800_a2",
+  "head_sha": "43d699e0fd836e49e05728672d2d1c5ac4f4335e",
+  "trigger_type": "nightly",
+  "image": "swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/vllm-ascend:v0.23.0rc1",
+  "started_at": "2026-09-05T20:25:33Z",
+  "scenarios": [
+    {
+      "index": 0,
+      "npu": "Atlas 800I A2",
+      "precision": "W8A8",
+      "deployment": "Single-Node",
+      "case": "Multi Card",
+      "serve_cmd": "#!/bin/sh\nexport VLLM_USE_MODELSCOPE=True\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\nexport HCCL_BUFFSIZE=512\nexport OMP_PROC_BIND=false\nexport OMP_NUM_THREADS=1\nexport TASK_QUEUE_ENABLE=1\n\nvllm serve /root/.cache/modelscope/hub/models/Eco-Tech/Qwen3.6-27B-w8a8 \\\n--host 0.0.0.0 \\\n--port 8000 \\\n--data-parallel-size 1 \\\n--tensor-parallel-size 2 \\\n--seed 1024 \\\n--quantization ascend \\\n--served-model-name qwen3.5 \\\n--max-num-seqs 32 \\\n--max-model-len 133000 \\\n--max-num-batched-tokens 8096 \\\n--trust-remote-code \\\n--gpu-memory-utilization 0.9 \\\n--no-enable-prefix-caching \\\n--compilation-config '{\"cudagraph_mode\":\"FULL_DECODE_ONLY\"}' \\\n--additional-config '{\"enable_cpu_binding\":true}' \\\n--async-scheduling"
+    }
+  ]
+}
