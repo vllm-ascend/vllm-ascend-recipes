@@ -1,0 +1,10 @@
+{
+  "recipe_path": "models/en/DeepSeek/DeepSeek-V2-Lite-W8A8.yaml",
+  "model_id": "vllm-ascend/DeepSeek-V2-Lite-W8A8",
+  "hw_key": "atlas_800_a2",
+  "head_sha": "8f9855d66fda11dc82c81eb1a7d85a16359c2da6",
+  "trigger_type": "nightly",
+  "image": "swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/vllm-ascend:v0.23.0rc1",
+  "started_at": "2026-09-06T20:17:49Z",
+  "scenarios": []
+}
