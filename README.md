@@ -168,7 +168,7 @@ The schema lives in [`src/lib/schema.ts`](src/lib/schema.ts) and is enforced by 
 | `modality` | yes | `text`, `vision`, `audio`, `image`, etc. |
 | `base_args` | no | Flags every scenario needs (e.g. `--trust-remote-code`, `--quantization ascend`) — upstream aligned |
 | `base_env` | no | Env vars every scenario needs (e.g. `HCCL_BUFFSIZE`, `OMP_NUM_THREADS`) — upstream aligned |
-| `docker_image` | no | Docker image string or per-hardware object (`atlas_800_a2` / `atlas_800_a3`) — upstream aligned |
+| `docker_image` | no | Docker image string or per-hardware object (`atlas_800_a2` / `atlas_800_a3` / `ascend_950dt`) — upstream aligned |
 | `nightly_required` | no | `true` when `min_vllm_version` is not a stable release — upstream aligned |
 | `install` | no | Install tabs: `pip` / `docker`, each `false` (hide) or `{command?, note?}` — upstream aligned |
 
@@ -385,7 +385,7 @@ references:
 
 The `meta.hardware` object uses these keys (defined in the schema):
 
-- Atlas: `atlas_800_a3`, `atlas_800_a2`
+- Ascend: `atlas_800_a3`, `atlas_800_a2`, `ascend_950dt`
 - AMD: `mi300x`, `mi325x`, `mi355x`
 - NVIDIA: `h200`, `b200`, `gb200`
 

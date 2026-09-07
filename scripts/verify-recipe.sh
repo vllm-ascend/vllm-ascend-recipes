@@ -154,10 +154,13 @@ CACHE_DIR_BY_MODEL = {a['model_id']: a['cache_dir'] for a in aliases}
 if hw_key == 'ascend_950dt' and model_id_for_path in {
     'deepseek-ai/DeepSeek-V4-Flash',
     'zai-org/GLM-5',
+    'Qwen/Qwen3.6-27B',
 }:
     a5_candidates = {
         'deepseek-ai/DeepSeek-V4-Flash': '/root/.cache/modelscope/hub/models/models--deepseek-ai--DeepSeek-V4-Flash',
         'zai-org/GLM-5': '/root/.cache/modelscope/hub/models/Eco-Tech/GLM-5.1-w4a4c8-mxfp4',
+        # The Qwen recipe selects this A5-only MXFP8 checkpoint.
+        'Qwen/Qwen3.6-27B': '/root/.cache/modelscope/hub/models/Eco-Tech/Qwen3.6-27B-w8a8-mxfp8',
     }
     a5_candidate = a5_candidates[model_id_for_path]
     CACHE_PATH = a5_candidate if os.path.isdir(a5_candidate) else None

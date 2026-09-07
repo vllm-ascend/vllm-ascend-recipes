@@ -22,6 +22,7 @@ import {
 function hwKeyForNpu(npu: string): string {
   const n = npu.toLowerCase();
   if (n.includes('300i') || n.includes('duo')) return 'atlas_300i_duo';
+  if (n.includes('950') || n.includes('a5')) return 'ascend_950dt';
   if (n.includes('a2')) return 'atlas_800_a2';
   if (n.includes('a3')) return 'atlas_800_a3';
   return 'default';
@@ -204,11 +205,13 @@ function StatusDot({ status }: { status?: string }) {
 // ---- Rich option metadata (per-language), mirroring the vllm recipes page ----
 const NPU_INFO: Record<string, Record<string, string>> = {
   en: {
+    a5: 'Ascend 950DT series server — 8 NPUs with 96G HBM per NPU; use the -a5 container image and DP-first TP=1 layouts.',
     a3: 'Huawei Atlas 800I A3 inference server — 8 NPUs in a dual-die design (16 compute chips), 64G or 128G memory per chip. Fastest single-node serving path for Ascend.',
     a2: 'Huawei Atlas 800I A2 (Ascend 910B) server — 8 NPUs × 64G memory; the workhorse node for single- and multi-node serving.',
     duo: 'Atlas 300I Duo inference card (310P) — 96G LPDDR4X per card for budget inference; uses the -310p container image and a conservative context length.',
   },
   zh: {
+    a5: 'Ascend 950DT 系列服务器 —— 8 颗 NPU、每卡 96G HBM；使用 -a5 容器镜像，推荐 DP-first 的 TP=1 并行布局。',
     a3: '华为 Atlas 800I A3 推理服务器 —— 8 颗 NPU、双芯设计共 16 个计算芯片，每芯 64G/128G 显存，是昇腾上最快的单机推理机型。',
     a2: '华为 Atlas 800I A2（昇腾 910B）服务器 —— 8 颗 NPU × 64G 显存，单机/多机部署的主力机型。',
     duo: 'Atlas 300I Duo 推理卡（310P）—— 每卡 96G LPDDR4X 显存，面向高性价比推理；使用 -310p 容器镜像并采用保守的上下文长度。',
@@ -220,11 +223,13 @@ function npuInfo(npu: string, lang: string): string | undefined {
   const key =
     n.includes('300i') || n.includes('duo')
       ? 'duo'
-      : n.includes('a3')
-        ? 'a3'
-        : n.includes('a2')
-          ? 'a2'
-          : '';
+      : n.includes('950') || n.includes('a5')
+        ? 'a5'
+        : n.includes('a3')
+          ? 'a3'
+          : n.includes('a2')
+            ? 'a2'
+            : '';
   return key ? NPU_INFO[lang]?.[key] : undefined;
 }
 

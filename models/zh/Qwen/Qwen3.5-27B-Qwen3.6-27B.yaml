@@ -6,7 +6,7 @@ meta:
   date_added: 2026-07-27
   tasks:
     - text
-  performance_headline: "Atlas 800 A2/A3 单节点部署，采用 TP=2 + DP=8 的 DP-first 并行策略"
+  performance_headline: "Atlas 800 A2/A3/950DT 单节点部署，采用 DP-first 并行策略"
   date_updated: 2026-07-27
   difficulty: advanced
   related_recipes:
@@ -15,6 +15,7 @@ meta:
     atlas_800_a3: verified
     atlas_800_a2: verified
     atlas_300i_duo: verified
+    ascend_950dt: verified
 
 model:
   model_id: "Qwen/Qwen3.6-27B"
@@ -37,6 +38,7 @@ model:
     atlas_800_a2: "quay.io/ascend/vllm-ascend:v0.18.0rc1"
     atlas_800_a3: "quay.io/ascend/vllm-ascend:v0.18.0rc1-a3"
     atlas_300i_duo: "quay.io/ascend/vllm-ascend:v0.23.0rc1-310p"
+    ascend_950dt: "quay.io/ascend/vllm-ascend:v0.23.0rc1-a5"
   nightly_required: false
   install:
     # Ascend 推荐 Docker 方式;pip 需源码编译,不提供官方 wheel,隐藏 pip 标签。
@@ -91,12 +93,20 @@ variants:
     model_id: "Qwen/Qwen3.6-27B"
     precision: bf16
     vram_minimum_gb: 65
-    description: "BF16 权重,适用于 Atlas 800 A3"
+    description: "BF16 权重,适用于 Atlas 800 A3 或 Ascend 950DT"
+    supported_hardware: [atlas_800_a3, atlas_800_a2, ascend_950dt]
+  a5_mxfp8:
+    model_id: "Eco-Tech/Qwen3.6-27B-w8a8-mxfp8"
+    precision: MXFP8
+    vram_minimum_gb: 33
+    description: "Qwen3.6-27B MXFP8 权重,适用于 Ascend 950DT"
+    supported_hardware: [ascend_950dt]
 
 compatible_strategies:
   - single_node_A2
   - single_node_A3
   - single_node_310p
+  - single_node_A5
   - pd_cluster
 
 hardware_overrides: {}
@@ -253,11 +263,23 @@ weight_download:
       git clone https://gitcode.com/Eco-Tech/Qwen3.6-27B-w8a8.git
       ```
 
+# ---- Qwen3.6-27B W8A8 MXFP8（Ascend 950DT） ----
+- weight_version: Qwen3.6-27B-w8a8-mxfp8
+  sources:
+  - source: ModelScope
+    url: https://www.modelscope.cn/models/Eco-Tech/Qwen3.6-27B-w8a8-mxfp8
+    command: |-
+      ```bash
+      pip install modelscope
+      modelscope download --model Eco-Tech/Qwen3.6-27B-w8a8-mxfp8
+      ```
+
 quantization:
   content: |-
     两个模型均提供预量化的 W8A8 版本（带 MTP 投机解码头），发布于 ModelScope 的 `Eco-Tech/` 命名空间下。W8A8 版本启动时**必须**带 `--quantization ascend`，关闭量化请移除该参数。
 
     BF16 版本（位于 `Qwen/` 命名空间下）无需 `--quantization ascend`。
+    在 Ascend 950DT 上，使用 Qwen3.6-27B MXFP8 权重（`Qwen3.6-27B-w8a8-mxfp8`）并添加 `--quantization ascend`。
 
 prerequisites:
 - title: 硬件要求
@@ -265,6 +287,7 @@ prerequisites:
     - **Atlas 800 A3** (64G × 16)：单节点部署至少 1 个节点；多节点 PD 分离至少 2 个节点。
     - **Atlas 800 A2** (64G × 8)：单节点部署至少 1 个节点；该平台不支持多节点 PD 分离。
     - **Atlas 300I DUO**（A2 300I 推理等）：至少 2 个设备；仅支持 TP 模式（TP=2 或 TP=4）。
+    - **Ascend 950DT**（96G × 8）：至少 1 个节点。Qwen3.6-27B BF16 或 W8A8 MXFP8 使用 TP=1 + DP=8。
 
 - title: 多节点通信（仅在使用 PD 分离时需要）
   content: |-
@@ -332,6 +355,22 @@ env_setup:
             -v /etc/ascend_install.info:/etc/ascend_install.info \
             -v /root/.cache:/root/.cache \
             -it $IMAGE bash
+        ```
+    "Ascend 950DT":
+      content: |-
+        在 Ascend 950DT 节点（8 张 NPU、每张 96G HBM）上使用 A5 镜像。
+
+        ```bash
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0rc1-a5
+        docker run --rm --name vllm-ascend --net=host --shm-size=1g \
+          --device /dev/davinci0 --device /dev/davinci1 --device /dev/davinci2 --device /dev/davinci3 \
+          --device /dev/davinci4 --device /dev/davinci5 --device /dev/davinci6 --device /dev/davinci7 \
+          --device /dev/davinci_manager --device /dev/hisi_hdc --device /dev/ummu --device /dev/uburma \
+          -v /usr/local/Ascend/driver:/usr/local/Ascend/driver \
+          -v /etc/ascend_install.info:/etc/ascend_install.info \
+          -v /etc/hccl_rootinfo.json:/etc/hccl_rootinfo.json \
+          -v /etc/hixlep/:/etc/hixlep/ -v /root/.cache:/root/.cache \
+          -it $IMAGE bash
         ```
     "Atlas 300I DUO":
       content: |-
@@ -666,6 +705,52 @@ scenarios:
     content: |-
       服务启动后，通过发送 prompt 验证其运行状态。使用示例请参考下方的验证部分。
 
+# ===== Ascend 950DT 单节点 =====
+- npu: Ascend 950DT
+  precision: MXFP8 / BF16
+  deployment: Single-Node
+  case: Multi Card
+  tags: [a5-single]
+  strategy: single_node_A5
+  steps:
+  - title: 启动服务（Qwen3.6-27B）
+    content: |-
+      在 Ascend 950DT 上，量化路径使用 `Qwen3.6-27B-w8a8-mxfp8`，BF16 使用 `Qwen3.6-27B`。上游推荐使用 TP=1 + DP=8，利用全部 8 张 NPU。
+
+      ```bash
+      export VLLM_USE_MODELSCOPE=True
+      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+      export HCCL_BUFFSIZE=512
+      export OMP_PROC_BIND=false
+      export OMP_NUM_THREADS=1
+      export TASK_QUEUE_ENABLE=1
+      export MODEL_PATH=Eco-Tech/Qwen3.6-27B-w8a8-mxfp8
+
+      vllm serve $MODEL_PATH \
+        --host 0.0.0.0 \
+        --port 8000 \
+        --data-parallel-size 8 \
+        --tensor-parallel-size 1 \
+        --seed 1024 \
+        --quantization ascend \
+        --served-model-name qwen3.6 \
+        --max-num-seqs {{max_num_seqs}} \
+        --max-model-len 262144 \
+        --max-num-batched-tokens 16384 \
+        --trust-remote-code \
+        --gpu-memory-utilization {{gpu_memory_utilization}} \
+        --no-enable-prefix-caching \
+        {{spec_decoding}} \
+        {{compilation_config}} \
+        {{async_scheduling}} \
+        {{cpu_binding}}
+      ```
+
+      BF16 请将 `MODEL_PATH` 改为 `Qwen/Qwen3.6-27B` 并移除 `--quantization ascend`。Qwen3.5-27B 在有兼容权重时使用相同的混合架构运行时和 MTP 配置。
+  - title: 服务验证
+    content: |-
+      参见下方“功能验证”部分 —— 日志打印 `Application startup complete.` 即服务就绪。
+
 verification: |-
   服务启动后，日志应显示：
   ```text
@@ -766,14 +851,18 @@ tuning: |-
 
   **Atlas 300I DUO**：仅支持 TP —— 选择 **TP=2** 或 **TP=4**。**TP=4** 时 `--max-model-len` 可支持 **128K** 与 **256K** 长序列场景。
 
+  **Ascend 950DT**：Qwen3.6-27B-w8a8-mxfp8 可放入单张 96G NPU。吞吐场景使用 TP=1 + DP=8，上下文最长可到 262144。
+
   | 场景 | 部署 | *NPU 数 | 权重 | 说明 |
   |----------|------------|-------|--------|-------|
   | 高吞吐（128K 上下文） | 单节点（A2） | 8 | Qwen3.x-27B-w8a8 | TP=2 + DP=4 —— 8 NPU 全部用于并行请求 batch |
   | 高吞吐（128K 上下文） | 单节点（A3） | 16 | Qwen3.x-27B-w8a8 | TP=2 + DP=8 —— 16 NPU 全部用于并行请求 batch |
   | 低延迟（128K 上下文） | 单节点（A3） | 16 | Qwen3.x-27B-w8a8 | TP=2 + DP=8 —— 减少小交互 batch 的逐层 Allreduce 开销 |
   | 长上下文（256K+） | 单节点（A3） | 16 | Qwen3.x-27B-w8a8 | TP=8 + DP=2 —— KV cache 分片到 8 NPU，最大化上下文窗口 |
+  | 高吞吐（128K 上下文） | 单节点（950DT） | 8 | Qwen3.6-27B-w8a8-mxfp8 | TP=1 + DP=8 —— 使用全部 8 张 NPU 处理并行请求 batch |
+  | 长上下文（256K+） | 单节点（950DT） | 8 | Qwen3.6-27B-w8a8-mxfp8 | TP=1 + DP=8 —— 支持完整 262144 上下文窗口 |
 
-  *总 NPU 数 = 1 台 Atlas 800 A3 = 16 NPU，1 台 Atlas 800 A2 = 8 NPU。
+  *总 NPU 数 = 1 台 Atlas 800 A3 = 16 NPU，1 台 Atlas 800 A2 = 8 NPU，或 1 台 Ascend 950DT = 8 NPU。
 
   | 场景 | 配置 | TP | DP | Max Num Seqs | Max Num Batched Tokens | Max Model Len | MTP Num | Async Scheduling |
   |----------|--------|----|----|--------------|------------------------|---------------|---------|-------------------|
@@ -781,6 +870,8 @@ tuning: |-
   | 高吞吐（128K） | 单节点 A3 | 2 | 8 | 32 | 16384 | 133000 | 3 | 开 |
   | 低延迟（128K） | 单节点 A3 | 2 | 8 | 4 | 4096 | 133000 | 3 | 开 |
   | 长上下文（256K+） | 单节点 A3 | 8 | 2 | 8 | 8192 | 266000 | 3 | 开 |
+  | 高吞吐（128K） | 单节点 950DT | 1 | 8 | 32 | 16384 | 133000 | 3 | 开 |
+  | 长上下文（256K+） | 单节点 950DT | 1 | 8 | 32 | 16384 | 262144 | 3 | 开 |
 
   ### 调优指南
 
