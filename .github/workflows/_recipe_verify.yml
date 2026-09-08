@@ -20,7 +20,7 @@ on:
       image:
         required: false
         type: string
-        default: 'swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/vllm-ascend:v0.23.0rc1'
+        default: 'swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/vllm-ascend:nightly-main'
       recipe_files:
         required: true
         type: string
