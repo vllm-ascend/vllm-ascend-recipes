@@ -1,0 +1,11 @@
+{
+  "recipe_path": "models/en/MoonshotAI/Kimi-K2.6.yaml",
+  "model_id": "",
+  "hw_key": "atlas_800_a2",
+  "head_sha": "540d79ae4dd6c1d11440cd3f18cca42c95761d69",
+  "trigger_type": "nightly",
+  "image": "swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/vllm-ascend:nightly-main",
+  "started_at": "2026-09-09T03:58:07Z",
+  "scenarios": [],
+  "skip_reason": "未提前下载权重，请联系maintainer下载权重 (model_id=moonshotai/Kimi-K2.6)"
+}
