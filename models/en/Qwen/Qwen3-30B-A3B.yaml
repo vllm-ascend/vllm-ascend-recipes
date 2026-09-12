@@ -114,6 +114,7 @@ guide: ""
 performance_model_names:
   - "Qwen3-30B-A3B"
 
+# Comment-only CI probe: configurable defaults below retain the tutorial baseline.
 # —— Configurable value params (page/CI extension; defaults = tutorial baseline) ——
 config_params:
   max_model_len:
