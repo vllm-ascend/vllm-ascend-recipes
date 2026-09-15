@@ -20,6 +20,15 @@ on:
         type: boolean
         description: 'Run all recipes (ignores change detection)'
         default: false
+      hardware_filter:
+        type: choice
+        description: 'Limit verification to specific hardware (schedule/push always runs all)'
+        options:
+          - all
+          - a2
+          - a3
+          - a5
+        default: all
       recipe_allowlist:
         type: string
         description: >-
@@ -36,6 +45,8 @@ jobs:
     outputs:
       a2_recipes: ${{ steps.recipes.outputs.a2_recipes }}
       a2_count: ${{ steps.recipes.outputs.a2_count }}
+      a3_recipes: ${{ steps.recipes.outputs.a3_recipes }}
+      a3_count: ${{ steps.recipes.outputs.a3_count }}
       a5_recipes: ${{ steps.recipes.outputs.a5_recipes }}
       a5_count: ${{ steps.recipes.outputs.a5_count }}
       should_run: ${{ steps.decide.outputs.should_run }}
@@ -88,6 +99,8 @@ jobs:
 
           A2_LIST=""
           A2_COUNT=0
+          A3_LIST=""
+          A3_COUNT=0
           A5_LIST=""
           A5_COUNT=0
 
@@ -116,6 +129,11 @@ jobs:
 
             A2_LIST="${A2_LIST}${file}"$'\n'
             A2_COUNT=$((A2_COUNT + 1))
+            A3_HW=$(python3 -c "import yaml, sys; d=yaml.safe_load(open('$file')); hw=d.get('meta',{}).get('hardware',{}); print(hw.get('atlas_800_a3',''))" 2>/dev/null || echo "")
+            if [ "$A3_HW" != "unsupported" ] && [ "$A3_HW" = "verified" ]; then
+              A3_LIST="${A3_LIST}${file}"$'\n'
+              A3_COUNT=$((A3_COUNT + 1))
+            fi
             A5_HW=$(python3 -c "import yaml, sys; d=yaml.safe_load(open('$file')); hw=d.get('meta',{}).get('hardware',{}); print(hw.get('ascend_950dt',''))" 2>/dev/null || echo "")
             if [ "$A5_HW" != "unsupported" ] && [ "$A5_HW" = "verified" ]; then
               A5_LIST="${A5_LIST}${file}"$'\n'
@@ -127,21 +145,20 @@ jobs:
           FILES=$(echo "$A2_LIST" | sed '/^$/d' | jq -R -s -c 'split("\n") | map(select(length > 0))')
           echo "a2_recipes=$FILES" >> "$GITHUB_OUTPUT"
           echo "a2_count=$A2_COUNT" >> "$GITHUB_OUTPUT"
+          A3_FILES=$(echo "$A3_LIST" | sed '/^$/d' | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          echo "a3_recipes=$A3_FILES" >> "$GITHUB_OUTPUT"
+          echo "a3_count=$A3_COUNT" >> "$GITHUB_OUTPUT"
           A5_FILES=$(echo "$A5_LIST" | sed '/^$/d' | jq -R -s -c 'split("\n") | map(select(length > 0))')
           echo "a5_recipes=$A5_FILES" >> "$GITHUB_OUTPUT"
           echo "a5_count=$A5_COUNT" >> "$GITHUB_OUTPUT"
 
-          echo "A2 recipes to verify: $A2_COUNT"
-          if [ "$A2_COUNT" -eq 0 ]; then
-            echo "::warning::No A2-compatible recipes in selection — verify-a2 job will be skipped"
-          fi
-
           echo "A2 recipes: $A2_COUNT"
+          echo "A3 recipes: $A3_COUNT"
           echo "A5 recipes: $A5_COUNT"
 
   verify-a2:
     needs: prepare
-    if: needs.prepare.outputs.should_run == 'true' && needs.prepare.outputs.a2_count != '0'
+    if: needs.prepare.outputs.should_run == 'true' && needs.prepare.outputs.a2_count != '0' && (github.event_name != 'workflow_dispatch' || github.event.inputs.hardware_filter == 'all' || github.event.inputs.hardware_filter == 'a2')
     uses: ./.github/workflows/_recipe_verify.yml
     with:
       runner: linux-aarch64-a2b4-8
@@ -152,9 +169,24 @@ jobs:
       obs_ak: ${{ secrets.obs_ak }}
       obs_sk: ${{ secrets.obs_sk }}
 
+  verify-a3:
+    needs: prepare
+    if: needs.prepare.outputs.should_run == 'true' && needs.prepare.outputs.a3_count != '0' && (github.event_name != 'workflow_dispatch' || github.event.inputs.hardware_filter == 'all' || github.event.inputs.hardware_filter == 'a3')
+    uses: ./.github/workflows/_recipe_verify.yml
+    with:
+      runner: linux-aarch64-a3-800i-16-cn12-001
+      hardware_key: atlas_800_a3
+      image: swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/vllm-ascend:nightly-main-a3
+      recipe_files: ${{ needs.prepare.outputs.a3_recipes }}
+      trigger_type: nightly
+      head_sha: ${{ github.sha }}
+    secrets:
+      obs_ak: ${{ secrets.obs_ak }}
+      obs_sk: ${{ secrets.obs_sk }}
+
   verify-a5:
     needs: prepare
-    if: needs.prepare.outputs.should_run == 'true' && needs.prepare.outputs.a5_count != '0'
+    if: needs.prepare.outputs.should_run == 'true' && needs.prepare.outputs.a5_count != '0' && (github.event_name != 'workflow_dispatch' || github.event.inputs.hardware_filter == 'all' || github.event.inputs.hardware_filter == 'a5')
     uses: ./.github/workflows/_recipe_verify.yml
     with:
       runner: linux-aarch64-a5-8
@@ -169,7 +201,7 @@ jobs:
       obs_sk: ${{ secrets.obs_sk }}
 
   summary:
-    needs: [prepare, verify-a2, verify-a5]
+    needs: [prepare, verify-a2, verify-a3, verify-a5]
     if: always() && needs.prepare.outputs.should_run == 'true'
     runs-on: ubuntu-latest
     steps:
@@ -180,6 +212,8 @@ jobs:
           echo "=========================================="
           echo "A2 recipes submitted: ${{ needs.prepare.outputs.a2_count }}"
           echo "A2 result: ${{ needs.verify-a2.result }}"
+          echo "A3 recipes submitted: ${{ needs.prepare.outputs.a3_count }}"
+          echo "A3 result: ${{ needs.verify-a3.result }}"
           echo "A5 recipes submitted: ${{ needs.prepare.outputs.a5_count }}"
           echo "A5 result: ${{ needs.verify-a5.result }}"
           echo "Trigger: ${{ github.event_name == 'schedule' && 'cron' || github.event_name == 'workflow_dispatch' && 'manual' || 'push' }}"
