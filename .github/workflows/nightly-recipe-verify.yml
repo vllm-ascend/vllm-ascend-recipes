@@ -176,7 +176,7 @@ jobs:
     with:
       runner: linux-aarch64-a3-800i-16-cn12-001
       hardware_key: atlas_800_a3
-      image: swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/vllm-ascend:v0.23.0rc1-a3
+      image: swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/vllm-ascend:v0.23.0-a3
       recipe_files: ${{ needs.prepare.outputs.a3_recipes }}
       trigger_type: nightly
       head_sha: ${{ github.sha }}
