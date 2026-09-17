@@ -7,7 +7,7 @@ name: 'PR Recipe Verify'
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, main-test]
     types: [opened, synchronize, reopened]
 
 permissions:
