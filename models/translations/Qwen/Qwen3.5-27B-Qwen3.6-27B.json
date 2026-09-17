@@ -47,6 +47,10 @@
     "en": "W8A8 + MTP weights (Qwen3.5-27B-w8a8-mtp)",
     "zh": "W8A8 + MTP 权重(Qwen3.5-27B-w8a8-mtp)"
   },
+  "variants.w8a8.description": {
+    "en": "W8A8 weights for Qwen3.6-27B",
+    "zh": "Qwen3.6-27B 的 W8A8 权重"
+  },
   "variants.bf16.description": {
     "en": "BF16 weights on Atlas 800 A3 or Ascend 950DT",
     "zh": "BF16 权重,适用于 Atlas 800 A3 或 Ascend 950DT"

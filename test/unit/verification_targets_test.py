@@ -79,6 +79,19 @@ class VerificationTargetTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "duplicate recipe/selector"):
                 load_module().load_targets(duplicate_path)
 
+    def test_qwen35_qwen36_a3_w8a8_target_matches_recipe_scenario(self) -> None:
+        targets = load_module().load_targets(ROOT / ".github" / "verification-targets.yaml")
+        target = next(target for target in targets if target["id"] == "qwen35-27b-qwen36-27b-a3-w8a8-single-node-multi-card")
+        recipe = yaml.safe_load((ROOT / target["recipe"]).read_text(encoding="utf-8")) or {}
+
+        self.assertEqual(target["runner"], "linux-aarch64-a3-800i-16-cn12-001")
+        self.assertTrue(
+            any(
+                all(scenario.get(key) == value for key, value in target["selector"].items())
+                for scenario in recipe["scenarios"]
+            )
+        )
+
     def test_pr34_recipe_test_ids_have_unique_targets(self) -> None:
         targets = load_module().load_targets(ROOT / ".github" / "verification-targets.yaml")
 
