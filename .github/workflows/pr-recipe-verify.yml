@@ -31,6 +31,8 @@ jobs:
       has_config_changes: ${{ steps.filter.outputs.config }}
       recipe_files: ${{ steps.recipes.outputs.files }}
       recipe_count: ${{ steps.recipes.outputs.count }}
+      a3_recipe_files: ${{ steps.recipes.outputs.a3_files }}
+      a3_recipe_count: ${{ steps.recipes.outputs.a3_count }}
       a5_recipe_files: ${{ steps.recipes.outputs.a5_files }}
       a5_recipe_count: ${{ steps.recipes.outputs.a5_count }}
     steps:
@@ -94,6 +96,8 @@ jobs:
             {
               echo "count=$COUNT"
               echo "files=$FILES"
+              echo "a3_count=$COUNT"
+              echo "a3_files=$FILES"
               echo "a5_count=$A5_COUNT"
               echo "a5_files=$A5_FILES"
             } >> "$GITHUB_OUTPUT"
@@ -107,6 +111,8 @@ jobs:
             {
               echo "count=0"
               echo "files=[]"
+              echo "a3_count=0"
+              echo "a3_files=[]"
               echo "a5_count=0"
               echo "a5_files=[]"
             } >> "$GITHUB_OUTPUT"
@@ -220,6 +226,23 @@ jobs:
     with:
       runner: linux-aarch64-a2b4-8
       recipe_files: ${{ needs.detect.outputs.recipe_files }}
+      trigger_type: pr
+      head_sha: ${{ github.event.pull_request.head.sha }}
+      started_at_iso: ${{ github.event.pull_request.updated_at }}
+
+  # A3 enables recipe parity across Atlas A2 / A3 generations.
+  verify-a3:
+    needs: [detect, validate]
+    if: |
+      needs.detect.outputs.has_model_changes == 'true' &&
+      needs.detect.outputs.a3_recipe_count != '0' &&
+      needs.validate.result == 'success'
+    uses: ./.github/workflows/_recipe_verify.yml
+    with:
+      runner: linux-aarch64-a3b4-8
+      hardware_key: atlas_800_a3
+      image: swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/vllm-ascend:v0.23.0-a3
+      recipe_files: ${{ needs.detect.outputs.a3_recipe_files }}
       trigger_type: pr
       head_sha: ${{ github.event.pull_request.head.sha }}
       started_at_iso: ${{ github.event.pull_request.updated_at }}
