@@ -171,7 +171,7 @@ jobs:
     uses: ./.github/workflows/_recipe_verify.yml
     with:
       runner: linux-aarch64-a2b4-8
-      image: ${{ github.event.inputs.a2_image || 'swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/vllm-ascend:nightly-main' }}
+      image: ${{ github.event.inputs.a2_image || 'swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/vllm-ascend:v0.23.0' }}
       recipe_files: ${{ needs.prepare.outputs.a2_recipes }}
       trigger_type: nightly
       head_sha: ${{ github.sha }}
@@ -201,7 +201,7 @@ jobs:
     with:
       runner: linux-aarch64-a5-8
       hardware_key: ascend_950dt
-      image: ${{ github.event.inputs.a5_image || 'swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/vllm-ascend:nightly-main-a5' }}
+      image: ${{ github.event.inputs.a5_image || 'swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/vllm-ascend:v0.23.0-a5' }}
       mount_share: true
       recipe_files: ${{ needs.prepare.outputs.a5_recipes }}
       trigger_type: nightly
