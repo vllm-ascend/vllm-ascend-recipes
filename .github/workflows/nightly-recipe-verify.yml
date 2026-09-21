@@ -37,13 +37,13 @@ on:
           Example: models/en/Qwen/Qwen3-30B-A3B.yaml,models/en/Qwen/Qwen3-235B-A22B.yaml
       a2_image:
         type: string
-        description: 'Override A2 Docker image (leave blank for default: nightly-main)'
+        description: 'Override A2 Docker image (leave blank for default: v0.23.0)'
       a3_image:
         type: string
         description: 'Override A3 Docker image (leave blank for default: v0.23.0-a3)'
       a5_image:
         type: string
-        description: 'Override A5 Docker image (leave blank for default: nightly-main-a5)'
+        description: 'Override A5 Docker image (leave blank for default: v0.23.0-a5)'
 
 permissions:
   contents: read
