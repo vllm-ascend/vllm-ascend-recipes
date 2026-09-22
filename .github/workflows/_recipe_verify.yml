@@ -61,7 +61,7 @@ defaults:
     shell: bash -el {0}
 
 concurrency:
-  group: recipe-verify-${{ inputs.runner }}-${{ github.ref }}-${{ inputs.trigger_type }}
+  group: recipe-verify-${{ github.workflow_ref }}-${{ inputs.runner }}-${{ github.ref }}-${{ inputs.trigger_type }}
   cancel-in-progress: ${{ inputs.trigger_type == 'pr' }}
 
 jobs:
