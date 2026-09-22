@@ -1,0 +1,11 @@
+{
+  "recipe_path": "models/en/THUDM/GLM-5.yaml",
+  "model_id": "",
+  "hw_key": "atlas_800_a3",
+  "head_sha": "966fca2724ab390bfdf25f7524de61d144130ec5",
+  "trigger_type": "nightly",
+  "image": "swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/vllm-ascend:v0.23.0-a3",
+  "started_at": "2026-09-22T13:43:32Z",
+  "scenarios": [],
+  "skip_reason": "未提前下载权重，请联系maintainer下载权重 (model_id=zai-org/GLM-5)"
+}
