@@ -1,0 +1,11 @@
+{
+  "recipe_path": "models/en/THUDM/GLM-4.x.yaml",
+  "model_id": "",
+  "hw_key": "atlas_800_a3",
+  "head_sha": "0681b1a94bce63bdf4eefc4e13ffa2ec9a57b205",
+  "trigger_type": "nightly",
+  "image": "swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/vllm-ascend:v0.23.0-a3",
+  "started_at": "2026-09-22T21:29:13Z",
+  "scenarios": [],
+  "skip_reason": "未提前下载权重，请联系maintainer下载权重 (model_id=ZhipuAI/GLM-4.7)"
+}

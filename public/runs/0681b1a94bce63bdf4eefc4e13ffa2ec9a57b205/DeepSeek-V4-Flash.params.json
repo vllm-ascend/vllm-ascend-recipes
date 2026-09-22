@@ -1,0 +1,27 @@
+{
+  "recipe_path": "models/en/DeepSeek/DeepSeek-V4-Flash.yaml",
+  "model_id": "deepseek-ai/DeepSeek-V4-Flash",
+  "hw_key": "atlas_800_a3",
+  "head_sha": "0681b1a94bce63bdf4eefc4e13ffa2ec9a57b205",
+  "trigger_type": "nightly",
+  "image": "swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/vllm-ascend:v0.23.0-a3",
+  "started_at": "2026-09-22T20:57:53Z",
+  "scenarios": [
+    {
+      "index": 0,
+      "npu": "Atlas 800I A3",
+      "precision": "W8A8",
+      "deployment": "Single-Node",
+      "case": "Low Latency",
+      "serve_cmd": "export OMP_PROC_BIND=false\nexport OMP_NUM_THREADS=10\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\nexport LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libjemalloc.so.2:$LD_PRELOAD\nexport HCCL_BUFFSIZE=1024\nexport VLLM_ASCEND_ENABLE_FLASHCOMM1=1\nexport TASK_QUEUE_ENABLE=1\nexport HCCL_OP_EXPANSION_MODE=\"AIV\"\n\nvllm serve /root/.cache/modelscope/hub/models/Eco-Tech/DeepSeek-V4-Flash-w8a8-mtp \\\n    --max-model-len 1048576 \\\n    --max-num-batched-tokens 10240 \\\n    --served-model-name dsv4 \\\n    --gpu-memory-utilization 0.9 \\\n    --api-server-count 1 \\\n    --max-num-seqs 32 \\\n    --data-parallel-size 4 \\\n    --tensor-parallel-size 4 \\\n    --enable-expert-parallel \\\n    --tokenizer-mode deepseek_v4 \\\n    --tool-call-parser deepseek_v4 \\\n    --enable-auto-tool-choice \\\n    --reasoning-parser deepseek_v4 \\\n    --safetensors-load-strategy 'prefetch' \\\n    --model-loader-extra-config='{\"enable_multithread_load\": \"true\", \"num_threads\": 128}' \\\n    --quantization ascend \\\n    --port 8900 \\\n    --block-size 128 \\\n    --compilation-config '{\"cudagraph_mode\":\"FULL_DECODE_ONLY\"}' \\\n    --async-scheduling \\\n    --additional-config '\n    {\"ascend_compilation_config\":{\n        \"enable_npugraph_ex\":true,\n        \"enable_static_kernel\":false\n        },\n    \"enable_cpu_binding\": true,\n    \"multistream_overlap_shared_expert\":true}'"
+    },
+    {
+      "index": 1,
+      "npu": "Atlas 800I A3",
+      "precision": "W8A8",
+      "deployment": "Multi-Node PD Separation",
+      "case": "PD Separation",
+      "serve_cmd": "nic_name=\"xxxx\" # change to your own nic name\nlocal_ip=xx.xx.xx.2 # change to your own ip\n\nexport LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libjemalloc.so.2:$LD_PRELOAD\nexport HCCL_OP_EXPANSION_MODE=\"AIV\"\nexport TASK_QUEUE_ENABLE=1\nexport VLLM_RPC_TIMEOUT=3600000\nexport VLLM_EXECUTE_MODEL_TIMEOUT_SECONDS=30000\nexport HCCL_EXEC_TIMEOUT=204\nexport HCCL_CONNECT_TIMEOUT=1200\nexport HCCL_IF_IP=$local_ip\nexport GLOO_SOCKET_IFNAME=$nic_name\nexport TP_SOCKET_IFNAME=$nic_name\nexport HCCL_SOCKET_IFNAME=$nic_name\nexport OMP_PROC_BIND=false\nexport OMP_NUM_THREADS=10\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\nexport HCCL_BUFFSIZE=1024\nexport ASCEND_RT_VISIBLE_DEVICES=$1\n\nvllm serve /root/.cache/modelscope/hub/models/Eco-Tech/DeepSeek-V4-Flash-w8a8-mtp \\\n    --host 0.0.0.0 \\\n    --port $2 \\\n    --data-parallel-size $3 \\\n    --data-parallel-rank $4 \\\n    --data-parallel-address $5 \\\n    --data-parallel-rpc-port $6 \\\n    --tensor-parallel-size $7 \\\n    --enable-expert-parallel \\\n    --seed 1024 \\\n    --served-model-name dsv4 \\\n    --max-model-len 1048576 \\\n    --max-num-batched-tokens 120 \\\n    --max-num-seqs 32 \\\n    --async-scheduling \\\n    --block-size 128 \\\n    --no-disable-hybrid-kv-cache-manager \\\n    --no-enable-prefix-caching \\\n    --safetensors-load-strategy 'prefetch' \\\n    --trust-remote-code \\\n    --tokenizer-mode deepseek_v4 \\\n    --model-loader-extra-config='{\"enable_multithread_load\": \"true\", \"num_threads\": 128}' \\\n    --tool-call-parser deepseek_v4 \\\n    --enable-auto-tool-choice \\\n    --reasoning-parser deepseek_v4 \\\n    --gpu-memory-utilization 0.9 \\\n    --quantization ascend \\\n    --compilation-config '{\"cudagraph_mode\":\"FULL_DECODE_ONLY\"}' \\\n    --kv-transfer-config \\\n    '{\"kv_connector\": \"MooncakeHybridConnector\",\n    \"kv_role\": \"kv_consumer\",\n    \"kv_port\": \"30100\",\n    \"engine_id\": \"1\",\n    \"kv_connector_extra_config\": {\n                \"prefill\": {\n                        \"dp_size\": 4,\n                        \"tp_size\": 4\n                },\n                \"decode\": {\n                        \"dp_size\": 16,\n                        \"tp_size\": 1\n                }\n        }\n    }' \\\n    --additional-config '{\n        \"ascend_compilation_config\":{\n            \"enable_npugraph_ex\":true,\n            \"enable_static_kernel\":false\n        },\n        \"enable_cpu_binding\":true,\n        \"multistream_overlap_shared_expert\":true,\n        \"recompute_scheduler_enable\":true\n    }'"
+    }
+  ]
+}
