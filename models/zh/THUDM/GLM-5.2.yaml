@@ -8,6 +8,7 @@ meta:
   hardware:
     atlas_800_a3: verified
     atlas_800_a2: verified
+    ascend_950dt: verified
 
 model:
   model_id: "zai-org/GLM-5.2"
@@ -35,6 +36,60 @@ variants:
     precision: BF16
     vram_minimum_gb: 1807
     description: "BF16 全精度权重 —— 2 台 Atlas 800I A3 或 4 台 Atlas 800I A2"
+
+features:
+  expert_parallel:
+    description: "跨 DP rank 的 MoE 专家并行(GLM-5.2 MoE 必需)"
+    args: ["--enable-expert-parallel"]
+  tool_calling:
+    description: "GLM 函数调用"
+    args: ["--enable-auto-tool-choice", "--tool-call-parser", "glm47"]
+  reasoning:
+    description: "GLM 推理解析器"
+    args: ["--reasoning-parser", "glm45"]
+  spec_decoding:
+    label: "MTP Spec Decoding"
+    description: "MTP 投机解码(deepseek_mtp,3 个投机 token),加速推理"
+    args: ["--speculative-config", '{"num_speculative_tokens": 3, "method": "deepseek_mtp", "enforce_eager": true}']
+  flashcomm1:
+    label: "FlashComm1"
+    description: "FlashComm 通信优化"
+    env:
+      VLLM_ASCEND_ENABLE_FLASHCOMM1: "1"
+  prefix_caching:
+    label: "Prefix Caching"
+    description: "KV 缓存前缀缓存,适用于长上下文场景"
+    args: ["--enable-prefix-caching"]
+    flag_when_false: "--no-enable-prefix-caching"
+  compilation_config:
+    label: "Compilation Config"
+    description: "decode 阶段全 ACL 图执行"
+    args: ["--compilation-config", '{"cudagraph_mode":"FULL_DECODE_ONLY"}']
+  async_scheduling:
+    label: "Async Scheduling"
+    description: "异步调度,CPU 与 NPU 计算重叠"
+    args: ["--async-scheduling"]
+  multistream_overlap:
+    label: "Multi-stream Overlap"
+    description: "MoE 共享专家多流重叠"
+    args: ["--additional-config", '{"multistream_overlap_shared_expert": true}']
+  mlapo:
+    label: "MLAPO"
+    description: "多层注意力预填充优化,适用于 W8A8 场景"
+    env:
+      VLLM_ASCEND_ENABLE_MLAPO: "1"
+
+opt_in_features:
+  - prefix_caching
+  - async_scheduling
+  - multistream_overlap
+  - mlapo
+
+compatible_strategies:
+  - single_node_A3
+  - single_node_A2
+  - multi_node_dp
+  - pd_cluster
 
 
 guide: ""

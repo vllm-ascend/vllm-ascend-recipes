@@ -36,6 +36,8 @@ model:
     - "--enable-expert-parallel"
     - "--safetensors-load-strategy"
     - "prefetch"
+    - "--attention-config"
+    - '{"indexer_kv_dtype": "int8"}'
   base_env:
     HCCL_OP_EXPANSION_MODE: "AIV"
     HCCL_BUFFSIZE: "1024"
@@ -44,6 +46,8 @@ model:
     OMP_NUM_THREADS: "10"
     TASK_QUEUE_ENABLE: "1"
     LD_PRELOAD: "/usr/lib/aarch64-linux-gnu/libjemalloc.so.2:$LD_PRELOAD"
+    VLLM_PREFIX_CACHE_RETENTION_INTERVAL: "4096"
+    VLLM_ASCEND_ENABLE_FUSED_MC2: "1"
   docker_image:
     atlas_800_a2: "quay.io/ascend/vllm-ascend:v0.23.0rc1"
     atlas_800_a3: "quay.io/ascend/vllm-ascend:v0.23.0rc1-a3"
@@ -71,6 +75,10 @@ features:
     label: "MTP Spec Decoding"
     description: "MTP(Multi-Token Prediction)投机解码,加速推理"
     args: ["--speculative-config", '{"num_speculative_tokens": 1, "method": "mtp", "enforce_eager": true}']
+  spec_decoding_dspark:
+    label: "DSpark Spec Decoding"
+    description: "DSpark 投机解码(7 个投机 token),加速推理(需要 v0.25.0+)"
+    args: ["--speculative-config", '{"num_speculative_tokens": 7, "method": "dspark", "enforce_eager": true}']
   flashcomm1:
     label: "FlashComm1"
     description: "FlashComm 通信优化,提升芯片间带宽"
@@ -126,6 +134,18 @@ variants:
     precision: MXFP4/MXFP8
     vram_minimum_gb: 341
     description: "单台 Ascend 950DT 使用的原始 MXFP4/MXFP8 权重"
+    supported_hardware: [ascend_950dt]
+  w8a8_mtp_0731:
+    model_id: "Eco-Tech/DeepSeek-V4-Flash-0731-w8a8"
+    precision: W8A8
+    vram_minimum_gb: 341
+    description: "0731 W8A8+MTP 权重,用于 A3 DSpark 和 PD DSpark 场景"
+    supported_hardware: [atlas_800_a3, atlas_800_a2]
+  w4a4c8_0731:
+    model_id: "Eco-Tech/DeepSeek-V4-Flash-0731-w4a4c8"
+    precision: W4A4C8
+    vram_minimum_gb: 171
+    description: "0731 W4A4C8 压缩权重,用于单台 Ascend 950DT"
     supported_hardware: [ascend_950dt]
 
 compatible_strategies:

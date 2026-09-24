@@ -30,6 +30,56 @@ variants:
     vram_minimum_gb: 564
     description: "BF16 全精度权重 —— 1 台 Atlas 800I A3（64G×16）、1 台 Atlas 800I A2（64G×8）或 2 台 Atlas 800I A2（32G×8）"
 
+features:
+  expert_parallel:
+    description: "跨 DP rank 的 MoE 专家并行"
+    args: ["--enable-expert-parallel"]
+  flashcomm1:
+    label: "FlashComm1"
+    description: "FlashComm 通信优化,提升芯片间带宽"
+    env:
+      VLLM_ASCEND_ENABLE_FLASHCOMM1: "1"
+  fused_mc2:
+    label: "Fused MC2"
+    description: "启用融合 MC2 集合通信"
+    args: ["--additional-config", '{"enable_fused_mc2": 1}']
+  prefix_caching:
+    label: "Prefix Caching"
+    description: "KV 缓存前缀缓存(--enable-prefix-caching / --no-enable-prefix-caching)"
+    args: ["--enable-prefix-caching"]
+    flag_when_false: "--no-enable-prefix-caching"
+  compilation_config:
+    label: "Compilation Config"
+    description: "decode 阶段全 ACL 图执行"
+    args: ["--compilation-config", '{"cudagraph_mode":"FULL_DECODE_ONLY"}']
+  async_scheduling:
+    label: "Async Scheduling"
+    description: "异步调度,CPU 与 NPU 计算重叠"
+    args: ["--async-scheduling"]
+  spec_decoding:
+    label: "Eagle3 Spec Decoding"
+    description: "Eagle3 投机解码,加速推理"
+    args: ["--speculative-config", '{"method": "eagle3", "model": "your_eagle3_model_path", "draft_tensor_parallel_size": 1, "num_speculative_tokens": 3}']
+  context_parallelism:
+    label: "Context Parallelism"
+    description: "扁平化上下文并行(最多 16 卡)"
+    args: ["--enable-context-parallelism", "--context-parallel-algo", "flattened"]
+  yarn_rope:
+    label: "YaRN RoPE Scaling"
+    description: "YaRN rope 缩放扩展上下文长度"
+    args: ["--hf-overrides", '{"rope_parameters": {"rope_type":"yarn","rope_theta":1000000,"factor":4,"original_max_position_embeddings":32768}}']
+
+opt_in_features:
+  - prefix_caching
+  - async_scheduling
+  - spec_decoding
+  - context_parallelism
+
+compatible_strategies:
+  - single_node_A3
+  - single_node_A2
+  - pd_cluster
+
 
 strategy_overrides:
   pd_cluster:

@@ -9,6 +9,8 @@ meta:
   performance_headline: "在 Ascend 950DT（96 GB × 8）上的单节点 W8A8 部署"
   hardware:
     ascend_950dt: experimental
+    atlas_800_a3: experimental
+    atlas_800_a2: experimental
 
 model:
   model_id: "Eco-Tech/Qwen3-VL-30B-A3B-Instruct-w8a8-mxfp8"
@@ -70,16 +72,32 @@ features:
     label: "编译配置"
     description: "教程基线使用完整 decode ACLGraph 回放。"
     args: ["--compilation-config", "{\"cudagraph_mode\":\"FULL_DECODE_ONLY\"}"]
+  fused_mc2:
+    label: "Fused MC2"
+    description: "启用融合 MC2 集合通信,适用于 A3 场景"
+    args: ["--additional-config", '{"enable_fused_mc2": 1}']
+  pipeline_parallel:
+    label: "流水线并行"
+    description: "流水线并行,适用于图验证场景"
+    args: ["--pipeline-parallel-size", "2"]
 
-opt_in_features: [prefix_caching]
+opt_in_features: [prefix_caching, fused_mc2, pipeline_parallel]
 
 variants:
   default:
+    model_id: "Eco-Tech/Qwen3-VL-30B-A3B-Instruct-w8a8-mxfp8"
     precision: W8A8
     vram_minimum_gb: 36
     description: "适用于单台 Ascend 950DT 节点的 W8A8 量化检查点。"
+    supported_hardware: [ascend_950dt]
+  bf16:
+    model_id: "Qwen/Qwen3-VL-30B-A3B-Instruct"
+    precision: BF16
+    vram_minimum_gb: 60
+    description: "适用于单台 Atlas 800I A3 或 A2 节点的 BF16 全精度权重。"
+    supported_hardware: [atlas_800_a3, atlas_800_a2]
 
-compatible_strategies: [single_node_A5]
+compatible_strategies: [single_node_A5, single_node_A3, single_node_A2]
 hardware_overrides: {}
 strategy_overrides: {}
 guide: ""

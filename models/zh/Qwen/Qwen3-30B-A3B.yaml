@@ -55,6 +55,10 @@ features:
     label: "Eagle3 Spec Decoding"
     description: "Eagle3 投机解码 — 将 your_eagle3_model_path 替换为草稿模型路径"
     args: ["--speculative-config", '{"method": "eagle3", "model": "your_eagle3_model_path", "draft_tensor_parallel_size": 1, "num_speculative_tokens": 3}']
+  spec_decoding_mtp:
+    label: "MTP Spec Decoding"
+    description: "MTP 投机解码(1 个投机 token),适用于 Atlas 300I DUO"
+    args: ["--speculative-config", '{"method": "mtp", "num_speculative_tokens": 1}']
   compilation_config:
     label: "Compilation Config"
     description: "decode 阶段全 ACL 图执行(--compilation-config cudagraph_mode=FULL_DECODE_ONLY)"
