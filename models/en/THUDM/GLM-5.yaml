@@ -79,11 +79,21 @@ features:
     label: "Multi-stream Overlap"
     description: "MoE shared expert multi-stream overlap"
     args: ["--additional-config", '{"multistream_overlap_shared_expert": true}']
+  async_scheduling:
+    label: "Async Scheduling"
+    description: "Asynchronous scheduling to overlap CPU and NPU computation"
+    args: ["--async-scheduling"]
+  mlapo:
+    label: "MLAPO"
+    description: "Multi-level attention prefill optimization for W8A8 scenarios"
+    env:
+      VLLM_ASCEND_ENABLE_MLAPO: "1"
 
 opt_in_features: []
 
 variants:
   default:
+    model_id: "Eco-Tech/GLM-5-w4a8"
     precision: W4A8
     vram_minimum_gb: 447
     description: "W4A8 quantized weights on Atlas 800 A2/A3"

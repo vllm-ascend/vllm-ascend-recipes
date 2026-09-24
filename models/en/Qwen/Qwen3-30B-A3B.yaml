@@ -55,6 +55,10 @@ features:
     label: "Eagle3 Spec Decoding"
     description: "Eagle3 speculative decoding — replace your_eagle3_model_path with your draft model path"
     args: ["--speculative-config", '{"method": "eagle3", "model": "your_eagle3_model_path", "draft_tensor_parallel_size": 1, "num_speculative_tokens": 3}']
+  spec_decoding_mtp:
+    label: "MTP Spec Decoding"
+    description: "MTP speculative decoding with 1 token (Atlas 300I DUO)"
+    args: ["--speculative-config", '{"method": "mtp", "num_speculative_tokens": 1}']
   compilation_config:
     label: "Compilation Config"
     description: "Full ACL graph execution in decode (--compilation-config cudagraph_mode=FULL_DECODE_ONLY)"

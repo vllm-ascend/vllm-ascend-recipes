@@ -9,6 +9,8 @@ meta:
   performance_headline: "Single-node W8A8 deployment on Ascend 950DT (96 GB × 8)"
   hardware:
     ascend_950dt: experimental
+    atlas_800_a3: experimental
+    atlas_800_a2: experimental
 
 model:
   model_id: "Eco-Tech/Qwen3-VL-30B-A3B-Instruct-w8a8-mxfp8"
@@ -70,16 +72,32 @@ features:
     label: "Compilation Config"
     description: "Full decode ACLGraph replay used by the tutorial baseline."
     args: ["--compilation-config", "{\"cudagraph_mode\":\"FULL_DECODE_ONLY\"}"]
+  fused_mc2:
+    label: "Fused MC2"
+    description: "Enable fused MC2 collective communication for A3 scenarios"
+    args: ["--additional-config", '{"enable_fused_mc2": 1}']
+  pipeline_parallel:
+    label: "Pipeline Parallel"
+    description: "Pipeline parallelism for graph validation scenarios"
+    args: ["--pipeline-parallel-size", "2"]
 
-opt_in_features: [prefix_caching]
+opt_in_features: [prefix_caching, fused_mc2, pipeline_parallel]
 
 variants:
   default:
+    model_id: "Eco-Tech/Qwen3-VL-30B-A3B-Instruct-w8a8-mxfp8"
     precision: W8A8
     vram_minimum_gb: 36
     description: "W8A8 quantized checkpoint for one Ascend 950DT node."
+    supported_hardware: [ascend_950dt]
+  bf16:
+    model_id: "Qwen/Qwen3-VL-30B-A3B-Instruct"
+    precision: BF16
+    vram_minimum_gb: 60
+    description: "Full BF16 weights for one Atlas 800I A3 or A2 node."
+    supported_hardware: [atlas_800_a3, atlas_800_a2]
 
-compatible_strategies: [single_node_A5]
+compatible_strategies: [single_node_A5, single_node_A3, single_node_A2]
 hardware_overrides: {}
 strategy_overrides: {}
 guide: ""

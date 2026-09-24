@@ -8,6 +8,7 @@ meta:
   hardware:
     atlas_800_a3: verified
     atlas_800_a2: verified
+    ascend_950dt: verified
 
 model:
   model_id: "zai-org/GLM-5.2"
@@ -36,6 +37,59 @@ variants:
     vram_minimum_gb: 1807
     description: "Full BF16 weights - 2x Atlas 800I A3 or 4x Atlas 800I A2"
 
+features:
+  expert_parallel:
+    description: "MoE expert parallelism across the DP ranks (required for GLM-5.2 MoE)"
+    args: ["--enable-expert-parallel"]
+  tool_calling:
+    description: "GLM function calling"
+    args: ["--enable-auto-tool-choice", "--tool-call-parser", "glm47"]
+  reasoning:
+    description: "GLM reasoning parser"
+    args: ["--reasoning-parser", "glm45"]
+  spec_decoding:
+    label: "MTP Spec Decoding"
+    description: "MTP speculative decoding (deepseek_mtp, 3 tokens) to accelerate inference"
+    args: ["--speculative-config", '{"num_speculative_tokens": 3, "method": "deepseek_mtp", "enforce_eager": true}']
+  flashcomm1:
+    label: "FlashComm1"
+    description: "FlashComm communication optimization"
+    env:
+      VLLM_ASCEND_ENABLE_FLASHCOMM1: "1"
+  prefix_caching:
+    label: "Prefix Caching"
+    description: "KV-cache prefix caching for long-context scenarios"
+    args: ["--enable-prefix-caching"]
+    flag_when_false: "--no-enable-prefix-caching"
+  compilation_config:
+    label: "Compilation Config"
+    description: "Full ACL graph execution in decode"
+    args: ["--compilation-config", '{"cudagraph_mode":"FULL_DECODE_ONLY"}']
+  async_scheduling:
+    label: "Async Scheduling"
+    description: "Asynchronous scheduling to overlap CPU and NPU computation"
+    args: ["--async-scheduling"]
+  multistream_overlap:
+    label: "Multi-stream Overlap"
+    description: "MoE shared expert multi-stream overlap"
+    args: ["--additional-config", '{"multistream_overlap_shared_expert": true}']
+  mlapo:
+    label: "MLAPO"
+    description: "Multi-level attention prefill optimization for W8A8 scenarios"
+    env:
+      VLLM_ASCEND_ENABLE_MLAPO: "1"
+
+opt_in_features:
+  - prefix_caching
+  - async_scheduling
+  - multistream_overlap
+  - mlapo
+
+compatible_strategies:
+  - single_node_A3
+  - single_node_A2
+  - multi_node_dp
+  - pd_cluster
 
 guide: ""
 performance_model_names:
