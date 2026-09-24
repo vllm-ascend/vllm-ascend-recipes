@@ -151,23 +151,7 @@ except Exception as e:
     print(json.dumps({'action': 'skip', 'reason': f'cache_paths 文件解析失败: {e}'}))
     sys.exit(0)
 CACHE_DIR_BY_MODEL = {a['model_id']: a['cache_dir'] for a in aliases}
-if hw_key == 'ascend_950dt' and model_id_for_path in {
-    'deepseek-ai/DeepSeek-V4-Flash',
-    'zai-org/GLM-5',
-}:
-    a5_candidates = {
-        'deepseek-ai/DeepSeek-V4-Flash': '/root/.cache/modelscope/hub/models/models--deepseek-ai--DeepSeek-V4-Flash',
-        'zai-org/GLM-5': '/root/.cache/modelscope/hub/models/Eco-Tech/GLM-5.1-w4a4c8-mxfp4',
-    }
-    a5_candidate = a5_candidates[model_id_for_path]
-    CACHE_PATH = a5_candidate if os.path.isdir(a5_candidate) else None
-    if CACHE_PATH is None:
-        print(json.dumps({
-            'action': 'skip',
-            'reason': f'A5 runner 未预装原始权重 (目录={a5_candidate})',
-        }))
-        sys.exit(0)
-elif model_id_for_path not in CACHE_DIR_BY_MODEL:
+if model_id_for_path not in CACHE_DIR_BY_MODEL:
     print(json.dumps({
         'action': 'skip',
         'reason': f'未提前下载权重，请联系maintainer下载权重 (model_id={model_id_for_path})',

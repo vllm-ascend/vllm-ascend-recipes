@@ -71,7 +71,7 @@ jobs:
     timeout-minutes: 240
     container:
       image: ${{ inputs.image }}
-      options: ${{ inputs.mount_share && '--volume /mnt/share:/root/.cache' || '' }}
+      options: ${{ inputs.mount_share && '--volume /mnt/weight:/root/.cache' || '' }}
       env:
         VLLM_LOGGING_LEVEL: ERROR
         VLLM_USE_MODELSCOPE: True

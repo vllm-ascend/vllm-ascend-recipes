@@ -37,3 +37,6 @@ aliases:
 
   - model_id: deepseek-ai/DeepSeek-V4-Flash
     cache_dir: DeepSeek-V4-Flash-w8a8-mtp
+
+  - model_id: zai-org/GLM-5
+    cache_dir: GLM-5.1-w4a4c8-mxfp4
