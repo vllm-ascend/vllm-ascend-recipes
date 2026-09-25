@@ -113,7 +113,7 @@ jobs:
 
           # Priority order for selecting which recipes to verify:
           #   1. workflow_dispatch input `recipe_allowlist` (when set, overrides everything)
-          #   2. full_run=true OR schedule trigger  -> run all A2-compatible recipes
+          #   2. full_run=true OR schedule trigger  -> run all compatible recipes
           #   3. push trigger with model changes    -> only run the changed files
           ALLOWLIST="${{ github.event.inputs.recipe_allowlist }}"
           if [ -n "$ALLOWLIST" ]; then
@@ -130,19 +130,20 @@ jobs:
           fi
 
           for file in $RECIPE_FILES; do
-            HW=$(python3 -c "import yaml, sys; d=yaml.safe_load(open('$file')); hw=d.get('meta',{}).get('hardware',{}); print(hw.get('atlas_800_a2',''))" 2>/dev/null || echo "")
+            A2_HW=$(python3 -c "import yaml, sys; d=yaml.safe_load(open('$file')); hw=d.get('meta',{}).get('hardware',{}); print(hw.get('atlas_800_a2',''))" 2>/dev/null || echo "")
+            if [ "$A2_HW" != "unsupported" ]; then
+              A2_LIST="${A2_LIST}${file}"$'\n'
+              A2_COUNT=$((A2_COUNT + 1))
+            fi
 
-            [ "$HW" = "unsupported" ] && continue
-
-            A2_LIST="${A2_LIST}${file}"$'\n'
-            A2_COUNT=$((A2_COUNT + 1))
             A3_HW=$(python3 -c "import yaml, sys; d=yaml.safe_load(open('$file')); hw=d.get('meta',{}).get('hardware',{}); print(hw.get('atlas_800_a3',''))" 2>/dev/null || echo "")
-            if [ "$A3_HW" != "unsupported" ] && [ "$A3_HW" = "verified" ]; then
+            if [ "$A3_HW" = "verified" ]; then
               A3_LIST="${A3_LIST}${file}"$'\n'
               A3_COUNT=$((A3_COUNT + 1))
             fi
+
             A5_HW=$(python3 -c "import yaml, sys; d=yaml.safe_load(open('$file')); hw=d.get('meta',{}).get('hardware',{}); print(hw.get('ascend_950dt',''))" 2>/dev/null || echo "")
-            if [ "$A5_HW" != "unsupported" ] && [ "$A5_HW" = "verified" ]; then
+            if [ "$A5_HW" = "verified" ]; then
               A5_LIST="${A5_LIST}${file}"$'\n'
               A5_COUNT=$((A5_COUNT + 1))
             fi
