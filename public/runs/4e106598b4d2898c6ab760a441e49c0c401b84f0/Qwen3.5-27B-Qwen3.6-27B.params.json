@@ -1,0 +1,11 @@
+{
+  "recipe_path": "models/en/Qwen/Qwen3.5-27B-Qwen3.6-27B.yaml",
+  "model_id": "",
+  "hw_key": "ascend_950dt",
+  "head_sha": "4e106598b4d2898c6ab760a441e49c0c401b84f0",
+  "trigger_type": "nightly",
+  "image": "swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/vllm-ascend:nightly-main-a5",
+  "started_at": "2026-09-24T09:00:59Z",
+  "scenarios": [],
+  "skip_reason": "镜像未预装该权重 (model_id=Qwen/Qwen3.6-27B, 目录=Qwen3.6-27B-w8a8, 已尝试 ['', 'Eco-Tech', 'vllm-ascend', 'models'])"
+}

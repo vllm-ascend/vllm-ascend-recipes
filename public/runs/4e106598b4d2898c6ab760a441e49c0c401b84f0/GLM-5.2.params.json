@@ -1,0 +1,11 @@
+{
+  "recipe_path": "models/en/THUDM/GLM-5.2.yaml",
+  "model_id": "",
+  "hw_key": "ascend_950dt",
+  "head_sha": "4e106598b4d2898c6ab760a441e49c0c401b84f0",
+  "trigger_type": "nightly",
+  "image": "swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/vllm-ascend:nightly-main-a5",
+  "started_at": "2026-09-24T09:01:02Z",
+  "scenarios": [],
+  "skip_reason": "未提前下载权重，请联系maintainer下载权重 (model_id=zai-org/GLM-5.2)"
+}
