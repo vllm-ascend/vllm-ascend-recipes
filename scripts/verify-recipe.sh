@@ -150,7 +150,9 @@ try:
 except Exception as e:
     print(json.dumps({'action': 'skip', 'reason': f'cache_paths 文件解析失败: {e}'}))
     sys.exit(0)
-CACHE_DIR_BY_MODEL = {a['model_id']: a['cache_dir'] for a in aliases}
+CACHE_DIR_BY_MODEL = {}
+for a in aliases:
+    CACHE_DIR_BY_MODEL[a['model_id']] = a['cache_dir']
 if model_id_for_path not in CACHE_DIR_BY_MODEL:
     print(json.dumps({
         'action': 'skip',
@@ -158,7 +160,17 @@ if model_id_for_path not in CACHE_DIR_BY_MODEL:
     }))
     sys.exit(0)
 else:
-    cache_dir = CACHE_DIR_BY_MODEL[model_id_for_path]
+    cache_dir_raw = CACHE_DIR_BY_MODEL[model_id_for_path]
+    if isinstance(cache_dir_raw, dict):
+        cache_dir = cache_dir_raw.get(hw_key, cache_dir_raw.get('default'))
+        if cache_dir is None:
+            print(json.dumps({
+                'action': 'skip',
+                'reason': f'cache_paths 未配置 {hw_key} 的权重目录 (model_id={model_id_for_path})',
+            }))
+            sys.exit(0)
+    else:
+        cache_dir = cache_dir_raw
     CACHE_PATH = None
     for prefix in CACHE_PREFIXES:
         candidate = os.path.join(CACHE_BASE, prefix, cache_dir)
