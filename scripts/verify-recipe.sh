@@ -142,7 +142,7 @@ def resolve_placeholders(content, data):
 # failures (`max_model_len > derived`, `cudagraph_capture_sizes not
 # multiples of tp_size`, etc.).
 CACHE_BASE = '/root/.cache/modelscope/hub/models'
-CACHE_PREFIXES = ('', 'Eco-Tech', 'vllm-ascend', 'models')   # tried in this order; first hit wins
+CACHE_PREFIXES = ('', 'Eco-Tech', 'vllm-ascend', 'models', '/root/.cache/')   # tried in this order; first hit wins
 model_id_for_path = data.get('model', {}).get('model_id', 'Qwen/Qwen3-30B-A3B')
 try:
     with open(cache_paths_file, 'r') as f:
@@ -150,34 +150,27 @@ try:
 except Exception as e:
     print(json.dumps({'action': 'skip', 'reason': f'cache_paths 文件解析失败: {e}'}))
     sys.exit(0)
-CACHE_DIR_BY_MODEL = {a['model_id']: a['cache_dir'] for a in aliases}
-if hw_key == 'ascend_950dt' and model_id_for_path in {
-    'deepseek-ai/DeepSeek-V4-Flash',
-    'zai-org/GLM-5',
-    'Qwen/Qwen3.6-27B',
-}:
-    a5_candidates = {
-        'deepseek-ai/DeepSeek-V4-Flash': '/root/.cache/modelscope/hub/models/models--deepseek-ai--DeepSeek-V4-Flash',
-        'zai-org/GLM-5': '/root/.cache/modelscope/hub/models/Eco-Tech/GLM-5.1-w4a4c8-mxfp4',
-        # The Qwen recipe selects this A5-only MXFP8 checkpoint.
-        'Qwen/Qwen3.6-27B': '/root/.cache/modelscope/hub/models/Eco-Tech/Qwen3.6-27B-w8a8-mxfp8',
-    }
-    a5_candidate = a5_candidates[model_id_for_path]
-    CACHE_PATH = a5_candidate if os.path.isdir(a5_candidate) else None
-    if CACHE_PATH is None:
-        print(json.dumps({
-            'action': 'skip',
-            'reason': f'A5 runner 未预装原始权重 (目录={a5_candidate})',
-        }))
-        sys.exit(0)
-elif model_id_for_path not in CACHE_DIR_BY_MODEL:
+CACHE_DIR_BY_MODEL = {}
+for a in aliases:
+    CACHE_DIR_BY_MODEL[a['model_id']] = a['cache_dir']
+if model_id_for_path not in CACHE_DIR_BY_MODEL:
     print(json.dumps({
         'action': 'skip',
         'reason': f'未提前下载权重，请联系maintainer下载权重 (model_id={model_id_for_path})',
     }))
     sys.exit(0)
 else:
-    cache_dir = CACHE_DIR_BY_MODEL[model_id_for_path]
+    cache_dir_raw = CACHE_DIR_BY_MODEL[model_id_for_path]
+    if isinstance(cache_dir_raw, dict):
+        cache_dir = cache_dir_raw.get(hw_key, cache_dir_raw.get('default'))
+        if cache_dir is None:
+            print(json.dumps({
+                'action': 'skip',
+                'reason': f'cache_paths 未配置 {hw_key} 的权重目录 (model_id={model_id_for_path})',
+            }))
+            sys.exit(0)
+    else:
+        cache_dir = cache_dir_raw
     CACHE_PATH = None
     for prefix in CACHE_PREFIXES:
         candidate = os.path.join(CACHE_BASE, prefix, cache_dir)
