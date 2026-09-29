@@ -548,7 +548,7 @@ scenarios:
       export HCCL_BUFFSIZE=1024
       export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3
 
-      vllm serve /root/.cache/modelscope/hub/models/models--deepseek-ai--DeepSeek-V4-Flash \
+      vllm serve your_model_path \
           --max-model-len {{max_model_len}} \
           --safetensors-load-strategy prefetch \
           --max-num-batched-tokens 4096 \
