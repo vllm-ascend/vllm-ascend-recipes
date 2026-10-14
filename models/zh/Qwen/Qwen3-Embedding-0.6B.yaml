@@ -1,0 +1,425 @@
+meta:
+  title: 'Qwen3-Embedding-0.6B'
+  slug: 'qwen3-embedding-0.6b'
+  provider: 'Qwen'
+  description: 'Qwen3 Embedding 系列最小成员，基于 Qwen3 稠密基座的 0.6B 文本嵌入模型，面向嵌入与检索任务，支持昇腾 NPU 单卡高效部署。'
+  date_added: 2026-10-14
+  difficulty: beginner
+  performance_headline: 'Atlas 800I A2 / Atlas 300I DUO 单节点单卡 pooling 部署'
+  hardware:
+    atlas_800_a2: verified
+
+model:
+  model_id: 'Qwen/Qwen3-Embedding-0.6B'
+  min_vllm_version: '0.9.2rc1'
+  architecture: dense
+  parameter_count: '0.6B'
+  active_parameters: null
+  context_length: 32768
+  modality: embedding
+  base_args:
+    - '--runner'
+    - 'pooling'
+  docker_image:
+    atlas_800_a2: 'quay.io/ascend/vllm-ascend:v0.30.0rc2'
+    atlas_800_a3: 'quay.io/ascend/vllm-ascend:v0.30.0rc2-a3'
+    ascend_950dt: 'quay.io/ascend/vllm-ascend:v0.30.0rc2-a5'
+    atlas_300i_duo: 'quay.io/ascend/vllm-ascend:v0.30.0rc2-310p'
+  nightly_required: false
+  install:
+    # Ascend 推荐使用 Docker；pip 需要源码编译（无官方 wheel），因此隐藏 pip 页签。
+    pip: false
+    docker:
+      command: 'docker run --rm --name vllm-ascend --shm-size=1g --net=host --device /dev/davinci0 --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc -v /root/.cache:/root/.cache -it quay.io/ascend/vllm-ascend:v0.30.0rc2 bash'
+      note: '官方昇腾镜像；完整设备/驱动挂载见环境准备中的容器配置。'
+
+compatible_strategies:
+  - single_node_A2
+  - single_node_A3
+  - single_node_A5
+  - single_node_310p
+
+# —— 可配置参数（默认值 = 教程基线） ——
+config_params:
+  max_model_len:
+    default: 1024
+    type: number
+    description: '最大上下文长度（输入 + 输出 token 数）。请显式设置保守值，否则注意力掩码（O(max_model_len^2)）可能超出 NPU 显存。'
+
+overview: |-
+  Qwen3 Embedding 系列是 Qwen 家族最新的专有模型，专为文本嵌入与排序任务设计。该系列基于 Qwen3 稠密基座模型构建，提供多种规格（0.6B、4B、8B）的文本嵌入与重排序模型。Qwen3-Embedding-0.6B 是该系列最小规格，面向快速、低成本的嵌入服务。
+
+  仅 vLLM Ascend 0.9.2rc1 及以上版本支持该模型。
+weight_download:
+  - weight_version: BF16
+    sources:
+      - source: ModelScope
+        url: https://www.modelscope.cn/models/Qwen/Qwen3-Embedding-0.6B
+        command: |-
+          ```bash
+          pip install modelscope
+          modelscope download --model Qwen/Qwen3-Embedding-0.6B
+          ```
+      - source: HuggingFace
+        url: https://huggingface.co/Qwen/Qwen3-Embedding-0.6B
+        command: |-
+          ```bash
+          pip install -U huggingface_hub
+          huggingface-cli download Qwen/Qwen3-Embedding-0.6B
+          ```
+      - source: Modelers
+        url: ''
+        command: |-
+          ```bash
+          pip install modelers
+          modelers download --model Qwen/Qwen3-Embedding-0.6B
+          ```
+      - source: GitCode
+        url: ''
+        command: |-
+          ```bash
+          git clone https://gitcode.com/Qwen/Qwen3-Embedding-0.6B.git
+          ```
+  - weight_version: BF16 (Qwen3-Embedding-4B)
+    sources:
+      - source: ModelScope
+        url: https://www.modelscope.cn/models/Qwen/Qwen3-Embedding-4B
+        command: |-
+          ```bash
+          pip install modelscope
+          modelscope download --model Qwen/Qwen3-Embedding-4B
+          ```
+      - source: HuggingFace
+        url: https://huggingface.co/Qwen/Qwen3-Embedding-4B
+        command: ''
+      - source: Modelers
+        url: ''
+        command: ''
+      - source: GitCode
+        url: ''
+        command: ''
+  - weight_version: BF16 (Qwen3-Embedding-8B)
+    sources:
+      - source: ModelScope
+        url: https://www.modelscope.cn/models/Qwen/Qwen3-Embedding-8B
+        command: |-
+          ```bash
+          pip install modelscope
+          modelscope download --model Qwen/Qwen3-Embedding-8B
+          ```
+      - source: HuggingFace
+        url: https://huggingface.co/Qwen/Qwen3-Embedding-8B
+        command: ''
+      - source: Modelers
+        url: ''
+        command: ''
+      - source: GitCode
+        url: ''
+        command: ''
+prerequisites:
+  - title: 模型权重
+    content: |-
+      建议将模型权重下载到多节点共享目录，例如 `/root/.cache/`。
+
+      | 权重版本 | 下载链接 |
+      | -------- | -------- |
+      | Qwen3-Embedding-0.6B | [ModelScope](https://www.modelscope.cn/models/Qwen/Qwen3-Embedding-0.6B) |
+      | Qwen3-Embedding-4B | [ModelScope](https://www.modelscope.cn/models/Qwen/Qwen3-Embedding-4B) |
+      | Qwen3-Embedding-8B | [ModelScope](https://www.modelscope.cn/models/Qwen/Qwen3-Embedding-8B) |
+
+      > **路径说明**：将模型权重下载到自选目录并记录该路径，确保后续部署命令中的模型路径与该目录一致。
+env_setup:
+  container:
+    A2:
+      content: |-
+        可以使用官方一体化 Docker 镜像直接运行 `Qwen3-Embedding`。
+
+        **拉取镜像：**
+
+        ```bash
+        docker pull quay.io/ascend/vllm-ascend:v0.30.0rc2
+        ```
+
+        **启动容器：**
+
+        ```bash
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.30.0rc2
+
+        docker run --rm \
+            --name vllm-ascend \
+            --shm-size=1g \
+            --net=host \
+            --privileged=true \
+            --device /dev/davinci0 \
+            --device /dev/davinci_manager \
+            --device /dev/devmm_svm \
+            --device /dev/hisi_hdc \
+            -v /usr/local/dcmi:/usr/local/dcmi \
+            -v /usr/local/Ascend/driver/tools/hccn_tool:/usr/local/Ascend/driver/tools/hccn_tool \
+            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+            -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \
+            -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
+            -v /etc/ascend_install.info:/etc/ascend_install.info \
+            -v /root/.cache:/root/.cache \
+            -it $IMAGE bash
+        ```
+
+        容器启动成功后，可执行 `docker ps` 命令确认容器服务正在运行。
+    A3:
+      content: |-
+        可以使用官方一体化 Docker 镜像直接运行 `Qwen3-Embedding`。
+
+        ```bash
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.30.0rc2-a3
+
+        docker run --rm \
+            --name vllm-ascend \
+            --shm-size=1g \
+            --net=host \
+            --privileged=true \
+            --device /dev/davinci0 \
+            --device /dev/davinci_manager \
+            --device /dev/devmm_svm \
+            --device /dev/hisi_hdc \
+            -v /usr/local/dcmi:/usr/local/dcmi \
+            -v /usr/local/Ascend/driver/tools/hccn_tool:/usr/local/Ascend/driver/tools/hccn_tool \
+            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+            -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \
+            -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
+            -v /etc/ascend_install.info:/etc/ascend_install.info \
+            -v /root/.cache:/root/.cache \
+            -it $IMAGE bash
+        ```
+    A5:
+      content: |-
+        以下命令使用面向 Ascend 950DT&950PR 产品的 Ubuntu 镜像启动容器。
+
+        ```bash
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.30.0rc2-a5
+
+        docker run --rm \
+            --name vllm-ascend \
+            --net=host \
+            --shm-size=1g \
+            --device /dev/davinci0 \
+            --device /dev/davinci_manager \
+            --device /dev/devmm_svm \
+            --device /dev/hisi_hdc \
+            -v /usr/local/dcmi:/usr/local/dcmi \
+            -v /usr/local/Ascend/driver/tools/hccn_tool:/usr/local/Ascend/driver/tools/hccn_tool \
+            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+            -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \
+            -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
+            -v /etc/ascend_install.info:/etc/ascend_install.info \
+            -v /root/.cache:/root/.cache \
+            -it $IMAGE bash
+        ```
+    300I DUO:
+      content: |-
+        Atlas 300I DUO 请使用 `-310p` 镜像：
+
+        ```bash
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.30.0rc2-310p
+
+        docker run --rm \
+            --name vllm-ascend \
+            --shm-size=1g \
+            --net=host \
+            --privileged=true \
+            --device /dev/davinci0 \
+            --device /dev/davinci_manager \
+            --device /dev/devmm_svm \
+            --device /dev/hisi_hdc \
+            -v /usr/local/dcmi:/usr/local/dcmi \
+            -v /usr/local/Ascend/driver/tools/hccn_tool:/usr/local/Ascend/driver/tools/hccn_tool \
+            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+            -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \
+            -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
+            -v /etc/ascend_install.info:/etc/ascend_install.info \
+            -v /root/.cache:/root/.cache \
+            -it $IMAGE bash
+        ```
+  pip:
+    content: |-
+      如果不使用 Docker 镜像，也可以从源码构建：
+
+      - 从源码安装 `vllm-ascend`，参考[安装指南](https://docs.vllm.ai/projects/ascend/en/latest/installation.html)。
+
+      如需部署多节点环境，需要在每个节点上配置环境。
+scenarios:
+  - npu: Atlas 800I A2
+    precision: bf16
+    deployment: 单节点
+    case: 单节点单卡
+    tags: [a2-single]
+    strategy: single_node_A2
+    steps:
+      - title: 启动服务
+        content: |-
+          单卡 pooling 部署在同一块 NPU 上完成嵌入计算，适合开发、测试与中小规模嵌入服务场景。
+
+          以下命令为示例配置，请根据实际场景调整参数。
+
+          ```bash
+          vllm serve Qwen/Qwen3-Embedding-0.6B \
+              --served-model-name Qwen/Qwen3-Embedding-0.6B \
+              --runner pooling \
+              --port 8000 \
+              --max-model-len {{max_model_len}}
+          ```
+
+          > - `--max-model-len` 表示上下文长度，即单条请求输入与输出的最大 token 数。若自动解析得到较大的上下文长度，分配该掩码（O(max_model_len^2)）可能超出 NPU 显存并触发 OOM。请务必显式设置保守值，例如 1024。
+          > - 如已提前下载权重，请将 `Qwen/Qwen3-Embedding-0.6B` 替换为本地权重目录。
+      - title: 服务验证
+        content: |-
+          服务启动后，发送一条嵌入请求进行验证。用法示例参见下方"服务验证"部分。
+  - npu: Atlas 300I DUO
+    precision: fp16
+    deployment: 单节点
+    case: 300I DUO (TP1)
+    tags: [310p-single]
+    strategy: single_node_310p
+    steps:
+      - title: 启动服务
+        content: |-
+          Atlas 300I DUO 单节点 pooling 部署（TP=1）。
+
+          ```bash
+          vllm serve Qwen/Qwen3-Embedding-0.6B \
+              --served-model-name Qwen/Qwen3-Embedding-0.6B \
+              --compilation-config '{"cudagraph_capture_sizes": [1024,512]}' \
+              --additional-config '{"ascend_compilation_config": {"fuse_norm_quant": false}}' \
+              --runner pooling \
+              --dtype float16 \
+              --port 8000 \
+              --max-model-len {{max_model_len}}
+          ```
+
+          > - `--compilation-config`：Atlas 300I DUO 受硬件流数量限制，需要限制 `cudagraph_capture_sizes` 的规模。
+          > - `--dtype float16`：与 Atlas 300I DUO 推理执行路径一致。
+          > - `--max-model-len`：若自动解析得到较大的上下文长度，分配该掩码（O(max_model_len^2)）可能超出 NPU 显存并触发 OOM。请务必显式设置保守值，例如 1024。
+      - title: 服务验证
+        content: |-
+          服务启动后，发送一条嵌入请求进行验证。用法示例参见下方"服务验证"部分。
+verification: |-
+  服务启动后，可通过以下命令进行验证：
+
+  ```bash
+  curl -X POST http://localhost:<port>/v1/embeddings -H "Content-Type: application/json" -d '{
+    "input": [
+      "The capital of China is Beijing.",
+      "Gravity is a force that attracts two bodies towards each other. It gives weight to physical objects and is responsible for the movement of planets around the sun."
+    ]
+  }'
+  ```
+
+  > - **URL**：将 `localhost` 替换为服务器 IP，端口与 `vllm serve` 命令一致。
+
+  预期结果：服务返回 HTTP 200 OK，JSON 响应包含 `embedding` 字段。示例输出：
+
+  ```json
+  {
+    "id": "embd-8136155c01e8411d",
+    "object": "list",
+    "created": 1784538286,
+    "model": "Qwen/Qwen3-Embedding-0.6B",
+    "data": [
+      {
+        "index": 0,
+        "object": "embedding",
+        "embedding": [-0.04725276678800583, -0.021066857501864433]
+      },
+      {
+        "index": 1,
+        "object": "embedding",
+        "embedding": [-0.053165290504693985, -0.01480848714709282]
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 39,
+      "total_tokens": 39,
+      "completion_tokens": 0,
+      "prompt_tokens_details": null
+    }
+  }
+  ```
+
+  更多用法示例请参考[嵌入示例](https://github.com/vllm-project/vllm/tree/main/examples/pooling/embed)。
+evaluation:
+  accuracy:
+    content: |-
+      ### 使用 MTEB
+
+      详见 [MTEB](https://docs.mteb.org/)。
+
+      运行以下代码执行精度评测：
+
+      ```python
+      import os
+      import mteb
+
+      from mteb.models.vllm_wrapper import VllmEncoderWrapper
+
+      if __name__ == "__main__":
+          data_path = "/home/data/mteb_data"
+          os.environ["HF_DATASETS_CACHE"] = data_path
+          os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
+
+          model = VllmEncoderWrapper("/root/.cache/Qwen3-Embedding-0.6B",
+                                      revision="norm",
+                                      dtype="float16",
+                                      max_model_len=10240,
+                                      )
+
+          cache = mteb.ResultCache(data_path)
+          tasks = mteb.get_tasks(tasks=["LeCaRDv2"])
+          results = mteb.evaluate(model, tasks=tasks, cache=cache, encode_kwargs={"batch_size": 2}, overwrite_strategy="always")
+          df = results.to_dataframe()
+          print(df)
+      ```
+
+      执行完成后即可得到评测结果。
+  performance:
+    content: |-
+      ### 使用 vLLM Benchmark
+
+      以 `Qwen3-Embedding-0.6B` 的性能评测为例，详见 [vllm benchmark](https://docs.vllm.ai/en/latest/benchmarking/cli/)。
+
+      以 `serve` 子命令为例，运行以下命令：
+
+      ```bash
+      vllm bench serve \
+          --model Qwen/Qwen3-Embedding-0.6B \
+          --backend openai-embeddings \
+          --port 8000 \
+          --dataset-name random \
+          --endpoint /v1/embeddings \
+          --random-input 200 \
+          --save-result \
+          --result-dir ./
+      ```
+
+      等待数分钟即可获得性能评测结果。
+performance:
+  accuracy: |-
+    官方教程未发布该模型的固定精度数据。请使用"更多信息"页签中的 MTEB 评测在自己的部署环境实测检索精度。
+  benchmark: |-
+    官方未发布该模型的固定吞吐/延迟数据；实际结果取决于硬件资源、输入长度、并发数与运行时配置。
+
+    请使用"更多信息"页签中可复现的 `vllm bench serve --backend openai-embeddings` 命令，在自己的部署环境实测嵌入吞吐与延迟。
+tuning: |-
+  ### 调优指南
+
+  调优方法请参考[公开性能调优文档](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/performance_and_debug/optimization_and_tuning.html)。
+  特性详细说明请参考[特性指南](https://docs.vllm.ai/projects/ascend/en/latest/user_guide/support_matrix/feature_matrix.html)。
+faq: |-
+  常见环境、安装与通用参数问题请参考[公开 FAQ](https://docs.vllm.ai/projects/ascend/en/latest/faqs.html)。本节仅覆盖模型特定问题。
+references:
+  - title: vllm-ascend 官方文档
+    url: https://docs.vllm.ai/projects/ascend/en/latest/tutorials/models/Qwen3-Embedding.html
+  - title: ModelScope 模型下载
+    url: https://www.modelscope.cn/models/Qwen/Qwen3-Embedding-0.6B
+  - title: HuggingFace 模型卡
+    url: https://huggingface.co/Qwen/Qwen3-Embedding-0.6B
+  - title: vllm-ascend GitHub
+    url: https://github.com/vllm-project/vllm-ascend
