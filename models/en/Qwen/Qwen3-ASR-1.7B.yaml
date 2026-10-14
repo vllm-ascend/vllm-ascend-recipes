@@ -1,0 +1,265 @@
+meta:
+  title: 'Qwen3-ASR-1.7B'
+  slug: 'qwen3-asr-1.7b'
+  provider: 'Qwen'
+  description: 'A 1.7B-parameter automatic speech recognition (ASR) model supporting Chinese and English speech, Chinese dialects, multilingual speech, and singing voice transcription, with long-audio and streaming inference capabilities.'
+  date_added: 2026-10-14
+  difficulty: beginner
+  performance_headline: 'Single-node single-card ASR deployment on Atlas 800I A2 / Atlas 300I DUO with vLLM-Ascend'
+  hardware:
+    atlas_800_a2: verified
+
+model:
+  model_id: 'Qwen/Qwen3-ASR-1.7B'
+  architecture: dense
+  parameter_count: '1.7B'
+  active_parameters: null
+  context_length: 4096
+  modality: audio
+  docker_image:
+    atlas_800_a2: 'quay.io/ascend/vllm-ascend:v0.30.0rc2'
+    atlas_300i_duo: 'quay.io/ascend/vllm-ascend:v0.30.0rc2-310p'
+  nightly_required: false
+  install:
+    # Ascend recommends Docker; pip requires source build (no official wheel), so the pip tab is hidden.
+    pip: false
+    docker:
+      command: 'docker run --rm --name vllm-ascend --shm-size=1g --net=host --device /dev/davinci0 --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc -v /root/.cache:/root/.cache -it quay.io/ascend/vllm-ascend:v0.30.0rc2 bash'
+      note: 'Official Ascend image; full device/driver mounts are covered in env_setup.container.'
+
+compatible_strategies:
+  - single_node_A2
+  - single_node_310p
+
+# —— Configurable value params (defaults = tutorial baseline) ——
+config_params:
+  max_model_len:
+    default: 4096
+    type: number
+    description: 'Maximum context length. Always set explicitly to a conservative value; automatic detection can allocate an oversized attention mask and cause OOM.'
+  gpu_memory_utilization:
+    default: 0.9
+    type: number
+    description: 'Fraction of NPU memory available for the model and KV cache. Lower this value if other workloads share the NPU.'
+
+overview: |-
+  Qwen3-ASR-1.7B is a 1.7B-parameter automatic speech recognition (ASR) model from the Qwen team. It supports Chinese and English speech, Chinese dialects, multilingual speech, and singing voice transcription, and provides long-audio and streaming inference capabilities.
+weight_download:
+  - weight_version: BF16
+    sources:
+      - source: ModelScope
+        url: https://www.modelscope.cn/models/Qwen/Qwen3-ASR-1.7B
+        command: |-
+          ```bash
+          pip install modelscope
+          modelscope download --model Qwen/Qwen3-ASR-1.7B
+          ```
+      - source: HuggingFace
+        url: https://huggingface.co/Qwen/Qwen3-ASR-1.7B
+        command: |-
+          ```bash
+          pip install -U huggingface_hub
+          huggingface-cli download Qwen/Qwen3-ASR-1.7B
+          ```
+      - source: Modelers
+        url: ''
+        command: ''
+      - source: GitCode
+        url: ''
+        command: ''
+prerequisites:
+  - title: Model Weight
+    content: |-
+      Replace `your_model_path` with the local model directory, or use `Qwen/Qwen3-ASR-1.7B` to download the model through the configured model hub.
+env_setup:
+  container:
+    A2:
+      content: |-
+        You can use the official all-in-one Docker image to run `Qwen3-ASR-1.7B` directly.
+
+        **Docker Pull:**
+
+        ```bash
+        docker pull quay.io/ascend/vllm-ascend:v0.30.0rc2
+        ```
+
+        **Docker Run:**
+
+        ```bash
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.30.0rc2
+
+        docker run --rm \
+            --name vllm-ascend \
+            --shm-size=1g \
+            --net=host \
+            --device /dev/davinci0 \
+            --device /dev/davinci_manager \
+            --device /dev/devmm_svm \
+            --device /dev/hisi_hdc \
+            -v /usr/local/dcmi:/usr/local/dcmi \
+            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+            -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \
+            -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
+            -v /etc/ascend_install.info:/etc/ascend_install.info \
+            -v /root/.cache:/root/.cache \
+            -it $IMAGE bash
+        ```
+
+        After a successful docker run, you can verify the running container service by executing the `docker ps` command.
+    300I DUO:
+      content: |-
+        For Atlas 300I DUO, use the `-310p` image:
+
+        ```bash
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.30.0rc2-310p
+
+        docker run --rm \
+            --name vllm-ascend \
+            --shm-size=1g \
+            --net=host \
+            --privileged=true \
+            --device /dev/davinci0 \
+            --device /dev/davinci_manager \
+            --device /dev/devmm_svm \
+            --device /dev/hisi_hdc \
+            -v /usr/local/dcmi:/usr/local/dcmi \
+            -v /usr/local/Ascend/driver/tools/hccn_tool:/usr/local/Ascend/driver/tools/hccn_tool \
+            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+            -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \
+            -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
+            -v /etc/ascend_install.info:/etc/ascend_install.info \
+            -v /root/.cache:/root/.cache \
+            -it $IMAGE bash
+        ```
+
+        > On Atlas 300I DUO, uninstall `triton-ascend` and `triton` if installed to avoid dependency conflicts: `pip uninstall -y triton-ascend triton`.
+  pip:
+    content: |-
+      If you do not want to use the Docker image, you can also build all from source:
+
+      - Install `vllm-ascend` from source, refer to the [installation guide](https://docs.vllm.ai/projects/ascend/en/latest/installation.html).
+
+      To verify the installation: `pip show vllm-ascend`.
+scenarios:
+  - npu: Atlas 800I A2
+    precision: bf16
+    deployment: Single-Node
+    case: Single Node Single Card
+    tags: [a2-single]
+    strategy: single_node_A2
+    steps:
+      - title: Start the server
+        content: |-
+          Single-node deployment runs both audio prefill and decoding on one NPU, making it suitable for development, testing, and small-scale ASR services.
+
+          ```bash
+          vllm serve your_model_path \
+              --served-model-name qwen3-asr \
+              --tensor-parallel-size 1 \
+              --max-model-len {{max_model_len}} \
+              --gpu-memory-utilization {{gpu_memory_utilization}} \
+              --enforce-eager \
+              --port 8000
+          ```
+
+          > - `--tensor-parallel-size 1` uses one NPU. Increase it only after confirming that the hardware and deployment topology support the chosen parallel configuration.
+          > - `--max-model-len 4096` limits the maximum sequence length; always set a conservative value explicitly.
+          > - Replace `your_model_path` with the local model directory, or use `Qwen/Qwen3-ASR-1.7B` to download the model through the configured model hub.
+          > - When the service starts successfully, the log contains `Application startup complete`.
+      - title: Service Verification
+        content: |-
+          After the service is started, verify it by sending an audio transcription request. Refer to the verification section below for a usage example.
+  - npu: Atlas 300I DUO
+    precision: fp16
+    deployment: Single-Node
+    case: 300I DUO (TP1)
+    tags: [310p-single]
+    strategy: single_node_310p
+    steps:
+      - title: Start the server
+        content: |-
+          Atlas 300I DUO single-node ASR deployment (TP=1).
+
+          ```bash
+          vllm serve your_model_path \
+              --served-model-name qwen3-asr \
+              --tensor-parallel-size 1 \
+              --gpu-memory-utilization {{gpu_memory_utilization}} \
+              --dtype float16 \
+              --max-model-len {{max_model_len}} \
+              --additional-config '{"ascend_compilation_config": {"fuse_norm_quant": false,"enable_npu_graph_ex":false}}' \
+              --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY", "cudagraph_capture_sizes": [1,4]}' \
+              --port 8000
+          ```
+
+          > - `--enforce-eager` is used in the Atlas 300I A2 2UP example for compatibility; `--compilation-config` with `FULL_DECODE_ONLY` and restricted `cudagraph_capture_sizes` is required on Atlas 300I DUO.
+          > - `--max-model-len 4096` limits the maximum sequence length. On Atlas 300I DUO, always specify a conservative value explicitly; automatic detection can allocate an oversized attention mask and cause an out-of-memory error.
+      - title: Service Verification
+        content: |-
+          After the service is started, verify it by sending an audio transcription request. Refer to the verification section below for a usage example.
+verification: |-
+  After the service is started, the model can be invoked by sending a prompt.
+
+  **Chat Completions API:**
+
+  ```bash
+  curl http://localhost:<port>/v1/chat/completions \
+      -H "Content-Type: application/json" \
+      -d '{
+          "model": "qwen3-asr",
+          "messages": [
+              {
+                  "role": "user",
+                  "content": [
+                      {
+                          "type": "audio_url",
+                          "audio_url": {
+                              "url": "https://qianwen-res.oss-cn-beijing.aliyuncs.com/Qwen3-ASR-Repo/asr_en.wav"
+                          }
+                      }
+                  ]
+              }
+          ]
+      }'
+  ```
+
+  Replace `localhost`, `<port>`, and `qwen3-asr` with the address, port, and `--served-model-name` used by your deployment. Expected result: HTTP 200 and a JSON response containing the transcription in the `choices` field.
+evaluation:
+  accuracy:
+    content: |-
+      Evaluate transcription quality with Word Error Rate (WER) for word-level recognition and Character Error Rate (CER) for character-level recognition. The official tutorial does not publish fixed WER/CER numbers; measure them on your own deployment with a labeled audio set.
+  performance:
+    content: |-
+      Measure ASR serving performance with audio samples that represent the production workload. Record at least the audio duration, request concurrency, end-to-end latency, real-time factor, and throughput. This ensures that audio preprocessing, request construction, API communication, inference, and response parsing are included in the result.
+
+      Actual performance varies with hardware, audio duration, concurrency, and deployment configuration. Evaluate short audio, long audio, and concurrent requests separately before selecting a production configuration.
+
+      The following settings are starting points rather than globally optimal configurations. Tune them according to audio duration, concurrency, latency requirements, and available NPU memory:
+
+      | Scenario | Settings | Notes |
+      | -------- | -------- | ----- |
+      | Low latency | `--tensor-parallel-size 1`, `--max-model-len 4096` | Use short audio inputs and avoid sharing the NPU with other workloads. |
+      | Long audio | Increase `--max-model-len` only as required | On Atlas 300I DUO, keep the value conservative because attention-mask memory grows with the configured maximum length. |
+performance:
+  accuracy: |-
+    The official tutorial does not publish fixed WER/CER numbers for this model. Measure transcription quality on your own deployment with a labeled audio set.
+  benchmark: |-
+    No fixed throughput/latency numbers are published for this model; results depend on audio duration, concurrency, and deployment configuration.
+
+    Use the `vllm bench serve` command to measure on your own deployment.
+tuning: |-
+  ### Tuning Guidelines
+
+  Please refer to the [Public Performance Tuning Documentation](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/performance_and_debug/optimization_and_tuning.html) for tuning methods.
+  Please refer to the [Feature Guide](https://docs.vllm.ai/projects/ascend/en/latest/user_guide/support_matrix/feature_matrix.html) for detailed feature descriptions.
+faq: |-
+  For common environment, installation, and general parameter issues, please refer to the [Public FAQs](https://docs.vllm.ai/projects/ascend/en/latest/faqs.html). This chapter only covers model-specific issues.
+references:
+  - title: vllm-ascend Documentation
+    url: https://docs.vllm.ai/projects/ascend/en/latest/tutorials/models/Qwen3-ASR-1.7B.html
+  - title: ModelScope Model Download
+    url: https://www.modelscope.cn/models/Qwen/Qwen3-ASR-1.7B
+  - title: HuggingFace Model Card
+    url: https://huggingface.co/Qwen/Qwen3-ASR-1.7B
+  - title: vllm-ascend GitHub
+    url: https://github.com/vllm-project/vllm-ascend
