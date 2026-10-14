@@ -1,0 +1,265 @@
+meta:
+  title: 'LLaVA-OneVision-Qwen2-0.5B-OV'
+  slug: 'llava-onevision-qwen2-0.5b-ov'
+  provider: 'LLaVA'
+  description: '基于 Qwen2 的 0.5B 小型多模态模型，同时支持纯文本生成、图像理解、多图推理与视觉对话，可在单张昇腾 NPU 上部署。'
+  date_added: 2026-10-14
+  difficulty: beginner
+  performance_headline: 'Atlas 800I A2 单节点单卡多模态部署'
+  hardware:
+    atlas_800_a2: verified
+
+model:
+  model_id: 'llava-hf/llava-onevision-qwen2-0.5b-ov-hf'
+  architecture: dense
+  parameter_count: '0.5B'
+  active_parameters: null
+  context_length: 32768
+  modality: multimodal
+  base_args:
+    - '--trust-remote-code'
+  docker_image:
+    atlas_800_a2: 'quay.io/ascend/vllm-ascend:v0.30.0rc2'
+  nightly_required: false
+  install:
+    # Ascend 推荐使用 Docker；pip 需要源码编译（无官方 wheel），因此隐藏 pip 页签。
+    pip: false
+    docker:
+      command: 'docker run --rm --name vllm-ascend --shm-size=1g --net=host --device /dev/davinci0 --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc -v /root/.cache:/root/.cache -it quay.io/ascend/vllm-ascend:v0.30.0rc2 bash'
+      note: '官方昇腾镜像；完整设备/驱动挂载见环境准备中的容器配置。'
+
+compatible_strategies:
+  - single_node_A2
+
+# —— 可配置参数（默认值 = 教程基线） ——
+config_params:
+  gpu_memory_utilization:
+    default: 0.8
+    type: number
+    description: '模型与 KV Cache 可用的 NPU 显存比例'
+
+overview: |-
+  `llava-hf/llava-onevision-qwen2-0.5b-ov-hf` 是基于 Qwen2 构建的小型多模态模型，同时支持纯文本生成、图像理解、多图推理与视觉对话。模型体积小，非常适合在单张昇腾 NPU 上开展多模态推理验证。
+weight_download:
+  - weight_version: BF16
+    sources:
+      - source: HuggingFace
+        url: https://huggingface.co/llava-hf/llava-onevision-qwen2-0.5b-ov-hf
+        command: |-
+          ```bash
+          pip install -U huggingface_hub
+          huggingface-cli download llava-hf/llava-onevision-qwen2-0.5b-ov-hf
+          ```
+      - source: ModelScope
+        url: https://www.modelscope.cn/models/llava-hf/llava-onevision-qwen2-0.5b-ov-hf
+        command: |-
+          ```bash
+          pip install modelscope
+          modelscope download --model llava-hf/llava-onevision-qwen2-0.5b-ov-hf
+          ```
+      - source: Modelers
+        url: ''
+        command: ''
+      - source: GitCode
+        url: ''
+        command: ''
+prerequisites:
+  - title: 模型权重
+    content: |-
+      经验证的单卡部署使用 1 张 Atlas A2 NPU。建议提前将模型权重缓存到 `/root/.cache`，以缩短启动时间。
+
+      | 权重版本 | 下载链接 |
+      | -------- | -------- |
+      | llava-onevision-qwen2-0.5b-ov-hf | [HuggingFace](https://huggingface.co/llava-hf/llava-onevision-qwen2-0.5b-ov-hf) / [ModelScope](https://www.modelscope.cn/models/llava-hf/llava-onevision-qwen2-0.5b-ov-hf) |
+env_setup:
+  container:
+    A2:
+      content: |-
+        可以使用官方一体化 Docker 镜像直接运行 `LLaVA-OneVision-Qwen2-0.5B-OV`。
+
+        **拉取镜像：**
+
+        ```bash
+        docker pull quay.io/ascend/vllm-ascend:v0.30.0rc2
+        ```
+
+        **启动容器：**
+
+        ```bash
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.30.0rc2
+
+        docker run --rm \
+            --name vllm-ascend \
+            --shm-size=1g \
+            --net=host \
+            --device /dev/davinci0 \
+            --device /dev/davinci_manager \
+            --device /dev/devmm_svm \
+            --device /dev/hisi_hdc \
+            -v /usr/local/dcmi:/usr/local/dcmi \
+            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+            -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \
+            -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
+            -v /etc/ascend_install.info:/etc/ascend_install.info \
+            -v /root/.cache:/root/.cache \
+            -it $IMAGE bash
+        ```
+
+        容器启动成功后，可执行 `docker ps` 命令确认容器服务正在运行。
+scenarios:
+  - npu: Atlas 800I A2
+    precision: bf16
+    deployment: 单节点
+    case: 单节点单卡
+    tags: [a2-single]
+    strategy: single_node_A2
+    steps:
+      - title: 启动服务
+        content: |-
+          该 0.5B 模型推荐单 NPU 部署（暂不支持 Prefill-Decode 分离）。
+
+          ```bash
+          export MODEL_PATH="llava-hf/llava-onevision-qwen2-0.5b-ov-hf"
+
+          vllm serve "${MODEL_PATH}" \
+              --host 0.0.0.0 \
+              --port 8000 \
+              --served-model-name LLaVA-OneVision-0.5B \
+              --trust-remote-code \
+              --gpu-memory-utilization {{gpu_memory_utilization}}
+          ```
+
+          > - `--served-model-name`：客户端请求使用的模型名，必须与下方验证请求中的 `model` 字段一致。
+          > - 如已提前下载权重，请将 `${MODEL_PATH}` 替换为本地权重目录。
+      - title: 服务验证
+        content: |-
+          服务启动后，分别用纯文本请求与图像理解请求进行验证。用法示例参见下方"服务验证"部分。
+verification: |-
+  服务启动成功后，可以看到类似以下日志：
+
+  ```bash
+  INFO:     Started server process [8173]
+  INFO:     Waiting for application startup.
+  INFO:     Application startup complete.
+  ```
+
+  可以先通过 OpenAI 兼容 API 确认模型已暴露：
+
+  ```bash
+  curl http://127.0.0.1:<port>/v1/models
+  ```
+
+  **纯文本请求：**
+
+  ```bash
+  curl http://127.0.0.1:<port>/v1/chat/completions \
+      -H "Content-Type: application/json" \
+      -d '{
+          "model": "LLaVA-OneVision-0.5B",
+          "messages": [
+              {
+                  "role": "user",
+                  "content": "Say hello in one short sentence."
+              }
+          ],
+          "max_completion_tokens": 16,
+          "temperature": 0
+      }'
+  ```
+
+  请求成功后，可以看到类似以下响应：
+
+  ```bash
+  {"choices":[{"message":{"content":"Hello! How can I assist you today?"}}]}
+  ```
+
+  **图像理解请求：**
+
+  ```bash
+  curl http://127.0.0.1:<port>/v1/chat/completions \
+      -H "Content-Type: application/json" \
+      -d '{
+          "model": "LLaVA-OneVision-0.5B",
+          "messages": [
+              {
+                  "role": "user",
+                  "content": [
+                      {
+                          "type": "text",
+                          "text": "Describe this image briefly."
+                      },
+                      {
+                          "type": "image_url",
+                          "image_url": {
+                              "url": "https://modelscope.oss-cn-beijing.aliyuncs.com/resource/qwen.png"
+                          }
+                      }
+                  ]
+              }
+          ],
+          "max_completion_tokens": 64,
+          "temperature": 0
+      }'
+  ```
+
+  请求成功后，可以看到类似以下响应：
+
+  ```bash
+  {"choices":[{"message":{"content":"The image features a logo consisting of a stylized geometric figure and the text \"TONGYI\" and \"Qwen\"..."}}]}
+  ```
+evaluation:
+  accuracy:
+    content: |-
+      仓库已内置该模型的端到端精度基线，配置文件为 [`tests/e2e/models/configs/llava-onevision-qwen2-0.5b-ov-hf.yaml`](https://github.com/vllm-project/vllm-ascend/blob/main/tests/e2e/models/configs/llava-onevision-qwen2-0.5b-ov-hf.yaml)。
+
+      部署设置：TP1、`dtype: auto`、`max_model_len: 4096`、`gpu_memory_utilization: 0.8`、`trust_remote_code: true`。评测设置：`num_fewshot: 0`、`apply_chat_template: false`、`fewshot_as_multiturn: false`、`batch_size: auto`。
+
+      | 数据集 | 平台 | 指标 | 数值 |
+      | ------ | ---- | ---- | ---- |
+      | ceval-valid | A2 | acc,none | 0.42 |
+  performance:
+    content: |-
+      ### 使用 vLLM Benchmark
+
+      详见 [vLLM benchmark](https://docs.vllm.ai/en/latest/benchmarking/)。
+
+      以 `serve` 子命令为例：
+
+      ```bash
+      vllm bench serve \
+          --model llava-hf/llava-onevision-qwen2-0.5b-ov-hf \
+          --served-model-name LLaVA-OneVision-0.5B \
+          --port 8000 \
+          --dataset-name random \
+          --random-input-len 128 \
+          --random-output-len 64 \
+          --num-prompts 100 \
+          --request-rate 10 \
+          --save-result \
+          --result-dir ./
+      ```
+
+      > 实际吞吐与延迟取决于硬件资源、输入输出长度、并发数与运行时配置。
+performance:
+  accuracy: |-
+    **ceval-valid（A2，acc,none）：0.42**——来自仓库端到端基线配置 [`tests/e2e/models/configs/llava-onevision-qwen2-0.5b-ov-hf.yaml`](https://github.com/vllm-project/vllm-ascend/blob/main/tests/e2e/models/configs/llava-onevision-qwen2-0.5b-ov-hf.yaml)。
+  benchmark: |-
+    官方教程未发布该模型的固定吞吐/延迟数据。请使用"更多信息"页签中的 `vllm bench serve` 命令在自己的部署环境实测。
+tuning: |-
+  ### 调优指南
+
+  调优方法请参考[公开性能调优文档](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/performance_and_debug/optimization_and_tuning.html)。
+  特性详细说明请参考[特性指南](https://docs.vllm.ai/projects/ascend/en/latest/user_guide/support_matrix/feature_matrix.html)。
+faq: |-
+  常见环境、安装与通用参数问题请参考[公开 FAQ](https://docs.vllm.ai/projects/ascend/en/latest/faqs.html)。本节仅覆盖模型特定问题。
+references:
+  - title: vllm-ascend 官方文档
+    url: https://docs.vllm.ai/projects/ascend/en/latest/tutorials/models/LLaVA-OneVision-Qwen2-0.5B-OV.html
+  - title: HuggingFace 模型卡
+    url: https://huggingface.co/llava-hf/llava-onevision-qwen2-0.5b-ov-hf
+  - title: ModelScope 模型下载
+    url: https://www.modelscope.cn/models/llava-hf/llava-onevision-qwen2-0.5b-ov-hf
+  - title: 端到端精度基线配置
+    url: https://github.com/vllm-project/vllm-ascend/blob/main/tests/e2e/models/configs/llava-onevision-qwen2-0.5b-ov-hf.yaml
+  - title: vllm-ascend GitHub
+    url: https://github.com/vllm-project/vllm-ascend
