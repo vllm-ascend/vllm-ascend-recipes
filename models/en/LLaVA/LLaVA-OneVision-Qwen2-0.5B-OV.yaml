@@ -1,0 +1,265 @@
+meta:
+  title: 'LLaVA-OneVision-Qwen2-0.5B-OV'
+  slug: 'llava-onevision-qwen2-0.5b-ov'
+  provider: 'LLaVA'
+  description: 'A compact 0.5B multimodal model built on Qwen2, supporting text-only generation together with image understanding, multi-image reasoning, and visual dialogue on a single Ascend NPU.'
+  date_added: 2026-10-14
+  difficulty: beginner
+  performance_headline: 'Single-node single-card multimodal deployment on Atlas 800I A2 with vLLM-Ascend'
+  hardware:
+    atlas_800_a2: verified
+
+model:
+  model_id: 'llava-hf/llava-onevision-qwen2-0.5b-ov-hf'
+  architecture: dense
+  parameter_count: '0.5B'
+  active_parameters: null
+  context_length: 32768
+  modality: multimodal
+  base_args:
+    - '--trust-remote-code'
+  docker_image:
+    atlas_800_a2: 'quay.io/ascend/vllm-ascend:v0.30.0rc2'
+  nightly_required: false
+  install:
+    # Ascend recommends Docker; pip requires source build (no official wheel), so the pip tab is hidden.
+    pip: false
+    docker:
+      command: 'docker run --rm --name vllm-ascend --shm-size=1g --net=host --device /dev/davinci0 --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc -v /root/.cache:/root/.cache -it quay.io/ascend/vllm-ascend:v0.30.0rc2 bash'
+      note: 'Official Ascend image; full device/driver mounts are covered in env_setup.container.'
+
+compatible_strategies:
+  - single_node_A2
+
+# —— Configurable value params (defaults = tutorial baseline) ——
+config_params:
+  gpu_memory_utilization:
+    default: 0.8
+    type: number
+    description: 'Fraction of NPU memory available for the model and KV cache'
+
+overview: |-
+  `llava-hf/llava-onevision-qwen2-0.5b-ov-hf` is a compact multimodal model built on top of Qwen2. It supports text-only generation together with image understanding, multi-image reasoning, and visual dialogue. Its small footprint makes it an ideal starting point for multimodal inference verification on a single Ascend NPU.
+weight_download:
+  - weight_version: BF16
+    sources:
+      - source: HuggingFace
+        url: https://huggingface.co/llava-hf/llava-onevision-qwen2-0.5b-ov-hf
+        command: |-
+          ```bash
+          pip install -U huggingface_hub
+          huggingface-cli download llava-hf/llava-onevision-qwen2-0.5b-ov-hf
+          ```
+      - source: ModelScope
+        url: https://www.modelscope.cn/models/llava-hf/llava-onevision-qwen2-0.5b-ov-hf
+        command: |-
+          ```bash
+          pip install modelscope
+          modelscope download --model llava-hf/llava-onevision-qwen2-0.5b-ov-hf
+          ```
+      - source: Modelers
+        url: ''
+        command: ''
+      - source: GitCode
+        url: ''
+        command: ''
+prerequisites:
+  - title: Model Weight
+    content: |-
+      The verified single-card deployment uses one Atlas A2 NPU. It is recommended to cache model weights under `/root/.cache` in advance to reduce startup time.
+
+      | Weight Version | Download Links |
+      | -------------- | -------------- |
+      | llava-onevision-qwen2-0.5b-ov-hf | [HuggingFace](https://huggingface.co/llava-hf/llava-onevision-qwen2-0.5b-ov-hf) / [ModelScope](https://www.modelscope.cn/models/llava-hf/llava-onevision-qwen2-0.5b-ov-hf) |
+env_setup:
+  container:
+    A2:
+      content: |-
+        You can use the official all-in-one Docker image to run `LLaVA-OneVision-Qwen2-0.5B-OV` directly.
+
+        **Docker Pull:**
+
+        ```bash
+        docker pull quay.io/ascend/vllm-ascend:v0.30.0rc2
+        ```
+
+        **Docker Run:**
+
+        ```bash
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.30.0rc2
+
+        docker run --rm \
+            --name vllm-ascend \
+            --shm-size=1g \
+            --net=host \
+            --device /dev/davinci0 \
+            --device /dev/davinci_manager \
+            --device /dev/devmm_svm \
+            --device /dev/hisi_hdc \
+            -v /usr/local/dcmi:/usr/local/dcmi \
+            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+            -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \
+            -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
+            -v /etc/ascend_install.info:/etc/ascend_install.info \
+            -v /root/.cache:/root/.cache \
+            -it $IMAGE bash
+        ```
+
+        After a successful docker run, you can verify the running container service by executing the `docker ps` command.
+scenarios:
+  - npu: Atlas 800I A2
+    precision: bf16
+    deployment: Single-Node
+    case: Single Node Single Card
+    tags: [a2-single]
+    strategy: single_node_A2
+    steps:
+      - title: Start the server
+        content: |-
+          Single-NPU deployment is recommended for this 0.5B model (Prefill-Decode disaggregation is not supported yet).
+
+          ```bash
+          export MODEL_PATH="llava-hf/llava-onevision-qwen2-0.5b-ov-hf"
+
+          vllm serve "${MODEL_PATH}" \
+              --host 0.0.0.0 \
+              --port 8000 \
+              --served-model-name LLaVA-OneVision-0.5B \
+              --trust-remote-code \
+              --gpu-memory-utilization {{gpu_memory_utilization}}
+          ```
+
+          > - `--served-model-name`: the name clients use in requests; must match the `model` field of the verification requests below.
+          > - Replace `${MODEL_PATH}` with your local weight directory if you pre-downloaded the model.
+      - title: Service Verification
+        content: |-
+          After the service is started, verify it with text-only and image understanding requests. Refer to the verification section below for usage examples.
+verification: |-
+  If your service starts successfully, you can see logs similar to the following:
+
+  ```bash
+  INFO:     Started server process [8173]
+  INFO:     Waiting for application startup.
+  INFO:     Application startup complete.
+  ```
+
+  You can first verify that the model is exposed by the OpenAI-compatible API:
+
+  ```bash
+  curl http://127.0.0.1:<port>/v1/models
+  ```
+
+  **Text-only Request:**
+
+  ```bash
+  curl http://127.0.0.1:<port>/v1/chat/completions \
+      -H "Content-Type: application/json" \
+      -d '{
+          "model": "LLaVA-OneVision-0.5B",
+          "messages": [
+              {
+                  "role": "user",
+                  "content": "Say hello in one short sentence."
+              }
+          ],
+          "max_completion_tokens": 16,
+          "temperature": 0
+      }'
+  ```
+
+  If the request succeeds, you can see a response similar to the following:
+
+  ```bash
+  {"choices":[{"message":{"content":"Hello! How can I assist you today?"}}]}
+  ```
+
+  **Image Understanding Request:**
+
+  ```bash
+  curl http://127.0.0.1:<port>/v1/chat/completions \
+      -H "Content-Type: application/json" \
+      -d '{
+          "model": "LLaVA-OneVision-0.5B",
+          "messages": [
+              {
+                  "role": "user",
+                  "content": [
+                      {
+                          "type": "text",
+                          "text": "Describe this image briefly."
+                      },
+                      {
+                          "type": "image_url",
+                          "image_url": {
+                              "url": "https://modelscope.oss-cn-beijing.aliyuncs.com/resource/qwen.png"
+                          }
+                      }
+                  ]
+              }
+          ],
+          "max_completion_tokens": 64,
+          "temperature": 0
+      }'
+  ```
+
+  If the request succeeds, you can see a response similar to the following:
+
+  ```bash
+  {"choices":[{"message":{"content":"The image features a logo consisting of a stylized geometric figure and the text \"TONGYI\" and \"Qwen\"..."}}]}
+  ```
+evaluation:
+  accuracy:
+    content: |-
+      The repository already contains an end-to-end accuracy baseline for this model in [`tests/e2e/models/configs/llava-onevision-qwen2-0.5b-ov-hf.yaml`](https://github.com/vllm-project/vllm-ascend/blob/main/tests/e2e/models/configs/llava-onevision-qwen2-0.5b-ov-hf.yaml).
+
+      Serve settings: TP1, `dtype: auto`, `max_model_len: 4096`, `gpu_memory_utilization: 0.8`, `trust_remote_code: true`. Evaluation settings: `num_fewshot: 0`, `apply_chat_template: false`, `fewshot_as_multiturn: false`, `batch_size: auto`.
+
+      | dataset | platform | metric | value |
+      | ------- | -------- | ------ | ----- |
+      | ceval-valid | A2 | acc,none | 0.42 |
+  performance:
+    content: |-
+      ### Using vLLM Benchmark
+
+      Refer to [vLLM benchmark](https://docs.vllm.ai/en/latest/benchmarking/) for more details.
+
+      Take the `serve` subcommand as an example:
+
+      ```bash
+      vllm bench serve \
+          --model llava-hf/llava-onevision-qwen2-0.5b-ov-hf \
+          --served-model-name LLaVA-OneVision-0.5B \
+          --port 8000 \
+          --dataset-name random \
+          --random-input-len 128 \
+          --random-output-len 64 \
+          --num-prompts 100 \
+          --request-rate 10 \
+          --save-result \
+          --result-dir ./
+      ```
+
+      > Actual throughput and latency depend on hardware resources, prompt length, output length, concurrency, and runtime configuration.
+performance:
+  accuracy: |-
+    **ceval-valid (A2, acc,none): 0.42** — from the repository's end-to-end baseline config [`tests/e2e/models/configs/llava-onevision-qwen2-0.5b-ov-hf.yaml`](https://github.com/vllm-project/vllm-ascend/blob/main/tests/e2e/models/configs/llava-onevision-qwen2-0.5b-ov-hf.yaml).
+  benchmark: |-
+    The official tutorial does not publish fixed throughput/latency numbers for this model. Use the `vllm bench serve` command in the "More Info" tab to measure on your own deployment.
+tuning: |-
+  ### Tuning Guidelines
+
+  Please refer to the [Public Performance Tuning Documentation](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/performance_and_debug/optimization_and_tuning.html) for tuning methods.
+  Please refer to the [Feature Guide](https://docs.vllm.ai/projects/ascend/en/latest/user_guide/support_matrix/feature_matrix.html) for detailed feature descriptions.
+faq: |-
+  For common environment, installation, and general parameter issues, please refer to the [Public FAQs](https://docs.vllm.ai/projects/ascend/en/latest/faqs.html). This chapter only covers model-specific issues.
+references:
+  - title: vllm-ascend Documentation
+    url: https://docs.vllm.ai/projects/ascend/en/latest/tutorials/models/LLaVA-OneVision-Qwen2-0.5B-OV.html
+  - title: HuggingFace Model Card
+    url: https://huggingface.co/llava-hf/llava-onevision-qwen2-0.5b-ov-hf
+  - title: ModelScope Model Download
+    url: https://www.modelscope.cn/models/llava-hf/llava-onevision-qwen2-0.5b-ov-hf
+  - title: End-to-end Accuracy Baseline Config
+    url: https://github.com/vllm-project/vllm-ascend/blob/main/tests/e2e/models/configs/llava-onevision-qwen2-0.5b-ov-hf.yaml
+  - title: vllm-ascend GitHub
+    url: https://github.com/vllm-project/vllm-ascend
