@@ -1,0 +1,265 @@
+meta:
+  title: 'Qwen3-ASR-1.7B'
+  slug: 'qwen3-asr-1.7b'
+  provider: 'Qwen'
+  description: 'Qwen 团队的 1.7B 参数自动语音识别（ASR）模型，支持中英文语音、中文方言、多语言语音及歌唱转写，支持长音频与流式推理。'
+  date_added: 2026-10-14
+  difficulty: beginner
+  performance_headline: 'Atlas 800I A2 / Atlas 300I DUO 单节点单卡 ASR 部署'
+  hardware:
+    atlas_800_a2: verified
+
+model:
+  model_id: 'Qwen/Qwen3-ASR-1.7B'
+  architecture: dense
+  parameter_count: '1.7B'
+  active_parameters: null
+  context_length: 4096
+  modality: audio
+  docker_image:
+    atlas_800_a2: 'quay.io/ascend/vllm-ascend:v0.30.0rc2'
+    atlas_300i_duo: 'quay.io/ascend/vllm-ascend:v0.30.0rc2-310p'
+  nightly_required: false
+  install:
+    # Ascend 推荐使用 Docker；pip 需要源码编译（无官方 wheel），因此隐藏 pip 页签。
+    pip: false
+    docker:
+      command: 'docker run --rm --name vllm-ascend --shm-size=1g --net=host --device /dev/davinci0 --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc -v /root/.cache:/root/.cache -it quay.io/ascend/vllm-ascend:v0.30.0rc2 bash'
+      note: '官方昇腾镜像；完整设备/驱动挂载见环境准备中的容器配置。'
+
+compatible_strategies:
+  - single_node_A2
+  - single_node_310p
+
+# —— 可配置参数（默认值 = 教程基线） ——
+config_params:
+  max_model_len:
+    default: 4096
+    type: number
+    description: '最大上下文长度。请始终显式设置保守值，自动检测可能分配过大的注意力掩码并导致 OOM。'
+  gpu_memory_utilization:
+    default: 0.9
+    type: number
+    description: '模型与 KV Cache 可用的 NPU 显存比例。若与其他工作负载共享 NPU，请适当调低。'
+
+overview: |-
+  Qwen3-ASR-1.7B 是 Qwen 团队的 1.7B 参数自动语音识别（ASR）模型，支持中英文语音、中文方言、多语言语音及歌唱转写，并提供长音频与流式推理能力。
+weight_download:
+  - weight_version: BF16
+    sources:
+      - source: ModelScope
+        url: https://www.modelscope.cn/models/Qwen/Qwen3-ASR-1.7B
+        command: |-
+          ```bash
+          pip install modelscope
+          modelscope download --model Qwen/Qwen3-ASR-1.7B
+          ```
+      - source: HuggingFace
+        url: https://huggingface.co/Qwen/Qwen3-ASR-1.7B
+        command: |-
+          ```bash
+          pip install -U huggingface_hub
+          huggingface-cli download Qwen/Qwen3-ASR-1.7B
+          ```
+      - source: Modelers
+        url: ''
+        command: ''
+      - source: GitCode
+        url: ''
+        command: ''
+prerequisites:
+  - title: 模型权重
+    content: |-
+      将 `your_model_path` 替换为本地模型目录，或使用 `Qwen/Qwen3-ASR-1.7B` 通过已配置的模型仓库下载。
+env_setup:
+  container:
+    A2:
+      content: |-
+        可以使用官方一体化 Docker 镜像直接运行 `Qwen3-ASR-1.7B`。
+
+        **拉取镜像：**
+
+        ```bash
+        docker pull quay.io/ascend/vllm-ascend:v0.30.0rc2
+        ```
+
+        **启动容器：**
+
+        ```bash
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.30.0rc2
+
+        docker run --rm \
+            --name vllm-ascend \
+            --shm-size=1g \
+            --net=host \
+            --device /dev/davinci0 \
+            --device /dev/davinci_manager \
+            --device /dev/devmm_svm \
+            --device /dev/hisi_hdc \
+            -v /usr/local/dcmi:/usr/local/dcmi \
+            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+            -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \
+            -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
+            -v /etc/ascend_install.info:/etc/ascend_install.info \
+            -v /root/.cache:/root/.cache \
+            -it $IMAGE bash
+        ```
+
+        容器启动成功后，可执行 `docker ps` 命令确认容器服务正在运行。
+    300I DUO:
+      content: |-
+        Atlas 300I DUO 请使用 `-310p` 镜像：
+
+        ```bash
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.30.0rc2-310p
+
+        docker run --rm \
+            --name vllm-ascend \
+            --shm-size=1g \
+            --net=host \
+            --privileged=true \
+            --device /dev/davinci0 \
+            --device /dev/davinci_manager \
+            --device /dev/devmm_svm \
+            --device /dev/hisi_hdc \
+            -v /usr/local/dcmi:/usr/local/dcmi \
+            -v /usr/local/Ascend/driver/tools/hccn_tool:/usr/local/Ascend/driver/tools/hccn_tool \
+            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+            -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \
+            -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
+            -v /etc/ascend_install.info:/etc/ascend_install.info \
+            -v /root/.cache:/root/.cache \
+            -it $IMAGE bash
+        ```
+
+        > 在 Atlas 300I DUO 上，若已安装 `triton-ascend` 和 `triton`，请先卸载以避免依赖冲突：`pip uninstall -y triton-ascend triton`。
+  pip:
+    content: |-
+      如果不使用 Docker 镜像，也可以从源码构建：
+
+      - 从源码安装 `vllm-ascend`，参考[安装指南](https://docs.vllm.ai/projects/ascend/en/latest/installation.html)。
+
+      验证安装：`pip show vllm-ascend`。
+scenarios:
+  - npu: Atlas 800I A2
+    precision: bf16
+    deployment: 单节点
+    case: 单节点单卡
+    tags: [a2-single]
+    strategy: single_node_A2
+    steps:
+      - title: 启动服务
+        content: |-
+          单节点部署在一张 NPU 上完成音频预填充与解码，适合开发、测试与小规模 ASR 服务场景。
+
+          ```bash
+          vllm serve your_model_path \
+              --served-model-name qwen3-asr \
+              --tensor-parallel-size 1 \
+              --max-model-len {{max_model_len}} \
+              --gpu-memory-utilization {{gpu_memory_utilization}} \
+              --enforce-eager \
+              --port 8000
+          ```
+
+          > - `--tensor-parallel-size 1` 使用一张 NPU。只有在确认硬件与部署拓扑支持所选并行配置后，才可增大该值。
+          > - `--max-model-len 4096` 限制最大序列长度，请始终显式设置保守值。
+          > - 将 `your_model_path` 替换为本地模型目录，或使用 `Qwen/Qwen3-ASR-1.7B` 通过已配置的模型仓库下载。
+          > - 服务启动成功时，日志中包含 `Application startup complete`。
+      - title: 服务验证
+        content: |-
+          服务启动后，发送一条语音转写请求进行验证。用法示例参见下方"服务验证"部分。
+  - npu: Atlas 300I DUO
+    precision: fp16
+    deployment: 单节点
+    case: 300I DUO (TP1)
+    tags: [310p-single]
+    strategy: single_node_310p
+    steps:
+      - title: 启动服务
+        content: |-
+          Atlas 300I DUO 单节点 ASR 部署（TP=1）。
+
+          ```bash
+          vllm serve your_model_path \
+              --served-model-name qwen3-asr \
+              --tensor-parallel-size 1 \
+              --gpu-memory-utilization {{gpu_memory_utilization}} \
+              --dtype float16 \
+              --max-model-len {{max_model_len}} \
+              --additional-config '{"ascend_compilation_config": {"fuse_norm_quant": false,"enable_npu_graph_ex":false}}' \
+              --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY", "cudagraph_capture_sizes": [1,4]}' \
+              --port 8000
+          ```
+
+          > - Atlas 300I A2 2UP 示例中使用 `--enforce-eager` 保证兼容性；Atlas 300I DUO 还需要通过 `--compilation-config` 设置 `FULL_DECODE_ONLY` 并限制 `cudagraph_capture_sizes` 规模。
+          > - `--max-model-len 4096` 限制最大序列长度。在 Atlas 300I DUO 上，请务必显式指定保守值；自动检测可能分配过大的注意力掩码并导致 OOM。
+      - title: 服务验证
+        content: |-
+          服务启动后，发送一条语音转写请求进行验证。用法示例参见下方"服务验证"部分。
+verification: |-
+  服务启动后，可通过以下命令调用模型：
+
+  **Chat Completions API：**
+
+  ```bash
+  curl http://localhost:<port>/v1/chat/completions \
+      -H "Content-Type: application/json" \
+      -d '{
+          "model": "qwen3-asr",
+          "messages": [
+              {
+                  "role": "user",
+                  "content": [
+                      {
+                          "type": "audio_url",
+                          "audio_url": {
+                              "url": "https://qianwen-res.oss-cn-beijing.aliyuncs.com/Qwen3-ASR-Repo/asr_en.wav"
+                          }
+                      }
+                  ]
+              }
+          ]
+      }'
+  ```
+
+  请将 `localhost`、`<port>` 和 `qwen3-asr` 替换为部署时使用的地址、端口与 `--served-model-name`。预期结果：返回 HTTP 200，JSON 响应的 `choices` 字段包含转写文本。
+evaluation:
+  accuracy:
+    content: |-
+      使用 WER（词错误率）评估词级识别效果，使用 CER（字错误率）评估字级识别效果。官方教程未发布固定 WER/CER 数值，请使用带标注的音频集在自己的部署环境实测。
+  performance:
+    content: |-
+      使用代表生产工作负载的音频样本测量 ASR 服务性能。至少记录音频时长、请求并发数、端到端延迟、实时率与吞吐量，确保结果覆盖音频预处理、请求构建、API 通信、推理与响应解析全过程。
+
+      实际性能因硬件、音频时长、并发数与部署配置而异。在选择生产配置前，请分别评估短音频、长音频与并发请求。
+
+      以下设置仅为起步参考而非全局最优，请根据音频时长、并发数、时延要求与可用 NPU 显存调整：
+
+      | 场景 | 设置 | 说明 |
+      | ---- | ---- | ---- |
+      | 低时延 | `--tensor-parallel-size 1`、`--max-model-len 4096` | 使用短音频输入，避免与其他工作负载共用 NPU。 |
+      | 长音频 | 仅按需增大 `--max-model-len` | 在 Atlas 300I DUO 上请保持保守值，注意力掩码显存随最大长度增长。 |
+performance:
+  accuracy: |-
+    官方教程未发布该模型的固定 WER/CER 数据。请使用带标注的音频集在自己的部署环境实测转写质量。
+  benchmark: |-
+    官方未发布该模型的固定吞吐/延迟数据；实际结果取决于音频时长、并发数与部署配置。
+
+    请使用 `vllm bench serve` 命令在自己的部署环境实测。
+tuning: |-
+  ### 调优指南
+
+  调优方法请参考[公开性能调优文档](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/performance_and_debug/optimization_and_tuning.html)。
+  特性详细说明请参考[特性指南](https://docs.vllm.ai/projects/ascend/en/latest/user_guide/support_matrix/feature_matrix.html)。
+faq: |-
+  常见环境、安装与通用参数问题请参考[公开 FAQ](https://docs.vllm.ai/projects/ascend/en/latest/faqs.html)。本节仅覆盖模型特定问题。
+references:
+  - title: vllm-ascend 官方文档
+    url: https://docs.vllm.ai/projects/ascend/en/latest/tutorials/models/Qwen3-ASR-1.7B.html
+  - title: ModelScope 模型下载
+    url: https://www.modelscope.cn/models/Qwen/Qwen3-ASR-1.7B
+  - title: HuggingFace 模型卡
+    url: https://huggingface.co/Qwen/Qwen3-ASR-1.7B
+  - title: vllm-ascend GitHub
+    url: https://github.com/vllm-project/vllm-ascend
