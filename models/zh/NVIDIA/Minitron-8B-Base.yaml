@@ -1,0 +1,267 @@
+meta:
+  title: 'Minitron-8B-Base'
+  slug: 'minitron-8b-base'
+  provider: 'NVIDIA'
+  description: 'NVIDIA 通过对 Nemotron-4 15B 剪枝与蒸馏得到的 8B 稠密小模型，面向通用文本生成与推理任务，支持单卡高效部署。'
+  date_added: 2026-10-14
+  difficulty: beginner
+  performance_headline: 'Atlas 800I A2 单节点单卡 BF16 精度部署'
+  hardware:
+    atlas_800_a2: verified
+
+model:
+  model_id: 'nv-community/Minitron-8B-Base'
+  architecture: dense
+  parameter_count: '8B'
+  active_parameters: null
+  context_length: 4096
+  modality: text
+  docker_image:
+    atlas_800_a2: 'quay.io/ascend/vllm-ascend:v0.30.0rc2'
+  nightly_required: false
+  install:
+    # Ascend 推荐使用 Docker；pip 需要源码编译（无官方 wheel），因此隐藏 pip 页签。
+    pip: false
+    docker:
+      command: 'docker run --rm --name vllm-ascend --shm-size=1g --device /dev/davinci0 --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc -v /root/.cache:/root/.cache -it quay.io/ascend/vllm-ascend:v0.30.0rc2 bash'
+      note: '官方昇腾镜像；完整设备/驱动挂载见环境准备中的容器配置。'
+
+compatible_strategies:
+  - single_node_A2
+
+# —— 可配置参数（默认值 = 教程基线） ——
+config_params:
+  max_model_len:
+    default: 4096
+    type: number
+    description: '最大上下文长度（输入 + 输出 token 数）'
+  gpu_memory_utilization:
+    default: 0.9
+    type: number
+    description: '模型与 KV Cache 可用的 NPU 显存比例'
+
+overview: |-
+  Minitron-8B-Base 是 NVIDIA 发布的轻量高效大语言模型，由 Nemotron-4 15B 经剪枝与知识蒸馏压缩到 8B 参数，面向通用文本生成与推理任务。模型采用 Nemotron 架构（32 层、GQA 注意力、部分旋转位置编码），以 BF16 精度发布。
+
+  Minitron-8B-Base 可完整装入单张 64GB 昇腾 910B NPU，适合作为 vLLM-Ascend 上功能验证、精度评测与小规模在线服务的基线模型。
+weight_download:
+  - weight_version: BF16
+    sources:
+      - source: ModelScope
+        url: https://www.modelscope.cn/models/nv-community/Minitron-8B-Base
+        command: |-
+          ```bash
+          pip install modelscope
+          modelscope download --model nv-community/Minitron-8B-Base
+          ```
+      - source: HuggingFace
+        url: https://huggingface.co/nvidia/Minitron-8B-Base
+        command: |-
+          ```bash
+          pip install -U huggingface_hub
+          huggingface-cli download nvidia/Minitron-8B-Base
+          ```
+      - source: Modelers
+        url: ''
+        command: |-
+          ```bash
+          pip install modelers
+          modelers download --model nv-community/Minitron-8B-Base
+          ```
+      - source: GitCode
+        url: ''
+        command: |-
+          ```bash
+          git clone https://gitcode.com/nv-community/Minitron-8B-Base.git
+          ```
+prerequisites:
+  - title: 模型权重
+    content: |-
+      BF16 模型需要 1 张 64GB 昇腾 910B NPU。建议将模型权重下载到本地模型目录，例如 `/root/.cache/` 或 `/data/vllm-workspace/models/Minitron-8B-Base`。
+
+      | 模型                   | 硬件要求                        | 下载                                                                        |
+      | ---------------------- | ------------------------------- | ---------------------------------------------------------------------------- |
+      | Minitron-8B-Base (BF16) | 1 x 64GB NPU (Ascend 910B)     | [下载](https://www.modelscope.cn/models/nv-community/Minitron-8B-Base)       |
+
+      > **路径说明**：将模型权重下载到自选目录并记录该路径，确保后续部署命令中的模型路径与该目录一致。
+env_setup:
+  container:
+    A2:
+      content: |-
+        可以使用官方一体化 Docker 镜像直接运行 `Minitron-8B-Base`。
+
+        **拉取镜像：**
+
+        ```bash
+        docker pull quay.io/ascend/vllm-ascend:v0.30.0rc2
+        ```
+
+        **启动容器：**
+
+        ```bash
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.30.0rc2
+
+        docker run --rm \
+            --name vllm-ascend \
+            --shm-size=1g \
+            --device /dev/davinci0 \
+            --device /dev/davinci_manager \
+            --device /dev/devmm_svm \
+            --device /dev/hisi_hdc \
+            -v /usr/local/dcmi:/usr/local/dcmi \
+            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+            -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \
+            -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
+            -v /etc/ascend_install.info:/etc/ascend_install.info \
+            -v /root/.cache:/root/.cache \
+            -v /data/vllm-workspace/models:/data/vllm-workspace/models \
+            -p 8000:8000 \
+            -it $IMAGE bash
+        ```
+
+        容器启动成功后，可执行 `docker ps` 命令确认容器服务正在运行。
+  pip:
+    content: |-
+      如果不使用 Docker 镜像，也可以从源码构建：
+
+      - 从源码安装 `vllm-ascend`，参考[安装指南](https://docs.vllm.ai/projects/ascend/en/latest/installation.html)。
+
+      如需部署多节点环境，需要在每个节点上配置环境。
+scenarios:
+  - npu: Atlas 800I A2
+    precision: bf16
+    deployment: 单节点
+    case: 单节点单卡
+    tags: [a2-single]
+    strategy: single_node_A2
+    steps:
+      - title: 启动服务
+        content: |-
+          单卡部署在同一块 NPU 上同时完成 Prefill 与 Decode，适合功能验证、精度评测与小规模推理场景。
+
+          以下命令为示例配置，请根据实际场景调整参数。
+
+          ```bash
+          vllm serve "nv-community/Minitron-8B-Base" \
+              --served-model-name minitron-8b-base \
+              --tensor-parallel-size 1 \
+              --max-model-len {{max_model_len}} \
+              --gpu-memory-utilization {{gpu_memory_utilization}} \
+              --enforce-eager \
+              --port 8000
+          ```
+
+          > - `--served-model-name`：客户端请求使用的模型名，必须与下方服务验证请求中的 `model` 字段一致。
+          > - `--tensor-parallel-size 1`：BF16 权重可完整装入单张 64GB NPU。
+          > - `--enforce-eager`：以 eager 模式运行，作为该模型的推荐基线。
+          > - 模型路径：如已提前下载权重，请将 `nv-community/Minitron-8B-Base` 替换为本地权重目录。
+      - title: 服务验证
+        content: |-
+          服务启动后，发送一条 prompt 进行验证。用法示例参见下方"服务验证"部分。
+verification: |-
+  服务启动后，可以通过一条简单 prompt 查询模型：
+
+  ```bash
+  curl http://localhost:<port>/v1/completions \
+      -H "Content-Type: application/json" \
+      -d '{
+          "model": "minitron-8b-base",
+          "prompt": "Question: If a train travels 60 miles in 2 hours, what is its average speed in miles per hour?\nAnswer:",
+          "max_tokens": 64,
+          "temperature": 1.0
+      }'
+  ```
+
+  > - **URL**：将 `localhost` 替换为服务器 IP，端口与 `vllm serve` 命令一致。
+  > - **`model`**：必须与 `vllm serve` 命令中 `--served-model-name` 的取值一致（如 `minitron-8b-base`）。
+
+  预期结果：返回合法响应，说明模型部署正确并能正常生成文本。
+evaluation:
+  accuracy:
+    content: |-
+      采用 GSM8K 数据集评测 `Minitron-8B-Base` 的推理能力。
+
+      评测设置为：
+
+      - 数据集：`gsm8k`
+      - 划分：`test`
+      - 样本数：`1000`
+      - Few-shot 设置：`5-shot`
+      - `apply_chat_template`：`False`
+      - `fewshot_as_multiturn`：`False`
+
+      昇腾上的评测工具配置参考[使用 lm_eval](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/evaluation/using_lm_eval.html)。示例命令：
+
+      ```bash
+      lm_eval --model vllm \
+          --model_args pretrained=/data/vllm-workspace/models/Minitron-8B-Base,tensor_parallel_size=1,distributed_executor_backend=mp \
+          --tasks gsm8k \
+          --num_fewshot 5 \
+          --limit 1000 \
+          --batch_size auto
+      ```
+
+      评测结果如下：
+
+      | 类别 | 数据集 | 指标 | 结果 |
+      |------|--------|------|------|
+      | 精度 | gsm8k / test | 总样本数 | 1000 |
+      | 精度 | gsm8k / test | exact_match,strict-match | 0.5436 |
+      | 精度 | gsm8k / test | exact_match,flexible-extract | 0.5451 |
+
+      指标说明：
+
+      - **exact_match,strict-match**：仅当预测严格匹配预期的最终答案抽取格式时才计为正确。
+      - **exact_match,flexible-extract**：采用更宽松的答案抽取规则，只要最终数值答案正确即容忍轻微格式差异。
+  performance:
+    content: |-
+      ### 使用 vLLM Benchmark
+
+      `Minitron-8B-Base` 可通过 `vllm-ascend` 部署进行在线推理与基准评测。详见 [vLLM benchmark](https://docs.vllm.ai/en/latest/benchmarking/)。
+
+      以 `serve` 子命令为例：
+
+      ```bash
+      vllm bench serve \
+          --model /data/vllm-workspace/models/Minitron-8B-Base \
+          --served-model-name minitron-8b-base \
+          --port 8000 \
+          --dataset-name random \
+          --random-input 128 \
+          --random-output-len 64 \
+          --num-prompts 100 \
+          --request-rate 10 \
+          --save-result \
+          --result-dir ./
+      ```
+
+      > 实际吞吐与延迟取决于硬件资源、输入输出长度、并发数与运行时配置。本 recipe 聚焦功能验证与 GSM8K 精度评测；建议进一步针对请求延迟、并发吞吐、长上下文推理、显存利用率与持续服务稳定性开展基准测试。
+performance:
+  accuracy: |-
+    **GSM8K（5-shot，1000 条测试样本）：**
+
+    | 类别 | 数据集 | 指标 | 结果 |
+    |------|--------|------|------|
+    | 精度 | gsm8k / test | 总样本数 | 1000 |
+    | 精度 | gsm8k / test | exact_match,strict-match | 0.5436 |
+    | 精度 | gsm8k / test | exact_match,flexible-extract | 0.5451 |
+  benchmark: |-
+    官方未发布该模型的固定吞吐/延迟数据；实际结果取决于硬件资源、输入输出长度、并发数与运行时配置。
+
+    请使用"更多信息"页签中可复现的 `vllm bench serve` 命令，在自己的部署环境实测吞吐与延迟。
+tuning: |-
+  ### 调优指南
+
+  调优方法请参考[公开性能调优文档](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/performance_and_debug/optimization_and_tuning.html)。
+  特性详细说明请参考[特性指南](https://docs.vllm.ai/projects/ascend/en/latest/user_guide/support_matrix/feature_matrix.html)。
+faq: |-
+  常见环境、安装与通用参数问题请参考[公开 FAQ](https://docs.vllm.ai/projects/ascend/en/latest/faqs.html)。本节仅覆盖模型特定问题。
+references:
+  - title: vllm-ascend 官方文档
+    url: https://docs.vllm.ai/projects/ascend/en/latest/tutorials/models/Minitron-8B-Base.html
+  - title: ModelScope 模型下载
+    url: https://www.modelscope.cn/models/nv-community/Minitron-8B-Base
+  - title: HuggingFace 模型卡
+    url: https://huggingface.co/nvidia/Minitron-8B-Base
+  - title: vllm-ascend GitHub
+    url: https://github.com/vllm-project/vllm-ascend
