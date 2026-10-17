@@ -1,0 +1,239 @@
+meta:
+  title: 'DeepSeek-OCR-2'
+  slug: 'deepseek-ocr-2'
+  provider: 'DeepSeek'
+  description: 'A multimodal OCR model from DeepSeek for document text extraction, figure parsing, and multimodal document understanding, deployable on a single Atlas 800 A2 NPU with vLLM-Ascend.'
+  date_added: 2026-10-14
+  difficulty: beginner
+  performance_headline: 'Single-node single-card multimodal OCR deployment on Atlas 800 A2 with vLLM-Ascend'
+  hardware:
+    atlas_800_a2: verified
+
+model:
+  model_id: 'deepseek-ai/DeepSeek-OCR-2'
+  architecture: dense
+  parameter_count: '3B'
+  active_parameters: null
+  context_length: 8192
+  modality: multimodal
+  base_args:
+    - '--trust-remote-code'
+  docker_image:
+    atlas_800_a2: 'quay.io/ascend/vllm-ascend:v0.30.0rc2'
+  nightly_required: false
+  install:
+    # Ascend recommends Docker; pip requires source build (no official wheel), so the pip tab is hidden.
+    pip: false
+    docker:
+      command: 'docker run --rm --name vllm-ascend --shm-size=1g --net=host --device /dev/davinci0 --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc -v /root/.cache:/root/.cache -it quay.io/ascend/vllm-ascend:v0.30.0rc2 bash'
+      note: 'Official Ascend image; full device/driver mounts are covered in env_setup.container.'
+
+compatible_strategies:
+  - single_node_A2
+
+# —— Configurable value params (defaults = tutorial baseline) ——
+config_params:
+  gpu_memory_utilization:
+    default: 0.8
+    type: number
+    description: 'Fraction of NPU memory available for the model and KV cache'
+
+overview: |-
+  DeepSeek-OCR-2 is a multimodal OCR model from DeepSeek for document text extraction, figure parsing, and multimodal document understanding. It can be deployed on a single Atlas 800 A2 with vLLM-Ascend. Single-node deployment is recommended; Prefill-Decode disaggregation is not required.
+weight_download:
+  - weight_version: BF16
+    sources:
+      - source: ModelScope
+        url: https://www.modelscope.cn/models/deepseek-ai/DeepSeek-OCR-2
+        command: |-
+          ```bash
+          pip install modelscope
+          modelscope download --model deepseek-ai/DeepSeek-OCR-2
+          ```
+      - source: HuggingFace
+        url: https://huggingface.co/deepseek-ai/DeepSeek-OCR-2
+        command: |-
+          ```bash
+          pip install -U huggingface_hub
+          huggingface-cli download deepseek-ai/DeepSeek-OCR-2
+          ```
+      - source: Modelers
+        url: ''
+        command: ''
+      - source: GitCode
+        url: ''
+        command: ''
+prerequisites:
+  - title: Model Weight
+    content: |-
+      Download the DeepSeek-OCR-2 model weights to a directory of your choice and record the path, for example `/root/.cache/DeepSeek-OCR-2`.
+env_setup:
+  container:
+    A2:
+      content: |-
+        You can use the official all-in-one Docker image to run `DeepSeek-OCR-2` directly.
+
+        **Docker Pull:**
+
+        ```bash
+        docker pull quay.io/ascend/vllm-ascend:v0.30.0rc2
+        ```
+
+        **Docker Run:**
+
+        ```bash
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.30.0rc2
+
+        docker run --rm \
+            --name vllm-ascend \
+            --shm-size=1g \
+            --net=host \
+            --device /dev/davinci0 \
+            --device /dev/davinci_manager \
+            --device /dev/devmm_svm \
+            --device /dev/hisi_hdc \
+            -v /usr/local/dcmi:/usr/local/dcmi \
+            -v /usr/local/Ascend/driver/tools/hccn_tool:/usr/local/Ascend/driver/tools/hccn_tool \
+            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+            -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \
+            -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
+            -v /etc/ascend_install.info:/etc/ascend_install.info \
+            -v /root/.cache:/root/.cache \
+            -it $IMAGE bash
+        ```
+
+        After a successful docker run, you can verify the running container service by executing the `docker ps` command.
+scenarios:
+  - npu: Atlas 800I A2
+    precision: bf16
+    deployment: Single-Node
+    case: Single Node Single Card
+    tags: [a2-single]
+    strategy: single_node_A2
+    steps:
+      - title: Start the server
+        content: |-
+          `DeepSeek-OCR-2` can be deployed on 1 Atlas 800 A2. Single-node deployment is recommended; Prefill-Decode disaggregation is not required.
+
+          ```bash
+          export PYTORCH_NPU_ALLOC_CONF="expandable_segments:True"
+
+          vllm serve /root/.cache/DeepSeek-OCR-2 \
+              --served-model-name deepseekocr2 \
+              --trust-remote-code \
+              --tensor-parallel-size 1  \
+              --port 1055 \
+              --max_model_len 8192 \
+              --no-enable-prefix-caching \
+              --gpu-memory-utilization {{gpu_memory_utilization}} \
+              --allowed-local-media-path / \
+              --additional-config '{
+                "weight_nz_mode": 0,
+                "enable_cpu_binding": true,
+                "multistream_overlap_shared_expert": true,
+                "ascend_compilation_config": {"fuse_qknorm_rope": false}
+              }' \
+              --mm-processor-cache-gb 0
+          ```
+
+          > - `--max-model-len` specifies the maximum context length - that is, the sum of input and output tokens for a single request.
+          > - `--no-enable-prefix-caching` indicates that prefix caching is disabled. To enable it, remove this option.
+          > - `--gpu-memory-utilization` represents the proportion of HBM that vLLM will use for actual inference. Setting it too high may lead to OOM during actual inference; the default value is 0.9, and this example uses 0.8.
+      - title: Service Verification
+        content: |-
+          After the service is started, verify it by sending a completion request. Refer to the verification section below for a usage example.
+verification: |-
+  If your service starts successfully, you can see logs similar to the following:
+
+  ```bash
+  INFO:     Started server process [87471]
+  INFO:     Waiting for application startup.
+  INFO:     Application startup complete.
+  ```
+
+  Once your server is started, you can query the model with input prompts:
+
+  ```bash
+  curl http://localhost:<port>/v1/completions \
+      -H "Content-Type: application/json" \
+      -d '{
+          "model": "deepseekocr2",
+          "prompt": "The future of AI is",
+          "max_completion_tokens": 50,
+          "temperature": 0
+      }'
+  ```
+
+  > - **URL**: Replace `localhost` with your server IP and use the port from the `vllm serve` command.
+evaluation:
+  accuracy:
+    content: |-
+      ### Using AISBench
+
+      For setup details, including installation, dataset download, and configuration, please refer to [Using AISBench](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/evaluation/using_ais_bench.html). After execution, you can get the result, here is the result of `DeepSeek-OCR-2` for reference only:
+
+      | dataset | version | metric | mode | vllm-api-general-chat | note |
+      | ------- | ------- | ------ | ---- | --------------------- | ---- |
+      | textvqa | - | accuracy | gen | 50.28 | 1 Atlas 800 A2 |
+      | omnidocbench | - | accuracy | gen | 66.86 | 1 Atlas 800 A2 |
+  performance:
+    content: |-
+      ### Using AISBench
+
+      For setup details, please refer to [Using AISBench for performance evaluation](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/evaluation/using_ais_bench.html#execute-performance-evaluation).
+
+      The performance result is:
+
+      **Hardware**: A2-313T, 1 node
+
+      **Input/Output**: 1080P/256
+
+      **Performance**: TTFT = 2s, TPOT = 200ms, average performance of each card is 864 TPS (tokens per second).
+performance:
+  accuracy: |-
+    **AISBench results (1 Atlas 800 A2):**
+
+    | dataset | version | metric | mode | vllm-api-general-chat | note |
+    | ------- | ------- | ------ | ---- | --------------------- | ---- |
+    | textvqa | - | accuracy | gen | 50.28 | 1 Atlas 800 A2 |
+    | omnidocbench | - | accuracy | gen | 66.86 | 1 Atlas 800 A2 |
+  benchmark: |-
+    **Performance result:**
+
+    - **Hardware**: A2-313T, 1 node
+    - **Input/Output**: 1080P/256
+    - **Performance**: TTFT = 2s, TPOT = 200ms, average performance of each card is 864 TPS (tokens per second).
+tuning: |-
+  ### Tuning Guidelines
+
+  Please refer to the [Public Performance Tuning Documentation](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/performance_and_debug/optimization_and_tuning.html) for tuning methods.
+  Please refer to the [Feature Matrix](https://docs.vllm.ai/projects/ascend/en/latest/user_guide/support_matrix/feature_matrix.html) for detailed feature descriptions.
+
+  ### Recommended Configurations
+
+  > **Note**: The following configurations are validated in specific test environments and are for reference only. The optimal configuration depends on factors such as maximum input/output length, prefix cache hit rate, precision requirements, and deployment machine ratios. It is recommended to refer to Section 9.2 for tuning based on actual conditions.
+
+  | Scenario | Deployment Mode | Total NPUs | Weight Version | Key Considerations |
+  | -------- | --------------- | ---------- | -------------- | ------------------ |
+  | Multimodal (1080P) | Single-Node Mixed | 16 (A3) | deepseekocr2 | dp1 tp1 for high-resolution visual inputs |
+faq: |-
+  For common environment, installation, and general parameter issues, please refer to the [Public FAQs](https://docs.vllm.ai/projects/ascend/en/latest/faqs.html). This chapter only covers model-specific issues.
+
+  - **Q: Startup fails with HCCL port conflicts (address already bound). What should I do?**
+
+    A: Clean up old processes and restart: `pkill -f vLLM*`.
+
+  - **Q: How to handle OOM or unstable startup?**
+
+    A: Reduce `--max-num-seqs` and `--max-model-len` first. If needed, reduce concurrency and load-testing pressure (e.g. `max-concurrency` / `num-prompts`).
+references:
+  - title: vllm-ascend Documentation
+    url: https://docs.vllm.ai/projects/ascend/en/latest/tutorials/models/DeepSeekOCR2.html
+  - title: ModelScope Model Download
+    url: https://www.modelscope.cn/models/deepseek-ai/DeepSeek-OCR-2
+  - title: HuggingFace Model Card
+    url: https://huggingface.co/deepseek-ai/DeepSeek-OCR-2
+  - title: AISBench Evaluation Guide
+    url: https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/evaluation/using_ais_bench.html
+  - title: vllm-ascend GitHub
+    url: https://github.com/vllm-project/vllm-ascend

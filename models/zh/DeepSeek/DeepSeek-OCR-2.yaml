@@ -1,0 +1,239 @@
+meta:
+  title: 'DeepSeek-OCR-2'
+  slug: 'deepseek-ocr-2'
+  provider: 'DeepSeek'
+  description: 'DeepSeek 多模态 OCR 模型，面向文档文字提取、图表解析与多模态文档理解，可在单张 Atlas 800 A2 NPU 上部署。'
+  date_added: 2026-10-14
+  difficulty: beginner
+  performance_headline: 'Atlas 800 A2 单节点单卡多模态 OCR 部署'
+  hardware:
+    atlas_800_a2: verified
+
+model:
+  model_id: 'deepseek-ai/DeepSeek-OCR-2'
+  architecture: dense
+  parameter_count: '3B'
+  active_parameters: null
+  context_length: 8192
+  modality: multimodal
+  base_args:
+    - '--trust-remote-code'
+  docker_image:
+    atlas_800_a2: 'quay.io/ascend/vllm-ascend:v0.30.0rc2'
+  nightly_required: false
+  install:
+    # Ascend 推荐使用 Docker；pip 需要源码编译（无官方 wheel），因此隐藏 pip 页签。
+    pip: false
+    docker:
+      command: 'docker run --rm --name vllm-ascend --shm-size=1g --net=host --device /dev/davinci0 --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc -v /root/.cache:/root/.cache -it quay.io/ascend/vllm-ascend:v0.30.0rc2 bash'
+      note: '官方昇腾镜像；完整设备/驱动挂载见环境准备中的容器配置。'
+
+compatible_strategies:
+  - single_node_A2
+
+# —— 可配置参数（默认值 = 教程基线） ——
+config_params:
+  gpu_memory_utilization:
+    default: 0.8
+    type: number
+    description: '模型与 KV Cache 可用的 NPU 显存比例'
+
+overview: |-
+  DeepSeek-OCR-2 是 DeepSeek 推出的多模态 OCR 模型，面向文档文字提取、图表解析与多模态文档理解，可在单张 Atlas 800 A2 上通过 vLLM-Ascend 部署。推荐单节点部署，无需 Prefill-Decode 分离。
+weight_download:
+  - weight_version: BF16
+    sources:
+      - source: ModelScope
+        url: https://www.modelscope.cn/models/deepseek-ai/DeepSeek-OCR-2
+        command: |-
+          ```bash
+          pip install modelscope
+          modelscope download --model deepseek-ai/DeepSeek-OCR-2
+          ```
+      - source: HuggingFace
+        url: https://huggingface.co/deepseek-ai/DeepSeek-OCR-2
+        command: |-
+          ```bash
+          pip install -U huggingface_hub
+          huggingface-cli download deepseek-ai/DeepSeek-OCR-2
+          ```
+      - source: Modelers
+        url: ''
+        command: ''
+      - source: GitCode
+        url: ''
+        command: ''
+prerequisites:
+  - title: 模型权重
+    content: |-
+      将 DeepSeek-OCR-2 权重下载到自选目录并记录路径，例如 `/root/.cache/DeepSeek-OCR-2`。
+env_setup:
+  container:
+    A2:
+      content: |-
+        可以使用官方一体化 Docker 镜像直接运行 `DeepSeek-OCR-2`。
+
+        **拉取镜像：**
+
+        ```bash
+        docker pull quay.io/ascend/vllm-ascend:v0.30.0rc2
+        ```
+
+        **启动容器：**
+
+        ```bash
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.30.0rc2
+
+        docker run --rm \
+            --name vllm-ascend \
+            --shm-size=1g \
+            --net=host \
+            --device /dev/davinci0 \
+            --device /dev/davinci_manager \
+            --device /dev/devmm_svm \
+            --device /dev/hisi_hdc \
+            -v /usr/local/dcmi:/usr/local/dcmi \
+            -v /usr/local/Ascend/driver/tools/hccn_tool:/usr/local/Ascend/driver/tools/hccn_tool \
+            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+            -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \
+            -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
+            -v /etc/ascend_install.info:/etc/ascend_install.info \
+            -v /root/.cache:/root/.cache \
+            -it $IMAGE bash
+        ```
+
+        容器启动成功后，可执行 `docker ps` 命令确认容器服务正在运行。
+scenarios:
+  - npu: Atlas 800I A2
+    precision: bf16
+    deployment: 单节点
+    case: 单节点单卡
+    tags: [a2-single]
+    strategy: single_node_A2
+    steps:
+      - title: 启动服务
+        content: |-
+          `DeepSeek-OCR-2` 可在 1 台 Atlas 800 A2 上部署，推荐单节点部署，无需 Prefill-Decode 分离。
+
+          ```bash
+          export PYTORCH_NPU_ALLOC_CONF="expandable_segments:True"
+
+          vllm serve /root/.cache/DeepSeek-OCR-2 \
+              --served-model-name deepseekocr2 \
+              --trust-remote-code \
+              --tensor-parallel-size 1  \
+              --port 1055 \
+              --max_model_len 8192 \
+              --no-enable-prefix-caching \
+              --gpu-memory-utilization {{gpu_memory_utilization}} \
+              --allowed-local-media-path / \
+              --additional-config '{
+                "weight_nz_mode": 0,
+                "enable_cpu_binding": true,
+                "multistream_overlap_shared_expert": true,
+                "ascend_compilation_config": {"fuse_qknorm_rope": false}
+              }' \
+              --mm-processor-cache-gb 0
+          ```
+
+          > - `--max-model-len` 指定最大上下文长度，即单条请求输入与输出的最大 token 数。
+          > - `--no-enable-prefix-caching` 表示禁用前缀缓存；如需启用请移除该选项。
+          > - `--gpu-memory-utilization` 表示 vLLM 用于实际推理的 HBM 比例。设置过高可能在实际推理时发生 OOM；默认值为 0.9，本例使用 0.8。
+      - title: 服务验证
+        content: |-
+          服务启动后，发送一条补全请求进行验证。用法示例参见下方"服务验证"部分。
+verification: |-
+  服务启动成功后，可以看到类似以下日志：
+
+  ```bash
+  INFO:     Started server process [87471]
+  INFO:     Waiting for application startup.
+  INFO:     Application startup complete.
+  ```
+
+  服务启动后，可通过输入 prompt 调用模型：
+
+  ```bash
+  curl http://localhost:<port>/v1/completions \
+      -H "Content-Type: application/json" \
+      -d '{
+          "model": "deepseekocr2",
+          "prompt": "The future of AI is",
+          "max_completion_tokens": 50,
+          "temperature": 0
+      }'
+  ```
+
+  > - **URL**：将 `localhost` 替换为服务器 IP，端口与 `vllm serve` 命令一致。
+evaluation:
+  accuracy:
+    content: |-
+      ### 使用 AISBench
+
+      关于安装、数据集下载与配置，请参考[使用 AISBench](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/evaluation/using_ais_bench.html)。执行完成后可获得结果，`DeepSeek-OCR-2` 的参考结果如下：
+
+      | 数据集 | 版本 | 指标 | 模式 | vllm-api-general-chat | 备注 |
+      | ------ | ---- | ---- | ---- | --------------------- | ---- |
+      | textvqa | - | accuracy | gen | 50.28 | 1 Atlas 800 A2 |
+      | omnidocbench | - | accuracy | gen | 66.86 | 1 Atlas 800 A2 |
+  performance:
+    content: |-
+      ### 使用 AISBench
+
+      关于安装与性能评测，请参考[使用 AISBench 执行性能评测](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/evaluation/using_ais_bench.html#execute-performance-evaluation)。
+
+      性能结果：
+
+      **硬件**：A2-313T，1 节点
+
+      **输入/输出**：1080P/256
+
+      **性能**：TTFT = 2s，TPOT = 200ms，单卡平均性能为 864 TPS（token/秒）。
+performance:
+  accuracy: |-
+    **AISBench 结果（1 Atlas 800 A2）：**
+
+    | 数据集 | 版本 | 指标 | 模式 | vllm-api-general-chat | 备注 |
+    | ------ | ---- | ---- | ---- | --------------------- | ---- |
+    | textvqa | - | accuracy | gen | 50.28 | 1 Atlas 800 A2 |
+    | omnidocbench | - | accuracy | gen | 66.86 | 1 Atlas 800 A2 |
+  benchmark: |-
+    **性能结果：**
+
+    - **硬件**：A2-313T，1 节点
+    - **输入/输出**：1080P/256
+    - **性能**：TTFT = 2s，TPOT = 200ms，单卡平均性能为 864 TPS（token/秒）。
+tuning: |-
+  ### 调优指南
+
+  调优方法请参考[公开性能调优文档](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/performance_and_debug/optimization_and_tuning.html)。
+  特性详细说明请参考[特性矩阵](https://docs.vllm.ai/projects/ascend/en/latest/user_guide/support_matrix/feature_matrix.html)。
+
+  ### 推荐配置
+
+  > **说明**：以下配置已在特定测试环境中验证，仅供参考。最优配置取决于最大输入/输出长度、前缀缓存命中率、精度要求和部署机器比例，建议根据实际情况参考第 9.2 节进行调优。
+
+  | 场景 | 部署模式 | NPU 总数 | 权重版本 | 关键考虑 |
+  | ---- | -------- | -------- | ---------- | -------- |
+  | 多模态（1080P） | 单节点混合 | 16（A3） | deepseekocr2 | 高分辨率视觉输入，dp1 tp1 |
+faq: |-
+  常见环境、安装与通用参数问题请参考[公开 FAQ](https://docs.vllm.ai/projects/ascend/en/latest/faqs.html)。本节仅覆盖模型特定问题。
+
+  - **Q：启动时 HCCL 端口冲突（address already bound）怎么办？**
+
+    A：清理旧进程后重启：`pkill -f vLLM*`。
+
+  - **Q：OOM 或启动不稳定如何处理？**
+
+    A：先减小 `--max-num-seqs` 与 `--max-model-len`；必要时再降低并发和压测压力（如 `max-concurrency` / `num-prompts`）。
+references:
+  - title: vllm-ascend 官方文档
+    url: https://docs.vllm.ai/projects/ascend/en/latest/tutorials/models/DeepSeekOCR2.html
+  - title: ModelScope 模型下载
+    url: https://www.modelscope.cn/models/deepseek-ai/DeepSeek-OCR-2
+  - title: HuggingFace 模型卡
+    url: https://huggingface.co/deepseek-ai/DeepSeek-OCR-2
+  - title: AISBench 使用指南
+    url: https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/evaluation/using_ais_bench.html
+  - title: vllm-ascend GitHub
+    url: https://github.com/vllm-project/vllm-ascend
