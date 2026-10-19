@@ -12,6 +12,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: read
   actions: write
 
 concurrency:
@@ -29,19 +30,17 @@ jobs:
       has_src_changes: ${{ steps.filter.outputs.src }}
       has_workflow_changes: ${{ steps.filter.outputs.workflows }}
       has_config_changes: ${{ steps.filter.outputs.config }}
-      recipe_files: ${{ steps.recipes.outputs.files }}
-      recipe_count: ${{ steps.recipes.outputs.count }}
-      a3_recipe_files: ${{ steps.recipes.outputs.a3_files }}
-      a3_recipe_count: ${{ steps.recipes.outputs.a3_count }}
-      a5_recipe_files: ${{ steps.recipes.outputs.a5_files }}
-      a5_recipe_count: ${{ steps.recipes.outputs.a5_count }}
+      recipe_matrix: ${{ steps.recipes.outputs.matrix }}
+      hardware_count: ${{ steps.recipes.outputs.count }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       - name: Detect changed paths
         id: filter
-        uses: dorny/paths-filter@v3
+        uses: dorny/paths-filter@v4
         with:
           list-files: csv
           filters: |
@@ -59,65 +58,24 @@ jobs:
               - 'eslint.config.*'
               - '.prettierrc.*'
 
-      - name: List changed recipes
-        id: recipes
-        if: steps.filter.outputs.models == 'true'
-        run: |
-          MODEL_FILES="${{ steps.filter.outputs.models_files }}"
-          echo "All changed model files: $MODEL_FILES"
-          EN_RECIPES=$(echo "$MODEL_FILES" | tr ',' '\n' | grep '^models/en/.*\.\(yaml\|yml\)$' || true)
-          # These standalone templates are verified only by verify_multi_node;
-          # do not pass them to the legacy single-node deployment workflow.
-          LEGACY_RECIPES=$(echo "$EN_RECIPES" | grep -Ev \
-            '^(models/en/DeepSeek/template_pd\.yaml|models/en/Qwen/template2_non_pd\.yaml)$' || true)
-          # Only trigger deployment verify for whitelisted models. The legacy
-          # multi-node workflow reads the same global whitelist.
-          VERIFY_RECIPES=$(echo "$LEGACY_RECIPES" | grep -E -f <(grep -vE '^\s*(#|$)' .github/recipe-verify-whitelist.txt) || true)
-          if [ -n "$VERIFY_RECIPES" ]; then
-            # Recipes with Ascend 950DT support must run on the dedicated A5
-            # runner; keep the remaining recipes on the legacy A2/A3 runner.
-            A5_RECIPES=$(echo "$VERIFY_RECIPES" | grep -E '^(models/en/DeepSeek/DeepSeek-V4-Flash|models/en/THUDM/GLM-5|models/en/Qwen/Qwen3-VL-30B-A3B-Instruct|models/en/Qwen/Qwen3\.5-27B-Qwen3\.6-27B)\.yaml$' || true)
-            LEGACY_VERIFY_RECIPES=$(echo "$VERIFY_RECIPES" | grep -v -E '^(models/en/DeepSeek/DeepSeek-V4-Flash|models/en/THUDM/GLM-5|models/en/Qwen/Qwen3-VL-30B-A3B-Instruct|models/en/Qwen/Qwen3\.5-27B-Qwen3\.6-27B)\.yaml$' || true)
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
 
-            if [ -n "$LEGACY_VERIFY_RECIPES" ]; then
-              COUNT=$(echo "$LEGACY_VERIFY_RECIPES" | wc -l)
-              FILES=$(echo "$LEGACY_VERIFY_RECIPES" | jq -R -s -c 'split("\n") | map(select(length > 0))')
-            else
-              COUNT=0
-              FILES=[]
-            fi
-            if [ -n "$A5_RECIPES" ]; then
-              A5_COUNT=$(echo "$A5_RECIPES" | wc -l)
-              A5_FILES=$(echo "$A5_RECIPES" | jq -R -s -c 'split("\n") | map(select(length > 0))')
-            else
-              A5_COUNT=0
-              A5_FILES=[]
-            fi
-            {
-              echo "count=$COUNT"
-              echo "files=$FILES"
-              echo "a3_count=$COUNT"
-              echo "a3_files=$FILES"
-              echo "a5_count=$A5_COUNT"
-              echo "a5_files=$A5_FILES"
-            } >> "$GITHUB_OUTPUT"
-            echo "Legacy verification recipes ($COUNT): $LEGACY_VERIFY_RECIPES"
-            echo "A5 verification recipes ($A5_COUNT): $A5_RECIPES"
-            SKIPPED_RECIPES=$(echo "$LEGACY_RECIPES" | grep -v -E -f <(grep -vE '^\s*(#|$)' .github/recipe-verify-whitelist.txt) || true)
-            if [ -n "$SKIPPED_RECIPES" ]; then
-              echo "Skipped (not in whitelist): $SKIPPED_RECIPES"
-            fi
-          else
-            {
-              echo "count=0"
-              echo "files=[]"
-              echo "a3_count=0"
-              echo "a3_files=[]"
-              echo "a5_count=0"
-              echo "a5_files=[]"
-            } >> "$GITHUB_OUTPUT"
-            echo "No models/en/ recipe files changed"
-          fi
+      - name: Install recipe planner dependency
+        run: python -m pip install pyyaml
+
+      - name: Discover changed recipes and their single-node hardware
+        id: recipes
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.sha }}
+        run: |
+          python .github/_scripts/verification_plan.py \
+            --trigger pr --base-ref "$BASE_REF" > /tmp/verification-plan.json
+          {
+            echo "matrix=$(jq -c . /tmp/verification-plan.json)"
+            echo "count=$(jq '.include | length' /tmp/verification-plan.json)"
+          } >> "$GITHUB_OUTPUT"
 
   # ============================================================
   # Step 2: YAML validation + site build (always)
@@ -127,13 +85,13 @@ jobs:
     if: always()
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: pnpm
@@ -175,13 +133,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: pnpm
@@ -207,7 +165,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Run actionlint
         uses: reviewdog/action-actionlint@v1
@@ -217,51 +175,48 @@ jobs:
   # Uses the reusable _recipe_verify workflow
   # ============================================================
   verify-deploy:
+    name: single-node (${{ matrix.job_id }})
     needs: [detect, validate]
     if: |
-      needs.detect.outputs.has_model_changes == 'true' &&
-      needs.detect.outputs.recipe_count != '0' &&
+      needs.detect.outputs.hardware_count != '0' &&
       needs.validate.result == 'success'
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix: ${{ fromJSON(needs.detect.outputs.recipe_matrix) }}
     uses: ./.github/workflows/_recipe_verify.yml
     with:
-      runner: linux-aarch64-a2b4-8
-      recipe_files: ${{ needs.detect.outputs.recipe_files }}
+      plan_id: ${{ matrix.job_id }}
+      runner: ${{ matrix.runner }}
+      hardware_key: ${{ matrix.hardware_key }}
+      image: ${{ matrix.image }}
+      mount_share: ${{ matrix.mount_share }}
+      recipe_files: ${{ matrix.recipe_files }}
       trigger_type: pr
       head_sha: ${{ github.event.pull_request.head.sha }}
       started_at_iso: ${{ github.event.pull_request.updated_at }}
 
-  # A3 enables recipe parity across Atlas A2 / A3 generations.
-  verify-a3:
-    needs: [detect, validate]
-    if: |
-      needs.detect.outputs.has_model_changes == 'true' &&
-      needs.detect.outputs.a3_recipe_count != '0' &&
-      needs.validate.result == 'success'
-    uses: ./.github/workflows/_recipe_verify.yml
-    with:
-      runner: linux-aarch64-a3b4-8
-      hardware_key: atlas_800_a3
-      image: swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/vllm-ascend:v0.23.0-a3
-      recipe_files: ${{ needs.detect.outputs.a3_recipe_files }}
-      trigger_type: pr
-      head_sha: ${{ github.event.pull_request.head.sha }}
-      started_at_iso: ${{ github.event.pull_request.updated_at }}
-
-  # A5-capable recipes are routed separately from the legacy recipe list and
-  # run on the dedicated A5 hardware runner.
-  verify-a5:
-    needs: [detect, validate]
-    if: |
-      needs.detect.outputs.has_model_changes == 'true' &&
-      needs.detect.outputs.a5_recipe_count != '0' &&
-      needs.validate.result == 'success'
-    uses: ./.github/workflows/_recipe_verify.yml
-    with:
-      runner: linux-aarch64-a5-8
-      hardware_key: ascend_950dt
-      image: swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/vllm-ascend:v0.23.0-a5
-      mount_share: true
-      recipe_files: ${{ needs.detect.outputs.a5_recipe_files }}
-      trigger_type: pr
-      head_sha: ${{ github.event.pull_request.head.sha }}
-      started_at_iso: ${{ github.event.pull_request.updated_at }}
+  # Preserve publish-status.yml's artifact name without letting hardware jobs
+  # overwrite one another's params/status files.
+  collect-results:
+    needs: [detect, verify-deploy]
+    if: always() && needs.detect.result == 'success' && needs.detect.outputs.hardware_count != '0'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v7
+        continue-on-error: true
+        with:
+          pattern: recipe-verify-results-${{ github.run_id }}-*
+          path: hardware-results/
+          merge-multiple: false
+      - name: Collect publisher-compatible recipe results
+        env:
+          EXPECTED_PLAN: ${{ needs.detect.outputs.recipe_matrix }}
+        run: python3 .github/_scripts/collect_recipe_artifacts.py --input hardware-results --output combined-results --expected-plan "$EXPECTED_PLAN"
+      - uses: actions/upload-artifact@v6
+        with:
+          name: recipe-verify-results-${{ github.run_id }}
+          path: combined-results/
+          retention-days: 14
+          if-no-files-found: warn

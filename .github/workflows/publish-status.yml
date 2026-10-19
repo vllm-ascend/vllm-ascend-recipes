@@ -74,12 +74,12 @@ jobs:
       # workflow_run fires in the default-branch context; HEAD == origin/main
       # here. We commit + push status data back to main.
       - name: Checkout main
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 1
 
       - name: Download run-params artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: recipe-verify-results-${{ github.event.workflow_run.id }}
           path: results/
@@ -88,7 +88,7 @@ jobs:
         continue-on-error: true
 
       - name: Download configuration verification results
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           pattern: verification-target-results-${{ github.event.workflow_run.id }}-*
           path: target-results/
@@ -322,42 +322,17 @@ jobs:
             --runs-dir public/runs \
             --targets .github/verification-targets.yaml
 
-          # 5) A scheduled run must supersede every target's former nightly
-          #    result, even when an A2 runner never initialized and therefore
-          #    could not upload its own artifact. Preserve real artifacts and
-          #    materialize a failed record only for targets that are absent.
-          if [ "$TRIGGER" = "nightly" ] && [ "$WORKFLOW_NAME" = "Multi-node framework" ]; then
-            python3 .github/_scripts/fill_missing_target_results.py \
-              --targets .github/verification-targets.yaml \
-              --output-dir target-results
-          elif [ "$TRIGGER" = "pr" ] && [ "$WORKFLOW_NAME" = "Multi-node framework" ]; then
-            # A whole PR workflow can be cancelled before its in-workflow
-            # fallback uploads. Query the completed job results here and
-            # synthesize only targets whose job did not succeed or skip.
-            failed_target_ids=()
-            while IFS= read -r job_name; do
-              case "$job_name" in
-                "multi-node (deepseek-v2-lite-pd-2n2c)")
-                  failed_target_ids+=(template-deepseek-v2-lite-pd-a2-w8a8-1p1d) ;;
-                "multi-node (deepseek-v2-lite-recipe-pd-2n2c)")
-                  failed_target_ids+=(deepseek-v2-lite-a2-w8a8-1p1d) ;;
-                "multi-node (qwen3-30b-a3b-dp-2n2c)")
-                  failed_target_ids+=(template-qwen3-30b-a3b-a2-bf16-2node) ;;
-                "multi-node (qwen3-30b-a3b-recipe-dp-2n2c)")
-                  failed_target_ids+=(qwen3-30b-a3b-a2-bf16-2node) ;;
-              esac
-            done < <(
-              gh api "repos/${REPO}/actions/runs/${RUN_ID}/jobs?per_page=100" --paginate \
-                | jq -r '.jobs[] | select(.conclusion != "success" and .conclusion != "skipped") | .name'
-            )
-            if ((${#failed_target_ids[@]})); then
-              fill_args=()
-              for target_id in "${failed_target_ids[@]}"; do
-                fill_args+=(--target-id "$target_id")
-              done
+          # 5) Only this run's explicitly selected multi-node targets may be
+          #    synthesized as missing. Disabled resource-policy entries are
+          #    not failures and must not overwrite earlier verification history.
+          if [ "$WORKFLOW_NAME" = "Multi-node framework" ]; then
+            if [ -f target-results/selected-targets.json ]; then
               python3 .github/_scripts/fill_missing_target_results.py \
                 --targets .github/verification-targets.yaml \
-                --output-dir target-results "${fill_args[@]}"
+                --output-dir target-results \
+                --selection-file target-results/selected-targets.json
+            else
+              echo "::warning::No selection manifest; not inferring failures for unrequested targets"
             fi
           fi
 

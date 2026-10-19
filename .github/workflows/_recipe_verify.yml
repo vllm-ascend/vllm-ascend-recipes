@@ -8,6 +8,11 @@ name: 'Recipe Deployment Verification'
 on:
   workflow_call:
     inputs:
+      plan_id:
+        required: false
+        type: string
+        default: ''
+        description: 'Internal image/hardware group identity; no model enrollment required'
       runner:
         required: true
         type: string
@@ -24,7 +29,7 @@ on:
       recipe_files:
         required: true
         type: string
-        description: 'Newline-separated list of model YAML paths relative to repo root'
+        description: 'JSON array of model YAML paths relative to repo root'
       trigger_type:
         required: false
         type: string
@@ -49,7 +54,7 @@ on:
         required: false
         type: boolean
         default: false
-        description: 'Mount runner host /mnt/share at /root/.cache in the job container'
+        description: 'Mount runner host /mnt/weight at /root/.cache in the job container'
     secrets:
       obs_ak:
         required: false
@@ -61,7 +66,7 @@ defaults:
     shell: bash -el {0}
 
 concurrency:
-  group: recipe-verify-${{ github.workflow_ref }}-${{ inputs.runner }}-${{ github.ref }}-${{ inputs.trigger_type }}
+  group: recipe-verify-${{ github.workflow_ref }}-${{ inputs.runner }}-${{ github.ref }}-${{ inputs.trigger_type }}-${{ inputs.plan_id || inputs.hardware_key }}
   cancel-in-progress: ${{ inputs.trigger_type == 'pr' }}
 
 jobs:
@@ -90,7 +95,7 @@ jobs:
           cat /usr/local/Ascend/ascend-toolkit/latest/"$(uname -i)"-linux/ascend_toolkit_install.info
 
       - name: Checkout recipes repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           path: ./recipes
 
@@ -132,9 +137,12 @@ jobs:
             echo "============================================================"
             echo "  Verifying recipe: $recipe"
             echo "============================================================"
-            RECIPE_YAML_PATH="$recipe" bash scripts/verify-recipe.sh "$recipe" \
-              2>&1 | tee "/tmp/verify-logs/$(basename "$recipe" .yaml).log"
-            rc=${PIPESTATUS[0]}
+            if RECIPE_YAML_PATH="$recipe" bash scripts/verify-recipe.sh "$recipe" \
+              2>&1 | tee "/tmp/verify-logs/$(basename "$recipe" .yaml).log"; then
+              rc=0
+            else
+              rc=${PIPESTATUS[0]}
+            fi
             if [ "$rc" -eq 0 ]; then
               PASSED=$((PASSED + 1))
               echo "PASS" > "/tmp/verify-results/$(basename "$recipe" .yaml).result"
@@ -163,9 +171,9 @@ jobs:
 
       - name: Upload verification logs (PR)
         if: ${{ always() && inputs.trigger_type == 'pr' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
-          name: recipe-verify-logs-${{ github.run_id }}
+          name: recipe-verify-logs-${{ github.run_id }}-${{ inputs.plan_id || inputs.hardware_key }}
           path: /tmp/verify-logs/
           retention-days: 7
           if-no-files-found: warn
@@ -178,9 +186,9 @@ jobs:
         # GitHub Artifact Blob uploads intermittently stall on self-hosted
         # A2 runners. OBS below remains the nightly persistence path.
         continue-on-error: true
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
-          name: recipe-verify-results-${{ github.run_id }}
+          name: recipe-verify-results-${{ github.run_id }}-${{ inputs.plan_id || inputs.hardware_key }}
           path: /tmp/verify-results/
           retention-days: 14
           if-no-files-found: warn
@@ -193,7 +201,7 @@ jobs:
           access_key: ${{ secrets.obs_ak }}
           secret_key: ${{ secrets.obs_sk }}
           bucket: mindx-package
-          name: recipe-verify-results-${{ github.run_id }}
+          name: recipe-verify-results-${{ github.run_id }}-${{ inputs.plan_id || inputs.hardware_key }}
           path: /tmp/verify-results/
           retention-days: 90
           if-no-files-found: warn

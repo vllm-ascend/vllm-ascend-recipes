@@ -3,14 +3,13 @@ name: Multi-node framework
 on:
   schedule:
     - cron: '30 18 * * *'
-  pull_request:
-    branches: [main]
-    types: [opened, synchronize, reopened]
-    paths:
-      # Only recipe YAML changes trigger the multi-node framework on PRs;
-      # framework/workflow changes are validated by workflow_dispatch / UT.
-      - 'models/**/*.yaml'
   workflow_dispatch:
+    inputs:
+      target_ids:
+        description: 'Optional comma-separated target IDs; blank uses the nightly multi_node list'
+        required: false
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -19,149 +18,66 @@ jobs:
   prepare:
     runs-on: ubuntu-latest
     outputs:
-      pd_template: ${{ steps.select.outputs.pd_template }}
-      v2lite: ${{ steps.select.outputs.v2lite }}
-      qwen: ${{ steps.select.outputs.qwen }}
-      qwen30b: ${{ steps.select.outputs.qwen30b }}
+      matrix: ${{ steps.plan.outputs.matrix }}
+      count: ${{ steps.plan.outputs.count }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
         with:
-          fetch-depth: 0
+          python-version: '3.12'
 
-      - name: Collect changed multi-node recipe YAMLs
-        id: select
-        run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            CHANGED=$(git diff --name-only "${{ github.event.pull_request.base.sha }}" "${{ github.sha }}" -- 'models/**/*.yaml' || true)
-            if echo "$CHANGED" | grep -q 'models/.*/DeepSeek/template_pd\.yaml'; then
-              echo "pd_template=true" >> "$GITHUB_OUTPUT"
-            fi
-            if echo "$CHANGED" | grep -q 'models/.*/DeepSeek/DeepSeek-V2-Lite-W8A8\.yaml'; then
-              echo "v2lite=true" >> "$GITHUB_OUTPUT"
-            fi
-            if echo "$CHANGED" | grep -q 'models/.*/Qwen/template2_non_pd\.yaml'; then
-              echo "qwen=true" >> "$GITHUB_OUTPUT"
-            fi
-            if echo "$CHANGED" | grep -q 'models/.*/Qwen/Qwen3-30B-A3B\.yaml'; then
-              echo "qwen30b=true" >> "$GITHUB_OUTPUT"
-            fi
-            echo "Changed multi-node recipes (en or zh):"
-            echo "$CHANGED" | grep -E 'template_pd|V2-Lite|template2_non_pd|Qwen3-30B-A3B' || echo "(none)"
-          else
-            # workflow_dispatch: every matrix case runs.
-            {
-              echo "pd_template=true"
-              echo "v2lite=true"
-              echo "qwen=true"
-              echo "qwen30b=true"
-            } >> "$GITHUB_OUTPUT"
-          fi
+      - name: Install planner dependencies
+        run: python -m pip install pyyaml
 
-  verify-template-pd:
-    needs: prepare
-    name: multi-node (deepseek-v2-lite-pd-2n2c)
-    # pull_request workflows cannot safely expose cluster credentials to forks.
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event.pull_request.head.repo.full_name == github.repository && needs.prepare.outputs.pd_template == 'true')
-    uses: ./.github/workflows/_verify_multi_node.yaml
-    with:
-      name: deepseek-v2-lite-pd-2n2c
-      target_id: template-deepseek-v2-lite-pd-a2-w8a8-1p1d
-      recipe: models/en/DeepSeek/template_pd.yaml
-      test_id: pd-2n2c
-    secrets:
-      KUBECONFIG_B64: ${{ secrets.KUBECONFIG_B64 }}
-      OBS_AK: ${{ secrets.OBS_AK }}
-      OBS_SK: ${{ secrets.OBS_SK }}
-
-  verify-v2lite:
-    needs: prepare
-    name: multi-node (deepseek-v2-lite-recipe-pd-2n2c)
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event.pull_request.head.repo.full_name == github.repository && needs.prepare.outputs.v2lite == 'true')
-    uses: ./.github/workflows/_verify_multi_node.yaml
-    with:
-      name: deepseek-v2-lite-recipe-pd-2n2c
-      target_id: deepseek-v2-lite-a2-w8a8-1p1d
-      recipe: models/en/DeepSeek/DeepSeek-V2-Lite-W8A8.yaml
-      test_id: dsv2lite-pd-2n2c
-    secrets:
-      KUBECONFIG_B64: ${{ secrets.KUBECONFIG_B64 }}
-      OBS_AK: ${{ secrets.OBS_AK }}
-      OBS_SK: ${{ secrets.OBS_SK }}
-
-  verify-qwen:
-    needs: prepare
-    name: multi-node (qwen3-30b-a3b-dp-2n2c)
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event.pull_request.head.repo.full_name == github.repository && needs.prepare.outputs.qwen == 'true')
-    uses: ./.github/workflows/_verify_multi_node.yaml
-    with:
-      name: qwen3-30b-a3b-dp-2n2c
-      target_id: template-qwen3-30b-a3b-a2-bf16-2node
-      recipe: models/en/Qwen/template2_non_pd.yaml
-      test_id: dp-2n2c
-    secrets:
-      KUBECONFIG_B64: ${{ secrets.KUBECONFIG_B64 }}
-      OBS_AK: ${{ secrets.OBS_AK }}
-      OBS_SK: ${{ secrets.OBS_SK }}
-
-  verify-qwen30b:
-    needs: prepare
-    name: multi-node (qwen3-30b-a3b-recipe-dp-2n2c)
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event.pull_request.head.repo.full_name == github.repository && needs.prepare.outputs.qwen30b == 'true')
-    uses: ./.github/workflows/_verify_multi_node.yaml
-    with:
-      name: qwen3-30b-a3b-recipe-dp-2n2c
-      target_id: qwen3-30b-a3b-a2-bf16-2node
-      recipe: models/en/Qwen/Qwen3-30B-A3B.yaml
-      test_id: qwen30b-dp-2n2c
-    secrets:
-      KUBECONFIG_B64: ${{ secrets.KUBECONFIG_B64 }}
-      OBS_AK: ${{ secrets.OBS_AK }}
-      OBS_SK: ${{ secrets.OBS_SK }}
-
-  # A self-hosted runner can fail before the reusable workflow gets far
-  # enough to upload its own result artifact. Record those failed/cancelled
-  # targets from GitHub's job result so PR and nightly evidence never remains
-  # stale. Skipped jobs are intentionally omitted: on a PR their recipe did
-  # not change, so no verification was requested for that target.
-  finalize-target-results:
-    needs: [prepare, verify-template-pd, verify-v2lite, verify-qwen, verify-qwen30b]
-    if: always()
-    runs-on: ubuntu-latest
-    steps:
-      - name: Write fallback verification results
+      - name: Plan selected multi-node targets
+        id: plan
         env:
-          TEMPLATE_PD_RESULT: ${{ needs.verify-template-pd.result }}
-          V2LITE_RESULT: ${{ needs.verify-v2lite.result }}
-          QWEN_RESULT: ${{ needs.verify-qwen.result }}
-          QWEN30B_RESULT: ${{ needs.verify-qwen30b.result }}
+          TRIGGER: ${{ github.event_name == 'schedule' && 'nightly' || 'manual' }}
+          TARGET_IDS: ${{ inputs.target_ids }}
         run: |
-          set -euo pipefail
-          mkdir -p /tmp/verification-target-fallback
-          write_result() {
-            local target_id="$1" recipe="$2" test_id="$3" result="$4"
-            case "$result" in
-              success|skipped) return ;;
-            esac
-            jq -n \
-              --arg target_id "$target_id" --arg recipe "$recipe" --arg test_id "$test_id" \
-              '{target_id:$target_id,recipe:$recipe,test_id:$test_id,status:"fail"}' \
-              > "/tmp/verification-target-fallback/fallback-${target_id}.json"
-          }
-          write_result template-deepseek-v2-lite-pd-a2-w8a8-1p1d \
-            models/en/DeepSeek/template_pd.yaml pd-2n2c "$TEMPLATE_PD_RESULT"
-          write_result deepseek-v2-lite-a2-w8a8-1p1d \
-            models/en/DeepSeek/DeepSeek-V2-Lite-W8A8.yaml dsv2lite-pd-2n2c "$V2LITE_RESULT"
-          write_result template-qwen3-30b-a3b-a2-bf16-2node \
-            models/en/Qwen/template2_non_pd.yaml dp-2n2c "$QWEN_RESULT"
-          write_result qwen3-30b-a3b-a2-bf16-2node \
-            models/en/Qwen/Qwen3-30B-A3B.yaml qwen30b-dp-2n2c "$QWEN30B_RESULT"
+          python .github/_scripts/nightly_multi_node_plan.py \
+            --trigger "$TRIGGER" --target-ids "$TARGET_IDS" > multi-node-plan.json
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
 
-      - name: Upload fallback verification results
-        if: always()
-        uses: actions/upload-artifact@v4
+          matrix = json.loads(Path("multi-node-plan.json").read_text(encoding="utf-8"))
+          selected = [entry["target_id"] for entry in matrix["include"]]
+          Path("selected-targets.json").write_text(
+              json.dumps({"selected_targets": selected}), encoding="utf-8"
+          )
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write("matrix=" + json.dumps(matrix, separators=(",", ":")) + "\n")
+              output.write(f"count={len(selected)}\n")
+          PY
+
+      - name: Upload selected target manifest
+        uses: actions/upload-artifact@v6
         with:
-          name: verification-target-results-${{ github.run_id }}-fallback
-          path: /tmp/verification-target-fallback/*.json
-          if-no-files-found: ignore
+          name: verification-target-results-${{ github.run_id }}-selection
+          path: selected-targets.json
+          if-no-files-found: error
           retention-days: 14
+
+  verify:
+    needs: prepare
+    name: multi-node (${{ matrix.name }})
+    if: needs.prepare.outputs.count != '0'
+    strategy:
+      matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
+      max-parallel: 1
+      fail-fast: false
+    uses: ./.github/workflows/_verify_multi_node.yaml
+    with:
+      name: ${{ matrix.name }}
+      target_id: ${{ matrix.target_id }}
+      recipe: ${{ matrix.recipe }}
+      test_id: ${{ matrix.test_id }}
+    secrets:
+      KUBECONFIG_B64: ${{ secrets.KUBECONFIG_B64 }}
+      OBS_AK: ${{ secrets.OBS_AK }}
+      OBS_SK: ${{ secrets.OBS_SK }}

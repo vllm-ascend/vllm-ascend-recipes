@@ -51,11 +51,21 @@ def main() -> None:
     parser.add_argument("--targets", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--target-id", action="append", default=[])
+    parser.add_argument("--selection-file", type=Path, help="Exact targets requested by this run; [] requests none")
     args = parser.parse_args()
+    selected = set(args.target_id) if args.target_id else None
+    if args.selection_file is not None:
+        if args.target_id:
+            parser.error("choose --selection-file or --target-id")
+        manifest = json.loads(args.selection_file.read_text(encoding="utf-8"))
+        ids = manifest.get("selected_targets") if isinstance(manifest, dict) else None
+        if not isinstance(ids, list) or any(not isinstance(value, str) or not value for value in ids):
+            parser.error("selection manifest must contain selected_targets as an array of IDs")
+        selected = set(ids)
     fill_missing_results(
         load_targets(args.targets),
         args.output_dir,
-        set(args.target_id) if args.target_id else None,
+        selected,
     )
 
 

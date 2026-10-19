@@ -1,0 +1,24 @@
+# Nightly resource policy ONLY. PRs never use this as a model admission list.
+# A plain recipe path uses model.docker_image; image is an optional explicit
+# override for a known CI environment, not a requirement when adding a model.
+single_node:
+  a2:
+    - recipe: models/en/Qwen/Qwen3-30B-A3B.yaml
+      image: swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/vllm-ascend:v0.23.0
+    - recipe: models/en/Qwen/Qwen3.5-27B-Qwen3.6-27B.yaml
+      image: swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/vllm-ascend:v0.23.0
+  a3:
+    - recipe: models/en/Qwen/Qwen3-30B-A3B.yaml
+      image: swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/vllm-ascend:v0.23.0-a3
+  a5:
+    - models/en/DeepSeek/DeepSeek-V4-Flash.yaml
+    - models/en/THUDM/GLM-5.yaml
+    - recipe: models/en/Qwen/Qwen3.5-27B-Qwen3.6-27B.yaml
+      image: swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/vllm-ascend:v0.23.0-a5
+
+# No multi-node resources are requested by default. Add existing target IDs
+# from verification-targets.yaml when machines are available, for example:
+# multi_node:
+#   - deepseek-v2-lite-a2-w8a8-1p1d
+#   - qwen3-30b-a3b-a2-bf16-2node
+multi_node: []

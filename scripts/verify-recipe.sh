@@ -32,6 +32,7 @@ fi
 # so it works in CI (working-directory=./recipes) and locally. Override via
 # CACHE_PATHS_FILE for unusual layouts.
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+export RECIPE_REPO_ROOT="${SCRIPT_DIR}/.."
 export CACHE_PATHS_FILE="${CACHE_PATHS_FILE:-${SCRIPT_DIR}/../models/_cache_paths.yaml}"
 if [[ ! -f "$CACHE_PATHS_FILE" ]]; then
   log_error "Cache alias file not found: $CACHE_PATHS_FILE"
@@ -62,6 +63,10 @@ import os
 import yaml
 import json
 import re
+import shlex
+
+sys.path.insert(0, os.path.join(os.environ['RECIPE_REPO_ROOT'], '.github', '_scripts'))
+from recipe_checks import verification_blocks
 
 recipe_path, hw_key, cache_paths_file = sys.argv[1], sys.argv[2], sys.argv[3]
 
@@ -85,12 +90,7 @@ container_content = env_setup.get('container', {}).get(hw_to_container.get(hw_ke
 
 # Extract global verification (curl commands shared across scenarios)
 verification = data.get('verification', '')
-global_verify_cmd = ''
-m = re.search(r'```(?:bash|shell)\s*\n(.*?)```', verification, re.DOTALL)
-if m:
-    global_verify_cmd = m.group(1).strip()
-    # Replace <node0_ip> etc
-    global_verify_cmd = global_verify_cmd.replace('<node0_ip>', 'localhost')
+global_verify_cmds = verification_blocks(verification)
 
 # Resolve {{name}} placeholders exactly like the site's Config panel:
 #   - config_params (value params) -> its `default`
@@ -134,16 +134,17 @@ def resolve_placeholders(content, data):
 # weights under `Eco-Tech/` and one that ships them under `models/` (or
 # any future layout) both work without changing the alias file.
 #
-# Recipes whose model_id is NOT aliased are skipped with reason
-# "未提前下载权重". Recipes whose alias exists but no candidate prefix
-# contains the directory are skipped with reason "镜像未预装该权重". Both
-# used to silently fall back to another recipe's weights, which made the
+# Without an alias, use the standard org/name cache only if config.json is
+# present. Missing weights are skipped, never downloaded or substituted with
+# another model. Earlier fallback behavior made the
 # runner boot a Qwen tokenizer with GLM flags and produced confusing
 # failures (`max_model_len > derived`, `cudagraph_capture_sizes not
 # multiples of tp_size`, etc.).
-CACHE_BASE = '/root/.cache/modelscope/hub/models'
+CACHE_BASE = os.environ.get('RECIPE_CACHE_BASE', '/root/.cache/modelscope/hub/models')
 CACHE_PREFIXES = ('', 'Eco-Tech', 'vllm-ascend', 'models', '/root/.cache/')   # tried in this order; first hit wins
-model_id_for_path = data.get('model', {}).get('model_id', 'Qwen/Qwen3-30B-A3B')
+model_id_for_path = data.get('model', {}).get('model_id', '')
+if not model_id_for_path:
+    raise ValueError('Recipe must declare model.model_id')
 try:
     with open(cache_paths_file, 'r') as f:
         aliases = (yaml.safe_load(f) or {}).get('aliases') or []
@@ -153,83 +154,71 @@ except Exception as e:
 CACHE_DIR_BY_MODEL = {}
 for a in aliases:
     CACHE_DIR_BY_MODEL[a['model_id']] = a['cache_dir']
-if model_id_for_path not in CACHE_DIR_BY_MODEL:
-    print(json.dumps({
-        'action': 'skip',
-        'reason': f'未提前下载权重，请联系maintainer下载权重 (model_id={model_id_for_path})',
-    }))
-    sys.exit(0)
-else:
-    cache_dir_raw = CACHE_DIR_BY_MODEL[model_id_for_path]
-    if isinstance(cache_dir_raw, dict):
-        cache_dir = cache_dir_raw.get(hw_key, cache_dir_raw.get('default'))
-        if cache_dir is None:
-            print(json.dumps({
-                'action': 'skip',
-                'reason': f'cache_paths 未配置 {hw_key} 的权重目录 (model_id={model_id_for_path})',
-            }))
-            sys.exit(0)
-    else:
-        cache_dir = cache_dir_raw
-    CACHE_PATH = None
-    for prefix in CACHE_PREFIXES:
-        candidate = os.path.join(CACHE_BASE, prefix, cache_dir)
-        if os.path.isdir(candidate):
-            CACHE_PATH = candidate
-            if prefix != CACHE_PREFIXES[0]:
-                print(f"DEBUG: cache resolved under non-default prefix '{prefix}/' for {model_id_for_path}", file=sys.stderr)
-            break
-    if CACHE_PATH is None:
+# Aliases remain authoritative for custom/quantized layouts. New models
+# in the standard org/name directory need no separate configuration PR.
+aliased = model_id_for_path in CACHE_DIR_BY_MODEL
+cache_dir_raw = CACHE_DIR_BY_MODEL.get(model_id_for_path, model_id_for_path)
+if isinstance(cache_dir_raw, dict):
+    cache_dir = cache_dir_raw.get(hw_key, cache_dir_raw.get('default'))
+    if cache_dir is None:
         print(json.dumps({
             'action': 'skip',
-            'reason': f'镜像未预装该权重 (model_id={model_id_for_path}, 目录={cache_dir}, 已尝试 {list(CACHE_PREFIXES)})',
+            'reason': f'cache_paths 未配置 {hw_key} 的权重目录 (model_id={model_id_for_path})',
         }))
         sys.exit(0)
+else:
+    cache_dir = cache_dir_raw
+CACHE_PATH = None
+for prefix in CACHE_PREFIXES:
+    candidate = os.path.join(CACHE_BASE, prefix, cache_dir)
+    if os.path.isdir(candidate) and (aliased or os.path.isfile(os.path.join(candidate, 'config.json'))):
+        CACHE_PATH = candidate
+        if prefix != CACHE_PREFIXES[0]:
+            print(f"DEBUG: cache resolved under non-default prefix '{prefix}/' for {model_id_for_path}", file=sys.stderr)
+        break
+if CACHE_PATH is None:
+    print(json.dumps({
+        'action': 'skip',
+        'reason': f'镜像未预装该权重 (model_id={model_id_for_path}, 目录={cache_dir}, 已尝试 {list(CACHE_PREFIXES)})',
+    }))
+    sys.exit(0)
 
-# Extract scenarios
-scenarios = data.get('scenarios', [])
+# Plan and execute the same single-node scenarios; multi-node/PD is handled
+# exclusively by verify_multi_node.yaml, even when it shares this recipe.
+from verification_plan import single_node_scenarios
+scenarios = single_node_scenarios(data, hw_key)
+if not scenarios:
+    print(json.dumps({'action': 'skip', 'reason': f'No executable single-node scenarios for {hw_key}'}))
+    sys.exit(0)
 commands = []
 for s in scenarios:
     serve_cmd = ''
     verify_cmds = []
-    # Skip scenarios for hardware this runner cannot provide: A3 scenarios on
-    # A2 runners, and Atlas 300I DUO (310p) scenarios anywhere (they need the
-    # inference-device image / TP-only path, not the a2b4 runners).
-    npu_name = s.get('npu', '')
-    if hw_key == 'atlas_800_a2' and ('A3' in npu_name or '950DT' in npu_name or '300I' in npu_name):
-        import sys
-        print(f"DEBUG: Skipping scenario '{npu_name}/{s.get('precision','')}' on A2 hardware", file=sys.stderr)
-        continue
-    if hw_key == 'atlas_800_a3' and ('A2' in npu_name or '950DT' in npu_name or '300I' in npu_name):
-        import sys
-        print(f"DEBUG: Skipping scenario '{npu_name}/{s.get('precision','')}' on A3 hardware", file=sys.stderr)
-        continue
-    if hw_key == 'ascend_950dt' and '950DT' not in npu_name:
-        import sys
-        print(f"DEBUG: Skipping scenario '{npu_name}/{s.get('precision','')}' on A5 hardware", file=sys.stderr)
-        continue
-
     for step in s.get('steps', []):
         content = step.get('content', '')
-        m = re.search(r'```(?:bash|shell)\s*\n(.*?)```', content, re.DOTALL)
-        if not m:
-            import sys
-            print(f"DEBUG: No bash block found in step '{step.get('title','')}', scenario '{s.get('npu','')}/{s.get('precision','')}', content[:150]={content[:150]}", file=sys.stderr)
+        verify_cmds.extend(verification_blocks(content))
+        blocks = re.findall(r'```(?:bash|shell)\s*\n(.*?)```', content, re.DOTALL)
+        serve_blocks = [block for block in blocks if 'vllm serve' in block]
+        if not serve_blocks:
             continue
-        bash_content = m.group(1)
+        bash_content = serve_blocks[-1]
         # Remove %%CONFIG:...%% markers (key may contain hyphens)
         bash_content = re.sub(r'%%CONFIG:[^%]+%%', '', bash_content)
         bash_content = re.sub(r'%%/CONFIG:[^%]+%%', '', bash_content)
         # Replace placeholder model paths with actual weights on the runner
         bash_content = bash_content.replace('your_model_path', CACHE_PATH)
+        # The cache is offline. Resolve the recipe's literal hub ID too,
+        # without accidentally replacing --served-model-name or curl payloads.
+        bash_content = re.sub(r'(\bvllm\s+serve\s+)([\'\"]?)' + re.escape(model_id_for_path) + r'\2(?=\s|$)',
+                              lambda m: m.group(1) + shlex.quote(CACHE_PATH), bash_content)
+        bash_content = re.sub(r'(?m)^(\s*(?:export\s+)?MODEL_PATH=)([\'\"]?)' + re.escape(model_id_for_path) + r'\2(?=\s|$)',
+                              lambda m: m.group(1) + shlex.quote(CACHE_PATH), bash_content)
         # Resolve {{name}} config/feature placeholders (mirrors the page)
         bash_content = resolve_placeholders(bash_content, data)
         # Remove speculative-config lines (contain placeholder paths)
         bash_content = re.sub(r'.*--speculative-config.*\n?', '', bash_content)
         if 'vllm serve' in bash_content:
             serve_cmd = bash_content.strip()
-        elif 'curl' in bash_content:
-            verify_cmds.append(bash_content.strip())
     
     if serve_cmd:
         # Local CI verifies the API inside the same container. Replace the
@@ -239,18 +228,11 @@ for s in scenarios:
         server_port = port_match.group(1) if port_match else '8000'
         verify_cmds = [
             cmd.replace('<node0_ip>', 'localhost')
+               .replace('<node_ip>', 'localhost')
                .replace('<server_ip>', 'localhost')
                .replace('<port>', server_port)
-            for cmd in verify_cmds
+            for cmd in verify_cmds + global_verify_cmds
         ]
-
-        # Append global verification curl commands.
-        if global_verify_cmd:
-            verify_cmds.append(
-                global_verify_cmd.replace('<node0_ip>', 'localhost')
-                .replace('<server_ip>', 'localhost')
-                .replace('<port>', server_port)
-            )
         
         commands.append({
             'npu': s.get('npu', ''),
@@ -259,6 +241,8 @@ for s in scenarios:
             'case': s.get('case', ''),
             'serve_cmd': serve_cmd,
             'verify_cmds': verify_cmds,
+            'benchmark_chat': any('/v1/chat/completions' in cmd for cmd in verify_cmds)
+                              and '--runner pooling' not in serve_cmd,
         })
 
 # Find minimum vllm version
@@ -279,7 +263,11 @@ print(json.dumps(result))
 PYEOF
 }
 
-RECIPE_INFO=$(parse_recipe 2>/tmp/recipe-parse-debug.log || echo '{"action":"skip","reason":"parse error"}')
+if ! RECIPE_INFO=$(parse_recipe 2>/tmp/recipe-parse-debug.log); then
+  log_error "Recipe configuration could not be parsed"
+  cat /tmp/recipe-parse-debug.log >&2
+  exit 1
+fi
 
 ACTION=$(echo "$RECIPE_INFO" | $PYTHON -c "import sys,json; print(json.loads(sys.stdin.read()).get('action','skip'))" 2>/dev/null || echo "skip")
 
@@ -394,6 +382,7 @@ for i, s in enumerate(info.get('scenarios', [])):
     })
 
 params_doc = {
+    'verification_scope': 'single-node API smoke; not accuracy or full feature coverage',
     'recipe_path': RECIPE_PATH_IN,
     'model_id': info.get('model_id', ''),
     'hw_key': info.get('hw_key', ''),
@@ -431,6 +420,12 @@ while IFS='|' read -r idx npu precision deployment case_name; do
 
   if [[ -z "$SERVE_CMD" ]]; then
     log_warn "  No vllm serve command found, skipping"
+    SKIPPED=1
+    continue
+  fi
+
+  if [[ -z "$VERIFY_CMD" ]]; then
+    log_warn "  No executable task request in recipe; readiness alone is not a pass"
     SKIPPED=1
     continue
   fi
@@ -496,12 +491,22 @@ SCRIPT_HEREDOC
   fi
 
   # Run recipe curl verification commands
+  TASK_VERIFIED=0
   if [[ -n "$VERIFY_CMD" ]]; then
     log_info "  Running recipe verification commands..."
     # Write curl command to temp script and execute
     CURL_SCRIPT="/tmp/curl_verify_${idx}.sh"
     echo "#!/usr/bin/env bash" > "$CURL_SCRIPT"
     echo "set -eo pipefail" >> "$CURL_SCRIPT"
+    PROOF_FILE="${RUN_PARAMS_DIR:-/tmp/verify-results}/$(basename "$RECIPE" .yaml)-${idx}.requests.jsonl"
+    mkdir -p "$(dirname "$PROOF_FILE")"
+    : > "$PROOF_FILE"
+    printf 'export PYTHON=%q\n' "$PYTHON" >> "$CURL_SCRIPT"
+    printf 'export RECIPE_CHECKS_SCRIPT=%q\n' "$SCRIPT_DIR/../.github/_scripts/recipe_checks.py" >> "$CURL_SCRIPT"
+    printf 'export CI_REQUEST_PROOF_FILE=%q\n' "$PROOF_FILE" >> "$CURL_SCRIPT"
+    printf 'export CI_SERVER_PORT=%q\n' "$SERVER_PORT" >> "$CURL_SCRIPT"
+    printf 'export PYTHONPATH=%q\n' "$SCRIPT_DIR/../.github/_scripts:${PYTHONPATH:-}" >> "$CURL_SCRIPT"
+    "$PYTHON" "$SCRIPT_DIR/../.github/_scripts/recipe_checks.py" --shell-wrapper >> "$CURL_SCRIPT"
     echo "$VERIFY_CMD" >> "$CURL_SCRIPT"
     chmod +x "$CURL_SCRIPT"
     if ! RESP=$(bash "$CURL_SCRIPT" 2>&1); then
@@ -510,16 +515,27 @@ SCRIPT_HEREDOC
       echo "$RESP" | while IFS= read -r rline; do log_error "  | $rline"; done
       log_error "  ====== END ======"
       STATUS=1
-    else
+    elif "$PYTHON" "$SCRIPT_DIR/../.github/_scripts/recipe_checks.py" --check-proof "$PROOF_FILE"; then
+      TASK_VERIFIED=1
       log_info "  Recipe curl verification PASSED"
       log_info "  ====== CURL RESPONSE ======"
       echo "$RESP" | while IFS= read -r rline; do log_info "  | $rline"; done
       log_info "  ====== END ======"
+    else
+      proof_rc=$?
+      if [[ "$proof_rc" -eq 2 ]]; then
+        log_warn "  No supported task request was verified; marking this recipe skipped"
+        SKIPPED=1
+      else
+        log_error "  Task response validation FAILED"
+        STATUS=1
+      fi
     fi
   fi
 
   # Run aisbench performance evaluation (Section 8 of tutorial)
-  if command -v ais_bench &>/dev/null; then
+  BENCHMARK_CHAT=$(echo "$RECIPE_INFO" | $PYTHON -c 'import sys,json; print(int(json.load(sys.stdin)["scenarios"][int(sys.argv[1])].get("benchmark_chat", False)))' "$idx")
+  if [[ "$TASK_VERIFIED" -eq 1 && "$BENCHMARK_CHAT" -eq 1 ]] && command -v ais_bench &>/dev/null; then
     log_info "  Running aisbench performance evaluation..."
     # Patch the installed model config to set model path and port
     AIS_CFG="/usr/local/python3.12.13/lib/python3.12/site-packages/ais_bench/benchmark/configs/models/vllm_api/vllm_api_stream_chat.py"
@@ -536,7 +552,7 @@ SCRIPT_HEREDOC
     echo "===== END =====" >> "$BENCH_FILE"
     log_info "  Benchmark saved to $BENCH_FILE"
   else
-    log_warn "  ais_bench not available, skipping benchmark"
+    log_warn "  Chat benchmark unavailable or not applicable to this task; skipping benchmark"
     echo "benchmark_skipped" > "/tmp/verify-results/$(basename "$RECIPE" .yaml).bench"
   fi
 

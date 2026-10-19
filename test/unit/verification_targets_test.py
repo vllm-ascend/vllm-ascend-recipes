@@ -3,6 +3,8 @@ from __future__ import annotations
 import importlib.util
 import json
 import re
+import subprocess
+import sys
 import tempfile
 import unittest
 from copy import deepcopy
@@ -110,9 +112,9 @@ class VerificationTargetTests(unittest.TestCase):
             if not isinstance(job, dict) or "uses" not in job:
                 continue
             inputs = job["with"]
-            target = load_module().find_target(targets, inputs["recipe"], inputs["test_id"])
-            self.assertIsNotNone(target)
-            self.assertEqual(inputs["target_id"], target["id"])
+            self.assertEqual(inputs["recipe"], "${{ matrix.recipe }}")
+            self.assertEqual(inputs["test_id"], "${{ matrix.test_id }}")
+            self.assertEqual(inputs["target_id"], "${{ matrix.target_id }}")
 
         self.assertIn("target_id", reusable[True]["workflow_call"]["inputs"])
         self.assertIn("Multi-node framework", publisher)
@@ -154,6 +156,29 @@ class VerificationTargetTests(unittest.TestCase):
             self.assertTrue((results / f'{multi_node_targets[1]["id"]}.json').exists())
             self.assertFalse((results / f'{multi_node_targets[0]["id"]}.json').exists())
 
+    def test_empty_selection_manifest_does_not_fail_disabled_nightly_targets(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            selection = root / "selected-targets.json"
+            selection.write_text('{"selected_targets": []}', encoding="utf-8")
+            output = root / "results"
+            result = subprocess.run([sys.executable, str(FILL_SCRIPT), "--targets", str(ROOT / ".github/verification-targets.yaml"),
+                                     "--output-dir", str(output), "--selection-file", str(selection)], capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(list(output.glob("*.json")), [])
+
+    def test_selection_manifest_only_materializes_requested_target(self) -> None:
+        selected = "deepseek-v2-lite-a2-w8a8-1p1d"
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            selection = root / "selected-targets.json"
+            selection.write_text(json.dumps({"selected_targets": [selected]}), encoding="utf-8")
+            output = root / "results"
+            result = subprocess.run([sys.executable, str(FILL_SCRIPT), "--targets", str(ROOT / ".github/verification-targets.yaml"),
+                                     "--output-dir", str(output), "--selection-file", str(selection)], capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual([p.stem for p in output.glob("*.json")], [selected])
+
     def test_missing_result_fallback_excludes_single_node_targets(self) -> None:
         targets = load_module().load_targets(ROOT / ".github" / "verification-targets.yaml")
         with tempfile.TemporaryDirectory() as directory:
@@ -172,11 +197,10 @@ class VerificationTargetTests(unittest.TestCase):
         self.assertIn("fill_missing_target_results.py", publisher)
         self.assertIn('echo "workflow_name=$RW_NAME"', publisher)
         self.assertIn(
-            'if [ "$TRIGGER" = "nightly" ] && [ "$WORKFLOW_NAME" = "Multi-node framework" ]; then',
+            'if [ "$WORKFLOW_NAME" = "Multi-node framework" ]; then',
             publisher,
         )
-        self.assertIn('actions/runs/${RUN_ID}/jobs?per_page=100', publisher)
-        self.assertIn('--target-id "$target_id"', publisher)
+        self.assertIn('--selection-file target-results/selected-targets.json', publisher)
         self.assertIn("seed_target_statuses.py", publisher)
         self.assertIn("build_status_index.py", publisher)
         self.assertNotIn("--argjson items", publisher)

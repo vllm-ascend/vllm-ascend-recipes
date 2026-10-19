@@ -289,8 +289,9 @@ Common types:
 - [`lint.yml`](.github/workflows/lint.yml) — validate + typecheck + lint + format:check
   (split by changed paths: `models/`, `src/`, `.github/workflows/`).
 - [`pr-recipe-verify.yml`](.github/workflows/pr-recipe-verify.yml) — YAML validation, i18n
-  pairing check, full site build, and (for whitelisted recipes) an end-to-end deployment
-  verification on real Ascend NPU hardware.
+  pairing check, full site build, and automatic discovery of changed single-node recipes
+  for deployment verification on Ascend NPUs. No PR model whitelist is required; fork
+  workflow approval follows repository Actions settings. Multi-node PR checks are CPU-only.
 - [`preview-build.yml`](.github/workflows/preview-build.yml) + `preview-deploy.yml` — the
   Netlify preview comment.
 
