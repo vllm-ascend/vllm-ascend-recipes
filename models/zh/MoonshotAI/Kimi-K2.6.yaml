@@ -4,7 +4,7 @@ meta:
   provider: "Moonshot AI"
   description: "原生多模态智能体模型，基于 Kimi-K2-Base 在约 15 万亿图文混合 token 上持续预训练，融合视觉与语言理解，支持即时/思考模式以及对话/智能体范式。"
   date_added: 2026-08-13
-  date_updated: 2026-08-13
+  date_updated: "2026-10-13"
   difficulty: advanced
   tasks:
     - text
@@ -14,12 +14,12 @@ meta:
     - "moonshotai/Kimi-K2.5"
   performance_headline: "1T/32B MoE 多模态智能体模型 — 基于 W4A8 权重的单机与多机 PD 分离部署"
   hardware:
-    atlas_800_a3: verified
+    atlas_800_a3: verified   # 教程 §5-§8 载官方 A3 部署与实测结果(依 GLM-5/V4-Flash 等存量惯例;第一方复验待资源,见 PR 说明)
     atlas_800_a2: verified
 
 model:
   model_id: "moonshotai/Kimi-K2.6"
-  min_vllm_version: "v0.20.0rc1"
+  min_vllm_version: "v0.30.0rc1"
   architecture: moe
   parameter_count: "1T"
   active_parameters: "32B"
@@ -45,14 +45,14 @@ model:
     OMP_NUM_THREADS: "1"
     TASK_QUEUE_ENABLE: "1"
   docker_image:
-    atlas_800_a2: "quay.io/ascend/vllm-ascend:v0.20.0rc1"
-    atlas_800_a3: "quay.io/ascend/vllm-ascend:v0.20.0rc1-a3"
+    atlas_800_a2: "quay.io/ascend/vllm-ascend:v0.30.0rc1"
+    atlas_800_a3: "quay.io/ascend/vllm-ascend:v0.30.0rc1-a3"
   nightly_required: false
   install:
     # Ascend 推荐 Docker 方式；pip 需源码编译，隐藏 pip 标签。
     pip: false
     docker:
-      command: "docker run --rm --name vllm-ascend --shm-size=1g --net=host --privileged=true --device /dev/davinci0 --device /dev/davinci1 --device /dev/davinci2 --device /dev/davinci3 --device /dev/davinci4 --device /dev/davinci5 --device /dev/davinci6 --device /dev/davinci7 --device /dev/davinci8 --device /dev/davinci9 --device /dev/davinci10 --device /dev/davinci11 --device /dev/davinci12 --device /dev/davinci13 --device /dev/davinci14 --device /dev/davinci15 --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc -it quay.io/ascend/vllm-ascend:v0.20.0rc1-a3 bash"
+      command: "docker run --rm --name vllm-ascend --shm-size=1g --net=host --privileged=true --device /dev/davinci0 --device /dev/davinci1 --device /dev/davinci2 --device /dev/davinci3 --device /dev/davinci4 --device /dev/davinci5 --device /dev/davinci6 --device /dev/davinci7 --device /dev/davinci8 --device /dev/davinci9 --device /dev/davinci10 --device /dev/davinci11 --device /dev/davinci12 --device /dev/davinci13 --device /dev/davinci14 --device /dev/davinci15 --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc -it quay.io/ascend/vllm-ascend:v0.30.0rc1-a3 bash"
       note: "Ascend 官方镜像；完整的设备/驱动挂载见 env_setup.container。"
 
 features:
@@ -150,7 +150,7 @@ strategy_overrides:
         - "--compilation-config"
         - '{"cudagraph_mode": "FULL_DECODE_ONLY"}'
         - "--additional-config"
-        - '{"recompute_scheduler_enable":true,"multistream_overlap_shared_expert": true}'
+        - '{"recompute_scheduler_enable":true,"multistream_overlap_shared_expert": true, "enable_mlapo": true}'
         - "--speculative-config"
         - '{"method": "eagle3", "model":"lightseekorg/kimi-k2.6-eagle3", "num_speculative_tokens": 3}'
         - "--kv-transfer-config"
@@ -206,6 +206,8 @@ prerequisites:
     - `Kimi-K2.5-DFlash`（利用轻量级块扩散模型做并行草稿生成的投机解码框架）：[下载模型权重](https://huggingface.co/z-lab/Kimi-K2.5-DFlash)。
 
     建议将模型权重下载到多节点共享目录，例如 `/root/.cache/`。
+
+    自 vLLM 0.30 起，Ascend 对本文使用的旧版 `Kimi-K2.5-DFlash` 配置保留了 vLLM 0.29 的 YaRN 幅值。该草稿模型的 YaRN 配置为 `factor=64`、`mscale=1`、`mscale_all_dim=1`；若不做兼容处理，新的缩放语义会降低其接受率。对该已识别配置，缺省的 `attention_factor` 取默认值 `1 + 0.1 * ln(64)`（约为 `1.4158883083`）。草稿 checkpoint 中显式声明的 `attention_factor` 优先（包括取 `1.0` 以选用新的基于比率的幅值）。目标模型的 RoPE 不受影响。
 - title: Verify Multi-node Communication
   content: |-
     如需部署多机环境，请按照[多机通信环境验证](https://docs.vllm.ai/projects/ascend/zh-cn/latest/installation.html#verify-multi-node-communication)验证多机通信。
@@ -219,7 +221,7 @@ env_setup:
         在每个节点上启动 docker 镜像。
 
         ```shell
-        export IMAGE=quay.io/ascend/vllm-ascend:v0.20.0rc1-a3
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.30.0rc1-a3
         docker run --rm \
             --name vllm-ascend \
             --shm-size=1g \
@@ -260,7 +262,7 @@ env_setup:
         在每个节点上启动 docker 镜像。
 
         ```shell
-        export IMAGE=quay.io/ascend/vllm-ascend:v0.20.0rc1
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.30.0rc1
         docker run --rm \
             --name vllm-ascend \
             --shm-size=1g \
@@ -330,7 +332,7 @@ scenarios:
       export VLLM_ASCEND_ENABLE_FLASHCOMM1=1
       export VLLM_ASCEND_BALANCE_SCHEDULING=0
 
-      vllm serve Eco-Tech/Kimi-K2.6-W4A8 \
+      vllm serve your_model_path \
           --quantization ascend \
           --tool-call-parser kimi_k2 \
           --reasoning-parser kimi_k2 \
@@ -435,7 +437,7 @@ scenarios:
       | `--vllm-start-port` | int | 否 | 9000 | 当前节点每个 vLLM 引擎实例的起始端口。 |
   - title: 配置 Prefill 节点
     content: |-
-      在每个 prefill 节点上设置网卡与 IP，并以 `kv_producer` 角色启动 vLLM 引擎。以下展示 Node 0（Prefill）；Node 1（Prefill）除 `local_ip`、`engine_id`、`kv_port` 不同外其余相同。
+      在每个 prefill 节点上设置网卡与 IP，并以 `kv_producer` 角色启动 vLLM 引擎。以下展示 Node 0（Prefill，`engine_id` 为 0，`kv_port` 为 30000）；Node 1（Prefill）除 `local_ip`、`engine_id`（设为 1）、`kv_port`（设为 30100）不同外其余相同。
 
       ```shell
       # 通过 ifconfig 获取
@@ -465,7 +467,7 @@ scenarios:
       export VLLM_ASCEND_ENABLE_FLASHCOMM1=1
       export ASCEND_RT_VISIBLE_DEVICES=$1
 
-      vllm serve Eco-Tech/Kimi-K2.6-W4A8 \
+      vllm serve your_model_path \
           --host 0.0.0.0 \
           --port $2 \
           --data-parallel-size $3 \
@@ -509,7 +511,7 @@ scenarios:
       ```
   - title: 配置 Decode 节点
     content: |-
-      在每个 decode 节点上以 `kv_consumer` 角色启动 vLLM 引擎。以下展示 Node 0（Decode）；Node 1（Decode）除 `local_ip`、`engine_id`、`kv_port` 不同外其余相同。
+      在每个 decode 节点上以 `kv_consumer` 角色启动 vLLM 引擎。以下展示 Node 0（Decode，`engine_id` 为 2，`kv_port` 为 30200）；Node 1（Decode）除 `local_ip`、`engine_id`（设为 3）、`kv_port`（设为 30300）不同外其余相同。
 
       ```shell
       nic_name="xxx"
@@ -535,7 +537,7 @@ scenarios:
       export VLLM_ASCEND_ENABLE_MLAPO=1
       export ASCEND_RT_VISIBLE_DEVICES=$1
 
-      vllm serve Eco-Tech/Kimi-K2.6-W4A8 \
+      vllm serve your_model_path \
           --host 0.0.0.0 \
           --port $2 \
           --data-parallel-size $3 \
@@ -557,7 +559,7 @@ scenarios:
           --tool-call-parser kimi_k2 \
           --reasoning-parser kimi_k2 \
           --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY"}' \
-          --additional-config '{"recompute_scheduler_enable":true,"multistream_overlap_shared_expert": true}' \
+          --additional-config '{"recompute_scheduler_enable":true,"multistream_overlap_shared_expert": true, "enable_mlapo": true}' \
           --speculative-config '{"method": "eagle3", "model":"lightseekorg/kimi-k2.6-eagle3", "num_speculative_tokens": 3}' \
           --kv-transfer-config \
           '{"kv_connector": "MooncakeConnectorV1",
@@ -716,7 +718,7 @@ evaluation:
       以 `serve` 为例，运行如下命令。
 
       ```shell
-      vllm bench serve --model Eco-Tech/Kimi-K2.6-w4a8 --dataset-name random --random-input 1024 --num-prompts 200 --request-rate 1 --save-result --result-dir ./
+      vllm bench serve --model kimi_k26 --dataset-name random --random-input 1024 --num-prompts 200 --request-rate 1 --save-result --result-dir ./
       ```
 
       大约几分钟后即可得到性能评估结果。
@@ -786,6 +788,10 @@ faq: |-
   - **Q：使用 tool_calls 特性需要什么 transformers 版本？**
 
     A：使用 tool_calls 特性时，请确保 transformers 版本不高于 4.57.6。如果 vllm-ascend 已升级到 v0.21 或更高版本，此要求不再适用。
+
+  - **Q：Kimi-K2.5 还支持吗？**
+
+    A：Kimi-K2.5 独立模型自 vLLM Ascend v0.30.0 起已停止支持，不再获得支持与修复。本 recipe 仅覆盖 Kimi-K2.6。权重列表中的 `Kimi-K2.5-DFlash` checkpoint 仍可使用——它是 Kimi-K2.6 场景使用的投机解码草稿模型，并非 Kimi-K2.5 目标模型的部署。
 
 references:
 - title: ModelScope 模型下载

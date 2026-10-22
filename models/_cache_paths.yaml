@@ -47,3 +47,6 @@ aliases:
 
   - model_id: PaddlePaddle/PaddleOCR-VL
     cache_dir: PaddlePaddle/PaddleOCR-VL
+
+  - model_id: moonshotai/Kimi-K2.6
+    cache_dir: Kimi-K2.6-W4A8
