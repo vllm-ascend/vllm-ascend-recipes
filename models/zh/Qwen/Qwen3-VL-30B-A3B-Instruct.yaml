@@ -4,10 +4,12 @@ meta:
   provider: "Qwen"
   description: "Qwen3-VL-30B-A3B-Instruct 是 Qwen3-VL 系列的稀疏混合专家视觉语言模型，总参数量约 30B，每个 token 激活约 3B 参数。它支持图像理解、视频理解、多模态对话和长上下文服务。"
   date_added: 2026-08-29
+  date_updated: 2026-10-12
   difficulty: intermediate
   tasks: [multimodal]
-  performance_headline: "在 Ascend 950DT（96 GB × 8）上的单节点 W8A8 部署"
+  performance_headline: "Atlas 800I A3（BF16，TP2）或 Ascend 950DT（W8A8，TP8）上的单节点服务"
   hardware:
+    atlas_800_a3: verified
     ascend_950dt: experimental
 
 model:
@@ -19,57 +21,50 @@ model:
   context_length: 262144
   modality: multimodal
   base_args:
-    - "--distributed-executor-backend"
-    - "mp"
     - "--data-parallel-size"
     - "1"
-    - "--tensor-parallel-size"
-    - "8"
     - "--enable-expert-parallel"
     - "--seed"
     - "1024"
-    - "--quantization"
-    - "ascend"
     - "--served-model-name"
     - "qwen3-vl-30b"
-    - "--trust-remote-code"
   base_env:
     VLLM_USE_MODELSCOPE: "True"
     PYTORCH_NPU_ALLOC_CONF: "expandable_segments:True"
     HCCL_OP_EXPANSION_MODE: "AIV"
-    HCCL_BUFFSIZE: "400"
-    OMP_PROC_BIND: "false"
-    OMP_NUM_THREADS: "100"
-    TASK_QUEUE_ENABLE: "1"
-    VLLM_ASCEND_ENABLE_FLASHCOMM1: "1"
   docker_image:
+    atlas_800_a3: "quay.io/ascend/vllm-ascend:v0.23.0-a3"
     ascend_950dt: "quay.io/ascend/vllm-ascend:v0.23.0-a5"
   nightly_required: false
   install:
     pip: false
     docker:
-      command: "docker pull quay.io/ascend/vllm-ascend:v0.23.0-a5"
-      note: "使用公开的 v0.23.0 A5 镜像；完整的设备和驱动挂载见下文。"
+      command: "docker pull quay.io/ascend/vllm-ascend:v0.23.0-a3"
+      note: "Atlas 800I A3 使用 v0.23.0 A3 镜像，Ascend 950DT 使用 v0.23.0 A5 镜像；完整的设备和驱动挂载见下文。"
 
 features:
   expert_parallel:
     label: "专家并行"
-    description: "在八个 NPU rank 间分布 MoE 专家。"
+    description: "在 NPU rank 间分布 MoE 专家。"
     args: ["--enable-expert-parallel"]
   flashcomm1:
     label: "FlashComm1"
-    description: "教程基线使用的 Ascend 通信优化。"
+    description: "Ascend 950DT W8A8 基线使用的 Ascend 通信优化。"
     env:
       VLLM_ASCEND_ENABLE_FLASHCOMM1: "1"
   prefix_caching:
     label: "前缀缓存"
-    description: "图像专用教程基线默认关闭。"
+    description: "教程基线默认关闭；重复前缀工作负载可按需开启。"
     args: ["--enable-prefix-caching"]
     flag_when_false: "--no-enable-prefix-caching"
   compilation_config:
     label: "编译配置"
     description: "教程基线使用完整 decode ACLGraph 回放。"
     args: ["--compilation-config", "{\"cudagraph_mode\":\"FULL_DECODE_ONLY\"}"]
+  fused_mc2:
+    label: "Fused MC2"
+    description: "Atlas 800I A3 BF16 基线使用的融合 MoE 通信算子。"
+    args: ["--additional-config", "{\"enable_fused_mc2\": 1}"]
 
 opt_in_features: [prefix_caching]
 
@@ -78,22 +73,48 @@ variants:
     precision: W8A8
     vram_minimum_gb: 36
     description: "适用于单台 Ascend 950DT 节点的 W8A8 量化检查点。"
+  bf16:
+    model_id: "Qwen/Qwen3-VL-30B-A3B-Instruct"
+    precision: BF16
+    vram_minimum_gb: 72
+    description: "原始 BF16 检查点，适用于单台 Atlas 800I A3 节点（也可运行在单台 Atlas 800 A2 节点），张量并行度为 2。"
+    supported_hardware: [atlas_800_a3]
 
-compatible_strategies: [single_node_A5]
+compatible_strategies: [single_node_A3, single_node_A5]
 hardware_overrides: {}
 strategy_overrides: {}
 guide: ""
+
+performance_model_names:
+  - "Qwen3-VL-30B-A3B-Instruct"
 
 config_params:
   gpu_memory_utilization:
     default: 0.9
     type: number
     description: "vLLM 用于计算 KV 缓存容量的 NPU 内存比例。"
+  max_model_len:
+    default: 32768
+    type: number
+    description: "单个请求的最大输入加输出长度。"
+  max_num_seqs:
+    default: 32
+    type: number
+    description: "每个 DP 组调度的最大活跃请求数。"
 
 overview: |-
   Qwen3-VL-30B-A3B-Instruct 是 Qwen3-VL 系列的稀疏 MoE 模型。其视觉语言架构支持图像理解、视频理解和多模态对话，每个 token 激活约 3B 参数。
 
 weight_download:
+  - weight_version: BF16
+    sources:
+      - source: ModelScope
+        url: https://modelscope.cn/models/Qwen/Qwen3-VL-30B-A3B-Instruct
+        command: |-
+          ```bash
+          pip install modelscope
+          modelscope download --model Qwen/Qwen3-VL-30B-A3B-Instruct
+          ```
   - weight_version: W8A8 MXFP8
     sources:
       - source: ModelScope
@@ -107,10 +128,52 @@ weight_download:
 prerequisites:
   - title: 模型权重
     content: |-
-      W8A8 检查点需要一台配备八张 96 GB NPU 的 Ascend 950DT 节点。启动服务前请下载公开的 ModelScope 检查点。
+      BF16 检查点需要一台配备十六张 64 GB NPU 的 Atlas 800I A3 节点，或一台配备八张 64 GB NPU 的 Atlas 800 A2 节点，使用张量并行度 2。W8A8 检查点需要一台配备八张 96 GB NPU 的 Ascend 950DT 节点。启动服务前请从 ModelScope 下载检查点。
 
 env_setup:
   container:
+    A3:
+      content: |-
+        拉取公开的 v0.23.0 A3 镜像，并按官方教程使用设备和驱动挂载启动容器。
+
+        ```bash
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0-a3
+        export NAME=vllm-ascend
+
+        docker run --rm \
+          --name $NAME \
+          --net=host \
+          --shm-size=512g \
+          --privileged=true \
+          --device /dev/davinci0 \
+          --device /dev/davinci1 \
+          --device /dev/davinci2 \
+          --device /dev/davinci3 \
+          --device /dev/davinci4 \
+          --device /dev/davinci5 \
+          --device /dev/davinci6 \
+          --device /dev/davinci7 \
+          --device /dev/davinci8 \
+          --device /dev/davinci9 \
+          --device /dev/davinci10 \
+          --device /dev/davinci11 \
+          --device /dev/davinci12 \
+          --device /dev/davinci13 \
+          --device /dev/davinci14 \
+          --device /dev/davinci15 \
+          --device /dev/davinci_manager \
+          --device /dev/devmm_svm \
+          --device /dev/hisi_hdc \
+          -v /usr/local/dcmi:/usr/local/dcmi \
+          -v /usr/local/Ascend/driver/tools/hccn_tool:/usr/local/Ascend/driver/tools/hccn_tool \
+          -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+          -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \
+          -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
+          -v /etc/ascend_install.info:/etc/ascend_install.info \
+          -v /etc/hccn.conf:/etc/hccn.conf \
+          -v /root/.cache:/root/.cache \
+          -it $IMAGE bash
+        ```
     A5:
       content: |-
         拉取公开的 v0.23.0 A5 镜像，并按官方教程使用设备和驱动挂载启动容器。
@@ -149,6 +212,211 @@ env_setup:
         ```
 
 scenarios:
+  - npu: Atlas 800I A3
+    precision: BF16
+    deployment: 单节点
+    case: 图像专用在线服务（A3）
+    tags: [a3-single]
+    strategy: single_node_A3
+    steps:
+      - title: 启动服务
+        content: |-
+          此场景在单台 Atlas 800I A3 节点（十六张 64 GB NPU）上以张量并行度 2 运行原始 BF16 检查点，仅接受图像输入。
+
+          ```bash
+          export VLLM_USE_MODELSCOPE=True
+          export HCCL_BUFFSIZE=1024
+          export HCCL_OP_EXPANSION_MODE="AIV"
+          export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+
+          vllm serve your_model_path \
+            --host 0.0.0.0 \
+            --port 8000 \
+            --served-model-name qwen3-vl-30b \
+            --data-parallel-size 1 \
+            --tensor-parallel-size 2 \
+            --enable-expert-parallel \
+            --seed 1024 \
+            --max-num-seqs {{max_num_seqs}} \
+            --max-model-len {{max_model_len}} \
+            --max-num-batched-tokens 16384 \
+            --gpu-memory-utilization {{gpu_memory_utilization}} \
+            {{prefix_caching}} \
+            --mm-processor-cache-gb 0 \
+            --limit-mm-per-prompt.image 1 \
+            --limit-mm-per-prompt.video 0 \
+            --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY","cudagraph_capture_sizes":[1,2,4,8,16,24,32]}' \
+            {{fused_mc2}}
+          ```
+      - title: 验证服务
+        content: |-
+          ```bash
+          curl http://<server_ip>:<port>/v1/chat/completions \
+            -H "Content-Type: application/json" \
+            -d '{
+              "model": "qwen3-vl-30b",
+              "messages": [
+                {"role": "user", "content": "Who are you?"}
+              ],
+              "max_tokens": 256,
+              "temperature": 0
+            }'
+          ```
+
+          服务应返回 HTTP 200 OK，JSON 响应中包含 `choices` 字段。
+      - title: 验证图像理解
+        content: |-
+          ```bash
+          curl http://<server_ip>:<port>/v1/chat/completions \
+            -H "Content-Type: application/json" \
+            -d '{
+              "model": "qwen3-vl-30b",
+              "messages": [
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "user", "content": [
+                  {"type": "image_url", "image_url": {"url": "https://modelscope.oss-cn-beijing.aliyuncs.com/resource/qwen.png"}},
+                  {"type": "text", "text": "What is the text in the illustration?"}
+                ]}
+              ],
+              "max_completion_tokens": 100,
+              "temperature": 0
+            }'
+          ```
+
+          HTTP 状态码应为 200，JSON 响应中包含带生成文本的 `choices` 字段，例如类似 `TONGYI Qwen` 的文本。
+  - npu: Atlas 800I A3
+    precision: BF16
+    deployment: 单节点
+    case: 视频在线服务（A3）
+    tags: [a3-single, video]
+    strategy: single_node_A3
+    steps:
+      - title: 启动服务
+        content: |-
+          视频请求占用内存更多，因此视频场景使用更小的 `--max-num-seqs`（8）、更长的 `--max-model-len`（128000），并为视频文件配置本地媒体路径。
+
+          ```bash
+          mkdir -p /media
+
+          export VLLM_USE_MODELSCOPE=True
+          export HCCL_BUFFSIZE=1024
+          export HCCL_OP_EXPANSION_MODE="AIV"
+          export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+
+          vllm serve your_model_path \
+            --host 0.0.0.0 \
+            --port 8000 \
+            --served-model-name qwen3-vl-30b \
+            --data-parallel-size 1 \
+            --tensor-parallel-size 2 \
+            --enable-expert-parallel \
+            --seed 1024 \
+            --max-num-seqs 8 \
+            --max-model-len 128000 \
+            --max-num-batched-tokens 4096 \
+            --gpu-memory-utilization 0.9 \
+            --no-enable-prefix-caching \
+            --mm-processor-cache-gb 0 \
+            --limit-mm-per-prompt.image 1 \
+            --limit-mm-per-prompt.video 1 \
+            --allowed-local-media-path /media \
+            --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY","cudagraph_capture_sizes":[1,2,4,8,16,24,32]}' \
+            --additional-config '{"enable_fused_mc2": 1}'
+          ```
+      - title: 验证服务
+        content: |-
+          ```bash
+          curl http://<server_ip>:<port>/v1/chat/completions \
+            -H "Content-Type: application/json" \
+            -d '{
+              "model": "qwen3-vl-30b",
+              "messages": [
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "user", "content": [
+                  {"type": "image_url", "image_url": {"url": "https://modelscope.oss-cn-beijing.aliyuncs.com/resource/qwen.png"}},
+                  {"type": "text", "text": "What is the text in the illustration?"}
+                ]}
+              ],
+              "max_completion_tokens": 100,
+              "temperature": 0
+            }'
+          ```
+
+          HTTP 状态码应为 200，JSON 响应中包含带生成文本的 `choices` 字段。
+
+          如需本地视频输入，请将宿主机媒体目录挂载到容器内的 `/media`，并使用 `file:///media/...` 形式的 URL 发送请求：
+
+          ```bash
+          curl http://<server_ip>:<port>/v1/chat/completions \
+            -H "Content-Type: application/json" \
+            -d '{
+              "model": "qwen3-vl-30b",
+              "messages": [
+                {"role": "user", "content": [
+                  {"type": "video_url", "video_url": {"url": "file:///media/test.mp4"}},
+                  {"type": "text", "text": "Describe this video."}
+                ]}
+              ],
+              "max_completion_tokens": 256,
+              "temperature": 0
+            }'
+          ```
+  - npu: Atlas 800I A3
+    precision: BF16
+    deployment: 单节点
+    case: ACLGraph 功能验证（A3）
+    tags: [a3-single, pp]
+    strategy: single_node_A3
+    steps:
+      - title: 启动服务
+        content: |-
+          此双卡功能场景使用流水线并行（`--tensor-parallel-size 1 --pipeline-parallel-size 2`）并配合短上下文，用于验证完整 decode ACLGraph 行为。
+
+          启用流水线并行时必须携带 `--hf-overrides` 为语言模型补齐 `text_config.architectures`（vLLM v0.23.0 的 PP 能力校验会读取该字段，多模态权重默认不含，缺失会导致启动报错 `No model architectures are specified`）。
+
+          ```bash
+          export VLLM_USE_MODELSCOPE=True
+          export HCCL_BUFFSIZE=1024
+          export HCCL_OP_EXPANSION_MODE="AIV"
+          export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+
+          vllm serve your_model_path \
+            --host 0.0.0.0 \
+            --port 8000 \
+            --served-model-name qwen3-vl-30b \
+            --data-parallel-size 1 \
+            --tensor-parallel-size 1 \
+            --pipeline-parallel-size 2 \
+            --enable-expert-parallel \
+            --seed 1024 \
+            --max-num-seqs 8 \
+            --max-model-len 4096 \
+            --max-num-batched-tokens 1024 \
+            --gpu-memory-utilization 0.9 \
+            --no-enable-prefix-caching \
+            --mm-processor-cache-gb 0 \
+            --limit-mm-per-prompt.image 1 \
+            --limit-mm-per-prompt.video 0 \
+            --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY","cudagraph_capture_sizes":[1,2,4,8,16,24,32]}' \
+            --additional-config '{"enable_fused_mc2": 1}' \
+            --hf-overrides '{"text_config": {"architectures": ["Qwen3MoeForCausalLM"]}}'
+          ```
+      - title: 验证服务
+        content: |-
+          ```bash
+          curl http://<server_ip>:<port>/v1/chat/completions \
+            -H "Content-Type: application/json" \
+            -d '{
+              "model": "qwen3-vl-30b",
+              "messages": [
+                {"role": "user", "content": "Who are you?"}
+              ],
+              "max_tokens": 256,
+              "temperature": 0
+            }'
+          ```
+
+          服务应返回 HTTP 200 OK，JSON 响应中包含 `choices` 字段。
   - npu: Ascend 950DT
     precision: W8A8
     deployment: 单节点
@@ -215,14 +483,14 @@ verification: |-
 
 performance:
   accuracy: |-
-    官方教程报告 AISBench 在 `mmmu_val` 上的结果为 0.58，指标为 `acc,none`，模式为 generation。评估流程请参见[使用 AISBench](https://docs.vllm.ai/projects/ascend/zh-cn/latest/developer_guide/evaluation/using_ais_bench.html)。
+    官方教程报告 AISBench 在 `mmmu_val` 上的结果为 0.58，指标为 `acc,none`，模式为 generation。在单台 Atlas 800I A3 上按 TP2 BF16 场景复测（seed 1024、temperature 0），900 题 validation 全量 Overall acc 为 66.22，达到参考值。注意 AISBench 以 `file://` 本地路径向服务传入 MMMU 图片，拉起服务时必须追加 `--allowed-local-media-path <MMMU_images 目录>`。评估流程请参见[使用 AISBench](https://docs.vllm.ai/projects/ascend/zh-cn/latest/developer_guide/evaluation/using_ais_bench.html)。
   benchmark: |-
     对服务流水线进行验证时，使用教程中的 [vLLM benchmark](https://docs.vllm.ai/en/latest/benchmarking/) 命令：
 
     ```bash
     export VLLM_USE_MODELSCOPE=True
     vllm bench serve \
-      --model Eco-Tech/Qwen3-VL-30B-A3B-Instruct-w8a8-mxfp8 \
+      --model Qwen/Qwen3-VL-30B-A3B-Instruct \
       --served-model-name qwen3-vl-30b \
       --dataset-name random \
       --random-input 200 \
@@ -233,15 +501,35 @@ performance:
     ```
 
 tuning: |-
-  请从图像专用服务开始。如果启动时内存不足，请降低 `--max-model-len`、`--max-num-seqs`、`--max-num-batched-tokens` 或 `--gpu-memory-utilization`。仅在需要时启用视频，并根据实际工作负载调整多模态请求限制。
+  官方教程推荐的调优顺序：
+
+  1. 从图像专用基线开始，确认服务稳定。
+  2. 按工作负载调整 `--max-model-len`；对许多图像/视频工作负载，`128000` 是一个实用的验证值。
+  3. 仅在服务稳定后再调整 `--gpu-memory-utilization`。
+  4. 调整 `--max-num-batched-tokens`：更大的值通常能提升 prefill 吞吐，但会增加激活内存；视频较重的工作负载通常需要保守取值。
+  5. 按目标并发调整 `--max-num-seqs`；视频请求比图像请求更耗内存，请从较小的值开始。
+  6. 仅在工作负载需要时启用视频输入，并相应调整 `--limit-mm-per-prompt`。
+  7. 调整 ACLGraph 捕获：decode 推荐 `FULL_DECODE_ONLY`；手动设置 `cudagraph_capture_sizes` 时应包含常见的 decode 批大小。
+
+  模型特定选项：`--allowed-local-media-path /media` 可避免服务过程中缓慢的网络视频下载；`--compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY"}'` 可降低算子分发开销并稳定 decode 性能；`--pipeline-parallel-size 2` 提供另一种双卡验证布局，需使用更短的上下文和更低的 batch tokens。
 
 faq: |-
-  如遇启动 OOM，请从禁用视频的图像专用配置开始。前缀缓存更适合重复前缀；对于图像各不相同或随机 prompt 的工作负载，应与基线配置进行对比。
+  **启动 OOM。** 长上下文、高图像分辨率、视频输入、过大的 `--max-num-seqs`、过大的 `--max-num-batched-tokens` 或过高的 `--gpu-memory-utilization` 都可能导致 HBM 余量不足。请从图像专用服务（`--limit-mm-per-prompt.video 0`）开始，降低 `--max-model-len`、`--max-num-seqs`、`--max-num-batched-tokens` 或 `--gpu-memory-utilization`，并保持 `PYTORCH_NPU_ALLOC_CONF=expandable_segments:True`。
+
+  **仅含图像的请求也预留了超出预期的内存。** 允许视频输入会为较长的视觉嵌入和预处理路径预留内存。图像专用服务请使用 `--limit-mm-per-prompt.video 0`，仅在工作负载需要时启用视频。
+
+  **本地文件路径的视频请求失败。** 服务只能访问挂载到容器内且被 `--allowed-local-media-path` 允许的本地媒体路径。请将宿主机媒体目录挂载到 `/media`，启动服务时带上 `--allowed-local-media-path /media`，并在请求中使用 `file:///media/test.mp4` 形式的 URL。
+
+  **开启前缀缓存未带来性能提升。** 前缀缓存仅在请求共享可复用前缀时有效。图像各异、视频各异或随机 prompt 可能只增加内存压力而没有可见收益。重复前缀工作负载可开启前缀缓存；随机压测或内存受限的视频工作负载请与关闭前缀缓存的配置对比。
+
+  **多模态精度评估无法插入图像 token。** Qwen3-VL 多模态任务依赖模型 chat template 在多模态处理前插入图像占位 token。请在评估配置中开启 chat template 应用；对基于 lm_eval 的多模态任务，将 `apply_chat_template` 设为 true。
 
 references:
   - title: "官方 vLLM-Ascend 教程（v0.23.0）"
     url: https://github.com/vllm-project/vllm-ascend/blob/v0.23.0/docs/source/tutorials/models/Qwen3-VL-30B-A3B-Instruct.md
-  - title: "ModelScope 检查点"
+  - title: "BF16 检查点"
+    url: https://modelscope.cn/models/Qwen/Qwen3-VL-30B-A3B-Instruct
+  - title: "W8A8 检查点"
     url: https://modelscope.cn/models/Eco-Tech/Qwen3-VL-30B-A3B-Instruct-w8a8-mxfp8
   - title: "vLLM-Ascend Docker 安装"
     url: https://docs.vllm.ai/projects/ascend/zh-cn/latest/installation.html
