@@ -1,0 +1,450 @@
+meta:
+  title: "PaddleOCR-VL"
+  slug: "paddleocr-vl"
+  provider: "PaddlePaddle"
+  description: "A state-of-the-art, resource-efficient vision-language model tailored for document parsing. Its core component, PaddleOCR-VL-0.9B, combines a NaViT-style dynamic resolution visual encoder with the ERNIE-4.5-0.3B language model to enable accurate element recognition for OCR, table, formula and chart recognition tasks."
+  date_added: 2026-10-17
+  performance_headline: "Single-node single-NPU deployment on Atlas 800 A2 and Atlas 300I DUO with BF16/FP16"
+  date_updated: 2026-10-17
+  difficulty: intermediate
+  hardware:
+    atlas_800_a2: verified
+    atlas_300i_duo: verified
+
+model:
+  model_id: "PaddlePaddle/PaddleOCR-VL"
+  min_vllm_version: "0.21.0rc1"
+  architecture: dense
+  parameter_count: "0.9B"
+  active_parameters: null
+  context_length: 16384
+  modality: ocr
+  base_args:
+    - "--trust-remote-code"
+    - "--no-enable-prefix-caching"
+    - "--mm-processor-cache-gb"
+    - "0"
+  base_env:
+    VLLM_USE_MODELSCOPE: "True"
+    TASK_QUEUE_ENABLE: "1"
+    PYTORCH_NPU_ALLOC_CONF: "expandable_segments:True"
+  docker_image:
+    atlas_800_a2: "quay.io/ascend/vllm-ascend:v0.23.0rc1"
+    atlas_300i_duo: "quay.io/ascend/vllm-ascend:v0.23.0rc1-310p"
+  nightly_required: false
+  install:
+    pip: false
+    docker:
+      command: "docker run --rm --name vllm-ascend --shm-size=1g --net=host --device /dev/davinci0 --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc -v /usr/local/dcmi:/usr/local/dcmi -v /usr/local/Ascend/driver/tools/hccn_tool:/usr/local/Ascend/driver/tools/hccn_tool -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info -v /etc/ascend_install.info:/etc/ascend_install.info -v /root/.cache:/root/.cache -it $IMAGE bash"
+      note: "Select $IMAGE per machine type (atlas_800_a2 or atlas_300i_duo image above). Verify the running container with `docker ps`."
+
+# —— Upstream alignment: features ——
+overview: "PaddleOCR-VL is a state-of-the-art (SOTA) and resource-efficient vision-language model tailored for document parsing. Its core component is PaddleOCR-VL-0.9B, a compact yet powerful VLM that integrates a NaViT-style dynamic resolution visual encoder with the ERNIE-4.5-0.3B language model to enable accurate element recognition. It supports OCR, table recognition, formula recognition and chart recognition, and can be combined with PP-DocLayoutV2 for full document parsing pipelines."
+
+weight_download:
+- weight_version: "BF16"
+  sources:
+  - source: "ModelScope"
+    url: "https://www.modelscope.cn/models/PaddlePaddle/PaddleOCR-VL"
+    command: "```bash\npip install modelscope\nmodelscope download --model PaddlePaddle/PaddleOCR-VL\n```"
+  - source: "HuggingFace"
+    url: "https://huggingface.co/PaddlePaddle/PaddleOCR-VL"
+    command: "```bash\npip install -U huggingface_hub\nhuggingface-cli download PaddlePaddle/PaddleOCR-VL\n```"
+
+prerequisites:
+- title: "Model Weight"
+  content: |-
+    The following hardware requirements apply. It is recommended to download the model weights to the cache directory and set `VLLM_USE_MODELSCOPE=True` to load the model automatically. If you have downloaded the weights to a local directory, update the `MODEL_PATH` variable in the deployment script accordingly.
+
+    | Weight Version | Hardware Requirements | Download Links |
+    |----------------|-----------------------|----------------|
+    | `PaddleOCR-VL-0.9B` | 1 Atlas 800 A3 (128GB × 8) nodes or 1 Atlas 800 A2 (64GB × 8) nodes or 1 Atlas 300I DUO (48GB × 8) nodes | [ModelScope](https://www.modelscope.cn/models/PaddlePaddle/PaddleOCR-VL) \| [Hugging Face](https://huggingface.co/PaddlePaddle/PaddleOCR-VL) |
+
+env_setup:
+  container:
+    atlas_800_a2:
+      content: |-
+        You can use the official docker image to run `PaddleOCR-VL` directly.
+
+        **Docker Pull:**
+
+        ```bash
+        docker pull quay.io/ascend/vllm-ascend:v0.23.0rc1
+        ```
+
+        **Docker Run:**
+
+        ```bash
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0rc1
+        docker run --rm \
+            --name vllm-ascend \
+            --shm-size=1g \
+            --net=host \
+            --device /dev/davinci0 \
+            --device /dev/davinci_manager \
+            --device /dev/devmm_svm \
+            --device /dev/hisi_hdc \
+            -v /usr/local/dcmi:/usr/local/dcmi \
+            -v /usr/local/Ascend/driver/tools/hccn_tool:/usr/local/Ascend/driver/tools/hccn_tool \
+            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+            -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \
+            -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
+            -v /etc/ascend_install.info:/etc/ascend_install.info \
+            -v /root/.cache:/root/.cache \
+            -it $IMAGE bash
+        ```
+
+        After a successful docker run, you can verify the running container service by executing the `docker ps` command.
+    atlas_300i_duo:
+      content: |-
+        For Atlas 300I DUO, use the 310p image.
+
+        **Docker Pull:**
+
+        ```bash
+        docker pull quay.io/ascend/vllm-ascend:v0.23.0rc1-310p
+        ```
+
+        **Docker Run:**
+
+        ```bash
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0rc1-310p
+        docker run --rm \
+            --name vllm-ascend \
+            --shm-size=1g \
+            --net=host \
+            --device /dev/davinci0 \
+            --device /dev/davinci_manager \
+            --device /dev/devmm_svm \
+            --device /dev/hisi_hdc \
+            -v /usr/local/dcmi:/usr/local/dcmi \
+            -v /usr/local/Ascend/driver/tools/hccn_tool:/usr/local/Ascend/driver/tools/hccn_tool \
+            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+            -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \
+            -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
+            -v /etc/ascend_install.info:/etc/ascend_install.info \
+            -v /root/.cache:/root/.cache \
+            -it $IMAGE bash
+        ```
+
+        After a successful docker run, you can verify the running container service by executing the `docker ps` command.
+
+        > If you don't want to use the docker image, you can also build all from source: install `vllm-ascend` from source, refer to the [installation guide](https://docs.vllm.ai/projects/ascend/en/latest/getting_started/installation.html).
+
+features:
+  compilation_config:
+    label: "Graph Compilation"
+    description: "Full decode graph compilation via --compilation-config '{\"cudagraph_mode\":\"FULL_DECODE_ONLY\"}'. On Atlas 300I DUO this requires CANN >= 9.0.0; on older CANN versions replace it with --enforce-eager."
+    args: ["--compilation-config", '{"cudagraph_mode":"FULL_DECODE_ONLY"}']
+  prefix_caching:
+    label: "Prefix Caching"
+    description: "Disabled by default for this model. Remove --no-enable-prefix-caching to enable it if prefix caching is effective for your workload."
+    args: ["--no-enable-prefix-caching"]
+    flag_when_false: ""
+
+scenarios:
+
+- npu: Atlas 800I A2
+  precision: BF16
+  deployment: Single-Node
+  case: Single NPU
+  tags: [a2-single-npu]
+  strategy: single_node_a2
+  steps:
+  - title: Start the server
+    content: |-
+      PaddleOCR-VL supports single-node single-card deployment on the A2 series. Single-node deployment completes both Prefill and Decode within the same node, suitable for development, testing, and small-to-medium scale inference scenarios.
+
+      1. Prepare model weights: with `VLLM_USE_MODELSCOPE=True` the model is loaded automatically from ModelScope. If you downloaded the weights locally, point `MODEL_PATH` to your model directory.
+      2. Create and execute the deployment script (save as `deploy.sh`):
+
+      **Atlas 800 A2 series:**
+
+      ```bash
+      #!/bin/sh
+      export VLLM_USE_MODELSCOPE=True
+      export MODEL_PATH="PaddlePaddle/PaddleOCR-VL"
+      export TASK_QUEUE_ENABLE=1
+      export CPU_AFFINITY_CONF=1
+      export PYTORCH_NPU_ALLOC_CONF="expandable_segments:True"
+
+      vllm serve ${MODEL_PATH} \
+                --max-num-batched-tokens 16384 \
+                --served-model-name PaddleOCR-VL-0.9B \
+                --trust-remote-code \
+                --no-enable-prefix-caching \
+                --mm-processor-cache-gb 0 \
+                --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY"}' \
+                --additional_config '{"enable_cpu_binding":true}' \
+                --port 8000
+      ```
+
+      Key parameter descriptions:
+
+      - `--max-num-batched-tokens` specifies the maximum number of tokens batched in a single forward pass. Adjust this parameter for throughput optimization.
+      - `--no-enable-prefix-caching` indicates that prefix caching is disabled. To enable it, remove this option.
+      - `--mm-processor-cache-gb` sets the size of the multimodal processor cache (in GB). A value of `0` disables caching.
+      - `--compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY"}'` enables full decode graph compilation for improved performance.
+      - `--additional_config '{"enable_cpu_binding":true}'` enables CPU binding to improve performance.
+
+      If you encounter startup issues, refer to the [Public FAQs](https://docs.vllm.ai/projects/ascend/en/latest/faqs.html) for troubleshooting.
+  - title: Service Verification
+    content: |-
+      After the service is started, verify it is running by sending a query. Refer to the verification section below for a usage example.
+
+- npu: Atlas 300I DUO
+  precision: FP16
+  deployment: Single-Node
+  case: Single NPU
+  tags: [300i-duo-single-npu]
+  strategy: single_node_300i_duo
+  steps:
+  - title: Start the server
+    content: |-
+      PaddleOCR-VL supports single-node single-card deployment on the Atlas 300I DUO platform.
+
+      > On Atlas 300I DUO:
+      > - Only `float16` dtype is supported.
+      > - Graph compilation (`--compilation-config`) requires **CANN version >= 9.0.0**. If your CANN version is lower, please revert to eager mode by replacing the `--compilation-config` argument with `--enforce-eager`.
+
+      **Atlas 300I DUO:**
+
+      ```bash
+      #!/bin/sh
+      export VLLM_USE_MODELSCOPE=True
+      export MODEL_PATH="PaddlePaddle/PaddleOCR-VL"
+      export TASK_QUEUE_ENABLE=1
+      export PYTORCH_NPU_ALLOC_CONF="expandable_segments:True"
+
+      vllm serve ${MODEL_PATH} \
+                --max_model_len 16384 \
+                --served-model-name PaddleOCR-VL-0.9B \
+                --trust-remote-code \
+                --no-enable-prefix-caching \
+                --mm-processor-cache-gb 0 \
+                --dtype float16 \
+                --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY"}' \
+                --additional_config '{"enable_cpu_binding":true}' \
+                --port 8000
+      ```
+
+      Key parameter descriptions:
+
+      - `--max_model_len` specifies the maximum context length — that is, the sum of input and output tokens for a single request.
+      - `--no-enable-prefix-caching` indicates that prefix caching is disabled. To enable it, remove this option.
+      - `--mm-processor-cache-gb` sets the size of the multimodal processor cache (in GB). A value of `0` disables caching.
+      - `--dtype float16` specifies the model dtype. On Atlas 300I DUO, only `float16` is supported.
+      - `--compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY"}'` enables full decode graph compilation for improved performance.
+      - `--additional_config '{"enable_cpu_binding":true}'` enables CPU binding to improve performance.
+
+      If you encounter startup issues, refer to the [Public FAQs](https://docs.vllm.ai/projects/ascend/en/latest/faqs.html) for troubleshooting.
+  - title: Service Verification
+    content: |-
+      After the service is started, verify it is running by sending a query. Refer to the verification section below for a usage example.
+
+- npu: Atlas 800I A2
+  precision: BF16
+  deployment: Single-Node
+  case: Standard
+  tags: [a2-offline-doc-parsing]
+  strategy: offline_doc_parsing_a2
+  steps:
+  - title: Offline inference with vLLM and PP-DocLayoutV2
+    content: |-
+      Beyond online serving, you can integrate the PP-DocLayoutV2 model to fully unleash the capabilities of the PaddleOCR-VL model, making it more consistent with the examples provided by the official PaddlePaddle documentation.
+
+      > Use separate virtual environments for vLLM and PP-DocLayoutV2 to prevent dependency conflicts.
+
+      **A2 series (PaddlePaddle framework inference):**
+
+      1. Pull the PaddlePaddle-compatible CANN image:
+
+      ```bash
+      docker pull ccr-2vdh3abv-pub.cnc.bj.baidubce.com/device/paddle-npu:cann800-ubuntu20-npu-910b-base-aarch64-gcc84
+      ```
+
+      Start the container:
+
+      ```bash
+      docker run -it --name paddle-npu-dev -v $(pwd):/work \
+          --privileged --network=host --shm-size=128G -w=/work \
+          -v /usr/local/Ascend/driver:/usr/local/Ascend/driver \
+          -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+          -v /usr/local/dcmi:/usr/local/dcmi \
+          -e ASCEND_RT_VISIBLE_DEVICES="0,1,2,3,4,5,6,7" \
+          ccr-2vdh3abv-pub.cnc.bj.baidubce.com/device/paddle-npu:cann800-ubuntu20-npu-910b-base-$(uname -m)-gcc84 /bin/bash
+      ```
+
+      2. Install PaddlePaddle and PaddleOCR:
+
+      ```bash
+      python -m pip install paddlepaddle==3.2.0
+      wget https://paddle-whl.bj.bcebos.com/stable/npu/paddle-custom-npu/paddle_custom_npu-3.2.0-cp310-cp310-linux_aarch64.whl
+      pip install paddle_custom_npu-3.2.0-cp310-cp310-linux_aarch64.whl
+      python -m pip install -U "paddleocr[doc-parser]"
+      pip install safetensors
+      ```
+
+      > The OpenCV component may be missing:
+      >
+      > ```bash
+      > apt-get update
+      > apt-get install -y libgl1 libglib2.0-0
+      > ```
+      >
+      > CANN-8.0.0 does not support some versions of NumPy and OpenCV. It is recommended to install the specified versions:
+      >
+      > ```bash
+      > python -m pip install numpy==1.26.4
+      > python -m pip install opencv-python==3.4.18.65
+      > ```
+
+      3. Use vLLM as the backend, combined with PP-DocLayoutV2 for offline inference:
+
+      ```python
+      from paddleocr import PaddleOCRVL
+
+      doclayout_model_path = "/path/to/your/PP-DocLayoutV2/"
+
+      pipeline = PaddleOCRVL(vl_rec_backend="vllm-server",
+                             vl_rec_server_url="http://localhost:8000/v1",
+                             layout_detection_model_name="PP-DocLayoutV2",
+                             layout_detection_model_dir=doclayout_model_path,
+                             device="npu")
+
+      output = pipeline.predict("https://paddle-model-ecology.bj.bcebos.com/paddlex/imgs/demo_image/paddleocr_vl_demo.png")
+
+      for i, res in enumerate(output):
+          res.save_to_json(save_path=f"output_{i}.json")
+          res.save_to_markdown(save_path=f"output_{i}.md")
+      ```
+
+      > On Atlas 300I DUO, only OM model inference is supported for PP-DocLayoutV2. See the [ModelZoo guide](https://gitcode.com/Ascend/ModelZoo-PyTorch/tree/master/ACL_PyTorch/built-in/ocr/PP-DocLayoutV2) for details.
+
+verification: |-
+  If your service starts successfully, you can see the info shown below:
+
+  ```bash
+  INFO:     Started server process [87471]
+  INFO:     Waiting for application startup.
+  INFO:     Application startup complete.
+  ```
+
+  Once your server is started, you can use the OpenAI API client to make queries.
+
+  ```python
+  from openai import OpenAI
+
+  client = OpenAI(
+      api_key="EMPTY",
+      base_url="http://localhost:8000/v1",
+      timeout=3600
+  )
+
+  # Task-specific base prompts
+  TASKS = {
+      "ocr": "OCR:",
+      "table": "Table Recognition:",
+      "formula": "Formula Recognition:",
+      "chart": "Chart Recognition:"
+  }
+
+  messages = [
+      {
+          "role": "user",
+          "content": [
+              {
+                  "type": "image_url",
+                  "image_url": {
+                      "url": "https://ofasys-multimodal-wlcb-3-toshanghai.oss-accelerate.aliyuncs.com/wpf272043/keepme/image/receipt.png"
+                  }
+              },
+              {
+                  "type": "text",
+                  "text": TASKS["ocr"]
+              }
+          ]
+      }
+  ]
+
+  response = client.chat.completions.create(
+      model="PaddleOCR-VL-0.9B",
+      messages=messages,
+      temperature=0.0,
+  )
+  print(f"Generated text: {response.choices[0].message.content}")
+  ```
+
+  Expected Result:
+
+  ```bash
+  Generated text: CINNAMON SUGAR
+  1 x 17,000
+  17,000
+  SUB TOTAL
+  17,000
+  GRAND TOTAL
+  17,000
+  CASH IDR
+  20,000
+  CHANGE DUE
+  3,000
+  ```
+
+performance:
+  accuracy: |-
+    For the accuracy evaluation of PaddleOCR-VL, please refer to the official [ModelZoo](https://gitcode.com/Ascend/ModelZoo-PyTorch/tree/master/ACL_PyTorch/built-in/ocr/PP-DocLayoutV2) for the evaluation process and results.
+  benchmark: |-
+    For the performance evaluation of PaddleOCR-VL, please refer to the official [ModelZoo](https://gitcode.com/Ascend/ModelZoo-PyTorch/tree/master/ACL_PyTorch/built-in/ocr/PP-DocLayoutV2) for the benchmark methodology and results.
+
+tuning: |-
+  ### Recommended Configurations
+
+  > **Note**: The following configurations are validated in specific test environments and are for reference only. The optimal configuration depends on factors such as maximum input/output length, precision requirements, and actual hardware specifications.
+
+  PaddleOCR-VL is a lightweight model that runs on a single NPU. The key tuning parameters differ between hardware platforms.
+
+  #### Scenario Overview
+
+  | Scenario | Hardware | Total NPUs | Weight Version | Key Considerations |
+  |----------|----------|------------|----------------|-------------------|
+  | High Throughput | A2 series | 1 | PaddleOCR-VL-0.9B | - |
+  | High Throughput | Atlas 300I DUO | 1 | PaddleOCR-VL-0.9B | Graph compilation requires **CANN >= 9.0.0** |
+
+  > `Total NPUs` indicates the total number of NPUs used across all nodes.
+
+  #### Detailed Node Configuration
+
+  | Scenario | Configuration | NPUs | TP | DP | Max Model Len | Max Num Batched Tokens | Graph Compilation | dtype |
+  |----------|-------------|------|----|----|---------------|------------------------|--------------------|-------|
+  | High Throughput | A2 series / Single Machine | 1 | — | — | — | — | FULL_DECODE_ONLY | bfloat16 (default) |
+  | High Throughput | Atlas 300I DUO / Single Machine | 1 | — | — | — | — | FULL_DECODE_ONLY; otherwise enforce-eager | float16 |
+
+  ### Tuning Guidelines
+
+  Please refer to the [Public Performance Tuning Documentation](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/performance_and_debug/optimization_and_tuning.html) for general tuning methods, including OS optimization (tcmalloc), `torch_npu` optimization (memory and scheduling), and CANN optimization.
+
+  Please refer to the [Feature Matrix](https://docs.vllm.ai/projects/ascend/en/latest/user_guide/support_matrix/feature_matrix.html) for detailed feature descriptions.
+
+faq: |-
+  For common environment, installation, and general parameter issues, please refer to the [Public FAQs](https://docs.vllm.ai/projects/ascend/en/latest/faqs.html). This chapter only covers model-specific issues.
+
+  - **Q: What are the deployment requirements for Atlas 300I DUO?**
+
+    A: On Atlas 300I DUO, only `float16` dtype is supported. Graph compilation (`--compilation-config`) requires **CANN version >= 9.0.0**; if your CANN version is lower, use `--enforce-eager` instead.
+
+  - **Q: What should I do if I encounter dependency conflicts during installation on Atlas 300I DUO?**
+
+    A: You may need to uninstall `triton-ascend` and `triton` to avoid dependency conflicts.
+
+references:
+- title: PaddleOCR-VL on ModelScope
+  url: https://www.modelscope.cn/models/PaddlePaddle/PaddleOCR-VL
+- title: PaddleOCR-VL on Hugging Face
+  url: https://huggingface.co/PaddlePaddle/PaddleOCR-VL
+- title: PP-DocLayoutV2 ModelZoo (accuracy & benchmark)
+  url: https://gitcode.com/Ascend/ModelZoo-PyTorch/tree/master/ACL_PyTorch/built-in/ocr/PP-DocLayoutV2
+- title: vllm-ascend Documentation
+  url: https://docs.vllm.ai/projects/ascend/en/latest/tutorials/models/PaddleOCR-VL.html
+- title: vllm-ascend GitHub
+  url: https://github.com/vllm-project/vllm-ascend
