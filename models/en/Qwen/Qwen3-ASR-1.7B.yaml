@@ -1,0 +1,320 @@
+meta:
+  title: "Qwen3-ASR-1.7B"
+  slug: "qwen3-asr-1.7b"
+  provider: "Qwen"
+  description: "A 1.7B-parameter ASR model for Chinese/English speech, dialects, multilingual audio, and singing. Verified single-card serving on Atlas 300I DUO (310P) with vLLM Ascend."
+  date_added: "2026-10-19"
+  date_updated: "2026-10-19"
+  difficulty: beginner
+  tasks:
+    - multimodal
+  performance_headline: "Atlas 300I DUO (310P) single-card ASR verified with vLLM Ascend 0.23.0"
+  related_recipes: []
+  hardware:
+    atlas_300i_duo: verified
+    atlas_800_a2: experimental
+
+model:
+  model_id: "Qwen/Qwen3-ASR-1.7B"
+  min_vllm_version: "0.19.0"
+  architecture: dense
+  parameter_count: "1.7B"
+  active_parameters: null
+  context_length: 4096
+  modality: asr
+  base_args:
+    - "--served-model-name"
+    - "qwen3-asr"
+    - "--tensor-parallel-size"
+    - "1"
+    - "--max-model-len"
+    - "4096"
+    - "--gpu-memory-utilization"
+    - "0.9"
+  base_env:
+    PYTORCH_NPU_ALLOC_CONF: "expandable_segments:True"
+    VLLM_USE_MODELSCOPE: "1"
+  docker_image:
+    atlas_800_a2: "quay.io/ascend/vllm-ascend:v0.23.0"
+    atlas_300i_duo: "quay.io/ascend/vllm-ascend:v0.23.0-310p"
+  nightly_required: false
+  install:
+    pip: false
+    docker:
+      command: "docker run --rm --name vllm-ascend --shm-size=10g --net=host --device /dev/davinci0 --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc -v /root/.cache:/root/.cache -it quay.io/ascend/vllm-ascend:v0.23.0-310p bash"
+      note: "Official Ascend 310P image; full device/driver mounts are covered in env_setup.container. Install audio extras: pip install 'vllm[audio]' (or av + soundfile)."
+
+features: {}
+
+opt_in_features: []
+
+variants:
+  default:
+    precision: fp16
+    vram_minimum_gb: 8
+    description: "BF16 checkpoint served in float16 on Atlas 300I DUO (verified)"
+
+compatible_strategies:
+  - single_node_310p
+  - single_node_A2
+
+hardware_overrides: {}
+strategy_overrides: {}
+
+dependencies: []
+
+guide: ""
+
+config_params:
+  max_model_len:
+    default: 4096
+    type: number
+    description: "Maximum context length. On Atlas 300I DUO always set explicitly; automatic detection can allocate an oversized attention mask and OOM."
+  gpu_memory_utilization:
+    default: 0.9
+    type: number
+    description: "Fraction of NPU memory for the model and KV cache."
+
+overview: |-
+  Qwen3-ASR-1.7B is a 1.7B-parameter automatic speech recognition model from the Qwen team. It supports Chinese and English speech, Chinese dialects, multilingual speech, and singing voice transcription, with long-audio and streaming inference. This recipe migrates the official vLLM Ascend tutorial into structured YAML, with end-to-end verification on Atlas 300I DUO (310P) using vLLM / vLLM Ascend 0.23.0. Requires audio extras (`pip install av soundfile` or `vllm[audio]`).
+
+weight_download:
+  - weight_version: BF16
+    sources:
+      - source: ModelScope
+        url: https://www.modelscope.cn/models/Qwen/Qwen3-ASR-1.7B
+        command: |-
+          ```bash
+          pip install modelscope
+          modelscope download --model Qwen/Qwen3-ASR-1.7B
+          ```
+      - source: HuggingFace
+        url: https://huggingface.co/Qwen/Qwen3-ASR-1.7B
+        command: |-
+          ```bash
+          pip install -U huggingface_hub
+          huggingface-cli download Qwen/Qwen3-ASR-1.7B
+          ```
+      - source: Modelers
+        url: ""
+        command: ""
+      - source: GitCode
+        url: ""
+        command: ""
+
+prerequisites:
+  - title: Model Weight
+    content: |-
+      | Weight Version | Hardware Requirements | Download Links |
+      |----------------|------------------------|----------------|
+      | BF16 | one Ascend Atlas 800I A2 64 GB NPU or one Ascend Atlas 300I DUO 48 GB NPU | [ModelScope](https://www.modelscope.cn/models/Qwen/Qwen3-ASR-1.7B) |
+
+      Download weights to a directory accessible from the deployment environment (for example `/root/.cache/`).
+
+      > **Path description**: Record the local path and ensure subsequent `vllm serve` commands use the same directory (or the ModelScope / HuggingFace model id with cache enabled).
+  - title: Audio dependencies
+    content: |-
+      Audio decoding requires PyAV / soundfile. Inside the container or venv:
+
+      ```bash
+      pip install av soundfile
+      # or: pip install "vllm[audio]"
+      ```
+
+      Without these packages, `/v1/chat/completions` returns `Invalid or unsupported audio file`.
+
+env_setup:
+  container:
+    300I DUO:
+      content: |-
+        Use the official `-310p` image (verified with v0.23.0):
+
+        ```bash
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0-310p
+
+        docker run --rm \
+            --name vllm-ascend \
+            --shm-size=10g \
+            --net=host \
+            --privileged=true \
+            --device /dev/davinci0 \
+            --device /dev/davinci_manager \
+            --device /dev/devmm_svm \
+            --device /dev/hisi_hdc \
+            -v /usr/local/dcmi:/usr/local/dcmi \
+            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+            -v /usr/local/Ascend/driver/lib64:/usr/local/Ascend/driver/lib64 \
+            -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
+            -v /etc/ascend_install.info:/etc/ascend_install.info \
+            -v /root/.cache:/root/.cache \
+            -it $IMAGE bash
+        ```
+
+        > On Atlas 300I DUO, uninstall `triton-ascend` and `triton` if installed: `pip uninstall -y triton-ascend triton`.
+        > Then install audio extras: `pip install av soundfile`.
+    A2:
+      content: |-
+        Atlas A2 image (tutorial-compatible; marked experimental in this recipe because verification focused on 310P):
+
+        ```bash
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0
+
+        docker run --rm \
+            --name vllm-ascend \
+            --shm-size=1g \
+            --net=host \
+            --device /dev/davinci0 \
+            --device /dev/davinci_manager \
+            --device /dev/devmm_svm \
+            --device /dev/hisi_hdc \
+            -v /usr/local/dcmi:/usr/local/dcmi \
+            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+            -v /usr/local/Ascend/driver/lib64:/usr/local/Ascend/driver/lib64 \
+            -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
+            -v /etc/ascend_install.info:/etc/ascend_install.info \
+            -v /root/.cache:/root/.cache \
+            -it $IMAGE bash
+        ```
+  pip:
+    content: |-
+      If you prefer not to use Docker, install `vllm-ascend` from source following the [Installation Guide](https://docs.vllm.ai/projects/ascend/en/latest/installation.html), then `pip install av soundfile`.
+
+scenarios:
+  - npu: Atlas 300I DUO
+    precision: fp16
+    deployment: Single-Node
+    case: 300I DUO (TP1)
+    tags: [310p-single]
+    strategy: single_node_310p
+    steps:
+      - title: Start the server
+        content: |-
+          Atlas 300I DUO single-node ASR deployment (TP=1). Verified with vLLM Ascend 0.23.0 on one 310P3 (~44 GB HBM).
+
+          ```bash
+          export ASCEND_RT_VISIBLE_DEVICES=0
+          export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+
+          vllm serve your_model_path \
+              --served-model-name qwen3-asr \
+              --tensor-parallel-size 1 \
+              --gpu-memory-utilization {{gpu_memory_utilization}} \
+              --dtype float16 \
+              --max-model-len {{max_model_len}} \
+              --additional-config '{"ascend_compilation_config": {"fuse_norm_quant": false,"enable_npu_graph_ex":false}}' \
+              --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY", "cudagraph_capture_sizes": [1,4]}' \
+              --host 0.0.0.0 \
+              --port 8000
+          ```
+
+          > - Replace `your_model_path` with the local weight directory or `Qwen/Qwen3-ASR-1.7B`.
+          > - On Atlas 300I DUO, always set `--max-model-len` explicitly (for example `4096`).
+          > - Expect `Application startup complete` in the log. A `No module named 'triton'` warning is expected on 310P.
+      - title: Service Verification
+        content: |-
+          After the service is started, verify with the `/v1/chat/completions` audio request in the verification section below.
+  - npu: Atlas 800I A2
+    precision: bf16
+    deployment: Single-Node
+    case: Single Node Single Card (A2)
+    tags: [a2-single]
+    strategy: single_node_A2
+    steps:
+      - title: Start the server
+        content: |-
+          Atlas A2 single-node ASR deployment from the official tutorial (experimental in this recipe).
+
+          ```bash
+          export ASCEND_RT_VISIBLE_DEVICES=0
+          export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+
+          vllm serve your_model_path \
+              --served-model-name qwen3-asr \
+              --tensor-parallel-size 1 \
+              --max-model-len {{max_model_len}} \
+              --gpu-memory-utilization {{gpu_memory_utilization}} \
+              --enforce-eager \
+              --port 8000
+          ```
+      - title: Service Verification
+        content: |-
+          After the service is started, verify with the `/v1/chat/completions` audio request in the verification section below.
+
+verification: |-
+  After the service is started, send an audio transcription request.
+
+  **Chat Completions API:**
+
+  ```bash
+  curl http://localhost:8000/v1/chat/completions \
+      -H "Content-Type: application/json" \
+      -d '{
+          "model": "qwen3-asr",
+          "messages": [
+              {
+                  "role": "user",
+                  "content": [
+                      {
+                          "type": "audio_url",
+                          "audio_url": {
+                              "url": "https://qianwen-res.oss-cn-beijing.aliyuncs.com/Qwen3-ASR-Repo/asr_en.wav"
+                          }
+                      }
+                  ]
+              }
+          ]
+      }'
+  ```
+
+  Expected result: HTTP 200 with a JSON body containing the transcription in `choices[0].message.content` and `finish_reason: stop`.
+
+  Verified on Atlas 300I DUO (310P3) with vLLM 0.23.0 / vLLM Ascend 0.23.0: the sample `asr_en.wav` returned an English transcription ending with `finish_reason: stop` (prompt ~211 tokens, completion ~49 tokens). Install `av` + `soundfile` first or the API returns `Invalid or unsupported audio file`.
+
+evaluation:
+  accuracy:
+    content: |-
+      Evaluate transcription quality with Word Error Rate (WER) and Character Error Rate (CER) on a labeled audio set. The official tutorial does not publish fixed WER/CER numbers for this model.
+  performance:
+    content: |-
+      Measure end-to-end ASR serving (audio preprocess + request + inference + parse). Record audio duration, concurrency, latency, real-time factor, and throughput.
+
+      | Scenario | Settings | Notes |
+      | -------- | -------- | ----- |
+      | Low latency | TP=1, `--max-model-len 4096` | Prefer short audio; avoid sharing the NPU |
+      | Long audio | Raise `--max-model-len` only as needed | Keep conservative on Atlas 300I DUO |
+
+performance:
+  accuracy: |-
+    Functional verification on Atlas 300I DUO succeeded with the tutorial sample audio (HTTP 200, coherent English transcription). Publish WER/CER against your labeled set for production readiness.
+  benchmark: |-
+    No fixed throughput numbers are claimed here. On the verified 310P host, a single tutorial-sample request completed successfully after engine warmup; re-measure with `vllm bench serve` or concurrent curl batches for your workload.
+
+tuning: |-
+  ### Tuning Guidelines
+
+  Refer to the [Public Performance Tuning Documentation](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/performance_and_debug/optimization_and_tuning.html).
+
+faq: |-
+  For common environment and installation issues, see the [Public FAQs](https://docs.vllm.ai/projects/ascend/en/latest/faqs.html).
+
+  ### Atlas 300I DUO: Invalid or unsupported audio file
+
+  **Cause:** Missing PyAV / soundfile.
+
+  **Solution:** `pip install av soundfile` (or `pip install "vllm[audio]"`), then retry the request.
+
+  ### Atlas 300I DUO: OOM during startup
+
+  **Cause:** Oversized attention mask from automatic context length.
+
+  **Solution:** Always set `--max-model-len` explicitly (for example `4096`).
+
+references:
+  - title: Qwen3-ASR-1.7B tutorial (vLLM Ascend)
+    url: https://docs.vllm.ai/projects/ascend/en/latest/tutorials/models/Qwen3-ASR-1.7B.html
+  - title: ModelScope model download
+    url: https://www.modelscope.cn/models/Qwen/Qwen3-ASR-1.7B
+  - title: HuggingFace model card
+    url: https://huggingface.co/Qwen/Qwen3-ASR-1.7B
+  - title: vLLM Ascend GitHub
+    url: https://github.com/vllm-project/vllm-ascend
