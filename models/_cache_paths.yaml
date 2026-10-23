@@ -47,3 +47,10 @@ aliases:
 
   - model_id: PaddlePaddle/PaddleOCR-VL
     cache_dir: PaddlePaddle/PaddleOCR-VL
+
+  - model_id: deepseek-ai/DeepSeek-V3.1
+    cache_dir:
+      default: DeepSeek-V3.1-w8a8-mtp-QuaRot
+      # 950DT single-node uses a dedicated mixed-precision build; until it is
+      # baked into the runner image the a5 scenarios are skipped cleanly.
+      ascend_950dt: DeepSeek-V3.1-w4a4mlp-w8a8c8attn
