@@ -1,0 +1,437 @@
+meta:
+  title: "Qwen3.5-Dense (2B/4B/9B)"
+  slug: "qwen3.5-dense"
+  provider: "Qwen"
+  description: "Qwen3.5-2B/4B/9B dense hybrid Mamba-Transformer models. Single-node serving on Atlas 300I DUO / Atlas 200I Pro (310P) with vLLM Ascend ≥ v0.23.0rc1."
+  date_added: "2026-10-28"
+  date_updated: "2026-10-29"
+  difficulty: beginner
+  tasks:
+    - text
+  performance_headline: "Atlas 300I DUO / 200I Pro (310P) single-node Dense with MTP (tutorial migration)"
+  related_recipes:
+    - "Qwen/Qwen3.5-27B-Qwen3.6-27B"
+  hardware:
+    atlas_300i_duo: verified
+    # Verified: function smoke + AISBench gsm8k on 310P3 (~21GB) image v0.30.0rc1-310p (2026-10-29). textvqa/perf still open.
+
+model:
+  model_id: "Qwen/Qwen3.5-4B"
+  min_vllm_version: "0.23.0rc1"
+  architecture: dense
+  parameter_count: "2B / 4B / 9B"
+  active_parameters: null
+  context_length: 16384
+  modality: text
+  base_args:
+    - "--trust-remote-code"
+    - "--served-model-name"
+    - "qwen3.5"
+    - "--tensor-parallel-size"
+    - "1"
+    - "--max-model-len"
+    - "16384"
+    - "--max-num-seqs"
+    - "32"
+    - "--gpu-memory-utilization"
+    - "0.90"
+    - "--dtype"
+    - "float16"
+    - "--mamba-ssm-cache-dtype"
+    - "float16"
+  base_env:
+    VLLM_USE_MODELSCOPE: "True"
+    PYTORCH_NPU_ALLOC_CONF: "expandable_segments:True"
+  docker_image:
+    # Smoke-verified on 310P3 (~21GB): v0.30.0rc1-310p (2026-10-29). Floor still ≥ v0.23.0rc1; v0.23.0-310p also passed earlier.
+    atlas_300i_duo: "quay.io/ascend/vllm-ascend:v0.30.0rc1-310p"
+  nightly_required: false
+  install:
+    pip: false
+    docker:
+      command: "docker run --rm --name vllm-ascend --shm-size=10g --device /dev/davinci0 --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc -v /root/.cache:/root/.cache -p 8080:8080 -it quay.io/ascend/vllm-ascend:v0.30.0rc1-310p bash"
+      note: "Smoke-verified tag: `v0.30.0rc1-310p` (2026-10-29 on ~21GB 310P3; also passed on `v0.23.0-310p`). Floor ≥ v0.23.0rc1. Full mounts in env_setup. On 310P uninstall triton-ascend/triton if present."
+
+features:
+  spec_decoding:
+    label: "MTP Spec Decoding"
+    description: "qwen3_5_mtp with num_speculative_tokens=1 — measured OK for FP16 2B/4B on ~21GB 310P3. Do NOT enable for 9B W8A8 on single ~21GB chip (OOM)."
+    args:
+      - "--speculative-config"
+      - '{"method": "qwen3_5_mtp","num_speculative_tokens":1}'
+  compilation_config:
+    label: "Compilation Config"
+    description: "FULL_DECODE_ONLY ACL graph; with MTP use capture sizes like [2,16]; for 9B W8A8 no-MTP use [1,8]"
+    args:
+      - "--compilation-config"
+      - '{"cudagraph_mode": "FULL_DECODE_ONLY", "cudagraph_capture_sizes": [2,16]}'
+  disable_npugraph_ex:
+    label: "Disable npugraph_ex"
+    description: "enable_npugraph_ex is not supported on 300I DUO / 200I Pro — must stay false"
+    args:
+      - "--additional-config"
+      - '{"ascend_compilation_config": {"enable_npugraph_ex": false}}'
+  w8a8_additional_config:
+    label: "W8A8 additional-config (9B)"
+    description: "On ~21GB 310P3 W8A8 9B: enable_npugraph_ex must be false. On v0.30.0rc1 DO NOT pass fuse_norm_quant (VllmConfig ValidationError). On v0.23.0-310p fuse_norm_quant=false was OK if needed."
+    args:
+      - "--additional-config"
+      - '{"ascend_compilation_config": {"enable_npugraph_ex": false}}'
+
+opt_in_features: []
+
+variants:
+  default:
+    model_id: "Qwen/Qwen3.5-4B"
+    precision: fp16
+    vram_minimum_gb: 12
+    description: "FP16 Qwen3.5-4B — on v0.30.0rc1-310p ~21GB use MTP + len=8192 + seqs=16 (16384/32 failed); v0.23 OK at 16384/32"
+  qwen35_2b_fp16:
+    model_id: "Qwen/Qwen3.5-2B"
+    precision: fp16
+    vram_minimum_gb: 8
+    description: "FP16 2B — comfortable on ~21 GB 310P3"
+  qwen35_9b_fp16:
+    model_id: "Qwen/Qwen3.5-9B"
+    precision: fp16
+    vram_minimum_gb: 20
+    description: "FP16 9B — tight on ~21 GB; may need lower max-model-len / max-num-seqs"
+  qwen35_2b_w8a8:
+    model_id: "Eco-Tech/Qwen3.5-2B-W8A8-310P"
+    precision: W8A8
+    vram_minimum_gb: 6
+    description: "W8A8-310P 2B"
+  qwen35_4b_w8a8:
+    model_id: "Eco-Tech/Qwen3.5-4B-W8A8-310P"
+    precision: W8A8
+    vram_minimum_gb: 8
+    description: "W8A8-310P 4B"
+  qwen35_9b_w8a8:
+    model_id: "Eco-Tech/Qwen3.5-9B-W8A8-310P"
+    precision: W8A8
+    vram_minimum_gb: 16
+    description: "W8A8-310P 9B — measured PASS on ~21GB 310P3 (v0.23+v0.30): text-only, no MTP, len=8192, seqs=8, util=0.90; on v0.30 omit fuse_norm_quant (~19.8/21.5 GB)"
+
+compatible_strategies:
+  - single_node_310p
+
+hardware_overrides: {}
+strategy_overrides: {}
+dependencies: []
+guide: ""
+
+config_params:
+  max_model_len:
+    default: 16384
+    type: number
+    description: "Context length (input+output). On ~21GB: 2B@v0.30 OK 16384; 4B@v0.30 floor 8192; 9B W8A8 8192. Tutorial default 16384 may OOM on 4B/9B."
+  max_num_seqs:
+    default: 32
+    type: number
+    description: "Max concurrent sequences. On ~21GB v0.30: 2B=32, 4B floor=16, 9B W8A8=8."
+  gpu_memory_utilization:
+    default: 0.9
+    type: number
+    description: "Fraction of NPU HBM for model + KV cache."
+
+overview: |-
+  Qwen3.5-2B, Qwen3.5-4B, and Qwen3.5-9B are dense hybrid Mamba-Transformer language models in the Qwen3.5 family (GDN + full attention). This recipe migrates the official vLLM Ascend tutorial into structured YAML for Atlas 300I DUO and Atlas 200I Pro (310P images ≥ v0.23.0rc1). Single-node TP=1 (or TP=2 on DUO with multiple visible NPUs). MTP via qwen3_5_mtp (1 token). enable_npugraph_ex must remain false.
+
+weight_download:
+  - weight_version: Qwen3.5-2B FP16
+    sources:
+      - source: ModelScope
+        url: https://www.modelscope.cn/models/Qwen/Qwen3.5-2B
+        command: |-
+          ```bash
+          pip install modelscope
+          modelscope download --model Qwen/Qwen3.5-2B
+          ```
+      - source: HuggingFace
+        url: https://huggingface.co/Qwen/Qwen3.5-2B
+        command: |-
+          ```bash
+          pip install -U huggingface_hub
+          huggingface-cli download Qwen/Qwen3.5-2B
+          ```
+      - source: Modelers
+        url: ""
+        command: ""
+      - source: GitCode
+        url: ""
+        command: ""
+  - weight_version: Qwen3.5-4B FP16
+    sources:
+      - source: ModelScope
+        url: https://www.modelscope.cn/models/Qwen/Qwen3.5-4B
+        command: |-
+          ```bash
+          pip install modelscope
+          modelscope download --model Qwen/Qwen3.5-4B
+          ```
+      - source: HuggingFace
+        url: https://huggingface.co/Qwen/Qwen3.5-4B
+        command: |-
+          ```bash
+          pip install -U huggingface_hub
+          huggingface-cli download Qwen/Qwen3.5-4B
+          ```
+      - source: Modelers
+        url: ""
+        command: ""
+      - source: GitCode
+        url: ""
+        command: ""
+  - weight_version: Qwen3.5-9B FP16
+    sources:
+      - source: ModelScope
+        url: https://www.modelscope.cn/models/Qwen/Qwen3.5-9B
+        command: |-
+          ```bash
+          pip install modelscope
+          modelscope download --model Qwen/Qwen3.5-9B
+          ```
+      - source: HuggingFace
+        url: https://huggingface.co/Qwen/Qwen3.5-9B
+        command: |-
+          ```bash
+          pip install -U huggingface_hub
+          huggingface-cli download Qwen/Qwen3.5-9B
+          ```
+      - source: Modelers
+        url: ""
+        command: ""
+      - source: GitCode
+        url: ""
+        command: ""
+  - weight_version: Qwen3.5-9B-W8A8-310P
+    sources:
+      - source: ModelScope
+        url: https://www.modelscope.cn/models/Eco-Tech/Qwen3.5-9B-W8A8-310P
+        command: |-
+          ```bash
+          pip install modelscope
+          modelscope download --model Eco-Tech/Qwen3.5-9B-W8A8-310P
+          ```
+      - source: HuggingFace
+        url: ""
+        command: ""
+      - source: Modelers
+        url: ""
+        command: ""
+      - source: GitCode
+        url: ""
+        command: ""
+
+quantization:
+  content: |-
+    Pre-quantized W8A8-310P checkpoints are published under `Eco-Tech/` on ModelScope
+    (`Qwen3.5-{2B,4B,9B}-W8A8-310P`). ModelSlim W8A8 may auto-detect quantization method
+    `ascend` (measured on 9B); explicit `--quantization ascend` is optional if auto works.
+    FP16 `Qwen/Qwen3.5-*` does not use that flag.
+    On ~21 GB single-chip 310P3, prefer W8A8 for 9B (FP16 9B not smoke-tested here).
+
+prerequisites:
+  - title: Hardware
+    content: |-
+      - **Atlas 300I DUO** or **Atlas 200I Pro** (310P series).
+      - Single visible NPU → **TP=1**. DUO with multiple devices may use **TP=2**.
+      - Some 310P3 SKUs report ~21 GB HBM (not ~44/48 GB). Size `max-model-len` / `max-num-seqs` / precision accordingly; 9B FP16 may OOM.
+  - title: Software
+    content: |-
+      - Image: smoke-verified `v0.30.0rc1-310p` (also passed `v0.23.0-310p`). Floor `v0.23.0rc1-310p`. openEuler: matching `-310p-openeuler`.
+      - On 310P you may need: `pip uninstall -y triton-ascend triton` (stub can break serve).
+
+env_setup:
+  container:
+    "Atlas 300I DUO":
+      content: |-
+        ```bash
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.30.0rc1-310p
+        # Fallback if needed: export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0-310p
+        docker run --rm \
+            --name vllm-ascend \
+            --shm-size=10g \
+            --device /dev/davinci0 \
+            --device /dev/davinci_manager \
+            --device /dev/devmm_svm \
+            --device /dev/hisi_hdc \
+            -v /usr/local/dcmi:/usr/local/dcmi \
+            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+            -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \
+            -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
+            -v /etc/ascend_install.info:/etc/ascend_install.info \
+            -v /root/.cache:/root/.cache \
+            -p 8080:8080 \
+            -it $IMAGE bash
+        ```
+        Adjust `--device /dev/davinciN` to the chip in use. Uninstall triton packages on 310P if needed.
+    "Atlas 200I Pro":
+      content: |-
+        Follow the official tutorial mounts for Ubuntu 24.04 or openEuler 24.03
+        (`--privileged`, many host libs). Image: `…-310p` or `…-310p-openeuler`.
+        See: https://docs.vllm.ai/projects/ascend/en/latest/tutorials/models/Qwen3.5-Dense.html
+  pip:
+    content: |-
+      ```bash
+      git clone https://github.com/vllm-project/vllm-ascend.git
+      cd vllm-ascend && pip install -e .
+      pip uninstall -y triton-ascend triton
+      pip show vllm-ascend
+      ```
+
+scenarios:
+  - npu: Atlas 300I DUO
+    precision: fp16
+    deployment: Single-Node
+    case: 310P TP1 (2B/4B/9B FP16)
+    tags: [310p-single]
+    strategy: single_node_310p
+    steps:
+      - title: Start the server
+        content: |-
+          Tutorial baseline (replace MODEL_PATH with 2B/4B/9B). Prefer Eco-Tech W8A8-310P for 9B on ~21 GB HBM.
+          **v0.30.0rc1-310p measured floors on ~21GB:** 2B = MTP + len=16384 + seqs=32; **4B = MTP + len=8192 + seqs=16** (YAML/tutorial 16384/32 failed on v0.30); 9B FP16 not smoke-tested here.
+
+          ```bash
+          export VLLM_USE_MODELSCOPE=True
+          export MODEL_PATH=Qwen/Qwen3.5-4B
+
+          vllm serve $MODEL_PATH \
+            --host 127.0.0.1 \
+            --port 8080 \
+            --tensor-parallel-size 1 \
+            --served-model-name qwen3.5 \
+            --max-num-seqs {{max_num_seqs}} \
+            --max-model-len {{max_model_len}} \
+            --trust-remote-code \
+            --gpu-memory-utilization {{gpu_memory_utilization}} \
+            --mamba-ssm-cache-dtype float16 \
+            --dtype float16 \
+            {{spec_decoding}} \
+            {{compilation_config}} \
+            {{disable_npugraph_ex}}
+          ```
+
+          > - `--dtype float16` and `--mamba-ssm-cache-dtype float16` are required on 300I DUO / 200I Pro.
+          > - MTP: `num_speculative_tokens=1`. Capture sizes with MTP use `n*(1+1)` (e.g. `[2,16]`).
+          > - If OOM: lower max-model-len / max-num-seqs, or switch to W8A8-310P (+ `--quantization ascend` if required).
+      - title: Service verification
+        content: |-
+          See the `verification` section. Expect `Application startup complete.` then HTTP 200 on chat/completions.
+
+  - npu: Atlas 300I DUO
+    precision: W8A8
+    deployment: Single-Node
+    case: 310P TP1 (9B W8A8 text-only on ~21GB — measured)
+    tags: [310p-single, w8a8]
+    strategy: single_node_310p
+    steps:
+      - title: Start the server (W8A8-310P, measured floor)
+        content: |-
+          Measured PASS on single ~21GB 310P3 (`v0.30.0rc1-310p` and earlier `v0.23.0-310p`): **no MTP**,
+          text-only MM limits, `max-model-len=8192`, `max-num-seqs=8`, `gpu-memory-utilization=0.90`,
+          cudagraph capture `[1,8]`. Quant method auto=`ascend`.
+          **v0.30:** do **not** pass `fuse_norm_quant` (ValidationError). **v0.23:** `fuse_norm_quant=false` was OK.
+          Recipe defaults with MTP + seqs=16 + multimodal profile_run **OOM** on this SKU.
+
+          ```bash
+          export VLLM_USE_MODELSCOPE=True
+          export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+          export MODEL_PATH=Eco-Tech/Qwen3.5-9B-W8A8-310P
+
+          vllm serve $MODEL_PATH \
+            --host 127.0.0.1 \
+            --port 8080 \
+            --tensor-parallel-size 1 \
+            --served-model-name qwen3.5 \
+            --max-num-seqs 8 \
+            --max-model-len 8192 \
+            --trust-remote-code \
+            --gpu-memory-utilization 0.90 \
+            --mamba-ssm-cache-dtype float16 \
+            --dtype float16 \
+            --limit-mm-per-prompt '{"image":0,"video":0}' \
+            --mm-processor-cache-gb 0 \
+            --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY","cudagraph_capture_sizes":[1,8]}' \
+            --additional-config '{"ascend_compilation_config":{"enable_npugraph_ex":false}}'
+          ```
+
+          Notes:
+          - Do **not** pass `{{spec_decoding}}` / MTP on this footprint.
+          - Do **not** pass `fuse_norm_quant` on v0.30 (add `"fuse_norm_quant": false` only if on v0.23 and needed).
+          - `--quantization ascend` optional if ModelSlim auto-detect works.
+          - Observed HBM after load ≈ 19800–19905/21525 MB; weights ≈ 15.66 GiB; KV ≈ 0.78–0.81 GiB.
+
+verification: |-
+  Log should show `Application startup complete.`
+
+  Completions:
+  ```bash
+  curl http://127.0.0.1:8080/v1/completions \
+      -H "Content-Type: application/json" \
+      -d '{"model":"qwen3.5","prompt":"The future of AI is","max_completion_tokens":50,"temperature":0}'
+  ```
+
+  Chat:
+  ```bash
+  curl http://127.0.0.1:8080/v1/chat/completions \
+      -H "Content-Type: application/json" \
+      -d '{"model":"qwen3.5","messages":[{"role":"user","content":"The future of AI is"}],"max_completion_tokens":1024,"temperature":0.7,"top_p":0.95}'
+  ```
+
+  Expected: HTTP 200 with non-empty `choices`.
+
+evaluation:
+  accuracy:
+    content: |-
+      Local AISBench gsm8k (Atlas 310P3 ~21GB, image `v0.30.0rc1-310p`, 2026-10-29 Asia/Shanghai):
+
+      | Model | dataset | metric | score | notes |
+      |-------|---------|--------|-------|-------|
+      | 2B FP16 | gsm8k | accuracy | 80.06 | FAIL=0; tutorial ref 77.71 |
+      | 4B FP16 | gsm8k | accuracy | 93.56 | FAIL=0 (clean rerun 2026-10-29 16:50 CST); tutorial ref 93.18 |
+      | 9B W8A8 | gsm8k | accuracy | 95.15 | FAIL=0; tutorial ref 95.30 |
+
+      Tutorial AISBench reference (Atlas 300I DUO, orientation only):
+
+      | Model | dataset | metric | score |
+      |-------|---------|--------|-------|
+      | 2B | gsm8k | accuracy | 77.71 |
+      | 2B | textvqa | accuracy | 76.09 |
+      | 4B | gsm8k | accuracy | 93.18 |
+      | 4B | textvqa | accuracy | 79.08 |
+      | 9B | gsm8k | accuracy | 95.30 |
+      | 9B | textvqa | accuracy | 82.33 |
+
+      textvqa / AISBench perf not run on this host yet (gsm8k only). Follow vllm-ascend AISBench guide; use `enable_thinking: False` postprocessor as in tutorial.
+  performance:
+    content: |-
+      Not measured yet on this host. Use AISBench performance mode or `vllm bench serve`. Do not invent numbers.
+
+tuning: |-
+  - Only TP on these platforms; prefer TP=1 on single-NPU 200I Pro / 310P3.
+  - Lower `--max-model-len`, `--max-num-seqs` before raising them.
+  - Keep `enable_npugraph_ex: false`.
+  - MTP `num_speculative_tokens: 1` for FP16 2B/4B; **disable MTP** for 9B W8A8 on ~21GB.
+  - On v0.30 ~21GB: 4B use len=8192 seqs=16 (16384/32 fails); 2B can keep 16384/32.
+  - 9B W8A8 on ~21GB: text-only MM limits; **omit** `fuse_norm_quant` on v0.30 (v0.23 may set false).
+
+faq: |-
+  See https://docs.vllm.ai/projects/ascend/en/latest/faqs.html
+
+  **OOM on 9B (~21 GB HBM):** Eco-Tech W8A8-310P + no MTP + `--limit-mm-per-prompt '{"image":0,"video":0}'` + `--mm-processor-cache-gb 0` + max-model-len 8192 + max-num-seqs 8 + util 0.90 (measured). MTP or multimodal profile_run OOM on this SKU.
+
+  **Wrong image:** must be `*-310p` ≥ v0.23.0rc1 (not A2 default image). Preferred smoke image: `v0.30.0rc1-310p` (also OK: `v0.23.0-310p`).
+
+  **v0.30 ValidationError on fuse_norm_quant:** omit that key from `--additional-config`.
+
+references:
+  - title: Qwen3.5-Dense tutorial (vLLM Ascend)
+    url: https://docs.vllm.ai/projects/ascend/en/latest/tutorials/models/Qwen3.5-Dense.html
+  - title: Tutorial source (GitHub)
+    url: https://github.com/vllm-project/vllm-ascend/blob/main/docs/source/tutorials/models/Qwen3.5-Dense.md
+  - title: Qwen3.5-2B ModelScope
+    url: https://www.modelscope.cn/models/Qwen/Qwen3.5-2B
+  - title: Eco-Tech Qwen3.5-9B-W8A8-310P
+    url: https://www.modelscope.cn/models/Eco-Tech/Qwen3.5-9B-W8A8-310P
