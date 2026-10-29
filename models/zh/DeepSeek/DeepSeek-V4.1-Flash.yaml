@@ -9,7 +9,7 @@ meta:
   difficulty: advanced
   tasks:
     - text
-  performance_headline: "并发 1 单卡 E2E 吞吐 196.54 TPS"
+  performance_headline: "并发 1 单卡 E2E 吞吐 177.09 TPS"
   related_recipes: []
   hardware:
     atlas_800_a3: verified
@@ -316,7 +316,7 @@ performance:
 
     |模型名称|产品组合|场景|设备信息|组网形态|总卡数|数据格式|上下文长度|平均输入|平均输出|
     |---|---|---|---|---|---|---|---|---|---|
-    |DeepSeek-V4.1-Flash|Atlas 800I A3 多节点-PD分离|PD 分离|Atlas 800I A3|多节点-PD分离|40|W8A8|1048576|256K/1K|-|
+    |DeepSeek-V4.1-Flash|Atlas 800I A3 多节点-PD分离|PD 分离|Atlas 800I A3|多节点-PD分离|40|W8A8|1048576|190K/1K|-|
 tuning: |-
   请参考公共性能调优文档与特性指南；本章仅涵盖模型特定问题。
 faq: |-
