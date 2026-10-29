@@ -1,0 +1,372 @@
+meta:
+  title: "Qwen3.5-Dense（2B/4B/9B）"
+  slug: "qwen3.5-dense"
+  provider: "Qwen"
+  description: "Qwen3.5-2B/4B/9B 稠密混合 Mamba-Transformer。Atlas 300I DUO / Atlas 200I Pro（310P）单机，vLLM Ascend ≥ v0.23.0rc1。"
+  date_added: "2026-10-28"
+  date_updated: "2026-10-29"
+  difficulty: beginner
+  tasks:
+    - text
+  performance_headline: "Atlas 300I DUO / 200I Pro（310P）单机 Dense + MTP（tutorial 迁移）"
+  related_recipes:
+    - "Qwen/Qwen3.5-27B-Qwen3.6-27B"
+  hardware:
+    atlas_300i_duo: verified
+
+model:
+  model_id: "Qwen/Qwen3.5-4B"
+  min_vllm_version: "0.23.0rc1"
+  architecture: dense
+  parameter_count: "2B / 4B / 9B"
+  active_parameters: null
+  context_length: 16384
+  modality: text
+  base_args:
+    - "--trust-remote-code"
+    - "--served-model-name"
+    - "qwen3.5"
+    - "--tensor-parallel-size"
+    - "1"
+    - "--max-model-len"
+    - "16384"
+    - "--max-num-seqs"
+    - "32"
+    - "--gpu-memory-utilization"
+    - "0.90"
+    - "--dtype"
+    - "float16"
+    - "--mamba-ssm-cache-dtype"
+    - "float16"
+  base_env:
+    VLLM_USE_MODELSCOPE: "True"
+    PYTORCH_NPU_ALLOC_CONF: "expandable_segments:True"
+  docker_image:
+    # 冒烟实测（约 21GB 310P3）：v0.30.0rc1-310p（2026-10-29）。最低仍 ≥ v0.23.0rc1；v0.23.0-310p 亦曾 PASS。
+    atlas_300i_duo: "quay.io/ascend/vllm-ascend:v0.30.0rc1-310p"
+  nightly_required: false
+  install:
+    pip: false
+    docker:
+      command: "docker run --rm --name vllm-ascend --shm-size=10g --device /dev/davinci0 --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc -v /root/.cache:/root/.cache -p 8080:8080 -it quay.io/ascend/vllm-ascend:v0.30.0rc1-310p bash"
+      note: "冒烟实测 tag：`v0.30.0rc1-310p`（2026-10-29，约 21GB 310P3；`v0.23.0-310p` 亦 PASS）。最低 ≥ v0.23.0rc1。完整挂载见 env_setup。310P 上如有 triton-ascend/triton 请卸载。"
+
+features:
+  spec_decoding:
+    label: "MTP 投机解码"
+    description: "qwen3_5_mtp，num_speculative_tokens=1 — FP16 2B/4B 约 21GB 实测可用；单卡约 21GB 上 9B W8A8 勿开 MTP（会 OOM）"
+    args:
+      - "--speculative-config"
+      - '{"method": "qwen3_5_mtp","num_speculative_tokens":1}'
+  compilation_config:
+    label: "编译配置"
+    description: "FULL_DECODE_ONLY；开 MTP 时 capture sizes 如 [2,16]；9B W8A8 无 MTP 用 [1,8]"
+    args:
+      - "--compilation-config"
+      - '{"cudagraph_mode": "FULL_DECODE_ONLY", "cudagraph_capture_sizes": [2,16]}'
+  disable_npugraph_ex:
+    label: "关闭 npugraph_ex"
+    description: "300I DUO / 200I Pro 不支持 enable_npugraph_ex，必须为 false"
+    args:
+      - "--additional-config"
+      - '{"ascend_compilation_config": {"enable_npugraph_ex": false}}'
+  w8a8_additional_config:
+    label: "W8A8 additional-config（9B）"
+    description: "约 21GB 310P3 上 9B W8A8：enable_npugraph_ex 必须为 false。v0.30.0rc1 勿传 fuse_norm_quant（VllmConfig ValidationError）；v0.23.0-310p 可设 fuse_norm_quant=false。"
+    args:
+      - "--additional-config"
+      - '{"ascend_compilation_config": {"enable_npugraph_ex": false}}'
+
+opt_in_features: []
+
+variants:
+  default:
+    model_id: "Qwen/Qwen3.5-4B"
+    precision: fp16
+    vram_minimum_gb: 12
+    description: "FP16 Qwen3.5-4B — v0.30.0rc1-310p 约 21GB 用 MTP + len=8192 + seqs=16（16384/32 失败）；v0.23 可用 16384/32"
+  qwen35_2b_fp16:
+    model_id: "Qwen/Qwen3.5-2B"
+    precision: fp16
+    vram_minimum_gb: 8
+    description: "FP16 2B，约 21GB 310P3 较宽松"
+  qwen35_9b_fp16:
+    model_id: "Qwen/Qwen3.5-9B"
+    precision: fp16
+    vram_minimum_gb: 20
+    description: "FP16 9B，约 21GB 偏紧"
+  qwen35_9b_w8a8:
+    model_id: "Eco-Tech/Qwen3.5-9B-W8A8-310P"
+    precision: W8A8
+    vram_minimum_gb: 16
+    description: "W8A8-310P 9B — 约 21GB（v0.23+v0.30）实测 PASS：text-only、无 MTP、len=8192、seqs=8、util=0.90；v0.30 勿传 fuse_norm_quant（约 19.8/21.5 GB）"
+
+compatible_strategies:
+  - single_node_310p
+
+hardware_overrides: {}
+strategy_overrides: {}
+dependencies: []
+guide: ""
+
+config_params:
+  max_model_len:
+    default: 16384
+    type: number
+    description: "上下文长度。约 21GB：2B@v0.30 可用 16384；4B@v0.30 地板 8192；9B W8A8 8192。tutorial 默认 16384 在 4B/9B 可能 OOM。"
+  max_num_seqs:
+    default: 32
+    type: number
+    description: "最大并发序列数。约 21GB v0.30：2B=32，4B 地板=16，9B W8A8=8。"
+  gpu_memory_utilization:
+    default: 0.9
+    type: number
+    description: "模型与 KV cache 占用的 HBM 比例。"
+
+overview: |-
+  Qwen3.5-2B/4B/9B 为 Qwen3.5 系列稠密混合 Mamba-Transformer（GDN + 全注意力）。本 recipe 将官方 vLLM Ascend tutorial 迁为结构化 YAML，面向 Atlas 300I DUO 与 Atlas 200I Pro（310p 镜像 ≥ v0.23.0rc1）。单机 TP=1（DUO 多卡可见时可 TP=2）。MTP：qwen3_5_mtp（1 token）。enable_npugraph_ex 必须为 false。
+
+weight_download:
+  - weight_version: Qwen3.5-2B FP16
+    sources:
+      - source: ModelScope
+        url: https://www.modelscope.cn/models/Qwen/Qwen3.5-2B
+        command: |-
+          ```bash
+          pip install modelscope
+          modelscope download --model Qwen/Qwen3.5-2B
+          ```
+      - source: HuggingFace
+        url: https://huggingface.co/Qwen/Qwen3.5-2B
+        command: |-
+          ```bash
+          pip install -U huggingface_hub
+          huggingface-cli download Qwen/Qwen3.5-2B
+          ```
+      - source: Modelers
+        url: ""
+        command: ""
+      - source: GitCode
+        url: ""
+        command: ""
+  - weight_version: Qwen3.5-4B FP16
+    sources:
+      - source: ModelScope
+        url: https://www.modelscope.cn/models/Qwen/Qwen3.5-4B
+        command: |-
+          ```bash
+          pip install modelscope
+          modelscope download --model Qwen/Qwen3.5-4B
+          ```
+      - source: HuggingFace
+        url: https://huggingface.co/Qwen/Qwen3.5-4B
+        command: |-
+          ```bash
+          pip install -U huggingface_hub
+          huggingface-cli download Qwen/Qwen3.5-4B
+          ```
+      - source: Modelers
+        url: ""
+        command: ""
+      - source: GitCode
+        url: ""
+        command: ""
+  - weight_version: Qwen3.5-9B FP16
+    sources:
+      - source: ModelScope
+        url: https://www.modelscope.cn/models/Qwen/Qwen3.5-9B
+        command: |-
+          ```bash
+          pip install modelscope
+          modelscope download --model Qwen/Qwen3.5-9B
+          ```
+      - source: HuggingFace
+        url: https://huggingface.co/Qwen/Qwen3.5-9B
+        command: |-
+          ```bash
+          pip install -U huggingface_hub
+          huggingface-cli download Qwen/Qwen3.5-9B
+          ```
+      - source: Modelers
+        url: ""
+        command: ""
+      - source: GitCode
+        url: ""
+        command: ""
+  - weight_version: Qwen3.5-9B-W8A8-310P
+    sources:
+      - source: ModelScope
+        url: https://www.modelscope.cn/models/Eco-Tech/Qwen3.5-9B-W8A8-310P
+        command: |-
+          ```bash
+          pip install modelscope
+          modelscope download --model Eco-Tech/Qwen3.5-9B-W8A8-310P
+          ```
+      - source: HuggingFace
+        url: ""
+        command: ""
+      - source: Modelers
+        url: ""
+        command: ""
+      - source: GitCode
+        url: ""
+        command: ""
+
+quantization:
+  content: |-
+    Eco-Tech 提供 `Qwen3.5-{2B,4B,9B}-W8A8-310P`。ModelSlim W8A8 可能自动识别 quantization=`ascend`（9B 实测）；
+    显式 `--quantization ascend` 可选。FP16 `Qwen/Qwen3.5-*` 不加该参数。约 21GB 单卡 9B 优先 W8A8。
+
+prerequisites:
+  - title: 硬件
+    content: |-
+      - Atlas 300I DUO 或 Atlas 200I Pro（310P）。
+      - 单卡可见 → TP=1；DUO 多卡可 TP=2。
+      - 部分 310P3 约 21GB HBM：9B FP16 可能 OOM，需降长/降并发或用 W8A8。
+  - title: 软件
+    content: |-
+      - 镜像冒烟实测 `v0.30.0rc1-310p`（`v0.23.0-310p` 亦 PASS）。最低 `v0.23.0rc1-310p`。
+      - 310P 上可能需要 `pip uninstall -y triton-ascend triton`（stub 会导致 serve 失败）。
+
+env_setup:
+  container:
+    "Atlas 300I DUO":
+      content: |-
+        ```bash
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.30.0rc1-310p
+        # 回退：export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0-310p
+        docker run --rm \
+            --name vllm-ascend \
+            --shm-size=10g \
+            --device /dev/davinci0 \
+            --device /dev/davinci_manager \
+            --device /dev/devmm_svm \
+            --device /dev/hisi_hdc \
+            -v /usr/local/dcmi:/usr/local/dcmi \
+            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+            -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \
+            -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
+            -v /etc/ascend_install.info:/etc/ascend_install.info \
+            -v /root/.cache:/root/.cache \
+            -p 8080:8080 \
+            -it $IMAGE bash
+        ```
+    "Atlas 200I Pro":
+      content: |-
+        按官方 tutorial 的 Ubuntu / openEuler 挂载（privileged 等）。镜像 `…-310p` 或 `…-310p-openeuler`。
+  pip:
+    content: |-
+      ```bash
+      git clone https://github.com/vllm-project/vllm-ascend.git
+      cd vllm-ascend && pip install -e .
+      pip uninstall -y triton-ascend triton
+      ```
+
+scenarios:
+  - npu: Atlas 300I DUO
+    precision: fp16
+    deployment: Single-Node
+    case: 310P TP1（2B/4B/9B FP16）
+    tags: [310p-single]
+    strategy: single_node_310p
+    steps:
+      - title: 启动服务
+        content: |-
+          **v0.30.0rc1-310p 约 21GB 实测地板：** 2B = MTP + len=16384 + seqs=32；**4B = MTP + len=8192 + seqs=16**（16384/32 失败）。下方为 tutorial 基线模板，4B 请按地板改长/并发。
+
+          ```bash
+          export VLLM_USE_MODELSCOPE=True
+          export MODEL_PATH=Qwen/Qwen3.5-4B
+
+          vllm serve $MODEL_PATH \
+            --host 127.0.0.1 \
+            --port 8080 \
+            --tensor-parallel-size 1 \
+            --served-model-name qwen3.5 \
+            --max-num-seqs {{max_num_seqs}} \
+            --max-model-len {{max_model_len}} \
+            --trust-remote-code \
+            --gpu-memory-utilization {{gpu_memory_utilization}} \
+            --mamba-ssm-cache-dtype float16 \
+            --dtype float16 \
+            {{spec_decoding}} \
+            {{compilation_config}} \
+            {{disable_npugraph_ex}}
+          ```
+      - title: 服务验证
+        content: |-
+          见 verification；日志出现 Application startup complete 后 curl。
+
+  - npu: Atlas 300I DUO
+    precision: W8A8
+    deployment: Single-Node
+    case: 310P TP1（约 21GB 9B W8A8 text-only — 实测）
+    tags: [310p-single, w8a8]
+    strategy: single_node_310p
+    steps:
+      - title: 启动服务（W8A8-310P，实测可跑配置）
+        content: |-
+          约 21GB 310P3（`v0.30.0rc1-310p` 与早先 `v0.23.0-310p`）实测 PASS：**关 MTP**、text-only、
+          `max-model-len=8192`、`max-num-seqs=8`、`gpu-memory-utilization=0.90`、
+          cudagraph `[1,8]`；quant 自动=`ascend`。
+          **v0.30：勿传 `fuse_norm_quant`**（ValidationError）。**v0.23：** 可设 `fuse_norm_quant=false`。
+          默认 MTP + seqs=16 + 多模态 profile_run 会 OOM。
+
+          ```bash
+          export VLLM_USE_MODELSCOPE=True
+          export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+          export MODEL_PATH=Eco-Tech/Qwen3.5-9B-W8A8-310P
+
+          vllm serve $MODEL_PATH \
+            --host 127.0.0.1 \
+            --port 8080 \
+            --tensor-parallel-size 1 \
+            --served-model-name qwen3.5 \
+            --max-num-seqs 8 \
+            --max-model-len 8192 \
+            --trust-remote-code \
+            --gpu-memory-utilization 0.90 \
+            --mamba-ssm-cache-dtype float16 \
+            --dtype float16 \
+            --limit-mm-per-prompt '{"image":0,"video":0}' \
+            --mm-processor-cache-gb 0 \
+            --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY","cudagraph_capture_sizes":[1,8]}' \
+            --additional-config '{"ascend_compilation_config":{"enable_npugraph_ex":false}}'
+          ```
+
+          说明：不要套 `{{spec_decoding}}`；v0.30 勿传 `fuse_norm_quant`（仅 v0.23 需要时可加 false）；
+          `--quantization ascend` 在自动识别成功时可省略；
+          加载后约 19800–19905/21525 MB；weights ≈ 15.66 GiB；KV ≈ 0.78–0.81 GiB。
+
+verification: |-
+  Completions / Chat 见英文版同结构；model 名 `qwen3.5`，端口 8080，期望 HTTP 200。
+
+evaluation:
+  accuracy:
+    content: |-
+      本地 AISBench gsm8k（310P3 约 21GB，镜像 `v0.30.0rc1-310p`，2026-10-29 Asia/Shanghai）：
+      2B FP16 **80.06**（FAIL=0；教程 77.71）；
+      4B FP16 **93.56**（FAIL=0，干净重跑 2026-10-29 16:50 CST；教程 93.18）；
+      9B W8A8 **95.15**（FAIL=0；教程 95.30）。
+      textvqa 本机未跑。Tutorial 参考（300I DUO）：2B 77.71 / 4B 93.18 / 9B 95.30。
+  performance:
+    content: |-
+      本机尚未测性能；勿编造数字。可用 AISBench perf 或 `vllm bench serve`。
+
+tuning: |-
+  仅 TP；单卡优先 TP=1。OOM 先降 max-model-len / max-num-seqs。保持 enable_npugraph_ex=false。
+  FP16 2B/4B 可开 MTP（tokens=1）；约 21GB 上 9B W8A8 **关 MTP**，并设 text-only MM 限制。
+  v0.30 约 21GB：4B 用 len=8192 seqs=16；9B **勿传** fuse_norm_quant（v0.23 可设 false）。
+
+faq: |-
+  见官方 FAQ。9B 约 21GB OOM → Eco-Tech W8A8-310P + 无 MTP + limit-mm image/video=0 + mm-cache=0 + len=8192 + seqs=8 + util=0.90（实测）。
+  镜像必须 `*-310p` ≥ v0.23.0rc1；优先冒烟镜像 `v0.30.0rc1-310p`（`v0.23.0-310p` 亦可）。
+  v0.30 传 fuse_norm_quant 会 ValidationError → 从 additional-config 去掉该键。
+
+references:
+  - title: Qwen3.5-Dense tutorial
+    url: https://docs.vllm.ai/projects/ascend/en/latest/tutorials/models/Qwen3.5-Dense.html
+  - title: Tutorial 源码
+    url: https://github.com/vllm-project/vllm-ascend/blob/main/docs/source/tutorials/models/Qwen3.5-Dense.md
+  - title: Eco-Tech 9B W8A8-310P
+    url: https://www.modelscope.cn/models/Eco-Tech/Qwen3.5-9B-W8A8-310P
