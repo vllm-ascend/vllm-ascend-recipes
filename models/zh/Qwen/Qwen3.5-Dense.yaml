@@ -54,13 +54,13 @@ model:
 features:
   spec_decoding:
     label: "MTP 投机解码"
-    description: "qwen3_5_mtp，num_speculative_tokens=1 — FP16 2B/4B 约 21GB 实测可用；单卡约 21GB 上 9B W8A8 勿开 MTP（会 OOM）"
+    description: "qwen3_5_mtp，num_speculative_tokens=1 — FP16 2B/4B 约 21GB 实测可用；单卡约 21GB 上 9B W8A8 勿开 MTP（会 OOM）。双卡约 21GB、TP=2 时 9B W8A8 + MTP 实测可用（2026-10-30）"
     args:
       - "--speculative-config"
       - '{"method": "qwen3_5_mtp","num_speculative_tokens":1}'
   compilation_config:
     label: "编译配置"
-    description: "FULL_DECODE_ONLY；开 MTP 时 capture sizes 如 [2,16]；9B W8A8 无 MTP 用 [1,8]"
+    description: "FULL_DECODE_ONLY；FP16 2B/4B 开 MTP 时 capture sizes 如 [2,16]；9B W8A8（TP1 无 MTP 或 TP2+MTP）用 [1,8]"
     args:
       - "--compilation-config"
       - '{"cudagraph_mode": "FULL_DECODE_ONLY", "cudagraph_capture_sizes": [2,16]}'
@@ -99,7 +99,7 @@ variants:
     model_id: "Eco-Tech/Qwen3.5-9B-W8A8-310P"
     precision: W8A8
     vram_minimum_gb: 16
-    description: "W8A8-310P 9B — 约 21GB（v0.23+v0.30）实测 PASS：text-only、无 MTP、len=8192、seqs=8、util=0.90；v0.30 勿传 fuse_norm_quant（约 19.8/21.5 GB）"
+    description: "W8A8-310P 9B — 单卡约 21GB TP1 地板（v0.23+v0.30）：text-only、无 MTP、len=8192、seqs=8、util=0.90；v0.30 勿传 fuse_norm_quant（约 19.8/21.5 GB）。可选双卡约 21GB TP=2 + MTP 实测 PASS（2026-10-30；约 17.3G/卡）"
 
 compatible_strategies:
   - single_node_310p
@@ -124,7 +124,7 @@ config_params:
     description: "模型与 KV cache 占用的 HBM 比例。"
 
 overview: |-
-  Qwen3.5-2B/4B/9B 为 Qwen3.5 系列稠密混合 Mamba-Transformer（GDN + 全注意力）。本 recipe 将官方 vLLM Ascend tutorial 迁为结构化 YAML，面向 Atlas 300I DUO 与 Atlas 200I Pro（310p 镜像 ≥ v0.23.0rc1）。单机 TP=1（DUO 多卡可见时可 TP=2）。MTP：qwen3_5_mtp（1 token）。enable_npugraph_ex 必须为 false。
+  Qwen3.5-2B/4B/9B 为 Qwen3.5 系列稠密混合 Mamba-Transformer（GDN + 全注意力）。本 recipe 将官方 vLLM Ascend tutorial 迁为结构化 YAML，面向 Atlas 300I DUO 与 Atlas 200I Pro（310p 镜像 ≥ v0.23.0rc1）。单机 TP=1（DUO 多卡可见时可 TP=2）。MTP：qwen3_5_mtp（1 token）——FP16 2B/4B 单卡约 21GB 可用；9B W8A8 单卡约 21GB 关 MTP，或双卡约 21GB TP=2 + MTP（2026-10-30 实测）。enable_npugraph_ex 必须为 false。
 
 weight_download:
   - weight_version: Qwen3.5-2B FP16
@@ -222,8 +222,8 @@ prerequisites:
   - title: 硬件
     content: |-
       - Atlas 300I DUO 或 Atlas 200I Pro（310P）。
-      - 单卡可见 → TP=1；DUO 多卡可 TP=2。
-      - 部分 310P3 约 21GB HBM：9B FP16 可能 OOM，需降长/降并发或用 W8A8。
+      - 单卡可见 → TP=1；DUO / 多卡主机可 TP=2（9B W8A8 + MTP 已在两张约 21GB 卡上实测）。
+      - 部分 310P3 约 21GB HBM：9B FP16 可能 OOM；单卡 9B W8A8 + MTP 会 OOM，开 MTP 请用 TP2。
   - title: 软件
     content: |-
       - 镜像冒烟实测 `v0.30.0rc1-310p`（`v0.23.0-310p` 亦 PASS）。最低 `v0.23.0rc1-310p`。
@@ -340,6 +340,51 @@ scenarios:
           `--quantization ascend` 在自动识别成功时可省略；
           加载后约 19800–19905/21525 MB；weights ≈ 15.66 GiB；KV ≈ 0.78–0.81 GiB。
 
+  - npu: Atlas 300I DUO
+    precision: W8A8
+    deployment: Single-Node
+    case: 310P TP2（双卡约 21GB 9B W8A8 + MTP — 实测）
+    tags: [310p-tp2, w8a8, mtp]
+    strategy: single_node_310p
+    steps:
+      - title: 启动服务（W8A8-310P TP2 + MTP，实测）
+        content: |-
+          两张约 21GB 310P3（`v0.30.0rc1-310p`，2026-10-30 Asia/Shanghai）实测 PASS：**TP=2** +
+          `qwen3_5_mtp`（`num_speculative_tokens=1`），`max-model-len=8192`，`max-num-seqs=8`，
+          `gpu-memory-utilization=0.90`，`--mm-processor-cache-gb 0`，cudagraph `[1,8]`。
+          本路径**不**传 `--limit-mm-per-prompt` 清零（该 W8A8 权重仍为 **generate-only**）。
+          v0.30 **勿传** `fuse_norm_quant`。单卡约 21GB + MTP 仍会 **OOM**——TP2 才能开 MTP。
+          宿主机两张卡映射进容器后，容器内设 `ASCEND_RT_VISIBLE_DEVICES=0,1`（逻辑编号）。
+          如有损坏的 `triton` / `triton-ascend` site-packages，启动前请清理。
+
+          将 `your_model_path` 换成本地 `Eco-Tech/Qwen3.5-9B-W8A8-310P` 权重（或 Hub/ModelScope id）。
+
+          ```bash
+          export VLLM_USE_MODELSCOPE=True
+          export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+          export ASCEND_RT_VISIBLE_DEVICES=0,1
+
+          vllm serve your_model_path \
+            --host 127.0.0.1 \
+            --port 8080 \
+            --tensor-parallel-size 2 \
+            --served-model-name qwen3.5 \
+            --max-num-seqs 8 \
+            --max-model-len 8192 \
+            --trust-remote-code \
+            --gpu-memory-utilization 0.90 \
+            --mamba-ssm-cache-dtype float16 \
+            --dtype float16 \
+            --mm-processor-cache-gb 0 \
+            --speculative-config '{"method":"qwen3_5_mtp","num_speculative_tokens":1}' \
+            --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY","cudagraph_capture_sizes":[1,8]}' \
+            --additional-config '{"ascend_compilation_config":{"enable_npugraph_ex":false}}'
+          ```
+
+          说明：单卡约 21GB 仍以 TP1 W8A8（无 MTP）为**默认地板**；method 可能提示 deprecated 并解析为 `mtp`；
+          chat 冒烟 PASS；fingerprint 例 `vllm-0.30.0-tp2-4d8a990a`；加载后约 **17287/21525** 与 **17248/21525** MB；
+          TP2 未重跑 gsm8k/perf，精度表仍为 TP1 数字。
+
 verification: |-
   Completions / Chat 见英文版同结构；model 名 `qwen3.5`，端口 8080，期望 HTTP 200。
 
@@ -350,18 +395,21 @@ evaluation:
       2B FP16 **80.06**（FAIL=0；教程 77.71）；
       4B FP16 **93.56**（FAIL=0，干净重跑 2026-10-29 16:50 CST；教程 93.18）；
       9B W8A8 **95.15**（FAIL=0；教程 95.30）。
+      9B W8A8 TP2+MTP 功能冒烟（双卡约 21GB）：**PASS**（2026-10-30 Asia/Shanghai；chat OK）。gsm8k 上表数字未改（仍为 TP1）。
       textvqa 本机未跑。Tutorial 参考（300I DUO）：2B 77.71 / 4B 93.18 / 9B 95.30。
   performance:
     content: |-
       本机尚未测性能；勿编造数字。可用 AISBench perf 或 `vllm bench serve`。
 
 tuning: |-
-  仅 TP；单卡优先 TP=1。OOM 先降 max-model-len / max-num-seqs。保持 enable_npugraph_ex=false。
-  FP16 2B/4B 可开 MTP（tokens=1）；约 21GB 上 9B W8A8 **关 MTP**，并设 text-only MM 限制。
-  v0.30 约 21GB：4B 用 len=8192 seqs=16；9B **勿传** fuse_norm_quant（v0.23 可设 false）。
+  仅 TP；单卡优先 TP=1；有两张约 21GB 卡时 9B W8A8 + MTP 可用 TP=2。
+  OOM 先降 max-model-len / max-num-seqs。保持 enable_npugraph_ex=false。
+  FP16 2B/4B 可开 MTP（tokens=1）；**单卡**约 21GB 上 9B W8A8 **关 MTP**；可选 **TP=2 + MTP**（双卡约 21GB 实测 PASS）。
+  v0.30 约 21GB：4B 用 len=8192 seqs=16；9B TP1 **勿传** fuse_norm_quant（v0.23 可设 false）。
+  TP2 路径：`--mm-processor-cache-gb 0`、不传 limit-mm 清零、cudagraph `[1,8]`、设备重映射时 `ASCEND_RT_VISIBLE_DEVICES=0,1`。
 
 faq: |-
-  见官方 FAQ。9B 约 21GB OOM → Eco-Tech W8A8-310P + 无 MTP + limit-mm image/video=0 + mm-cache=0 + len=8192 + seqs=8 + util=0.90（实测）。
+  见官方 FAQ。9B **单卡**约 21GB OOM → Eco-Tech W8A8-310P + 无 MTP + limit-mm image/video=0 + mm-cache=0 + len=8192 + seqs=8 + util=0.90（实测）。单卡 MTP 仍 OOM；开 MTP 用双卡约 21GB **TP=2**（2026-10-30 实测 PASS）。
   镜像必须 `*-310p` ≥ v0.23.0rc1；优先冒烟镜像 `v0.30.0rc1-310p`（`v0.23.0-310p` 亦可）。
   v0.30 传 fuse_norm_quant 会 ValidationError → 从 additional-config 去掉该键。
 
