@@ -13,7 +13,8 @@ meta:
     - "Qwen/Qwen3.5-27B-Qwen3.6-27B"
   hardware:
     atlas_300i_duo: verified
-    # Verified: function smoke + AISBench gsm8k on 310P3 (~21GB) image v0.30.0rc1-310p (2026-10-29). textvqa/perf still open.
+    # Verified: function smoke + AISBench gsm8k on 310P3 (~21GB) image v0.30.0rc1-310p (2026-10-29).
+    # Follow-up 2026-10-30: 9B W8A8 TP2+MTP function smoke PASS on two ~21GB chips. textvqa/perf still open.
 
 model:
   model_id: "Qwen/Qwen3.5-4B"
@@ -55,13 +56,13 @@ model:
 features:
   spec_decoding:
     label: "MTP Spec Decoding"
-    description: "qwen3_5_mtp with num_speculative_tokens=1 — measured OK for FP16 2B/4B on ~21GB 310P3. Do NOT enable for 9B W8A8 on single ~21GB chip (OOM)."
+    description: "qwen3_5_mtp with num_speculative_tokens=1 — measured OK for FP16 2B/4B on ~21GB 310P3. Do NOT enable for 9B W8A8 on a single ~21GB chip (OOM). On TP=2 across two ~21GB chips, 9B W8A8 + MTP measured OK (2026-10-30)."
     args:
       - "--speculative-config"
       - '{"method": "qwen3_5_mtp","num_speculative_tokens":1}'
   compilation_config:
     label: "Compilation Config"
-    description: "FULL_DECODE_ONLY ACL graph; with MTP use capture sizes like [2,16]; for 9B W8A8 no-MTP use [1,8]"
+    description: "FULL_DECODE_ONLY ACL graph; with MTP on FP16 2B/4B use capture sizes like [2,16]; for 9B W8A8 (TP1 no-MTP or TP2+MTP) use [1,8]"
     args:
       - "--compilation-config"
       - '{"cudagraph_mode": "FULL_DECODE_ONLY", "cudagraph_capture_sizes": [2,16]}'
@@ -100,7 +101,7 @@ variants:
     model_id: "Eco-Tech/Qwen3.5-9B-W8A8-310P"
     precision: W8A8
     vram_minimum_gb: 16
-    description: "W8A8-310P 9B — measured PASS on ~21GB 310P3 (v0.23+v0.30): text-only, no MTP, len=8192, seqs=8, util=0.90; on v0.30 omit fuse_norm_quant (~19.8/21.5 GB)"
+    description: "W8A8-310P 9B — TP1 floor on single ~21GB (v0.23+v0.30): text-only, no MTP, len=8192, seqs=8, util=0.90; omit fuse_norm_quant on v0.30 (~19.8/21.5 GB). Optional TP=2 on two ~21GB chips: +MTP measured PASS (2026-10-30; ~17.3G/chip)."
 
 compatible_strategies:
   - single_node_310p
@@ -125,7 +126,7 @@ config_params:
     description: "Fraction of NPU HBM for model + KV cache."
 
 overview: |-
-  Qwen3.5-2B, Qwen3.5-4B, and Qwen3.5-9B are dense hybrid Mamba-Transformer language models in the Qwen3.5 family (GDN + full attention). This recipe migrates the official vLLM Ascend tutorial into structured YAML for Atlas 300I DUO and Atlas 200I Pro (310P images ≥ v0.23.0rc1). Single-node TP=1 (or TP=2 on DUO with multiple visible NPUs). MTP via qwen3_5_mtp (1 token). enable_npugraph_ex must remain false.
+  Qwen3.5-2B, Qwen3.5-4B, and Qwen3.5-9B are dense hybrid Mamba-Transformer language models in the Qwen3.5 family (GDN + full attention). This recipe migrates the official vLLM Ascend tutorial into structured YAML for Atlas 300I DUO and Atlas 200I Pro (310P images ≥ v0.23.0rc1). Single-node TP=1 (or TP=2 on DUO with multiple visible NPUs). MTP via qwen3_5_mtp (1 token): OK for FP16 2B/4B on single ~21GB; for 9B W8A8 use no-MTP on single ~21GB, or TP=2 + MTP on two ~21GB chips (measured 2026-10-30). enable_npugraph_ex must remain false.
 
 weight_download:
   - weight_version: Qwen3.5-2B FP16
@@ -226,8 +227,8 @@ prerequisites:
   - title: Hardware
     content: |-
       - **Atlas 300I DUO** or **Atlas 200I Pro** (310P series).
-      - Single visible NPU → **TP=1**. DUO with multiple devices may use **TP=2**.
-      - Some 310P3 SKUs report ~21 GB HBM (not ~44/48 GB). Size `max-model-len` / `max-num-seqs` / precision accordingly; 9B FP16 may OOM.
+      - Single visible NPU → **TP=1**. DUO / multi-chip hosts may use **TP=2** (9B W8A8 + MTP measured on two ~21GB chips).
+      - Some 310P3 SKUs report ~21 GB HBM (not ~44/48 GB). Size `max-model-len` / `max-num-seqs` / precision accordingly; 9B FP16 may OOM. Single-chip 9B W8A8 + MTP OOMs; use TP2 for MTP.
   - title: Software
     content: |-
       - Image: smoke-verified `v0.30.0rc1-310p` (also passed `v0.23.0-310p`). Floor `v0.23.0rc1-310p`. openEuler: matching `-310p-openeuler`.
@@ -354,6 +355,53 @@ scenarios:
           - `--quantization ascend` optional if ModelSlim auto-detect works.
           - Observed HBM after load ≈ 19800–19905/21525 MB; weights ≈ 15.66 GiB; KV ≈ 0.78–0.81 GiB.
 
+  - npu: Atlas 300I DUO
+    precision: W8A8
+    deployment: Single-Node
+    case: 310P TP2 (9B W8A8 + MTP on two ~21GB chips — measured)
+    tags: [310p-tp2, w8a8, mtp]
+    strategy: single_node_310p
+    steps:
+      - title: Start the server (W8A8-310P TP2 + MTP, measured)
+        content: |-
+          Measured PASS on two ~21GB 310P3 chips (`v0.30.0rc1-310p`, 2026-10-30 Asia/Shanghai): **TP=2** +
+          `qwen3_5_mtp` (`num_speculative_tokens=1`), `max-model-len=8192`, `max-num-seqs=8`,
+          `gpu-memory-utilization=0.90`, `--mm-processor-cache-gb 0`, cudagraph `[1,8]`.
+          Omit `--limit-mm-per-prompt` zeroing on this path (still **generate-only** for this W8A8 checkpoint).
+          **Do not** pass `fuse_norm_quant` on v0.30. Single ~21GB chip + MTP still **OOM** — TP2 is what enables MTP.
+          When two host devices are remapped into the container, set `ASCEND_RT_VISIBLE_DEVICES=0,1` inside the
+          container (logical indices). Purge broken `triton` / `triton-ascend` in site-packages before serve if needed.
+
+          Replace `your_model_path` with local `Eco-Tech/Qwen3.5-9B-W8A8-310P` weights (or Hub/ModelScope id).
+
+          ```bash
+          export VLLM_USE_MODELSCOPE=True
+          export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+          export ASCEND_RT_VISIBLE_DEVICES=0,1
+
+          vllm serve your_model_path \
+            --host 127.0.0.1 \
+            --port 8080 \
+            --tensor-parallel-size 2 \
+            --served-model-name qwen3.5 \
+            --max-num-seqs 8 \
+            --max-model-len 8192 \
+            --trust-remote-code \
+            --gpu-memory-utilization 0.90 \
+            --mamba-ssm-cache-dtype float16 \
+            --dtype float16 \
+            --mm-processor-cache-gb 0 \
+            --speculative-config '{"method":"qwen3_5_mtp","num_speculative_tokens":1}' \
+            --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY","cudagraph_capture_sizes":[1,8]}' \
+            --additional-config '{"ascend_compilation_config":{"enable_npugraph_ex":false}}'
+          ```
+
+          Notes:
+          - Keep the TP1 W8A8 scenario as the **default floor** on a single ~21GB chip (no MTP).
+          - Method may log as deprecated → resolved as `mtp`; chat smoke PASS; fingerprint example `vllm-0.30.0-tp2-4d8a990a`.
+          - Observed HBM after MTP load ≈ **17287/21525** and **17248/21525** MB (~17.3G/chip); workers ≈ 15461 MB each.
+          - gsm8k / perf not re-run for TP2 — accuracy table remains TP1 numbers.
+
 verification: |-
   Log should show `Application startup complete.`
 
@@ -395,23 +443,23 @@ evaluation:
       | 9B | gsm8k | accuracy | 95.30 |
       | 9B | textvqa | accuracy | 82.33 |
 
-      textvqa / AISBench perf not run on this host yet (gsm8k only). Follow vllm-ascend AISBench guide; use `enable_thinking: False` postprocessor as in tutorial.
+      TP2 + MTP function smoke for 9B W8A8 on two ~21GB chips: **PASS** (2026-10-30 Asia/Shanghai; chat OK). gsm8k numbers above are unchanged (TP1). textvqa / AISBench perf not run on this host yet. Follow vllm-ascend AISBench guide; use `enable_thinking: False` postprocessor as in tutorial.
   performance:
     content: |-
       Not measured yet on this host. Use AISBench performance mode or `vllm bench serve`. Do not invent numbers.
 
 tuning: |-
-  - Only TP on these platforms; prefer TP=1 on single-NPU 200I Pro / 310P3.
+  - Only TP on these platforms; prefer TP=1 on single-NPU 200I Pro / 310P3; use TP=2 when two ~21GB chips are available for 9B W8A8 + MTP.
   - Lower `--max-model-len`, `--max-num-seqs` before raising them.
   - Keep `enable_npugraph_ex: false`.
-  - MTP `num_speculative_tokens: 1` for FP16 2B/4B; **disable MTP** for 9B W8A8 on ~21GB.
+  - MTP `num_speculative_tokens: 1` for FP16 2B/4B; **disable MTP** for 9B W8A8 on a **single** ~21GB chip; optional **TP=2 + MTP** measured OK on two ~21GB chips.
   - On v0.30 ~21GB: 4B use len=8192 seqs=16 (16384/32 fails); 2B can keep 16384/32.
-  - 9B W8A8 on ~21GB: text-only MM limits; **omit** `fuse_norm_quant` on v0.30 (v0.23 may set false).
+  - 9B W8A8 TP1 on ~21GB: text-only MM limits; **omit** `fuse_norm_quant` on v0.30 (v0.23 may set false). TP2 path: `--mm-processor-cache-gb 0`, omit limit-mm zeroing, cudagraph `[1,8]`, `ASCEND_RT_VISIBLE_DEVICES=0,1` when devices remapped.
 
 faq: |-
   See https://docs.vllm.ai/projects/ascend/en/latest/faqs.html
 
-  **OOM on 9B (~21 GB HBM):** Eco-Tech W8A8-310P + no MTP + `--limit-mm-per-prompt '{"image":0,"video":0}'` + `--mm-processor-cache-gb 0` + max-model-len 8192 + max-num-seqs 8 + util 0.90 (measured). MTP or multimodal profile_run OOM on this SKU.
+  **OOM on 9B (single ~21 GB HBM):** Eco-Tech W8A8-310P + no MTP + `--limit-mm-per-prompt '{"image":0,"video":0}'` + `--mm-processor-cache-gb 0` + max-model-len 8192 + max-num-seqs 8 + util 0.90 (measured). MTP on single chip still OOM. For MTP, use **TP=2** on two ~21GB chips (measured PASS 2026-10-30).
 
   **Wrong image:** must be `*-310p` ≥ v0.23.0rc1 (not A2 default image). Preferred smoke image: `v0.30.0rc1-310p` (also OK: `v0.23.0-310p`).
 
