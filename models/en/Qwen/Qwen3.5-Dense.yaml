@@ -4,7 +4,7 @@ meta:
   provider: "Qwen"
   description: "Qwen3.5-2B/4B/9B dense hybrid Mamba-Transformer models. Single-node serving on Atlas 300I DUO / Atlas 200I Pro (310P) with vLLM Ascend ≥ v0.23.0rc1."
   date_added: "2026-10-28"
-  date_updated: "2026-10-29"
+  date_updated: "2026-10-30"
   difficulty: beginner
   tasks:
     - text
@@ -30,9 +30,9 @@ model:
     - "--tensor-parallel-size"
     - "1"
     - "--max-model-len"
-    - "16384"
+    - "8192"
     - "--max-num-seqs"
-    - "32"
+    - "16"
     - "--gpu-memory-utilization"
     - "0.90"
     - "--dtype"
@@ -96,16 +96,6 @@ variants:
     precision: fp16
     vram_minimum_gb: 20
     description: "FP16 9B — tight on ~21 GB; may need lower max-model-len / max-num-seqs"
-  qwen35_2b_w8a8:
-    model_id: "Eco-Tech/Qwen3.5-2B-W8A8-310P"
-    precision: W8A8
-    vram_minimum_gb: 6
-    description: "W8A8-310P 2B"
-  qwen35_4b_w8a8:
-    model_id: "Eco-Tech/Qwen3.5-4B-W8A8-310P"
-    precision: W8A8
-    vram_minimum_gb: 8
-    description: "W8A8-310P 4B"
   qwen35_9b_w8a8:
     model_id: "Eco-Tech/Qwen3.5-9B-W8A8-310P"
     precision: W8A8
@@ -122,13 +112,13 @@ guide: ""
 
 config_params:
   max_model_len:
-    default: 16384
+    default: 8192
     type: number
-    description: "Context length (input+output). On ~21GB: 2B@v0.30 OK 16384; 4B@v0.30 floor 8192; 9B W8A8 8192. Tutorial default 16384 may OOM on 4B/9B."
+    description: "Context length (input+output). Defaults match measured 4B floor on ~21GB v0.30. 2B@v0.30 can raise to 16384; 9B W8A8 keep 8192. Tutorial 16384/32 may OOM on 4B/9B."
   max_num_seqs:
-    default: 32
+    default: 16
     type: number
-    description: "Max concurrent sequences. On ~21GB v0.30: 2B=32, 4B floor=16, 9B W8A8=8."
+    description: "Max concurrent sequences. Default 16 = measured 4B floor on ~21GB v0.30. 2B can use 32; 9B W8A8 use 8."
   gpu_memory_utilization:
     default: 0.9
     type: number
@@ -225,9 +215,10 @@ weight_download:
 
 quantization:
   content: |-
-    Pre-quantized W8A8-310P checkpoints are published under `Eco-Tech/` on ModelScope
-    (`Qwen3.5-{2B,4B,9B}-W8A8-310P`). ModelSlim W8A8 may auto-detect quantization method
-    `ascend` (measured on 9B); explicit `--quantization ascend` is optional if auto works.
+    Pre-quantized W8A8-310P checkpoints exist under `Eco-Tech/` on ModelScope.
+    This recipe only documents the **measured** `Qwen3.5-9B-W8A8-310P` variant (2B/4B W8A8
+    omitted until smoke + accuracy are recorded). ModelSlim W8A8 may auto-detect quantization
+    method `ascend` (measured on 9B); explicit `--quantization ascend` is optional if auto works.
     FP16 `Qwen/Qwen3.5-*` does not use that flag.
     On ~21 GB single-chip 310P3, prefer W8A8 for 9B (FP16 9B not smoke-tested here).
 
@@ -290,14 +281,13 @@ scenarios:
     steps:
       - title: Start the server
         content: |-
-          Tutorial baseline (replace MODEL_PATH with 2B/4B/9B). Prefer Eco-Tech W8A8-310P for 9B on ~21 GB HBM.
-          **v0.30.0rc1-310p measured floors on ~21GB:** 2B = MTP + len=16384 + seqs=32; **4B = MTP + len=8192 + seqs=16** (YAML/tutorial 16384/32 failed on v0.30); 9B FP16 not smoke-tested here.
+          Replace `your_model_path` with local 2B/4B FP16 weights (or Hub id). Prefer Eco-Tech W8A8-310P for 9B on ~21 GB HBM (see W8A8 scenario).
+          **v0.30.0rc1-310p measured floors on ~21GB:** 2B = MTP + len=16384 + seqs=32; **4B = MTP + len=8192 + seqs=16** (16384/32 failed on v0.30). Recipe defaults below match the **4B floor**. 9B FP16 not smoke-tested here.
 
           ```bash
           export VLLM_USE_MODELSCOPE=True
-          export MODEL_PATH=Qwen/Qwen3.5-4B
 
-          vllm serve $MODEL_PATH \
+          vllm serve your_model_path \
             --host 127.0.0.1 \
             --port 8080 \
             --tensor-parallel-size 1 \
@@ -335,12 +325,13 @@ scenarios:
           **v0.30:** do **not** pass `fuse_norm_quant` (ValidationError). **v0.23:** `fuse_norm_quant=false` was OK.
           Recipe defaults with MTP + seqs=16 + multimodal profile_run **OOM** on this SKU.
 
+          Replace `your_model_path` with local `Eco-Tech/Qwen3.5-9B-W8A8-310P` weights (or Hub/ModelScope id).
+
           ```bash
           export VLLM_USE_MODELSCOPE=True
           export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
-          export MODEL_PATH=Eco-Tech/Qwen3.5-9B-W8A8-310P
 
-          vllm serve $MODEL_PATH \
+          vllm serve your_model_path \
             --host 127.0.0.1 \
             --port 8080 \
             --tensor-parallel-size 1 \
