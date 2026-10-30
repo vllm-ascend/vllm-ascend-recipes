@@ -1,0 +1,73 @@
+{
+  "verification_scope": "single-node API smoke; not accuracy or full feature coverage",
+  "recipe_path": "models/en/DeepSeek/DeepSeek-V3.1.yaml",
+  "model_id": "deepseek-ai/DeepSeek-V3.1",
+  "hw_key": "mixed",
+  "head_sha": "92ca5b8451e5fd25a73d651d17d191ac932bfa0c",
+  "workflow_run_id": "40843418894",
+  "trigger_type": "pr",
+  "image": "mixed; see hardware_runs",
+  "started_at": "2026-10-29T08:36:56Z",
+  "scenarios": [
+    {
+      "index": 0,
+      "npu": "Atlas 800I A3",
+      "precision": "W8A8",
+      "deployment": "Single-Node",
+      "case": "High Throughput",
+      "serve_cmd": "#!/bin/sh\n  # this obtained through ifconfig\n  # nic_name is the network interface name corresponding to local_ip of the current node\n  nic_name=\"xxxx\"\n  local_ip=\"xxxx\"\n\n  # [Optional] jemalloc\n  # jemalloc is for better performance, if `libjemalloc.so` is installed on your machine, you can turn it on.\n  # export LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libjemalloc.so.2:$LD_PRELOAD\n\n  # AIV\n  export HCCL_OP_EXPANSION_MODE=\"AIV\"\n\n  export HCCL_IF_IP=$local_ip\n  export GLOO_SOCKET_IFNAME=$nic_name\n  export TP_SOCKET_IFNAME=$nic_name\n  export HCCL_SOCKET_IFNAME=$nic_name\n  export VLLM_ASCEND_BALANCE_SCHEDULING=1\n  export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\n\n  vllm serve /root/.cache/modelscope/hub/models/Eco-Tech/DeepSeek-V3.1-w8a8-mtp-QuaRot \\\n  --host 0.0.0.0 \\\n  --port 8015 \\\n  --data-parallel-size 4 \\\n  --tensor-parallel-size 4 \\\n  --quantization ascend \\\n  --seed 1024 \\\n  --served-model-name deepseek_v3 \\\n  --enable-expert-parallel \\\n  --max-num-seqs 16 \\\n  --max-model-len 16384 \\\n  --max-num-batched-tokens 4096 \\\n  --trust-remote-code \\\n  --no-enable-prefix-caching \\\n  --gpu-memory-utilization 0.92 \\\n  --compilation-config '{\"cudagraph_mode\": \"FULL_DECODE_ONLY\"}'",
+      "verification_status": "fail",
+      "verification_reason": "Model server did not become ready"
+    }
+  ],
+  "hardware_runs": [
+    {
+      "verification_scope": "single-node API smoke; not accuracy or full feature coverage",
+      "recipe_path": "models/en/DeepSeek/DeepSeek-V3.1.yaml",
+      "model_id": "deepseek-ai/DeepSeek-V3.1",
+      "hw_key": "atlas_800_a3",
+      "head_sha": "92ca5b8451e5fd25a73d651d17d191ac932bfa0c",
+      "workflow_run_id": "40843418894",
+      "trigger_type": "pr",
+      "image": "swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/vllm-ascend:v0.23.0-a3",
+      "started_at": "2026-10-29T08:36:56Z",
+      "scenarios": [
+        {
+          "index": 0,
+          "npu": "Atlas 800I A3",
+          "precision": "W8A8",
+          "deployment": "Single-Node",
+          "case": "High Throughput",
+          "serve_cmd": "#!/bin/sh\n  # this obtained through ifconfig\n  # nic_name is the network interface name corresponding to local_ip of the current node\n  nic_name=\"xxxx\"\n  local_ip=\"xxxx\"\n\n  # [Optional] jemalloc\n  # jemalloc is for better performance, if `libjemalloc.so` is installed on your machine, you can turn it on.\n  # export LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libjemalloc.so.2:$LD_PRELOAD\n\n  # AIV\n  export HCCL_OP_EXPANSION_MODE=\"AIV\"\n\n  export HCCL_IF_IP=$local_ip\n  export GLOO_SOCKET_IFNAME=$nic_name\n  export TP_SOCKET_IFNAME=$nic_name\n  export HCCL_SOCKET_IFNAME=$nic_name\n  export VLLM_ASCEND_BALANCE_SCHEDULING=1\n  export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\n\n  vllm serve /root/.cache/modelscope/hub/models/Eco-Tech/DeepSeek-V3.1-w8a8-mtp-QuaRot \\\n  --host 0.0.0.0 \\\n  --port 8015 \\\n  --data-parallel-size 4 \\\n  --tensor-parallel-size 4 \\\n  --quantization ascend \\\n  --seed 1024 \\\n  --served-model-name deepseek_v3 \\\n  --enable-expert-parallel \\\n  --max-num-seqs 16 \\\n  --max-model-len 16384 \\\n  --max-num-batched-tokens 4096 \\\n  --trust-remote-code \\\n  --no-enable-prefix-caching \\\n  --gpu-memory-utilization 0.92 \\\n  --compilation-config '{\"cudagraph_mode\": \"FULL_DECODE_ONLY\"}'",
+          "verification_status": "fail",
+          "verification_reason": "Model server did not become ready"
+        }
+      ],
+      "status": "fail"
+    },
+    {
+      "verification_scope": "single-node API smoke; not accuracy or full feature coverage",
+      "recipe_path": "models/en/DeepSeek/DeepSeek-V3.1.yaml",
+      "model_id": "deepseek-ai/DeepSeek-V3.1",
+      "hw_key": "ascend_950dt",
+      "head_sha": "92ca5b8451e5fd25a73d651d17d191ac932bfa0c",
+      "workflow_run_id": "40843418894",
+      "trigger_type": "pr",
+      "image": "swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/vllm-ascend:v0.23.0-a5",
+      "started_at": "2026-10-29T08:36:56Z",
+      "scenarios": [
+        {
+          "index": 0,
+          "npu": "Ascend 950DT",
+          "precision": "W4A4MLP+W8A8C8Attn",
+          "deployment": "Single-Node",
+          "case": "High Throughput",
+          "serve_cmd": "export HCCL_BUFFSIZE=512\n  export HCCL_CONNECT_TIMEOUT=600\n  export HCCL_EXEC_TIMEOUT=600\n\n  export OMP_PROC_BIND=false\n  export OMP_NUM_THREADS=10\n  export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\n  export TASK_QUEUE_ENABLE=1\n\n  export VLLM_ASCEND_ENABLE_MLAPO=1\n\n  vllm serve /root/.cache/modelscope/hub/models/Eco-Tech/DeepSeek-V3.1-w8a8c8-mxfp8 \\\n  --host 0.0.0.0 \\\n  --port 8015 \\\n  --max_model_len 135168 \\\n  --max-num-batched-tokens 16384 \\\n  --served-model-name deepseek_v3 \\\n  --gpu-memory-utilization 0.9 \\\n  --data-parallel-size 1 \\\n  --tensor-parallel-size 8 \\\n  --enable-expert-parallel \\\n  --async-scheduling \\\n  --max-num-seqs 96 \\\n  --no-enable-prefix-caching \\\n  --trust-remote-code \\\n  --compilation-config '{\"cudagraph_mode\": \"FULL_DECODE_ONLY\"}' \\\n  --quantization ascend \\\n  --additional_config '{\"enable_cpu_binding\": true, \"multistream_overlap_shared_expert\": true, \"enable_balance_scheduling\": true}' \\",
+          "verification_status": "fail",
+          "verification_reason": "Model server did not become ready"
+        }
+      ],
+      "status": "unknown"
+    }
+  ]
+}
