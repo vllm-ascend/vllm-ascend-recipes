@@ -4,7 +4,7 @@ meta:
   provider: "Qwen"
   description: "Qwen3.5-2B/4B/9B 稠密混合 Mamba-Transformer。Atlas 300I DUO / Atlas 200I Pro（310P）单机，vLLM Ascend ≥ v0.23.0rc1。"
   date_added: "2026-10-28"
-  date_updated: "2026-10-29"
+  date_updated: "2026-10-30"
   difficulty: beginner
   tasks:
     - text
@@ -29,9 +29,9 @@ model:
     - "--tensor-parallel-size"
     - "1"
     - "--max-model-len"
-    - "16384"
+    - "8192"
     - "--max-num-seqs"
-    - "32"
+    - "16"
     - "--gpu-memory-utilization"
     - "0.90"
     - "--dtype"
@@ -111,13 +111,13 @@ guide: ""
 
 config_params:
   max_model_len:
-    default: 16384
+    default: 8192
     type: number
-    description: "上下文长度。约 21GB：2B@v0.30 可用 16384；4B@v0.30 地板 8192；9B W8A8 8192。tutorial 默认 16384 在 4B/9B 可能 OOM。"
+    description: "上下文长度。默认对齐约 21GB v0.30 上 4B 实测地板。2B@v0.30 可升到 16384；9B W8A8 保持 8192。tutorial 16384/32 在 4B/9B 可能 OOM。"
   max_num_seqs:
-    default: 32
+    default: 16
     type: number
-    description: "最大并发序列数。约 21GB v0.30：2B=32，4B 地板=16，9B W8A8=8。"
+    description: "最大并发序列数。默认 16 = 约 21GB v0.30 上 4B 实测地板。2B 可用 32；9B W8A8 用 8。"
   gpu_memory_utilization:
     default: 0.9
     type: number
@@ -214,7 +214,8 @@ weight_download:
 
 quantization:
   content: |-
-    Eco-Tech 提供 `Qwen3.5-{2B,4B,9B}-W8A8-310P`。ModelSlim W8A8 可能自动识别 quantization=`ascend`（9B 实测）；
+    Eco-Tech 在 ModelScope 有 W8A8-310P 权重。本 recipe **仅收录已实测** 的 `Qwen3.5-9B-W8A8-310P`
+    （2B/4B W8A8 待冒烟与精度后再补）。ModelSlim W8A8 可能自动识别 quantization=`ascend`（9B 实测）；
     显式 `--quantization ascend` 可选。FP16 `Qwen/Qwen3.5-*` 不加该参数。约 21GB 单卡 9B 优先 W8A8。
 
 prerequisites:
@@ -272,13 +273,13 @@ scenarios:
     steps:
       - title: 启动服务
         content: |-
-          **v0.30.0rc1-310p 约 21GB 实测地板：** 2B = MTP + len=16384 + seqs=32；**4B = MTP + len=8192 + seqs=16**（16384/32 失败）。下方为 tutorial 基线模板，4B 请按地板改长/并发。
+          将 `your_model_path` 换成本地 2B/4B FP16 权重（或 Hub id）。约 21GB 上 9B 请用 W8A8 场景。
+          **v0.30.0rc1-310p 约 21GB 实测地板：** 2B = MTP + len=16384 + seqs=32；**4B = MTP + len=8192 + seqs=16**（16384/32 失败）。下方默认对齐 **4B 地板**。
 
           ```bash
           export VLLM_USE_MODELSCOPE=True
-          export MODEL_PATH=Qwen/Qwen3.5-4B
 
-          vllm serve $MODEL_PATH \
+          vllm serve your_model_path \
             --host 127.0.0.1 \
             --port 8080 \
             --tensor-parallel-size 1 \
@@ -312,12 +313,13 @@ scenarios:
           **v0.30：勿传 `fuse_norm_quant`**（ValidationError）。**v0.23：** 可设 `fuse_norm_quant=false`。
           默认 MTP + seqs=16 + 多模态 profile_run 会 OOM。
 
+          将 `your_model_path` 换成本地 `Eco-Tech/Qwen3.5-9B-W8A8-310P` 权重（或 Hub/ModelScope id）。
+
           ```bash
           export VLLM_USE_MODELSCOPE=True
           export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
-          export MODEL_PATH=Eco-Tech/Qwen3.5-9B-W8A8-310P
 
-          vllm serve $MODEL_PATH \
+          vllm serve your_model_path \
             --host 127.0.0.1 \
             --port 8080 \
             --tensor-parallel-size 1 \
