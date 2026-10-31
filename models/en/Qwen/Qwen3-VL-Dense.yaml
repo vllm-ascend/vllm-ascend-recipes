@@ -1,0 +1,556 @@
+meta:
+  title: "Qwen3-VL-Dense"
+  slug: "qwen3-vl-dense"
+  provider: "Qwen"
+  description: "Qwen3-VL dense vision-language models (8B / 32B) for image-text understanding. Migrated from the vLLM-Ascend tutorial, covering Atlas 800 A2/A3, Atlas 300I DUO, and Ascend 950DT W8A8 single-node serve."
+  date_added: "2026-10-19"
+  date_updated: "2026-10-19"
+  difficulty: intermediate
+  tasks:
+    - multimodal
+  performance_headline: "Single-node dense VL serve on A2/A3, 300I DUO, and 950DT W8A8"
+  related_recipes:
+    - "qwen3-vl-30b-a3b-instruct"
+  hardware:
+    atlas_800_a3: verified
+    atlas_800_a2: experimental
+    atlas_300i_duo: verified
+    ascend_950dt: verified
+
+model:
+  model_id: "Qwen/Qwen3-VL-8B-Instruct"
+  min_vllm_version: "0.18.0"
+  architecture: dense
+  parameter_count: "8B"
+  active_parameters: null
+  context_length: 256000
+  modality: multimodal
+  base_args:
+    - "--served-model-name"
+    - "qwen3vl"
+    - "--trust-remote-code"
+    - "--no-enable-prefix-caching"
+    - "--mm-processor-cache-gb"
+    - "0"
+  base_env:
+    HCCL_OP_EXPANSION_MODE: "AIV"
+    PYTORCH_NPU_ALLOC_CONF: "expandable_segments:True"
+    VLLM_USE_MODELSCOPE: "True"
+  docker_image:
+    atlas_800_a2: "quay.io/ascend/vllm-ascend:v0.23.0"
+    atlas_800_a3: "quay.io/ascend/vllm-ascend:v0.23.0-a3"
+    atlas_300i_duo: "quay.io/ascend/vllm-ascend:v0.23.0-310p"
+    ascend_950dt: "quay.io/ascend/vllm-ascend:v0.23.0-a5"
+  nightly_required: false
+  install:
+    pip: false
+    docker:
+      command: "docker run --rm --net=host --shm-size=1g -v /root/.cache:/root/.cache --device /dev/davinci0 --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc -it quay.io/ascend/vllm-ascend:v0.23.0-a3 bash"
+      note: "Pick the image tag for your hardware (A2 / A3 / 310p / a5). Full device mounts are in env_setup.container."
+
+features:
+  prefix_caching:
+    label: "Prefix Caching"
+    description: "Disabled in the tutorial image baseline."
+    args: ["--enable-prefix-caching"]
+    flag_when_false: "--no-enable-prefix-caching"
+  compilation_config:
+    label: "Compilation Config"
+    description: "FULL_DECODE_ONLY ACLGraph replay from the tutorial. Use --enforce-eager on older CANN or when graphs are unavailable."
+    args:
+      - "--compilation-config"
+      - "{\"cudagraph_mode\": \"FULL_DECODE_ONLY\", \"cudagraph_capture_sizes\": [1,2,4,8,16,32]}"
+  async_scheduling:
+    label: "Async Scheduling"
+    description: "Tutorial throughput knob for A2/A3/950DT baselines."
+    args: ["--async-scheduling"]
+
+opt_in_features: [prefix_caching]
+
+variants:
+  default:
+    precision: bf16
+    vram_minimum_gb: 20
+    description: "BF16 Qwen3-VL-8B-Instruct (1 card on A2/A3/300I DUO)"
+  vl_8b_w8a8:
+    model_id: "vllm-ascend/Qwen3-VL-8B-Instruct-W8A8"
+    precision: W8A8
+    vram_minimum_gb: 16
+    description: "W8A8 Qwen3-VL-8B (1 card on 950DT). Tutorial Eco-Tech mxfp8 id is 404; use this ascend W8A8 checkpoint."
+  vl_32b:
+    model_id: "Qwen/Qwen3-VL-32B-Instruct"
+    precision: bf16
+    vram_minimum_gb: 64
+    description: "BF16 Qwen3-VL-32B-Instruct (2 cards on A2/A3)"
+  vl_32b_w8a8:
+    model_id: "Eco-Tech/Qwen3-VL-32B-Instruct-w8a8-QuaRot"
+    precision: W8A8
+    vram_minimum_gb: 48
+    description: "W8A8 Qwen3-VL-32B (1 card on 950DT). Tutorial Eco-Tech mxfp8 id is 404; use the public QuaRot W8A8 checkpoint."
+
+compatible_strategies:
+  - single_node_A3
+  - single_node_A2
+  - single_node_310p
+  - single_node_A5
+
+hardware_overrides: {}
+strategy_overrides: {}
+dependencies: []
+guide: ""
+
+config_params:
+  max_model_len:
+    default: 32768
+    type: number
+    description: "Maximum context length. Lower this (for example 4096) on memory-tight smokes."
+  max_num_seqs:
+    default: 128
+    type: number
+    description: "Maximum concurrent sequences."
+  max_num_batched_tokens:
+    default: 16384
+    type: number
+    description: "Maximum tokens batched per step."
+  gpu_memory_utilization:
+    default: 0.91
+    type: number
+    description: "Fraction of NPU HBM reserved for the engine."
+  port:
+    default: 8000
+    type: number
+    description: "HTTP listen port."
+
+overview: |-
+  Qwen3-VL Dense is the dense vision-language line of Qwen3-VL (8B / 32B Instruct). This recipe migrates the official vLLM-Ascend tutorial into EN/ZH recipes: BF16 single-card 8B on A2/A3 and Atlas 300I DUO, BF16 two-card 32B on A2/A3, and W8A8 single-card 8B/32B on 950DT products. Atlas inference products need vLLM-Ascend 0.18.0+; 950DT needs v0.23.0rc1+.
+
+weight_download:
+  - weight_version: BF16 (8B)
+    sources:
+      - source: ModelScope
+        url: https://www.modelscope.cn/models/Qwen/Qwen3-VL-8B-Instruct
+        command: |-
+          ```bash
+          pip install modelscope
+          modelscope download --model Qwen/Qwen3-VL-8B-Instruct
+          ```
+      - source: HuggingFace
+        url: https://huggingface.co/Qwen/Qwen3-VL-8B-Instruct
+        command: |-
+          ```bash
+          pip install -U huggingface_hub
+          huggingface-cli download Qwen/Qwen3-VL-8B-Instruct
+          ```
+      - source: Modelers
+        url: ""
+        command: ""
+      - source: GitCode
+        url: ""
+        command: ""
+  - weight_version: W8A8 (8B)
+    sources:
+      - source: ModelScope
+        url: https://www.modelscope.cn/models/vllm-ascend/Qwen3-VL-8B-Instruct-W8A8
+        command: |-
+          ```bash
+          pip install modelscope
+          # Tutorial Eco-Tech/Qwen3-VL-8B-Instruct-w8a8-mxfp8 returns 404.
+          modelscope download --model vllm-ascend/Qwen3-VL-8B-Instruct-W8A8
+          ```
+      - source: HuggingFace
+        url: ""
+        command: ""
+      - source: Modelers
+        url: ""
+        command: ""
+      - source: GitCode
+        url: ""
+        command: ""
+  - weight_version: BF16 (32B)
+    sources:
+      - source: ModelScope
+        url: https://www.modelscope.cn/models/Qwen/Qwen3-VL-32B-Instruct
+        command: |-
+          ```bash
+          pip install modelscope
+          modelscope download --model Qwen/Qwen3-VL-32B-Instruct
+          ```
+      - source: HuggingFace
+        url: https://huggingface.co/Qwen/Qwen3-VL-32B-Instruct
+        command: |-
+          ```bash
+          pip install -U huggingface_hub
+          huggingface-cli download Qwen/Qwen3-VL-32B-Instruct
+          ```
+      - source: Modelers
+        url: ""
+        command: ""
+      - source: GitCode
+        url: ""
+        command: ""
+  - weight_version: W8A8 (32B)
+    sources:
+      - source: ModelScope
+        url: https://www.modelscope.cn/models/Eco-Tech/Qwen3-VL-32B-Instruct-w8a8-QuaRot
+        command: |-
+          ```bash
+          pip install modelscope
+          # Tutorial Eco-Tech/Qwen3-VL-32B-Instruct-w8a8-mxfp8 returns 404.
+          modelscope download --model Eco-Tech/Qwen3-VL-32B-Instruct-w8a8-QuaRot
+          ```
+      - source: HuggingFace
+        url: ""
+        command: ""
+      - source: Modelers
+        url: ""
+        command: ""
+      - source: GitCode
+        url: ""
+        command: ""
+
+prerequisites:
+  - title: Model Weight
+    content: |-
+      | Weight Version | Hardware | Download |
+      |----------------|----------|----------|
+      | `Qwen3-VL-8B-Instruct` | 1 card A2 / A3 / 300I DUO | [ModelScope](https://www.modelscope.cn/models/Qwen/Qwen3-VL-8B-Instruct) |
+      | `Qwen3-VL-8B-Instruct-W8A8` | 1 card 950DT | [ModelScope](https://www.modelscope.cn/models/vllm-ascend/Qwen3-VL-8B-Instruct-W8A8) |
+      | `Qwen3-VL-32B-Instruct` | 2 cards A2 / A3 | [ModelScope](https://www.modelscope.cn/models/Qwen/Qwen3-VL-32B-Instruct) |
+      | `Qwen3-VL-32B-Instruct-w8a8-QuaRot` | 1 card 950DT | [ModelScope](https://www.modelscope.cn/models/Eco-Tech/Qwen3-VL-32B-Instruct-w8a8-QuaRot) |
+
+      The tutorial `Eco-Tech/...-w8a8-mxfp8` links currently 404 on ModelScope. Use the W8A8 replacements above.
+
+env_setup:
+  container:
+    A3:
+      content: |-
+        ```bash
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0-a3
+        docker run --rm --name vllm-ascend --shm-size=1g --net=host --privileged=true \
+          --device /dev/davinci0 --device /dev/davinci1 \
+          --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc \
+          -v /usr/local/dcmi:/usr/local/dcmi \
+          -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+          -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \
+          -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
+          -v /etc/ascend_install.info:/etc/ascend_install.info \
+          -v /root/.cache:/root/.cache \
+          -it $IMAGE bash
+        ```
+    A2:
+      content: |-
+        ```bash
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0
+        docker run --rm --name vllm-ascend --shm-size=1g --net=host --privileged=true \
+          --device /dev/davinci0 --device /dev/davinci_manager \
+          --device /dev/devmm_svm --device /dev/hisi_hdc \
+          -v /usr/local/dcmi:/usr/local/dcmi \
+          -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+          -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \
+          -v /root/.cache:/root/.cache \
+          -it $IMAGE bash
+        ```
+    300I DUO:
+      content: |-
+        ```bash
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0-310p
+        docker run --rm --name vllm-ascend --shm-size=1g --net=host --privileged=true \
+          --device /dev/davinci0 --device /dev/davinci_manager \
+          --device /dev/devmm_svm --device /dev/hisi_hdc \
+          -v /usr/local/dcmi:/usr/local/dcmi \
+          -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+          -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \
+          -v /root/.cache:/root/.cache \
+          -it $IMAGE bash
+        ```
+    A5:
+      content: |-
+        ```bash
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0-a5
+        docker run --rm --name vllm-ascend --net=host --shm-size=1g --privileged=true \
+          --device /dev/davinci0 --device /dev/davinci_manager --device /dev/hisi_hdc \
+          --device /dev/ummu --device /dev/uburma \
+          -v /usr/local/Ascend/driver:/usr/local/Ascend/driver \
+          -v /etc/ascend_install.info:/etc/ascend_install.info \
+          -v /root/.cache:/root/.cache \
+          -itd $IMAGE bash
+        ```
+  pip:
+    content: |-
+      Prefer the prebuilt Ascend image. For source installs see the [Installation Guide](https://docs.vllm.ai/projects/ascend/en/latest/installation.html). On A3 use the A3 wheel / image.
+
+scenarios:
+  - npu: Atlas 800I A3
+    precision: bf16
+    deployment: Single-Node
+    case: 8B Single Card
+    tags: [a3-8b]
+    strategy: single_node_A3
+    steps:
+      - title: Start the server
+        content: |-
+          ```bash
+          export HCCL_OP_EXPANSION_MODE="AIV"
+          export ASCEND_RT_VISIBLE_DEVICES=0
+          export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+
+          vllm serve Qwen/Qwen3-VL-8B-Instruct \
+            --host 0.0.0.0 \
+            --port {{port}} \
+            --dtype bfloat16 \
+            --served-model-name qwen3vl \
+            --no-enable-prefix-caching \
+            --data-parallel-size 1 \
+            --tensor-parallel-size 1 \
+            --trust-remote-code \
+            --max-num-seqs {{max_num_seqs}} \
+            --max-model-len {{max_model_len}} \
+            --max-num-batched-tokens {{max_num_batched_tokens}} \
+            --gpu-memory-utilization {{gpu_memory_utilization}} \
+            --async-scheduling \
+            --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY", "cudagraph_capture_sizes": [1,2,4,8,16,32]}' \
+            --mm-processor-cache-gb 0
+          ```
+
+          For a quick smoke, prefer `--enforce-eager`, `--max-model-len 8192`, `--max-num-batched-tokens 4096`, `--max-num-seqs 4`, and `--gpu-memory-utilization 0.6`.
+      - title: Service Verification
+        content: |-
+          Use the image chat request in the verification section. Expect HTTP 200 and content mentioning `TONGYI Qwen`.
+  - npu: Atlas 800I A3
+    precision: bf16
+    deployment: Single-Node
+    case: 32B Two Cards
+    tags: [a3-32b]
+    strategy: single_node_A3
+    steps:
+      - title: Start the server
+        content: |-
+          Qwen3-VL-32B-Instruct needs two cards (TP=2) on A2/A3 / Atlas inference products.
+
+          ```bash
+          export HCCL_OP_EXPANSION_MODE="AIV"
+          export ASCEND_RT_VISIBLE_DEVICES=0,1
+          export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+
+          vllm serve Qwen/Qwen3-VL-32B-Instruct \
+            --host 0.0.0.0 \
+            --port {{port}} \
+            --dtype bfloat16 \
+            --served-model-name qwen3vl \
+            --no-enable-prefix-caching \
+            --tensor-parallel-size 2 \
+            --trust-remote-code \
+            --max-num-seqs 4 \
+            --max-model-len 4096 \
+            --max-num-batched-tokens 2048 \
+            --gpu-memory-utilization 0.8 \
+            --enforce-eager \
+            --mm-processor-cache-gb 0
+          ```
+      - title: Service Verification
+        content: |-
+          Use the image chat request in the verification section.
+  - npu: Atlas 800I A2
+    precision: bf16
+    deployment: Single-Node
+    case: 8B Single Card (A2)
+    tags: [a2-8b]
+    strategy: single_node_A2
+    steps:
+      - title: Start the server
+        content: |-
+          ```bash
+          export HCCL_OP_EXPANSION_MODE="AIV"
+          export ASCEND_RT_VISIBLE_DEVICES=0
+          export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+
+          vllm serve Qwen/Qwen3-VL-8B-Instruct \
+            --host 0.0.0.0 \
+            --port {{port}} \
+            --dtype bfloat16 \
+            --served-model-name qwen3vl \
+            --no-enable-prefix-caching \
+            --tensor-parallel-size 1 \
+            --trust-remote-code \
+            --max-num-seqs {{max_num_seqs}} \
+            --max-model-len {{max_model_len}} \
+            --max-num-batched-tokens {{max_num_batched_tokens}} \
+            --gpu-memory-utilization {{gpu_memory_utilization}} \
+            --async-scheduling \
+            --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY", "cudagraph_capture_sizes": [1,2,4,8,16,32]}' \
+            --mm-processor-cache-gb 0
+          ```
+      - title: Service Verification
+        content: |-
+          Use the image chat request in the verification section.
+  - npu: Atlas 300I DUO
+    precision: fp16
+    deployment: Single-Node
+    case: 8B Single Card
+    tags: [310p-8b]
+    strategy: single_node_310p
+    steps:
+      - title: Start the server
+        content: |-
+          On Atlas 300I DUO only `float16` is supported. Disable `enable_npugraph_ex`. On CANN older than 9.0.0 use `--enforce-eager` instead of graph compilation.
+
+          ```bash
+          export HCCL_OP_EXPANSION_MODE="AIV"
+          export ASCEND_RT_VISIBLE_DEVICES=0
+          export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+
+          vllm serve Qwen/Qwen3-VL-8B-Instruct \
+            --host 0.0.0.0 \
+            --port {{port}} \
+            --dtype float16 \
+            --served-model-name qwen3vl \
+            --no-enable-prefix-caching \
+            --tensor-parallel-size 1 \
+            --trust-remote-code \
+            --max-num-seqs 4 \
+            --max-model-len 4096 \
+            --max-num-batched-tokens 2048 \
+            --gpu-memory-utilization 0.7 \
+            --enforce-eager \
+            --additional-config '{"ascend_compilation_config": {"enable_npugraph_ex": false}}' \
+            --mm-processor-cache-gb 0
+          ```
+
+          Tutorial 32B is two full cards on A2/A3 / Atlas inference products, not 300I DUO. Dual-die TP=2 on one 300I DUO was observed to hang after load.
+      - title: Service Verification
+        content: |-
+          Use the image chat request in the verification section.
+  - npu: Ascend 950DT
+    precision: W8A8
+    deployment: Single-Node
+    case: 8B W8A8 Single Card
+    tags: [a5-8b-w8a8]
+    strategy: single_node_A5
+    steps:
+      - title: Start the server
+        content: |-
+          ```bash
+          export HCCL_OP_EXPANSION_MODE="AIV"
+          export ASCEND_RT_VISIBLE_DEVICES=0
+          export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+
+          vllm serve vllm-ascend/Qwen3-VL-8B-Instruct-W8A8 \
+            --host 0.0.0.0 \
+            --port {{port}} \
+            --quantization ascend \
+            --served-model-name qwen3vl \
+            --no-enable-prefix-caching \
+            --tensor-parallel-size 1 \
+            --trust-remote-code \
+            --max-num-seqs 4 \
+            --max-model-len 4096 \
+            --max-num-batched-tokens 2048 \
+            --gpu-memory-utilization 0.8 \
+            --enforce-eager \
+            --mm-processor-cache-gb 0
+          ```
+      - title: Service Verification
+        content: |-
+          Use the image chat request in the verification section.
+  - npu: Ascend 950DT
+    precision: W8A8
+    deployment: Single-Node
+    case: 32B W8A8 Single Card
+    tags: [a5-32b-w8a8]
+    strategy: single_node_A5
+    steps:
+      - title: Start the server
+        content: |-
+          ```bash
+          export HCCL_OP_EXPANSION_MODE="AIV"
+          export ASCEND_RT_VISIBLE_DEVICES=0
+          export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+
+          vllm serve Eco-Tech/Qwen3-VL-32B-Instruct-w8a8-QuaRot \
+            --host 0.0.0.0 \
+            --port {{port}} \
+            --quantization ascend \
+            --served-model-name qwen3vl \
+            --no-enable-prefix-caching \
+            --tensor-parallel-size 1 \
+            --trust-remote-code \
+            --max-num-seqs 4 \
+            --max-model-len 4096 \
+            --max-num-batched-tokens 2048 \
+            --gpu-memory-utilization 0.8 \
+            --enforce-eager \
+            --mm-processor-cache-gb 0
+          ```
+      - title: Service Verification
+        content: |-
+          Use the image chat request in the verification section.
+
+verification: |-
+  Once the server is up:
+
+  ```bash
+  curl http://127.0.0.1:8000/v1/chat/completions \
+    -H "Content-Type: application/json" \
+    -d '{
+      "model": "qwen3vl",
+      "messages": [
+        {"role": "system", "content": "You are a helpful assistant."},
+        {"role": "user", "content": [
+          {"type": "image_url", "image_url": {"url": "https://modelscope.oss-cn-beijing.aliyuncs.com/resource/qwen.png"}},
+          {"type": "text", "text": "What is the text in the illustration?"}
+        ]}
+      ],
+      "max_completion_tokens": 100,
+      "temperature": 0
+    }'
+  ```
+
+  Expected: HTTP 200 with assistant content containing `TONGYI Qwen`.
+
+evaluation:
+  accuracy:
+    content: |-
+      A2 / A3 `mmmu_val` via lm_eval (tutorial reference on vllm-ascend 0.11.0rc3: about 0.5389):
+
+      ```bash
+      lm_eval --model vllm-vlm \
+        --model_args pretrained=Qwen/Qwen3-VL-8B-Instruct,max_model_len=8192,gpu_memory_utilization=0.7 \
+        --tasks mmmu_val --batch_size 32 --apply_chat_template --trust_remote_code \
+        --output_path ./results
+      ```
+
+      Atlas 300I DUO AISBench `text_vqa` (tutorial reference on v0.23.0rc1: about 80.57):
+
+      ```bash
+      ais_bench --models vllm_api_general_chat --datasets textvqa_gen_base64 --mode all --debug
+      ```
+
+performance:
+  benchmark: |-
+    ```bash
+    vllm bench serve \
+      --backend openai-chat \
+      --model Qwen/Qwen3-VL-8B-Instruct \
+      --endpoint /v1/chat/completions \
+      --dataset-name random \
+      --num-prompts 100 \
+      --request-rate 1 \
+      --save-result \
+      --result-dir ./
+    ```
+
+tuning: |-
+  Cap `--max-model-len` when KV cache OOMs. On 300I DUO keep TP=1 for the 8B row. Triton `target_info` warnings on 950PR do not block `--enforce-eager` W8A8 serve. If ACLGraph is unavailable, replace `--compilation-config` and `--async-scheduling` with `--enforce-eager`.
+
+faq: |-
+  For environment and install issues see the [Public FAQs](https://docs.vllm.ai/projects/ascend/en/latest/faqs.html).
+
+references:
+  - title: Qwen-VL-Dense tutorial (vLLM Ascend)
+    url: https://docs.vllm.ai/projects/ascend/en/latest/tutorials/models/Qwen-VL-Dense.html
+  - title: Qwen3-VL-8B-Instruct on ModelScope
+    url: https://www.modelscope.cn/models/Qwen/Qwen3-VL-8B-Instruct
+  - title: Qwen3-VL-32B-Instruct on ModelScope
+    url: https://www.modelscope.cn/models/Qwen/Qwen3-VL-32B-Instruct
+  - title: vLLM Ascend GitHub
+    url: https://github.com/vllm-project/vllm-ascend
