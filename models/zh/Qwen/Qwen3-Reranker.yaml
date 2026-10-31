@@ -1,0 +1,533 @@
+meta:
+  title: "Qwen3-Reranker"
+  slug: "qwen3-reranker"
+  provider: "Qwen"
+  description: "Qwen3 Reranker 模型系列是 Qwen 家族的专有重排序模型，基于 Qwen3 系列的稠密基础模型构建，提供 0.6B、4B、8B 三种尺寸。在昇腾 NPU 上由 vLLM Ascend 通过 pooling runner 提供服务，并以 /v1/rerank 相关性打分接口对外暴露。"
+  date_added: 2026-10-29
+  date_updated: 2026-10-29
+  difficulty: beginner
+  tasks:
+    - embedding
+  performance_headline: "在 Atlas 800I A2/A3 与 Atlas 300I DUO 上单节点 pooling 部署，通过 /v1/rerank 打分"
+  related_recipes: []
+  # 教程覆盖三个硬件 SKU。本 Recipe 由 v0.23.0 教程静态迁移而来、尚未在硬件上重新端到端验证，
+  # 因此统一标注 experimental。
+  hardware:
+    atlas_800_a3: experimental
+    atlas_800_a2: experimental
+    atlas_300i_duo: experimental
+
+model:
+  model_id: "Qwen/Qwen3-Reranker-0.6B"
+  min_vllm_version: "0.23.0"
+  architecture: dense
+  parameter_count: "0.6B"
+  active_parameters: null
+  context_length: 40960
+  modality: text
+  base_args:
+    - "--runner"
+    - "pooling"
+    - "--hf_overrides"
+    - '{"architectures": ["Qwen3VLForSequenceClassification"], "classifier_from_token": ["no", "yes"], "is_original_qwen3_reranker": true}'
+  base_env: {}
+  # Qwen3-Reranker 自 vLLM Ascend v0.30.0 起停止支持，因此镜像固定在仍提供该模型的
+  # v0.23.0 发布线，而不是最新发布的 tag。
+  docker_image:
+    atlas_800_a2: "quay.io/ascend/vllm-ascend:v0.23.0"
+    atlas_800_a3: "quay.io/ascend/vllm-ascend:v0.23.0-a3"
+    atlas_300i_duo: "quay.io/ascend/vllm-ascend:v0.23.0-310p"
+  nightly_required: false
+  install:
+    # 昇腾推荐使用 Docker，且没有官方 wheel，因此隐藏 pip 页签。
+    pip: false
+    docker:
+      command: "docker run --rm --name vllm-ascend --shm-size=1g --net=host --privileged=true --device /dev/davinci0 --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc -v /usr/local/dcmi:/usr/local/dcmi -v /usr/local/Ascend/driver/tools/hccn_tool:/usr/local/Ascend/driver/tools/hccn_tool -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info -v /etc/ascend_install.info:/etc/ascend_install.info -v /root/.cache:/root/.cache -it quay.io/ascend/vllm-ascend:v0.23.0 bash"
+      note: "官方昇腾镜像；各 SKU 的设备挂载与 -a3 / -310p 标签见 env_setup.container。"
+
+features: {}
+
+opt_in_features: []
+
+variants:
+  default:
+    precision: bf16
+    vram_minimum_gb: 2
+    description: "Qwen3-Reranker-0.6B 的 BF16 权重 —— 教程中所有命令使用的检查点。"
+  reranker_4b:
+    model_id: "Qwen/Qwen3-Reranker-4B"
+    precision: bf16
+    vram_minimum_gb: 10
+    description: "该系列 4B 成员的 BF16 权重；服务参数与 0.6B 基线一致。"
+  reranker_8b:
+    model_id: "Qwen/Qwen3-Reranker-8B"
+    precision: bf16
+    vram_minimum_gb: 20
+    description: "该系列 8B 成员的 BF16 权重；服务参数与 0.6B 基线一致。"
+
+compatible_strategies:
+  - single_node_A2
+  - single_node_A3
+  - single_node_310p
+
+hardware_overrides: {}
+strategy_overrides: {}
+
+guide: ""
+
+config_params:
+  max_model_len:
+    default: 1024
+    type: number
+    description: "上下文长度，即单个请求输入加输出的最大 token 数。教程在所有场景都取 1024；在 Atlas 300I DUO 上更大的自动解析值会分配 O(max_model_len^2) 的掩码并可能 OOM。"
+
+overview: |-
+  Qwen3 Reranker 模型系列是 Qwen 家族最新的专有模型，专为文本嵌入和排序任务设计。它基于 Qwen3 系列的稠密基础模型构建，提供 0.6B、4B 和 8B 多种尺寸的文本嵌入与重排序模型。
+
+  在 vLLM Ascend 上，检查点通过 pooling runner 与 Qwen3 重排序头覆盖加载，随后通过 `/v1/rerank` 接口访问，逐文档返回 `relevance_score`。
+
+weight_download:
+- weight_version: Qwen3-Reranker-0.6B（BF16）
+  sources:
+  - source: ModelScope
+    url: https://www.modelscope.cn/models/Qwen/Qwen3-Reranker-0.6B
+    command: |-
+      ```bash
+      pip install modelscope
+      modelscope download --model Qwen/Qwen3-Reranker-0.6B
+      ```
+  - source: HuggingFace
+    url: https://huggingface.co/Qwen/Qwen3-Reranker-0.6B
+    command: |-
+      ```bash
+      pip install -U huggingface_hub
+      hf download Qwen/Qwen3-Reranker-0.6B
+      ```
+  - source: Modelers
+    url: ''
+    command: ''
+  - source: GitCode
+    url: ''
+    command: ''
+- weight_version: Qwen3-Reranker-4B（BF16）
+  sources:
+  - source: ModelScope
+    url: https://www.modelscope.cn/models/Qwen/Qwen3-Reranker-4B
+    command: |-
+      ```bash
+      pip install modelscope
+      modelscope download --model Qwen/Qwen3-Reranker-4B
+      ```
+  - source: HuggingFace
+    url: https://huggingface.co/Qwen/Qwen3-Reranker-4B
+    command: |-
+      ```bash
+      pip install -U huggingface_hub
+      hf download Qwen/Qwen3-Reranker-4B
+      ```
+  - source: Modelers
+    url: ''
+    command: ''
+  - source: GitCode
+    url: ''
+    command: ''
+- weight_version: Qwen3-Reranker-8B（BF16）
+  sources:
+  - source: ModelScope
+    url: https://www.modelscope.cn/models/Qwen/Qwen3-Reranker-8B
+    command: |-
+      ```bash
+      pip install modelscope
+      modelscope download --model Qwen/Qwen3-Reranker-8B
+      ```
+  - source: HuggingFace
+    url: https://huggingface.co/Qwen/Qwen3-Reranker-8B
+    command: |-
+      ```bash
+      pip install -U huggingface_hub
+      hf download Qwen/Qwen3-Reranker-8B
+      ```
+  - source: Modelers
+    url: ''
+    command: ''
+  - source: GitCode
+    url: ''
+    command: ''
+
+prerequisites:
+- title: 模型权重
+  content: |-
+    该系列包含三个检查点，下载你准备服务的那个并记录本地路径：
+
+    | 模型 | 参数量 | 下载 |
+    | --- | --- | --- |
+    | Qwen3-Reranker-0.6B | 0.6B | [ModelScope](https://www.modelscope.cn/models/Qwen/Qwen3-Reranker-0.6B) |
+    | Qwen3-Reranker-4B | 4B | [ModelScope](https://www.modelscope.cn/models/Qwen/Qwen3-Reranker-4B) |
+    | Qwen3-Reranker-8B | 8B | [ModelScope](https://www.modelscope.cn/models/Qwen/Qwen3-Reranker-8B) |
+
+    建议将模型权重下载到多节点共享目录，例如 `/root/.cache/`。
+
+    **路径说明**：将模型权重下载到你选择的目录并记录该路径。确保后续部署命令中的模型路径与此目录一致。
+- title: 版本说明
+  content: |-
+    仅 vLLM Ascend 0.9.2rc1 及更高版本支持该模型，且教程已在 vLLM Ascend v0.30.0 中从文档集合移除（该版本起模型停止支持）。请固定使用下文列出的 `v0.23.0` 镜像线 —— 这是仍提供 Qwen3-Reranker 支持的最新发布线 —— 不要升级到最新发布的 tag。
+
+env_setup:
+  container:
+    A3:
+      content: |-
+        使用 A3 系列的官方一体化镜像：
+
+        **拉取镜像：**
+
+        ```bash
+        docker pull quay.io/ascend/vllm-ascend:v0.23.0-a3
+        ```
+
+        **启动容器：**
+
+        ```bash
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0-a3
+        docker run --rm \
+          --name vllm-ascend \
+          --shm-size=1g \
+          --net=host \
+          --privileged=true \
+          --device /dev/davinci0 \
+          --device /dev/davinci_manager \
+          --device /dev/devmm_svm \
+          --device /dev/hisi_hdc \
+          -v /usr/local/dcmi:/usr/local/dcmi \
+          -v /usr/local/Ascend/driver/tools/hccn_tool:/usr/local/Ascend/driver/tools/hccn_tool \
+          -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+          -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \
+          -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
+          -v /etc/ascend_install.info:/etc/ascend_install.info \
+          -v /root/.cache:/root/.cache \
+          -it $IMAGE bash
+        ```
+
+        Docker 启动成功后，可执行 `docker ps` 命令验证容器是否正常运行。
+    A2:
+      content: |-
+        使用 A2 系列的官方一体化镜像：
+
+        **拉取镜像：**
+
+        ```bash
+        docker pull quay.io/ascend/vllm-ascend:v0.23.0
+        ```
+
+        **启动容器：**
+
+        ```bash
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0
+        docker run --rm \
+          --name vllm-ascend \
+          --shm-size=1g \
+          --net=host \
+          --privileged=true \
+          --device /dev/davinci0 \
+          --device /dev/davinci_manager \
+          --device /dev/devmm_svm \
+          --device /dev/hisi_hdc \
+          -v /usr/local/dcmi:/usr/local/dcmi \
+          -v /usr/local/Ascend/driver/tools/hccn_tool:/usr/local/Ascend/driver/tools/hccn_tool \
+          -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+          -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \
+          -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
+          -v /etc/ascend_install.info:/etc/ascend_install.info \
+          -v /root/.cache:/root/.cache \
+          -it $IMAGE bash
+        ```
+
+        Docker 启动成功后，可执行 `docker ps` 命令验证容器是否正常运行。
+    300I DUO:
+      content: |-
+        Atlas 300I DUO 请使用 `-310p` 镜像：
+
+        **拉取镜像：**
+
+        ```bash
+        docker pull quay.io/ascend/vllm-ascend:v0.23.0-310p
+        ```
+
+        **启动容器：**
+
+        ```bash
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0-310p
+        docker run --rm \
+          --name vllm-ascend \
+          --shm-size=1g \
+          --net=host \
+          --privileged=true \
+          --device /dev/davinci0 \
+          --device /dev/davinci_manager \
+          --device /dev/devmm_svm \
+          --device /dev/hisi_hdc \
+          -v /usr/local/dcmi:/usr/local/dcmi \
+          -v /usr/local/Ascend/driver/tools/hccn_tool:/usr/local/Ascend/driver/tools/hccn_tool \
+          -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+          -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \
+          -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
+          -v /etc/ascend_install.info:/etc/ascend_install.info \
+          -v /root/.cache:/root/.cache \
+          -it $IMAGE bash
+        ```
+
+        Docker 启动成功后，可执行 `docker ps` 命令验证容器是否正常运行。
+
+scenarios:
+
+- npu: Atlas 800I A3
+  precision: bf16
+  deployment: 单节点
+  case: 单卡
+  tags: [a3-single]
+  strategy: single_node_A3
+  steps:
+  - title: 启动服务
+    content: |-
+      Qwen3-Reranker 通过 pooling runner 提供服务：`--runner pooling` 将服务切换到嵌入/重排序接口路径，`--hf_overrides` 从 `no`/`yes` 分类 token 加载 Qwen3 重排序分类头。
+
+      ```bash
+      vllm serve Qwen/Qwen3-Reranker-0.6B \
+        --served-model-name Qwen/Qwen3-Reranker-0.6B \
+        --runner pooling \
+        --hf_overrides '{"architectures": ["Qwen3VLForSequenceClassification"],"classifier_from_token": ["no", "yes"],"is_original_qwen3_reranker": true}' \
+        --port 8000 \
+        --max-model-len {{max_model_len}}
+      ```
+
+      > - `--max-model-len` 是上下文长度（单个请求的输入加输出）。请保留这个明确的保守值；在 Atlas 300I DUO 上较大的自动解析值会在分配掩码时 OOM。
+      > - `--served-model-name` 是客户端请求体中传入的模型 id，请与下方请求保持一致。
+      > - A2 系列使用同样的命令，仅镜像 tag 不同。
+  - title: 服务验证
+    content: |-
+      服务启动后，向 `/v1/rerank` 发送重排序请求，确认每个结果都带有 `relevance_score`。完整示例见下方“功能验证”部分。
+- npu: Atlas 800I A2
+  precision: bf16
+  deployment: 单节点
+  case: 单卡（A2）
+  tags: [a2-single]
+  strategy: single_node_A2
+  steps:
+  - title: 启动服务
+    content: |-
+      A2 系列使用与 A3 系列相同的服务参数，请在 `v0.23.0` 镜像（不带 `-a3` 后缀）中运行。
+
+      ```bash
+      vllm serve Qwen/Qwen3-Reranker-0.6B \
+        --served-model-name Qwen/Qwen3-Reranker-0.6B \
+        --runner pooling \
+        --hf_overrides '{"architectures": ["Qwen3VLForSequenceClassification"],"classifier_from_token": ["no", "yes"],"is_original_qwen3_reranker": true}' \
+        --port 8000 \
+        --max-model-len {{max_model_len}}
+      ```
+
+      > - 可调整 `--port` 以避免与同机其它服务端口冲突。
+  - title: 服务验证
+    content: |-
+      服务启动后，向 `/v1/rerank` 发送重排序请求。完整示例见下方“功能验证”部分。
+- npu: Atlas 300I DUO
+  precision: bf16
+  deployment: 单节点
+  case: 300I DUO
+  tags: [310p-single]
+  strategy: single_node_310p
+  steps:
+  - title: 启动服务
+    content: |-
+      Atlas 300I DUO 上需要限制图捕获尺寸并使用 float16，因此启动命令额外带上 `--compilation-config`、`--additional-config` 与 `--dtype`：
+
+      ```bash
+      vllm serve Qwen/Qwen3-Reranker-0.6B \
+        --served-model-name Qwen/Qwen3-Reranker-0.6B \
+        --runner pooling \
+        --hf_overrides '{"architectures": ["Qwen3VLForSequenceClassification"],"classifier_from_token": ["no", "yes"],"is_original_qwen3_reranker": true}' \
+        --compilation-config '{"cudagraph_capture_sizes": [1024,512]}' \
+        --additional-config '{"ascend_compilation_config": {"fuse_norm_quant": false}}' \
+        --dtype float16 \
+        --port 8000 \
+        --max-model-len {{max_model_len}}
+      ```
+
+      **必需参数说明：**
+
+      - `--compilation-config`：对于 Atlas 300I DUO，由于硬件流有限，`cudagraph_capture_sizes` 的大小受到限制。
+
+      **关键参数说明：**
+
+      - `--max-model-len`：对于 Atlas 300I DUO，如果自动解析得到较大的上下文长度，分配该掩码（O(max_model_len^2)）可能超出 NPU 内存并触发 OOM。请务必设置明确且保守的值，例如 `--max-model-len 1024`。
+  - title: 服务验证
+    content: |-
+      服务启动后，向 `/v1/rerank` 发送重排序请求。完整示例见下方“功能验证”部分。
+
+verification: |-
+  服务启动后，可用以下脚本验证。请使用查询与文档模板，使重排序模型收到其训练时的提示格式：
+
+  ```python
+  import requests
+
+  url = "http://127.0.0.1:8000/v1/rerank"
+
+  # 请使用 query_template 与 document_template 格式化查询和文档，以获得更好的重排序结果。
+
+  prefix = '<|im_start|>system\nJudge whether the Document meets the requirements based on the Query and the Instruct provided. Note that the answer can only be "yes" or "no".<|im_end|>\n<|im_start|>user\n'
+  suffix = "<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n"
+
+  query_template = "{prefix}<Instruct>: {instruction}\n<Query>: {query}\n"
+  document_template = "<Document>: {doc}{suffix}"
+
+  instruction = (
+      "Given a web search query, retrieve relevant passages that answer the query"
+  )
+
+  query = "What is the capital of China?"
+
+  documents = [
+      "The capital of China is Beijing.",
+      "Gravity is a force that attracts two bodies towards each other. It gives weight to physical objects and is responsible for the movement of planets around the sun.",
+  ]
+
+  documents = [
+      document_template.format(doc=doc, suffix=suffix) for doc in documents
+  ]
+
+  response = requests.post(url,
+                           json={
+                               "query": query_template.format(prefix=prefix, instruction=instruction, query=query),
+                               "documents": documents,
+                           }).json()
+
+  print(response)
+  ```
+
+  预期结果：服务返回 HTTP 200 OK，JSON 响应中包含 `relevance_score` 字段。示例输出：
+
+  ```json
+  {
+      "id": "score-xxx",
+      "model": "Qwen/Qwen3-Reranker-0.6B",
+      "usage": {
+          "prompt_tokens": 193,
+          "total_tokens": 193
+      },
+      "results": [
+          {
+              "index": 0,
+              "document": {
+                  "text": "<Document>: The capital of China is Beijing.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
+                  "multi_modal": null
+              },
+              "relevance_score": 0.9994981288909912
+          },
+          {
+              "index": 1,
+              "document": {
+                  "text": "<Document>: Gravity is a force that attracts two bodies towards each other. It gives weight to physical objects and is responsible for the movement of planets around the sun.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
+                  "multi_modal": null
+              },
+              "relevance_score": 0.00000506485957885161
+          }
+      ]
+  }
+  ```
+
+  更多使用示例请参考 [vLLM pooling/score 示例](https://github.com/vllm-project/vllm/tree/main/examples/pooling/score)。
+
+evaluation:
+  accuracy:
+    content: |-
+      ### 使用 MTEB
+
+      1. 详见 [MTEB](https://docs.mteb.org/)。
+      2. 运行以下代码执行精度评估。
+
+      ```python
+      import os
+
+      from mteb.models.vllm_wrapper import VllmCrossEncoderWrapper
+
+      if __name__ == "__main__":
+          import mteb
+
+          data_path = "/home/data/mteb_data"
+          os.environ["HF_DATASETS_CACHE"] = data_path
+          os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
+
+          model = VllmCrossEncoderWrapper(f"/home/data/Qwen3-Reranker-0.6B",
+                                      revision="norm",
+                                      dtype="float16",
+                                      enforce_eager=True,
+                                      max_model_len=10240,
+                                      hf_overrides={"architectures": ["Qwen3VLForSequenceClassification"],"classifier_from_token": ["no", "yes"],"is_original_qwen3_reranker": True})
+
+          cache = mteb.ResultCache("/home/data/mteb_data")
+          tasks = mteb.get_tasks(
+              task_types=["Reranking"],
+              languages=["zho"]
+          )
+          tasks = mteb.get_tasks(tasks=["MultiLongDocReranking"])
+          results = mteb.evaluate(model, tasks=tasks, cache=cache, overwrite_strategy="always")
+          print(results)
+      ```
+
+      3. 执行后即可获得结果。
+performance:
+  accuracy: |-
+    精度通过 MTEB 的重排序任务（`MultiLongDocReranking` 以及 `Reranking` 任务类型）衡量。可运行脚本见“精度评估”部分，指标定义见 [MTEB](https://docs.mteb.org/)。
+
+    教程未公布 Qwen3-Reranker 在昇腾上的参考分数，因此此处不声明精度数值。
+  benchmark: |-
+    ### 使用 vLLM Benchmark
+
+    `Qwen3-Reranker-0.6B` 的性能通过 `vllm bench serve` 的 rerank 后端测量。更多细节请参考 [vLLM benchmark](https://docs.vllm.ai/en/latest/benchmarking/cli/)。
+
+    ```bash
+    vllm bench serve --model Qwen/Qwen3-Reranker-0.6B --backend vllm-rerank  --port 8000 --dataset-name random-rerank --endpoint /v1/rerank --random-input 200  --save-result --result-dir ./
+    ```
+
+    大约几分钟后，即可获得性能评估结果。
+tuning: |-
+  ### 调优指南
+
+  调优方法请参考[公共性能调优文档](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/performance_and_debug/optimization_and_tuning.html)，特性说明请参考[特性指南](https://docs.vllm.ai/projects/ascend/en/latest/user_guide/support_matrix/feature_matrix.html)。
+
+  重排序模型专属说明：教程中唯一按场景固定的调优参数是 `--max-model-len`。提高它会放大注意力掩码（O(max_model_len^2)），在 Atlas 300I DUO 上可能 OOM —— 该硬件保持 1024，只有在 A2/A3 上测出显存余量后再提升。
+faq: |-
+  **问：Atlas 300I DUO 上启动即 OOM。**
+
+  答：设置明确且保守的 `--max-model-len`（例如 1024）。较大的自动解析上下文长度会分配 O(max_model_len^2) 的掩码并超出 NPU 内存。
+
+  **问：该模型无法使用 `/v1/chat/completions`。**
+
+  答：Qwen3-Reranker 是 pooling 模型。`--runner pooling` 暴露的是 `/v1/rerank`、`/v1/score` 与 `/v1/embeddings`，而不是对话接口。
+
+  **问：应该使用哪个镜像？**
+
+  答：`v0.23.0` 镜像线（`-a3`、无后缀、`-310p`）。该模型自 vLLM Ascend v0.30.0 起停止支持，更新的 tag 不再提供该模型。
+
+  有关常见环境、安装和一般参数问题，请参阅[公共 FAQ](https://docs.vllm.ai/projects/ascend/en/latest/faqs.html)。
+
+references:
+- title: vLLM Ascend 教程（v0.23.0，迁移来源）
+  url: https://docs.vllm.ai/projects/ascend/en/v0.23.0/tutorials/models/Qwen3-Reranker.html
+- title: vLLM Ascend 教程（latest，停止支持说明）
+  url: https://docs.vllm.ai/projects/ascend/en/latest/tutorials/models/Qwen3-Reranker.html
+- title: vLLM Ascend 安装指南
+  url: https://docs.vllm.ai/projects/ascend/en/latest/installation.html
+- title: vLLM CLI 参考
+  url: https://docs.vllm.ai/en/stable/cli/
+- title: vLLM benchmark CLI
+  url: https://docs.vllm.ai/en/latest/benchmarking/cli/
+- title: vLLM pooling/score 示例
+  url: https://github.com/vllm-project/vllm/tree/main/examples/pooling/score
+- title: MTEB 文档
+  url: https://docs.mteb.org/
+- title: Qwen3-Reranker-0.6B（ModelScope）
+  url: https://www.modelscope.cn/models/Qwen/Qwen3-Reranker-0.6B
+- title: Qwen3-Reranker-0.6B（HuggingFace）
+  url: https://huggingface.co/Qwen/Qwen3-Reranker-0.6B
+- title: vLLM Ascend GitHub
+  url: https://github.com/vllm-project/vllm-ascend
