@@ -1,0 +1,269 @@
+# English version (structure mirrors models/zh; prose translation pending).
+meta:
+  title: "DeepSeek-V4.1-Flash"
+  slug: "deepseek-v4-1-flash"
+  provider: "DeepSeek"
+  description: "SWA"
+  date_added: 2026-10-28
+  date_updated: 2026-10-28
+  difficulty: advanced
+  tasks:
+    - text
+  performance_headline: "并发 32 单卡 E2E 吞吐 2131.36 TPS"
+  related_recipes: []
+  hardware:
+    atlas_800_a3: verified
+model:
+  model_id: "deepseek-ai/DeepSeek-V4.1-Flash"
+  min_vllm_version: "v0.23.0rc1"
+  architecture: moe
+  parameter_count: "763B"
+  active_parameters: "763B"
+  context_length: 1048576
+  modality: text
+  base_args:
+    - "--trust-remote-code"
+  base_env:
+    HCCL_OP_EXPANSION_MODE: "AIV"
+  docker_image:
+    atlas_800_a3: "quay.io/ascend/vllm-ascend:nightly-main-a3-openeuler"
+  nightly_required: false
+  install:
+    # Ascend 推荐 Docker 方式；pip 需源码编译，隐藏 pip 标签
+    pip: false
+    docker:
+      command: "docker run --rm --net=host --shm-size=512g -v /root/.cache/modelscope:/root/.cache/modelscope --device /dev/davinci0 --device /dev/davinci1 --device /dev/davinci2 --device /dev/davinci3 --device /dev/davinci4 --device /dev/davinci5 --device /dev/davinci6 --device /dev/davinci7 --device /dev/davinci8 --device /dev/davinci9 --device /dev/davinci10 --device /dev/davinci11 --device /dev/davinci12 --device /dev/davinci13 --device /dev/davinci14 --device /dev/davinci15 --device /dev/davinci16 --device /dev/davinci17 --device /dev/davinci18 --device /dev/davinci19 --device /dev/davinci20 --device /dev/davinci21 --device /dev/davinci22 --device /dev/davinci23 --device /dev/davinci24 --device /dev/davinci25 --device /dev/davinci26 --device /dev/davinci27 --device /dev/davinci28 --device /dev/davinci29 --device /dev/davinci30 --device /dev/davinci31 --device /dev/davinci32 --device /dev/davinci33 --device /dev/davinci34 --device /dev/davinci35 --device /dev/davinci36 --device /dev/davinci37 --device /dev/davinci38 --device /dev/davinci39 -it quay.io/ascend/vllm-ascend:nightly-main-a3-openeuler bash"
+      note: "Ascend 官方镜像；权重目录已挂载进容器；设备/驱动挂载见 env_setup.container。"
+features:
+  expert_parallel:
+    description: "跨 DP rank 的 MoE 专家并行"
+    args: ["--enable-expert-parallel"]
+  tool_calling:
+    description: "原生工具调用"
+    args: ["--enable-auto-tool-choice", "--tool-call-parser deepseek_v4"]
+  reasoning:
+    description: "推理模式（思考链）"
+    args: ["--reasoning-parser deepseek_v4"]
+  spec_decoding:
+    label: "MTP Spec Decoding"
+    description: "MTP 投机解码，加速推理"
+    args: ["--speculative-config", '{"num_speculative_tokens": 1, "method": "mtp", "enforce_eager": true}']
+  flashcomm1:
+    label: "FlashComm1"
+    description: "FlashComm 通信优化，提升芯片间带宽"
+    env:
+      VLLM_ASCEND_ENABLE_FLASHCOMM1: "1"
+  prefix_caching:
+    label: "Prefix Caching"
+    description: "KV 缓存前缀缓存"
+    args: ["--enable-prefix-caching"]
+    flag_when_false: "--no-enable-prefix-caching"
+  async_scheduling:
+    label: "Async Scheduling"
+    description: "异步调度，CPU 调度与 NPU 计算重叠"
+    args: ["--async-scheduling"]
+  compilation_config:
+    label: "Compilation Config"
+    description: "decode 阶段全 ACL 图执行，降低调度时延"
+    args: ["--compilation-config", '{"cudagraph_mode":"FULL_DECODE_ONLY"}']
+  cpu_binding:
+    label: "CPU Binding"
+    description: "CPU 核绑定，降低 NUMA 时延"
+    args: ["--additional-config", '{"enable_cpu_binding": true}']
+  multistream_overlap:
+    label: "Multi-stream Overlap"
+    description: "MoE 共享专家多流重叠"
+    args: ["--additional-config", '{"multistream_overlap_shared_expert": true}']
+  npugraph_ex:
+    label: "NPUGraph EX"
+    description: "NPUGraph EX 加速图执行"
+    args: ["--additional-config", '{"ascend_compilation_config": {"enable_npugraph_ex": true, "enable_static_kernel": false}}']
+opt_in_features:
+  - prefix_caching
+  - cpu_binding
+  - multistream_overlap
+  - npugraph_ex
+variants:
+  ascend_w8a8:
+    model_id: "deepseek-ai/DeepSeek-V4.1-Flash"
+    label: "W8A8 (A3)"
+    precision: W8A8
+    vram_minimum_gb: 916
+    description: "W8A8 量化服务于 Atlas 800I A3（由小灵平台一键采集实测数据生成，请审核）。"
+    supported_hardware: [atlas_800_a3]
+    tp:
+      atlas_800_a3: 1
+compatible_strategies:
+  - single_node_A2
+  - single_node_A3
+  - single_node_A5
+  - pd_cluster
+hardware_overrides:
+  ascend_a3:
+    extra_args:
+      - "--compilation-config"
+      - '{"cudagraph_mode": "FULL_DECODE_ONLY"}'
+    extra_env:
+      HCCL_BUFFSIZE: "2560"
+strategy_overrides:
+  pd_cluster:
+    prefill:
+      nodes: { default: 1 }
+    decode:
+      nodes: { default: 1 }
+dependencies: []
+guide: ""
+performance_model_names:
+  - "DeepSeek-V4.1-Flash"
+config_params:
+  max_model_len:
+    default: 32768
+    type: number
+    description: "最大上下文长度(输入+输出 token 之和),按实际场景调整"
+  max_num_seqs:
+    default: 32
+    type: number
+    description: "每个 DP 组最大并发序列数"
+  gpu_memory_utilization:
+    default: 0.9
+    type: number
+    description: "KV cache 可用的显存比例"
+overview: |-
+  SWA
+weight_download:
+- weight_version: "W8A8"
+  sources:
+  - source: "Hugging Face"
+    command: |-
+      ```bash
+      pip install modelscope
+      modelscope download --model deepseek-ai/DeepSeek-V4.1-Flash
+      ```
+prerequisites:
+- title: "模型权重"
+  content: |-
+    请按上面 weight_download 下载权重；多节点部署请先验证多节点通信环境。
+env_setup:
+  container:
+    A3:
+      content: |-
+      根据您的机器类型选择镜像，并在节点上启动 Docker 镜像。
+
+        ```bash
+
+        export IMAGE=quay.io/ascend/vllm-ascend:nightly-main-a3-openeuler
+        docker run --rm \
+            --name vllm-ascend \
+            --shm-size=512g \
+            --net=host \
+            --device /dev/davinci0 \
+            --device /dev/davinci1 \
+            --device /dev/davinci2 \
+            --device /dev/davinci3 \
+            --device /dev/davinci4 \
+            --device /dev/davinci5 \
+            --device /dev/davinci6 \
+            --device /dev/davinci7 \
+            --device /dev/davinci8 \
+            --device /dev/davinci9 \
+            --device /dev/davinci10 \
+            --device /dev/davinci11 \
+            --device /dev/davinci12 \
+            --device /dev/davinci13 \
+            --device /dev/davinci14 \
+            --device /dev/davinci15 \
+            --device /dev/davinci16 \
+            --device /dev/davinci17 \
+            --device /dev/davinci18 \
+            --device /dev/davinci19 \
+            --device /dev/davinci20 \
+            --device /dev/davinci21 \
+            --device /dev/davinci22 \
+            --device /dev/davinci23 \
+            --device /dev/davinci24 \
+            --device /dev/davinci25 \
+            --device /dev/davinci26 \
+            --device /dev/davinci27 \
+            --device /dev/davinci28 \
+            --device /dev/davinci29 \
+            --device /dev/davinci30 \
+            --device /dev/davinci31 \
+            --device /dev/davinci32 \
+            --device /dev/davinci33 \
+            --device /dev/davinci34 \
+            --device /dev/davinci35 \
+            --device /dev/davinci36 \
+            --device /dev/davinci37 \
+            --device /dev/davinci38 \
+            --device /dev/davinci39 \
+            --device /dev/davinci_manager \
+            --device /dev/devmm_svm \
+            --device /dev/hisi_hdc \
+            -v /usr/local/dcmi:/usr/local/dcmi \
+            -v /usr/local/Ascend/driver/tools/hccn_tool:/usr/local/Ascend/driver/tools/hccn_tool \
+            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+            -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \
+            -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
+            -v /etc/ascend_install.info:/etc/ascend_install.info \
+            -v /etc/hccn.conf:/etc/hccn.conf \
+            -it $IMAGE bash
+        ```
+  pip:
+    content: |-
+      Ascend 推荐 Docker 方式；pip 需源码编译，不提供官方 wheel。
+extra_config:
+  label: "DSA CP"
+scenarios:
+- npu: Atlas 800I A3
+  precision: W8A8
+  deployment: 多节点-PD分离
+  case: PD 分离
+  tags: [ascend]
+  strategy: pd_cluster
+  steps:
+  - title: "启动服务"
+    content: |-
+      TODO
+  - title: "服务验证"
+    content: |-
+      ```shell
+      curl http://<node0_ip>:<port>/v1/chat/completions \
+          -H "Content-Type: application/json" \
+          -d '{"model": "<served-model-name>", "messages": [{"role": "user", "content": "Who are you?"}], "max_tokens": 256, "temperature": 0}'
+      ```
+verification: |-
+  服务启动后，使用上面的 curl 命令验证；预期返回 HTTP 200 OK 且包含 choices 字段的 JSON 响应。
+evaluation:
+  accuracy:
+    content: |-
+      以下精度结果来自小灵平台模型档案（一键采集实测）；评估方法参考 AISBench。
+      实测数据请见平台模型档案；如需在本文补充，请按上行表格格式追加。
+  performance:
+    content: |-
+      性能评估参考 AISBench 性能评估与 vllm benchmark 文档。
+performance:
+  accuracy: |-
+  以下精度结果来自小灵平台模型档案（一键采集实测）；评估方法参考 AISBench。
+  benchmark: |-
+    ### 场景概览
+
+    |场景|部署模式|总 NPU 数|权重版本|关键考虑因素|
+    |---|---|---|---|---|
+    |PD 分离|多节点-PD分离|40（A3）|W8A8|来自一键采集实测|
+
+    ### 详细节点配置
+
+    |模型名称|产品组合|场景|设备信息|组网形态|总卡数|数据格式|上下文长度|平均输入|平均输出|
+    |---|---|---|---|---|---|---|---|---|---|
+    |DeepSeek-V4.1-Flash|Atlas 800I A3 多节点-PD分离|PD 分离|Atlas 800I A3|多节点-PD分离|40|W8A8|1048576|190K/1K|-|
+
+    实测指标（并发/吞吐/时延）记录于小灵平台模型档案，本 YAML 不重复展开。
+tuning: |-
+  请参考公共性能调优文档与特性指南；本章仅涵盖模型特定问题。
+faq: |-
+  关于常见的环境、安装和通用参数问题，请参考公共 FAQ。
+references:
+- title: vllm-ascend 文档
+  url: https://docs.vllm.ai/projects/ascend/zh-cn/latest/tutorials/models/
+- title: vllm-ascend GitHub
+  url: https://github.com/vllm-project/vllm-ascend
