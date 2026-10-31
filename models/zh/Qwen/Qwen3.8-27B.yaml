@@ -1,0 +1,219 @@
+meta:
+  title: "Qwen3.8-27B"
+  slug: "qwen3-8-27b"
+  provider: "Qwen"
+  description: "Qwen3.8 系列 27B 稠密模型在昇腾上的文本推理。已在 Atlas A3 上用 W8A8 TP=2、vLLM Ascend 0.23.0（eager）完成冒烟。"
+  date_added: "2026-10-29"
+  date_updated: "2026-10-29"
+  difficulty: intermediate
+  tasks:
+    - text-generation
+  performance_headline: "Atlas A3 W8A8 TP=2 冒烟（vLLM Ascend 0.23.0，enforce-eager）"
+  related_recipes: []
+  hardware:
+    atlas_800_a3: verified
+    atlas_800_a2: experimental
+    atlas_300i_duo: experimental
+
+model:
+  model_id: "Eco-Tech/Qwen3.8-27B-w8a8"
+  min_vllm_version: "0.23.0"
+  architecture: dense
+  parameter_count: "27B"
+  active_parameters: null
+  context_length: 262144
+  modality: text
+  base_args:
+    - "--served-model-name"
+    - "qwen3.8"
+    - "--data-parallel-size"
+    - "1"
+    - "--tensor-parallel-size"
+    - "2"
+    - "--quantization"
+    - "ascend"
+    - "--max-num-seqs"
+    - "4"
+    - "--max-model-len"
+    - "8192"
+    - "--max-num-batched-tokens"
+    - "2048"
+    - "--trust-remote-code"
+    - "--gpu-memory-utilization"
+    - "0.65"
+    - "--enforce-eager"
+  base_env:
+    PYTORCH_NPU_ALLOC_CONF: "expandable_segments:True"
+    HCCL_BUFFSIZE: "512"
+    VLLM_USE_MODELSCOPE: "1"
+  docker_image:
+    atlas_800_a3: "quay.io/ascend/vllm-ascend:qwen3.8-a3"
+    atlas_800_a2: "quay.io/ascend/vllm-ascend:qwen3.8-a2"
+    atlas_300i_duo: "quay.io/ascend/vllm-ascend:v0.23.0-310p"
+  nightly_required: false
+  install:
+    pip: false
+    docker:
+      command: "docker run --rm --name vllm-ascend --shm-size=1g --net=host --device /dev/davinci0 --device /dev/davinci1 --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc -v /root/.cache:/root/.cache -it quay.io/ascend/vllm-ascend:qwen3.8-a3 bash"
+      note: "Qwen3.8 A3 官方镜像；完整设备与驱动挂载见 env_setup.container。"
+
+features: {}
+
+opt_in_features: []
+
+variants:
+  ascend_w8a8:
+    precision: int8
+    vram_minimum_gb: 64
+    description: "ModelSlim W8A8（Eco-Tech）。必须加 --quantization ascend。已在 Atlas A3 TP=2 验证。"
+
+compatible_strategies:
+  - single_node_A3
+  - single_node_A2
+
+hardware_overrides: {}
+strategy_overrides: {}
+
+dependencies: []
+
+guide: ""
+
+config_params:
+  max_model_len:
+    default: 8192
+    type: number
+    description: "冒烟使用 8192。教程 A3 示例在显存允许时可到 131072。"
+  gpu_memory_utilization:
+    default: 0.65
+    type: number
+    description: "共享双芯容器若有残余 HBM / 僵尸 worker，需先降利用率；教程默认 0.85。"
+
+overview: |-
+  Qwen3.8-27B 是 Qwen3.8 系列 27B 稠密模型，混合注意力（64 层中 16 层全注意力）并带原生 MTP。本昇腾 recipe 覆盖 Atlas A3/A2 上 W8A8 文本服务（vLLM Ascend 0.23.0）。已在 Atlas A3（Ascend910×2）用 `Eco-Tech/Qwen3.8-27B-w8a8`、TP=2、`--quantization ascend`、`--enforce-eager` 完成端到端冒烟（本栈上 aclgraph FULL_DECODE_ONLY 会触发 rms/图捕获问题）。
+
+weight_download:
+  - weight_version: W8A8
+    sources:
+      - source: ModelScope
+        url: https://www.modelscope.cn/models/Eco-Tech/Qwen3.8-27B-w8a8
+        command: |-
+          ```bash
+          pip install modelscope
+          modelscope download --model Eco-Tech/Qwen3.8-27B-w8a8
+          ```
+      - source: HuggingFace
+        url: ""
+        command: ""
+      - source: Modelers
+        url: ""
+        command: ""
+      - source: GitCode
+        url: ""
+        command: ""
+
+prerequisites:
+  - title: 模型权重
+    content: |-
+      | 权重版本 | 硬件要求 | 下载 |
+      |----------|----------|------|
+      | W8A8 | Atlas 800 A3（64GB×16）或 Atlas 800 A2（64GB×8）；实验室冒烟为 2×Ascend910 + TP=2 | [ModelScope](https://www.modelscope.cn/models/Eco-Tech/Qwen3.8-27B-w8a8) |
+      | BF16 | 显存需求更大，见教程 | [ModelScope](https://www.modelscope.cn/models/Qwen/Qwen3.8-27B) |
+
+      > **路径说明**：记录本地下载目录，并在 `vllm serve` 中使用同一路径；或配合 `VLLM_USE_MODELSCOPE=1` 直接传 ModelScope 模型 ID。
+
+env_setup:
+  container:
+    A3:
+      content: |-
+        ```bash
+        export IMAGE=quay.io/ascend/vllm-ascend:qwen3.8-a3
+        export NAME=vllm-ascend
+
+        docker run --rm \
+            --name $NAME \
+            --net=host \
+            --shm-size=1g \
+            --device /dev/davinci0 \
+            --device /dev/davinci1 \
+            --device /dev/davinci_manager \
+            --device /dev/devmm_svm \
+            --device /dev/hisi_hdc \
+            -v /usr/local/dcmi:/usr/local/dcmi \
+            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+            -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \
+            -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
+            -v /etc/ascend_install.info:/etc/ascend_install.info \
+            -v /root/.cache:/root/.cache \
+            -it $IMAGE bash
+        ```
+
+        > 优先使用 A3 变体 wheel（`…-aarch64-a3.whl`，plain pip 需改名）或 `qwen3.8-a3` 镜像。0.23.0 上若 aclgraph 失败请保留 `--enforce-eager`。
+    A2:
+      content: |-
+        ```bash
+        export IMAGE=quay.io/ascend/vllm-ascend:qwen3.8-a2
+        # 设备挂载同教程 A2；pip 安装时使用 A2 变体 wheel。
+        ```
+  pip:
+    content: |-
+      安装匹配的 Ascend torch / torch_npu 2.10 与 `vllm==0.23.0`，再从华为 WheelNext 安装 A3/A2 变体 `vllm-ascend==0.23.0`（`…-a3.whl` / `…-910b.whl`）。若用 plain pip，先去掉变体后缀再安装。
+
+scenarios:
+  - npu: Atlas A3
+    title: W8A8 TP=2 在线服务
+    content: |-
+      ```bash
+      export MODEL_PATH=Eco-Tech/Qwen3.8-27B-w8a8
+      export VLLM_USE_MODELSCOPE=True
+      export HCCL_BUFFSIZE=512
+      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+
+      vllm serve $MODEL_PATH \
+          --host 0.0.0.0 \
+          --port 8000 \
+          --data-parallel-size 1 \
+          --tensor-parallel-size 2 \
+          --quantization ascend \
+          --served-model-name qwen3.8 \
+          --max-num-seqs 4 \
+          --max-model-len 8192 \
+          --max-num-batched-tokens 2048 \
+          --trust-remote-code \
+          --gpu-memory-utilization 0.65 \
+          --enforce-eager
+      ```
+
+      教程完整 A3 命令可提高 `--max-model-len` / `--max-num-seqs`，并在图模式正常时启用 prefix caching、MTP 与 `--compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY"}'`。
+
+  - npu: Atlas A3
+    title: 冒烟对话
+    content: |-
+      ```bash
+      curl http://127.0.0.1:8000/v1/chat/completions \
+        -H "Content-Type: application/json" \
+        -d '{
+          "model": "qwen3.8",
+          "messages": [{"role":"user","content":"用一句短话打招呼。"}],
+          "max_tokens": 64,
+          "temperature": 0
+        }'
+      ```
+
+accuracy_and_performance: |-
+  Atlas A3（Ascend910×2 die，W8A8 TP=2，vLLM / vLLM Ascend 0.23.0，`--enforce-eager`，`--quantization ascend`，`max_model_len=8192`，`gpu_memory_utilization=0.65`）功能冒烟通过。`/v1/models` HTTP 200，served id `qwen3.8`。Chat completion（`temperature=0`，`max_tokens=64`）HTTP 200，冷启动路径约 45 s（thinking 模型，最终回复 “Hello!”）。权重约 14.1 GiB/die，启动时空闲 HBM 约 61 GiB/die。
+
+faq:
+  - q: 为什么要用 `--enforce-eager`？
+    a: 已验证的 0.23.0 A3 栈上 aclgraph FULL_DECODE_ONLY 会失败（rms / 图捕获）。eager 是可靠冒烟路径；升级镜像/wheel 后再试图模式。
+  - q: 为什么降低 `--gpu-memory-utilization`？
+    a: 共享双芯容器常有残余 HBM。先清理残留 `VLLMWorker_TP`，再向教程默认 0.85 提高。
+  - q: A2 wheel 装到 A3 上？
+    a: `vllm_ascend._build_info.__device_type__` 必须为 `A3`。请安装 `…-a3.whl` 变体（plain pip 需改名）。
+  - q: Worker 报 `libtbe_adapter.so: undefined symbol: Mki::Dl(std::__cxx11::string)`？
+    a: `LD_LIBRARY_PATH` 里另有一份 `libmki.so`（常见于 `nnal/asdsip`）排在 ATB `cxx_abi_1` 前面。请把 `/usr/local/Ascend/nnal/atb/.../cxx_abi_1/lib` 放在 asdsip 之前，或仅跑 ATB 时不要把 asdsip 加进路径。
+
+references:
+  - title: vLLM Ascend 教程 Qwen3.8-27B
+    url: https://docs.vllm.ai/projects/ascend/en/latest/tutorials/models/Qwen3.8-27B.html
+  - title: ModelScope W8A8
+    url: https://www.modelscope.cn/models/Eco-Tech/Qwen3.8-27B-w8a8
