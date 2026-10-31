@@ -1,0 +1,320 @@
+meta:
+  title: "Qwen3-ASR-1.7B"
+  slug: "qwen3-asr-1.7b"
+  provider: "Qwen"
+  description: "1.7B 参数 ASR 模型，支持中英文、方言、多语言语音与歌唱转写。已在 Atlas 300I DUO（310P）单卡用 vLLM Ascend 完成验证。"
+  date_added: "2026-10-19"
+  date_updated: "2026-10-19"
+  difficulty: beginner
+  tasks:
+    - multimodal
+  performance_headline: "Atlas 300I DUO（310P）单卡 ASR，已用 vLLM Ascend 0.23.0 验证"
+  related_recipes: []
+  hardware:
+    atlas_300i_duo: verified
+    atlas_800_a2: experimental
+
+model:
+  model_id: "Qwen/Qwen3-ASR-1.7B"
+  min_vllm_version: "0.19.0"
+  architecture: dense
+  parameter_count: "1.7B"
+  active_parameters: null
+  context_length: 4096
+  modality: asr
+  base_args:
+    - "--served-model-name"
+    - "qwen3-asr"
+    - "--tensor-parallel-size"
+    - "1"
+    - "--max-model-len"
+    - "4096"
+    - "--gpu-memory-utilization"
+    - "0.9"
+  base_env:
+    PYTORCH_NPU_ALLOC_CONF: "expandable_segments:True"
+    VLLM_USE_MODELSCOPE: "1"
+  docker_image:
+    atlas_800_a2: "quay.io/ascend/vllm-ascend:v0.23.0"
+    atlas_300i_duo: "quay.io/ascend/vllm-ascend:v0.23.0-310p"
+  nightly_required: false
+  install:
+    pip: false
+    docker:
+      command: "docker run --rm --name vllm-ascend --shm-size=10g --net=host --device /dev/davinci0 --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc -v /root/.cache:/root/.cache -it quay.io/ascend/vllm-ascend:v0.23.0-310p bash"
+      note: "昇腾 310P 官方镜像；完整设备与驱动挂载见 env_setup.container。请安装音频依赖：pip install av soundfile。"
+
+features: {}
+
+opt_in_features: []
+
+variants:
+  default:
+    precision: fp16
+    vram_minimum_gb: 8
+    description: "BF16 权重在 Atlas 300I DUO 上以 float16 服务（已验证）"
+
+compatible_strategies:
+  - single_node_310p
+  - single_node_A2
+
+hardware_overrides: {}
+strategy_overrides: {}
+
+dependencies: []
+
+guide: ""
+
+config_params:
+  max_model_len:
+    default: 4096
+    type: number
+    description: "最大上下文长度。Atlas 300I DUO 上必须显式设置；自动探测可能分配过大的 attention mask 并 OOM。"
+  gpu_memory_utilization:
+    default: 0.9
+    type: number
+    description: "模型和 KV cache 可用的 NPU 显存比例。"
+
+overview: |-
+  Qwen3-ASR-1.7B 是 Qwen 团队的 1.7B 参数自动语音识别模型，支持中英文、中文方言、多语言语音和歌唱转写，以及长音频与流式推理。本 recipe 将官方 vLLM Ascend tutorial 迁移为结构化 YAML，并在 Atlas 300I DUO（310P）上用 vLLM / vLLM Ascend 0.23.0 完成端到端验证。需要音频依赖（`pip install av soundfile` 或 `vllm[audio]`）。
+
+weight_download:
+  - weight_version: BF16
+    sources:
+      - source: ModelScope
+        url: https://www.modelscope.cn/models/Qwen/Qwen3-ASR-1.7B
+        command: |-
+          ```bash
+          pip install modelscope
+          modelscope download --model Qwen/Qwen3-ASR-1.7B
+          ```
+      - source: HuggingFace
+        url: https://huggingface.co/Qwen/Qwen3-ASR-1.7B
+        command: |-
+          ```bash
+          pip install -U huggingface_hub
+          huggingface-cli download Qwen/Qwen3-ASR-1.7B
+          ```
+      - source: Modelers
+        url: ""
+        command: ""
+      - source: GitCode
+        url: ""
+        command: ""
+
+prerequisites:
+  - title: Model Weight
+    content: |-
+      | Weight Version | Hardware Requirements | Download Links |
+      |----------------|------------------------|----------------|
+      | BF16 | one Ascend Atlas 800I A2 64 GB NPU or one Ascend Atlas 300I DUO 48 GB NPU | [ModelScope](https://www.modelscope.cn/models/Qwen/Qwen3-ASR-1.7B) |
+
+      将权重下载到部署环境可访问的目录（例如 `/root/.cache/`）。
+
+      > **路径说明**：记下本地路径，后续 `vllm serve` 使用同一目录（或启用缓存的 ModelScope / HuggingFace 模型 ID）。
+  - title: Audio dependencies
+    content: |-
+      音频解码需要 PyAV / soundfile。在容器或 venv 中：
+
+      ```bash
+      pip install av soundfile
+      # or: pip install "vllm[audio]"
+      ```
+
+      缺少这些包时，`/v1/chat/completions` 会返回 `Invalid or unsupported audio file`。
+
+env_setup:
+  container:
+    300I DUO:
+      content: |-
+        使用官方 `-310p` 镜像（已用 v0.23.0 验证）：
+
+        ```bash
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0-310p
+
+        docker run --rm \
+            --name vllm-ascend \
+            --shm-size=10g \
+            --net=host \
+            --privileged=true \
+            --device /dev/davinci0 \
+            --device /dev/davinci_manager \
+            --device /dev/devmm_svm \
+            --device /dev/hisi_hdc \
+            -v /usr/local/dcmi:/usr/local/dcmi \
+            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+            -v /usr/local/Ascend/driver/lib64:/usr/local/Ascend/driver/lib64 \
+            -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
+            -v /etc/ascend_install.info:/etc/ascend_install.info \
+            -v /root/.cache:/root/.cache \
+            -it $IMAGE bash
+        ```
+
+        > 在 Atlas 300I DUO 上，如已安装请卸载：`pip uninstall -y triton-ascend triton`。
+        > 然后安装音频依赖：`pip install av soundfile`。
+    A2:
+      content: |-
+        Atlas A2 镜像（与 tutorial 一致；本 recipe 将 A2 标为 experimental，因为验证集中在 310P）：
+
+        ```bash
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0
+
+        docker run --rm \
+            --name vllm-ascend \
+            --shm-size=1g \
+            --net=host \
+            --device /dev/davinci0 \
+            --device /dev/davinci_manager \
+            --device /dev/devmm_svm \
+            --device /dev/hisi_hdc \
+            -v /usr/local/dcmi:/usr/local/dcmi \
+            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+            -v /usr/local/Ascend/driver/lib64:/usr/local/Ascend/driver/lib64 \
+            -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
+            -v /etc/ascend_install.info:/etc/ascend_install.info \
+            -v /root/.cache:/root/.cache \
+            -it $IMAGE bash
+        ```
+  pip:
+    content: |-
+      若不使用 Docker，可按[安装指南](https://docs.vllm.ai/projects/ascend/zh-cn/latest/installation.html)从源码安装 `vllm-ascend`，再执行 `pip install av soundfile`。
+
+scenarios:
+  - npu: Atlas 300I DUO
+    precision: fp16
+    deployment: Single-Node
+    case: 300I DUO (TP1)
+    tags: [310p-single]
+    strategy: single_node_310p
+    steps:
+      - title: Start the server
+        content: |-
+          Atlas 300I DUO 单机 ASR（TP=1）。已在一张 310P3（约 44 GB HBM）上用 vLLM Ascend 0.23.0 验证。
+
+          ```bash
+          export ASCEND_RT_VISIBLE_DEVICES=0
+          export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+
+          vllm serve your_model_path \
+              --served-model-name qwen3-asr \
+              --tensor-parallel-size 1 \
+              --gpu-memory-utilization {{gpu_memory_utilization}} \
+              --dtype float16 \
+              --max-model-len {{max_model_len}} \
+              --additional-config '{"ascend_compilation_config": {"fuse_norm_quant": false,"enable_npu_graph_ex":false}}' \
+              --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY", "cudagraph_capture_sizes": [1,4]}' \
+              --host 0.0.0.0 \
+              --port 8000
+          ```
+
+          > - 将 `your_model_path` 换成本地权重目录或 `Qwen/Qwen3-ASR-1.7B`。
+          > - 在 Atlas 300I DUO 上务必显式设置 `--max-model-len`（例如 `4096`）。
+          > - 日志出现 `Application startup complete` 即启动成功。310P 上出现 `No module named 'triton'` 属于预期警告。
+      - title: Service Verification
+        content: |-
+          服务启动后，按下方验证章节发送 `/v1/chat/completions` 音频请求。
+  - npu: Atlas 800I A2
+    precision: bf16
+    deployment: Single-Node
+    case: Single Node Single Card (A2)
+    tags: [a2-single]
+    strategy: single_node_A2
+    steps:
+      - title: Start the server
+        content: |-
+          官方 tutorial 中的 Atlas A2 单机 ASR（本 recipe 标为 experimental）。
+
+          ```bash
+          export ASCEND_RT_VISIBLE_DEVICES=0
+          export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+
+          vllm serve your_model_path \
+              --served-model-name qwen3-asr \
+              --tensor-parallel-size 1 \
+              --max-model-len {{max_model_len}} \
+              --gpu-memory-utilization {{gpu_memory_utilization}} \
+              --enforce-eager \
+              --port 8000
+          ```
+      - title: Service Verification
+        content: |-
+          服务启动后，按下方验证章节发送 `/v1/chat/completions` 音频请求。
+
+verification: |-
+  服务启动后发送音频转写请求。
+
+  **Chat Completions API:**
+
+  ```bash
+  curl http://localhost:8000/v1/chat/completions \
+      -H "Content-Type: application/json" \
+      -d '{
+          "model": "qwen3-asr",
+          "messages": [
+              {
+                  "role": "user",
+                  "content": [
+                      {
+                          "type": "audio_url",
+                          "audio_url": {
+                              "url": "https://qianwen-res.oss-cn-beijing.aliyuncs.com/Qwen3-ASR-Repo/asr_en.wav"
+                          }
+                      }
+                  ]
+              }
+          ]
+      }'
+  ```
+
+  预期：HTTP 200，JSON 的 `choices[0].message.content` 含转写文本，且 `finish_reason` 为 `stop`。
+
+  已在 Atlas 300I DUO（310P3）上用 vLLM 0.23.0 / vLLM Ascend 0.23.0 验证：样例 `asr_en.wav` 返回英文转写，`finish_reason` 为 `stop`（prompt 约 211 tokens，completion 约 49 tokens）。须先安装 `av` 与 `soundfile`，否则接口返回 `Invalid or unsupported audio file`。
+
+evaluation:
+  accuracy:
+    content: |-
+      在标注音频集上用词错误率（WER）和字错误率（CER）评估。官方 tutorial 未给出固定 WER/CER 数字。
+  performance:
+    content: |-
+      测量端到端 ASR 服务（音频预处理 + 请求 + 推理 + 解析）。记录音频时长、并发、时延、实时率和吞吐。
+
+      | Scenario | Settings | Notes |
+      | -------- | -------- | ----- |
+      | 低时延 | TP=1，`--max-model-len 4096` | 优先短音频；避免与其他任务共享 NPU |
+      | 长音频 | 仅在需要时提高 `--max-model-len` | Atlas 300I DUO 上保持保守取值 |
+
+performance:
+  accuracy: |-
+    Atlas 300I DUO 上官方样例音频功能验证通过（HTTP 200，英文转写连贯）。生产就绪请在自有标注集上给出 WER/CER。
+  benchmark: |-
+    此处不宣称固定吞吐数字。已验证的 310P 上，引擎预热后单条 tutorial 样例请求成功；请用 `vllm bench serve` 或并发 curl 按实际负载复测。
+
+tuning: |-
+  ### 调优说明
+
+  请参考[公开性能调优文档](https://docs.vllm.ai/projects/ascend/zh-cn/latest/developer_guide/performance_and_debug/optimization_and_tuning.html)。
+
+faq: |-
+  环境与安装类问题见[公开 FAQ](https://docs.vllm.ai/projects/ascend/zh-cn/latest/faqs.html)。
+
+  ### Atlas 300I DUO：Invalid or unsupported audio file
+
+  **原因：** 缺少 PyAV / soundfile。
+
+  **处理：** 执行 `pip install av soundfile`（或 `pip install "vllm[audio]"`）后重试。
+
+  ### Atlas 300I DUO：启动时 OOM
+
+  **原因：** 自动上下文长度导致 attention mask 过大。
+
+  **处理：** 始终显式设置 `--max-model-len`（例如 `4096`）。
+
+references:
+  - title: Qwen3-ASR-1.7B 教程（vLLM Ascend）
+    url: https://docs.vllm.ai/projects/ascend/en/latest/tutorials/models/Qwen3-ASR-1.7B.html
+  - title: ModelScope 模型下载
+    url: https://www.modelscope.cn/models/Qwen/Qwen3-ASR-1.7B
+  - title: HuggingFace 模型卡
+    url: https://huggingface.co/Qwen/Qwen3-ASR-1.7B
+  - title: vLLM Ascend GitHub
+    url: https://github.com/vllm-project/vllm-ascend
