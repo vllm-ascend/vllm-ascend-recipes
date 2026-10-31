@@ -251,8 +251,8 @@ scenarios:
         #!/bin/sh
         # nic_name/local_ip: obtain through ifconfig on your machine. When
         # unset, both are auto-detected so the command also runs as-is.
-        nic_name="${nic_name:-$(ip -o -4 addr show scope global | cut -d' ' -f2 | head -n 1)}"
-        local_ip="${local_ip:-$(hostname -I | cut -d' ' -f1)}"
+        nic_name="${nic_name:-$(ifconfig 2>/dev/null | sed -n 's/^\([a-zA-Z0-9_]*\):.*/\1/p' | grep -v '^lo$' | head -n 1)}" || true
+        local_ip="${local_ip:-$(hostname -I 2>/dev/null | cut -d' ' -f1)}" || true
 
         # [Optional] jemalloc
         # jemalloc is for better performance, if `libjemalloc.so` is installed on your machine, you can turn it on.
