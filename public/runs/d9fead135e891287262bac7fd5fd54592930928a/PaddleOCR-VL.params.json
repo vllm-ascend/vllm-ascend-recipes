@@ -1,0 +1,23 @@
+{
+  "verification_scope": "single-node API smoke; not accuracy or full feature coverage",
+  "recipe_path": "models/en/PaddlePaddle/PaddleOCR-VL.yaml",
+  "model_id": "PaddlePaddle/PaddleOCR-VL",
+  "hw_key": "atlas_800_a2",
+  "head_sha": "d9fead135e891287262bac7fd5fd54592930928a",
+  "workflow_run_id": "39416442054",
+  "trigger_type": "pr",
+  "image": "quay.nju.edu.cn/ascend/vllm-ascend:v0.30.0rc2",
+  "started_at": "2026-10-20T11:38:51Z",
+  "scenarios": [
+    {
+      "index": 0,
+      "npu": "Atlas 800I A2",
+      "precision": "BF16",
+      "deployment": "Single-Node",
+      "case": "High Throughput (Graph)",
+      "serve_cmd": "export VLLM_USE_MODELSCOPE=True\nexport ASCEND_RT_VISIBLE_DEVICES=0\nexport TASK_QUEUE_ENABLE=0\nexport CPU_AFFINITY_CONF=1\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\n\nvllm serve /root/.cache/modelscope/hub/models/PaddlePaddle/PaddleOCR-VL \\\n    --max-num-batched-tokens 16384 \\\n    --gpu-memory-utilization 0.80 \\\n    --served-model-name PaddlePaddle/PaddleOCR-VL PaddleOCR-VL-0.9B \\\n    --trust-remote-code \\\n    --no-enable-prefix-caching \\\n    --mm-processor-cache-gb 0 \\\n    --compilation-config '{\"cudagraph_mode\":\"FULL_DECODE_ONLY\"}' \\\n    --additional-config '{\"enable_cpu_binding\":true}' \\\n    --host 127.0.0.1 --port 8000",
+      "verification_status": "fail",
+      "verification_reason": "Task response validation failed"
+    }
+  ]
+}

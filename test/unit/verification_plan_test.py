@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -106,7 +107,56 @@ class VerificationPlanTests(unittest.TestCase):
         value["model"]["docker_image"] = {"ascend_950dt": "quay.io/ascend/vllm-ascend:v0.30.0rc2-a5"}
         self.write(path, value)
         jobs = build_plan(self.root, "pr", changed_files=[path])["include"]
-        self.assertEqual(jobs[0]["image"], "quay.io/ascend/vllm-ascend:v0.30.0rc2-a5")
+        self.assertEqual(jobs[0]["image"], "quay.nju.edu.cn/ascend/vllm-ascend:v0.30.0rc2-a5")
+
+    def test_quay_mirror_preserves_tags_and_digests_for_every_hardware(self):
+        for family, key, npu, suffix in [
+            ("a2", "atlas_800_a2", "Atlas 800I A2", ""),
+            ("a3", "atlas_800_a3", "Atlas 800I A3", "-a3"),
+            ("a5", "ascend_950dt", "Ascend 950DT", "-a5"),
+        ]:
+            for reference in (":v0.23.0" + suffix, ":v0.30.0rc2" + suffix,
+                              "@sha256:" + "a" * 64):
+                with self.subTest(family=family, reference=reference):
+                    path = self.recipe(scenarios=[scenario(npu)], hardware={key: "verified"})
+                    value = yaml.safe_load((self.root / path).read_text(encoding="utf-8"))
+                    value["model"]["docker_image"] = {key: "quay.io/ascend/vllm-ascend" + reference}
+                    self.write(path, value)
+                    jobs = build_plan(self.root, "pr", changed_files=[path])["include"]
+                    self.assertEqual(len(jobs), 1)
+                    self.assertEqual(jobs[0]["hardware"], family)
+                    self.assertEqual(jobs[0]["image"], "quay.nju.edu.cn/ascend/vllm-ascend" + reference)
+                    self.assertEqual(yaml.safe_load((self.root / path).read_text())["model"], value["model"])
+
+    def test_nightly_and_manual_image_overrides_use_the_same_quay_mirror(self):
+        path = self.recipe()
+        upstream = "quay.io/other/project:v1"
+        self.write(".github/nightly-recipes.yaml", {"a5": [{"recipe": path, "image": upstream}]})
+        for trigger, overrides in [("nightly", {}), ("manual", {"a5": upstream})]:
+            with self.subTest(trigger=trigger):
+                jobs = build_plan(self.root, trigger, images=overrides)["include"]
+                self.assertEqual(jobs[0]["image"], "quay.nju.edu.cn/other/project:v1")
+
+    def test_non_quay_images_are_not_rewritten(self):
+        path = self.recipe()
+        for image in ("swr.example/ascend:v1", "ghcr.io/org/project:v1", "docker.io/org/project:v1",
+                      "quay.nju.edu.cn/org/project:v1", "quay.io.example/org/project:v1",
+                      "example.com/quay.io/project:v1"):
+            with self.subTest(image=image):
+                self.write(".github/nightly-recipes.yaml", {"a5": [{"recipe": path, "image": image}]})
+                jobs = build_plan(self.root, "nightly")["include"]
+                self.assertEqual(jobs[0]["image"], image)
+
+    def test_quay_and_nju_references_group_into_the_same_hardware_image_job(self):
+        a, b = self.recipe(), self.recipe("models/en/Other/model.yaml")
+        for path, registry in [(a, "quay.io"), (b, "quay.nju.edu.cn")]:
+            value = yaml.safe_load((self.root / path).read_text(encoding="utf-8"))
+            value["model"]["docker_image"] = registry + "/ascend/vllm-ascend:v0.30.0rc2-a5"
+            self.write(path, value)
+        jobs = build_plan(self.root, "pr", changed_files=[a, b])["include"]
+        self.assertEqual(len(jobs), 1)
+        self.assertEqual(json.loads(jobs[0]["recipe_files"]), [a, b])
+        self.assertEqual(jobs[0]["image"], "quay.nju.edu.cn/ascend/vllm-ascend:v0.30.0rc2-a5")
 
     def test_different_recipe_images_on_same_hardware_have_independent_jobs(self):
         a, b = self.recipe(), self.recipe("models/en/Other/model.yaml")
@@ -130,6 +180,39 @@ class VerificationPlanTests(unittest.TestCase):
         path = self.recipe(scenarios=[item])
         jobs = build_plan(self.root, "pr", changed_files=[path])["include"]
         self.assertEqual(jobs[0]["runner"], "linux-aarch64-a3-800i-16-cn12-001")
+
+    def test_env_setup_device_count_selects_the_small_fitting_runner(self):
+        path = self.recipe(scenarios=[scenario("Atlas 800I A2")])
+        value = yaml.safe_load((self.root / path).read_text(encoding="utf-8"))
+        value["env_setup"] = {"container": {"A2": {"content":
+            "docker run --device /dev/davinci0 --device /dev/davinci_manager -it image bash"}}}
+        self.write(path, value)
+        jobs = build_plan(self.root, "pr", changed_files=[path])["include"]
+        self.assertEqual(jobs[0]["runner"], "linux-aarch64-a2b4-2")
+
+    def test_different_device_counts_do_not_share_a_runner_job(self):
+        one = self.recipe("models/en/New/one.yaml", scenarios=[scenario("Atlas 800I A2")])
+        eight = self.recipe("models/en/New/eight.yaml", scenarios=[scenario("Atlas 800I A2")])
+        for path, devices in ((one, 1), (eight, 8)):
+            value = yaml.safe_load((self.root / path).read_text(encoding="utf-8"))
+            value["env_setup"] = {"container": {"A2": {"content":
+                "docker run " + " ".join(f"--device /dev/davinci{i}" for i in range(devices))
+                + " -it image bash"}}}
+            self.write(path, value)
+        jobs = build_plan(self.root, "pr", changed_files=[one, eight])["include"]
+        self.assertEqual({j["runner"] for j in jobs}, {"linux-aarch64-a2b4-2", "linux-aarch64-a2b4-8"})
+
+    def test_env_setup_section_key_spellings_are_all_recognized(self):
+        paths = []
+        for i, section_key in enumerate(("A2", "Atlas 800 A2", "atlas_800_a2")):
+            path = self.recipe(f"models/en/New/model{i}.yaml", scenarios=[scenario("Atlas 800I A2")])
+            value = yaml.safe_load((self.root / path).read_text(encoding="utf-8"))
+            value["env_setup"] = {"container": {section_key: {"content":
+                "docker run --device /dev/davinci0 --device /dev/davinci1 -it image bash"}}}
+            self.write(path, value)
+            paths.append(path)
+        jobs = build_plan(self.root, "pr", changed_files=paths)["include"]
+        self.assertEqual({j["runner"] for j in jobs}, {"linux-aarch64-a2b4-2"})
 
     def test_shell_comments_with_inline_backticks_do_not_hide_real_serve_command(self):
         path = "models/en/MoonshotAI/Kimi-K2.6.yaml"
@@ -231,12 +314,73 @@ class RecipeParserTests(unittest.TestCase):
         self.assertEqual(result["action"], "verify")
         self.assertIn("Example/model", result["cache_path"].replace("\\", "/"))
 
+    def test_model_path_alias_uses_the_resolved_offline_directory(self):
+        item = scenario()
+        item["steps"][0]["content"] = (
+            "```bash\nexport MODEL_PATH=model\n"
+            "vllm serve $MODEL_PATH --served-model-name model --port 8123\n```"
+        )
+        result = self.parse([item])
+        command = result["scenarios"][0]["serve_cmd"]
+        self.assertIn("MODEL_PATH=" + shlex.quote(result["cache_path"]), command)
+        self.assertIn("--served-model-name model", command)
+
+    def test_literal_cache_alias_is_resolved_without_rewriting_request_names(self):
+        item = scenario()
+        item["steps"][0]["content"] = (
+            "```bash\nvllm serve model --served-model-name model --port 8123\n```"
+        )
+        result = self.parse([item])
+        command = result["scenarios"][0]["serve_cmd"]
+        self.assertIn("vllm serve " + shlex.quote(result["cache_path"]), command)
+        self.assertIn("--served-model-name model", command)
+
     def test_log_example_does_not_hide_later_global_request(self):
         verification = "```bash\nINFO: Server ready\n```\n```bash\ncurl http://<node_ip>:<port>/v1/embeddings\n```"
         result = self.parse([scenario()], verification=verification, tasks=["embedding"])
         checks = result["scenarios"][0]["verify_cmds"]
         self.assertEqual(checks, ["curl http://localhost:8123/v1/embeddings"])
         self.assertFalse(result["scenarios"][0]["benchmark_chat"])
+
+    def test_scenario_task_check_overrides_global_request_for_another_variant(self):
+        item = scenario()
+        item["steps"].append({"content": "```bash\ncurl http://<server_ip>:<port>/v1/chat/completions -d '{\"model\":\"a5-model\"}'\n```"})
+        global_check = "```bash\ncurl http://<server_ip>:<port>/v1/chat/completions -d '{\"model\":\"a2-model\"}'\n```"
+        result = self.parse([item], verification=global_check)
+        checks = result["scenarios"][0]["verify_cmds"]
+        self.assertEqual(len(checks), 1)
+        self.assertIn('"model":"a5-model"', checks[0])
+
+    def test_local_readiness_does_not_replace_the_global_inference_check(self):
+        item = scenario()
+        item["steps"].append({"content": "```bash\ncurl http://<server_ip>:<port>/v1/models\n```"})
+        result = self.parse([item], verification="```bash\ncurl http://<server_ip>:<port>/v1/embeddings\n```")
+        self.assertEqual(len(result["scenarios"][0]["verify_cmds"]), 2)
+
+    def test_qwen_a5_requests_target_served_name_and_keep_chat_benchmark(self):
+        recipe = yaml.safe_load((ROOT / "models/en/Qwen/Qwen3.5-27B-Qwen3.6-27B.yaml").read_text(encoding="utf-8"))
+        selected = [item for item in recipe["scenarios"] if item["npu"] == "Ascend 950DT"]
+        result = self.parse(selected, verification=recipe["verification"])
+        checks = result["scenarios"][0]["verify_cmds"]
+        self.assertEqual(len(checks), 2)
+        for command in checks:
+            self.assertIn('"model":"qwen3.6"', command.replace(" ", ""))
+            self.assertNotIn('"model":"qwen3.5"', command.replace(" ", ""))
+        self.assertTrue(result["scenarios"][0]["benchmark_chat"])
+
+    def test_glm_a5_uses_dtype_flags_instead_of_removed_sparse_c8_option(self):
+        for language in ("en", "zh"):
+            with self.subTest(language=language):
+                recipe = yaml.safe_load((ROOT / f"models/{language}/THUDM/GLM-5.yaml").read_text(encoding="utf-8"))
+                selected = [dict(item, deployment="Single-Node") for item in recipe["scenarios"]
+                            if item.get("strategy") == "single_node_A5"]
+                result = self.parse(selected)
+                self.assertEqual(len(result["scenarios"]), 1)
+                args = shlex.split(result["scenarios"][0]["serve_cmd"].replace("\\\n", " "))
+                config = json.loads(args[args.index("--additional-config") + 1])
+                self.assertNotIn("enable_sparse_c8", config)
+                self.assertEqual(args[args.index("--kv-cache-dtype") + 1], "fp8")
+                self.assertEqual(args[args.index("--attention_config.indexer_kv_dtype") + 1], "fp8")
 
     def test_python_reranker_check_is_not_reduced_to_server_readiness(self):
         text = "```python\nimport requests\nrequests.post('http://<server_ip>:<port>/score', json={})\n```"
@@ -245,12 +389,42 @@ class RecipeParserTests(unittest.TestCase):
 
 
 class RecipeWorkflowLoopTests(unittest.TestCase):
+    def test_benchmark_refreshes_arrow_after_install_and_propagates_refresh_failure(self):
+        workflow = yaml.safe_load((ROOT / ".github/workflows/_recipe_verify.yml").read_text(encoding="utf-8"))
+        step = next(s for s in workflow["jobs"]["recipe-verify"]["steps"] if s.get("name") == "Install benchmark tools")
+        # Replace only the external package installer; execute the real step's
+        # shell, ordering and failure handling without downloading packages.
+        installer = '''pip() {
+  printf '%s\\n' "$*" >> "$PIP_CALLS"
+  if [[ "$*" == *"pyarrow==25.0.0"* ]]; then
+    return "$ARROW_INSTALL_EXIT"
+  fi
+  return 0
+}
+'''
+        for install_exit in (0, 23):
+            with self.subTest(install_exit=install_exit), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                entry = root / "install-step.sh"
+                entry.write_text(installer + step["run"], encoding="utf-8", newline="\n")
+                calls_path = root / "pip-calls.txt"
+                env = {**os.environ, "PIP_CALLS": str(calls_path), "ARROW_INSTALL_EXIT": str(install_exit)}
+                shell = shlex.split(workflow["defaults"]["run"]["shell"])
+                result = subprocess.run([part.replace("{0}", str(entry)) for part in shell],
+                                        env=env, text=True, capture_output=True)
+                calls = [shlex.split(line) for line in calls_path.read_text().splitlines()]
+                aisbench = next(i for i, args in enumerate(calls) if "ais_bench_benchmark" in args)
+                arrow = [i for i, args in enumerate(calls) if "pyarrow==25.0.0" in args]
+                self.assertEqual(len(arrow), 1, result.stdout)
+                self.assertGreater(arrow[0], aisbench)
+                self.assertEqual(result.returncode, install_exit, result.stderr)
+
     def test_skip_and_failure_are_stamped_and_do_not_abort_later_recipes(self):
         workflow = yaml.safe_load((ROOT / ".github/workflows/_recipe_verify.yml").read_text(encoding="utf-8"))
         step = next(s for s in workflow["jobs"]["recipe-verify"]["steps"] if s.get("name") == "Verify recipes")
         # Exercise the real loop after CANN setup, with a verifier double that
         # returns the documented exit codes. Never start an NPU server here.
-        loop = "mkdir -p" + step["run"].split("mkdir -p", 1)[1]
+        loop = step["run"].replace(". /usr/local/Ascend/ascend-toolkit/set_env.sh", "true")
         for name, expected_rc, expected_status in [("skip", 0, "skip"), ("fail", 1, "fail")]:
             with self.subTest(name=name), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
@@ -261,7 +435,12 @@ class RecipeWorkflowLoopTests(unittest.TestCase):
                 )
                 (root / "recipe_list.txt").write_text(f"{name}.yaml\npass.yaml\n", encoding="utf-8", newline="\n")
                 script = 'export PATH="/usr/bin:/bin:$PATH"\n' + loop.replace("/tmp/", "./")
-                result = subprocess.run(["bash", "-e", "-o", "pipefail", "-c", script],
+                entry = root / "verify-step.sh"
+                entry.write_text(script, encoding="utf-8", newline="\n")
+                # Do not add shell flags absent from production: that hid the
+                # tee pipeline swallowing the verifier's failure exit code.
+                shell = shlex.split(workflow["defaults"]["run"]["shell"])
+                result = subprocess.run([part.replace("{0}", str(entry)) for part in shell],
                                         cwd=root, text=True, capture_output=True)
                 self.assertEqual(result.returncode, expected_rc, result.stderr)
                 status = root / "verify-results" / f"{name}.status"

@@ -209,10 +209,15 @@ for s in scenarios:
         bash_content = bash_content.replace('your_model_path', CACHE_PATH)
         # The cache is offline. Resolve the recipe's literal hub ID too,
         # without accidentally replacing --served-model-name or curl payloads.
-        bash_content = re.sub(r'(\bvllm\s+serve\s+)([\'\"]?)' + re.escape(model_id_for_path) + r'\2(?=\s|$)',
-                              lambda m: m.group(1) + shlex.quote(CACHE_PATH), bash_content)
-        bash_content = re.sub(r'(?m)^(\s*(?:export\s+)?MODEL_PATH=)([\'\"]?)' + re.escape(model_id_for_path) + r'\2(?=\s|$)',
-                              lambda m: m.group(1) + shlex.quote(CACHE_PATH), bash_content)
+        # Quantized scenarios can name the configured cache alias rather than
+        # model.model_id (e.g. Eco-Tech/Qwen3.6-27B-w8a8-mxfp8).
+        # Only rewrite known identities; never replace served names or payloads.
+        identities = {model_id_for_path, cache_dir, os.path.relpath(CACHE_PATH, CACHE_BASE)}
+        for identity in sorted(identities, key=len, reverse=True):
+            bash_content = re.sub(r'(\bvllm\s+serve\s+)([\'\"]?)' + re.escape(identity) + r'\2(?=\s|$)',
+                                  lambda m: m.group(1) + shlex.quote(CACHE_PATH), bash_content)
+            bash_content = re.sub(r'(?m)^(\s*(?:export\s+)?MODEL_PATH=)([\'\"]?)' + re.escape(identity) + r'\2(?=\s|$)',
+                                  lambda m: m.group(1) + shlex.quote(CACHE_PATH), bash_content)
         # Resolve {{name}} config/feature placeholders (mirrors the page)
         bash_content = resolve_placeholders(bash_content, data)
         # Remove speculative-config lines (contain placeholder paths)
@@ -226,12 +231,18 @@ for s in scenarios:
         # this scenario's vllm serve command.
         port_match = re.search(r'--port\s+(\d+)', serve_cmd)
         server_port = port_match.group(1) if port_match else '8000'
+        # A variant's explicit inference request supersedes a shared example
+        # for another served model. Readiness-only checks never suppress tasks.
+        has_local_task = any(re.search(
+            r'/(?:v1/(?:chat/completions|completions|embeddings|audio/transcriptions|score|rerank)|score|rerank)\b',
+            cmd) for cmd in verify_cmds)
+        checks = verify_cmds if has_local_task else verify_cmds + global_verify_cmds
         verify_cmds = [
             cmd.replace('<node0_ip>', 'localhost')
                .replace('<node_ip>', 'localhost')
                .replace('<server_ip>', 'localhost')
                .replace('<port>', server_port)
-            for cmd in verify_cmds + global_verify_cmds
+            for cmd in checks
         ]
         
         commands.append({
@@ -379,6 +390,7 @@ for i, s in enumerate(info.get('scenarios', [])):
         'deployment': s.get('deployment', ''),
         'case': s.get('case', ''),
         'serve_cmd': s.get('serve_cmd', ''),
+        'verification_status': 'unknown',
     })
 
 params_doc = {
@@ -387,6 +399,7 @@ params_doc = {
     'model_id': info.get('model_id', ''),
     'hw_key': info.get('hw_key', ''),
     'head_sha': HEAD_SHA,
+    'workflow_run_id': os.environ.get('GITHUB_RUN_ID', ''),
     'trigger_type': TRIGGER_TYPE,
     'image': VLLM_IMAGE,
     'started_at': os.environ.get('STARTED_AT_ISO', '')
@@ -404,8 +417,17 @@ with open(out_path, 'w') as fp:
     json.dump(params_doc, fp, indent=2, ensure_ascii=False)
 print(f'[PARAMS] wrote {out_path}', file=sys.stderr)
 "
+PARAMS_FILE="${RUN_PARAMS_DIR:-/tmp/verify-results}/$(basename "$RECIPE" .yaml).params.json"
+record_scenario_result() {
+  if ! "$PYTHON" "$SCRIPT_DIR/../.github/_scripts/record_scenario_result.py" \
+    --params "$PARAMS_FILE" --index "$idx" --status "$1" --reason "${2:-}"; then
+    log_error "  Failed to persist scenario outcome"
+    STATUS=1
+  fi
+}
 while IFS='|' read -r idx npu precision deployment case_name; do
   [ -z "$idx" ] && continue
+  SCENARIO_FAILED=0
 
   if [[ "${CI_RUNNER_SMOKE:-0}" == "1" ]] && [[ "$idx" != "0" ]]; then
     continue
@@ -421,12 +443,14 @@ while IFS='|' read -r idx npu precision deployment case_name; do
   if [[ -z "$SERVE_CMD" ]]; then
     log_warn "  No vllm serve command found, skipping"
     SKIPPED=1
+    record_scenario_result skip "No vllm serve command"
     continue
   fi
 
   if [[ -z "$VERIFY_CMD" ]]; then
     log_warn "  No executable task request in recipe; readiness alone is not a pass"
     SKIPPED=1
+    record_scenario_result skip "No executable task request"
     continue
   fi
 
@@ -434,6 +458,7 @@ while IFS='|' read -r idx npu precision deployment case_name; do
   if echo "$SERVE_CMD" | grep -qE '\$[0-9]'; then
     log_warn "  Multi-node scenario (contains positional params), skipping"
     SKIPPED=1
+    record_scenario_result skip "Multi-node command is outside single-node verification"
     continue
   fi
 
@@ -476,6 +501,7 @@ SCRIPT_HEREDOC
     log_error "  Server failed to become ready within 600s"
     kill $SERVE_PID 2>/dev/null || true
     STATUS=1
+    record_scenario_result fail "Model server did not become ready"
     continue
   fi
 
@@ -487,6 +513,7 @@ SCRIPT_HEREDOC
     log_error "  /v1/models returned unexpected response"
     kill $SERVE_PID 2>/dev/null || true
     STATUS=1
+    record_scenario_result fail "Invalid model readiness response"
     continue
   fi
 
@@ -515,6 +542,7 @@ SCRIPT_HEREDOC
       echo "$RESP" | while IFS= read -r rline; do log_error "  | $rline"; done
       log_error "  ====== END ======"
       STATUS=1
+      SCENARIO_FAILED=1
     elif "$PYTHON" "$SCRIPT_DIR/../.github/_scripts/recipe_checks.py" --check-proof "$PROOF_FILE"; then
       TASK_VERIFIED=1
       log_info "  Recipe curl verification PASSED"
@@ -529,6 +557,7 @@ SCRIPT_HEREDOC
       else
         log_error "  Task response validation FAILED"
         STATUS=1
+        SCENARIO_FAILED=1
       fi
     fi
   fi
@@ -568,10 +597,14 @@ SCRIPT_HEREDOC
   pkill -f "vllm serve" 2>/dev/null || true
   log_info "  Server stopped."
 
-  if [[ "$STATUS" -ne 0 ]]; then
+  if [[ "$SCENARIO_FAILED" -ne 0 ]]; then
+    record_scenario_result fail "Task response validation failed"
     log_error "FAILED: $MODEL_ID scenario [$idx]"
-  else
+  elif [[ "$TASK_VERIFIED" -eq 1 ]]; then
+    record_scenario_result pass "Task API response validated"
     log_info "PASSED: $MODEL_ID scenario [$idx]"
+  else
+    record_scenario_result skip "No supported task request was verified"
   fi
 done < /tmp/scenario_list.txt
 

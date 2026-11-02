@@ -1,0 +1,8 @@
+{
+  "recipe_path": "models/en/PaddlePaddle/PaddleOCR-VL.yaml",
+  "hw_key": "atlas_800_a2",
+  "image": "quay.io/ascend/vllm-ascend:v0.30.0rc2@sha256:6348403a0ebb19f52bc1b7497de1daeb6df0e4650f9051c169e47a011527a6c3",
+  "scenarios": [],
+  "missing_reason": "selected hardware job did not provide results",
+  "head_sha": "114769eea1e14b3849a952daf0e50d4e3e609fe1"
+}

@@ -1,0 +1,11 @@
+{
+  "recipe_path": "models/en/PaddlePaddle/PaddleOCR-VL.yaml",
+  "model_id": "",
+  "hw_key": "atlas_800_a2",
+  "head_sha": "b68e477cdf1619ec3c49adfcb583bbb2be475aac",
+  "trigger_type": "pr",
+  "image": "quay.io/ascend/vllm-ascend:v0.30.0rc2",
+  "started_at": "2026-10-20T07:52:45Z",
+  "scenarios": [],
+  "skip_reason": "镜像未预装该权重 (model_id=PaddlePaddle/PaddleOCR-VL, 目录=PaddlePaddle/PaddleOCR-VL, 已尝试 ['', 'Eco-Tech', 'vllm-ascend', 'models', '/root/.cache/'])"
+}
