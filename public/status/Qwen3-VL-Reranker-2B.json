@@ -1,0 +1,24 @@
+{
+  "model": "Qwen3-VL-Reranker-2B",
+  "last_pr_run": {
+    "kind": "pr",
+    "status": "pass",
+    "conclusion": "success",
+    "head_sha": "614fdee8a0d26a95d210ac2be670ec3fdce198ea",
+    "head_sha_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/commit/614fdee8a0d26a95d210ac2be670ec3fdce198ea",
+    "workflow_run_id": 41417002504,
+    "workflow_run_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/actions/runs/41417002504",
+    "recipe_path": "models/en/Qwen/Qwen3-VL-Reranker-2B.yaml",
+    "recipe_yaml_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/blob/614fdee8a0d26a95d210ac2be670ec3fdce198ea/models/en/Qwen/Qwen3-VL-Reranker-2B.yaml",
+    "params_url": "https://vllm-ascend.github.io/vllm-ascend-recipes/runs/614fdee8a0d26a95d210ac2be670ec3fdce198ea/Qwen3-VL-Reranker-2B.params.json",
+    "started_at": "2026-11-02T08:58:50Z",
+    "finished_at": "2026-11-02T10:21:25Z",
+    "pr_number": null,
+    "pr_url": null,
+    "pr_title": null,
+    "pr_author": null
+  },
+  "last_nightly_run": null,
+  "last_manual_run": null,
+  "targets": {}
+}
