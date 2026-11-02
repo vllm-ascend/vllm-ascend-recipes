@@ -1,47 +1,36 @@
-#
-# Copyright (c) 2025 Huawei Technologies Co., Ltd. All Rights Reserved.
-# This file is a part of the vllm-ascend-recipes project.
-#
-
 name: 'Nightly Recipe Verify'
 
 on:
+  schedule:
+    - cron: '0 18 * * *' # 02:00 Asia/Shanghai; multi-node keeps its own schedule.
   push:
     branches: [main]
     paths:
       - 'models/**'
-      - 'package.json'
-      - 'pnpm-lock.yaml'
+      - '.github/nightly-recipes.yaml'
   workflow_dispatch:
     inputs:
-      full_run:
-        type: boolean
-        description: 'Run all recipes (ignores change detection)'
-        default: false
-      hardware_filter:
-        type: choice
-        description: 'Limit verification to specific hardware (schedule/push always runs all)'
-        options:
-          - all
-          - a2
-          - a3
-          - a5
-        default: all
       recipe_allowlist:
         type: string
-        description: >-
-          Comma-separated recipe paths to run. Overrides both auto-detection
-          and full_run. Leave blank to use the default allowlist (Qwen3-30B-A3B).
-          Example: models/en/Qwen/Qwen3-30B-A3B.yaml,models/en/Qwen/Qwen3-235B-A22B.yaml
+        description: 'Optional English recipe paths, comma-separated. Blank uses .github/nightly-recipes.yaml.'
+      full_run:
+        type: boolean
+        default: false
+        description: 'Discover all English recipes with executable single-node scenarios. recipe_allowlist takes priority.'
+      hardware_filter:
+        type: choice
+        description: 'Limit manual verification to one hardware family'
+        options: [all, a2, a3, a5]
+        default: all
       a2_image:
         type: string
-        description: 'Override A2 Docker image (leave blank for default: v0.23.0)'
+        description: 'Override A2 image; blank uses the nightly entry or recipe image'
       a3_image:
         type: string
-        description: 'Override A3 Docker image (leave blank for default: v0.23.0-a3)'
+        description: 'Override A3 image; blank uses the nightly entry or recipe image'
       a5_image:
         type: string
-        description: 'Override A5 Docker image (leave blank for default: v0.23.0-a5)'
+        description: 'Override A5 image; blank uses the nightly entry or recipe image'
 
 permissions:
   contents: read
@@ -50,158 +39,76 @@ jobs:
   prepare:
     runs-on: ubuntu-latest
     outputs:
-      a2_recipes: ${{ steps.recipes.outputs.a2_recipes }}
-      a2_count: ${{ steps.recipes.outputs.a2_count }}
-      a3_recipes: ${{ steps.recipes.outputs.a3_recipes }}
-      a3_count: ${{ steps.recipes.outputs.a3_count }}
-      a5_recipes: ${{ steps.recipes.outputs.a5_recipes }}
-      a5_count: ${{ steps.recipes.outputs.a5_count }}
-      should_run: ${{ steps.decide.outputs.should_run }}
+      recipe_matrix: ${{ steps.plan.outputs.matrix }}
+      hardware_count: ${{ steps.plan.outputs.count }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Detect changed files (push trigger only)
-        id: changed
-        if: github.event_name == 'push'
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Install recipe planner dependency
+        run: python -m pip install pyyaml
+      - name: Plan single-node verification
+        id: plan
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.event.before }}
+          FULL_RUN: ${{ inputs.full_run }}
+          RECIPE_ALLOWLIST: ${{ inputs.recipe_allowlist }}
+          HARDWARE_FILTER: ${{ inputs.hardware_filter || 'all' }}
+          A2_IMAGE: ${{ inputs.a2_image }}
+          A3_IMAGE: ${{ inputs.a3_image }}
+          A5_IMAGE: ${{ inputs.a5_image }}
         run: |
-          CHANGED=$(git diff --name-only HEAD~1 HEAD -- models/ | grep '\.yaml$\|\.yml$' || echo "")
-          echo "changed_files=$CHANGED" >> "$GITHUB_OUTPUT"
-
-      - name: Determine whether to run
-        id: decide
-        run: |
-          if [[ "${{ github.event_name }}" == "schedule" ]] || [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            echo "should_run=true" >> "$GITHUB_OUTPUT"
-          elif [[ -n "${{ steps.changed.outputs.changed_files }}" ]]; then
-            echo "should_run=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "should_run=false" >> "$GITHUB_OUTPUT"
+          args=(--trigger nightly)
+          if [ "$EVENT_NAME" = workflow_dispatch ]; then
+            args=(--trigger manual)
+            if [ "$FULL_RUN" = true ]; then args+=(--full-run); fi
+          elif [ "$EVENT_NAME" = push ] && [[ "$BASE_REF" =~ ^[0-9a-f]{40}$ ]] && [[ "$BASE_REF" != 0000000000000000000000000000000000000000 ]]; then
+            args+=(--base-ref "$BASE_REF")
           fi
+          python .github/_scripts/verification_plan.py "${args[@]}" \
+            --recipe-allowlist "$RECIPE_ALLOWLIST" \
+            --hardware-filter "$HARDWARE_FILTER" \
+            --a2-image "$A2_IMAGE" --a3-image "$A3_IMAGE" --a5-image "$A5_IMAGE" \
+            > /tmp/verification-plan.json
+          {
+            echo "matrix=$(jq -c . /tmp/verification-plan.json)"
+            echo "count=$(jq '.include | length' /tmp/verification-plan.json)"
+          } >> "$GITHUB_OUTPUT"
 
       - uses: pnpm/action-setup@v4
-        if: steps.decide.outputs.should_run == 'true'
-
-      - uses: actions/setup-node@v4
-        if: steps.decide.outputs.should_run == 'true'
+        if: steps.plan.outputs.count != '0'
+      - uses: actions/setup-node@v5
+        if: steps.plan.outputs.count != '0'
         with:
           node-version: 22
           cache: pnpm
-
-      # Field-level schema validation before touching the cluster: a broken
-      # recipe must fail the nightly here instead of wasting 10+ minutes on
-      # the Ascend runners.
       - name: Validate recipe fields
-        if: steps.decide.outputs.should_run == 'true'
+        if: steps.plan.outputs.count != '0'
         run: |
           pnpm install --frozen-lockfile
           pnpm validate
           pnpm check:recipes
 
-      - name: Classify recipes by hardware
-        id: recipes
-        if: steps.decide.outputs.should_run == 'true'
-        run: |
-          pip install pyyaml
-
-          A2_LIST=""
-          A2_COUNT=0
-          A3_LIST=""
-          A3_COUNT=0
-          A5_LIST=""
-          A5_COUNT=0
-
-          # Priority order for selecting which recipes to verify:
-          #   1. workflow_dispatch input `recipe_allowlist` (when set, overrides everything)
-          #   2. full_run=true OR schedule trigger  -> run all A2-compatible recipes
-          #   3. push trigger with model changes    -> only run the changed files
-          ALLOWLIST="${{ github.event.inputs.recipe_allowlist }}"
-          if [ -n "$ALLOWLIST" ]; then
-            echo "Using recipe_allowlist input (overrides full_run and auto-detection)"
-            echo "  -> $ALLOWLIST"
-            # Comma-separated -> newline-separated for the for-loop below
-            RECIPE_FILES=$(echo "$ALLOWLIST" | tr ',' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | sed '/^$/d')
-          elif [[ "${{ github.event.inputs.full_run }}" == "true" ]] || [[ "${{ github.event_name }}" == "schedule" ]]; then
-            RECIPE_FILES=$(find models/en -name '*.yaml' -o -name '*.yml' | sort)
-          elif [[ -n "${{ steps.changed.outputs.changed_files }}" ]]; then
-            RECIPE_FILES="${{ steps.changed.outputs.changed_files }}"
-          else
-            RECIPE_FILES=""
-          fi
-
-          for file in $RECIPE_FILES; do
-            HW=$(python3 -c "import yaml, sys; d=yaml.safe_load(open('$file')); hw=d.get('meta',{}).get('hardware',{}); print(hw.get('atlas_800_a2',''))" 2>/dev/null || echo "")
-
-            [ "$HW" = "unsupported" ] && continue
-
-            A2_LIST="${A2_LIST}${file}"$'\n'
-            A2_COUNT=$((A2_COUNT + 1))
-            A3_HW=$(python3 -c "import yaml, sys; d=yaml.safe_load(open('$file')); hw=d.get('meta',{}).get('hardware',{}); print(hw.get('atlas_800_a3',''))" 2>/dev/null || echo "")
-            if [ "$A3_HW" != "unsupported" ] && [ "$A3_HW" = "verified" ]; then
-              A3_LIST="${A3_LIST}${file}"$'\n'
-              A3_COUNT=$((A3_COUNT + 1))
-            fi
-            A5_HW=$(python3 -c "import yaml, sys; d=yaml.safe_load(open('$file')); hw=d.get('meta',{}).get('hardware',{}); print(hw.get('ascend_950dt',''))" 2>/dev/null || echo "")
-            if [ "$A5_HW" != "unsupported" ] && [ "$A5_HW" = "verified" ]; then
-              A5_LIST="${A5_LIST}${file}"$'\n'
-              A5_COUNT=$((A5_COUNT + 1))
-            fi
-          done
-
-          # Output as JSON array (same format as pr-recipe-verify)
-          FILES=$(echo "$A2_LIST" | sed '/^$/d' | jq -R -s -c 'split("\n") | map(select(length > 0))')
-          echo "a2_recipes=$FILES" >> "$GITHUB_OUTPUT"
-          echo "a2_count=$A2_COUNT" >> "$GITHUB_OUTPUT"
-          A3_FILES=$(echo "$A3_LIST" | sed '/^$/d' | jq -R -s -c 'split("\n") | map(select(length > 0))')
-          echo "a3_recipes=$A3_FILES" >> "$GITHUB_OUTPUT"
-          echo "a3_count=$A3_COUNT" >> "$GITHUB_OUTPUT"
-          A5_FILES=$(echo "$A5_LIST" | sed '/^$/d' | jq -R -s -c 'split("\n") | map(select(length > 0))')
-          echo "a5_recipes=$A5_FILES" >> "$GITHUB_OUTPUT"
-          echo "a5_count=$A5_COUNT" >> "$GITHUB_OUTPUT"
-
-          echo "A2 recipes: $A2_COUNT"
-          echo "A3 recipes: $A3_COUNT"
-          echo "A5 recipes: $A5_COUNT"
-
-  verify-a2:
+  verify:
+    name: single-node (${{ matrix.job_id }})
     needs: prepare
-    if: needs.prepare.outputs.should_run == 'true' && needs.prepare.outputs.a2_count != '0' && (github.event_name != 'workflow_dispatch' || github.event.inputs.hardware_filter == 'all' || github.event.inputs.hardware_filter == 'a2')
+    if: needs.prepare.outputs.hardware_count != '0'
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix: ${{ fromJSON(needs.prepare.outputs.recipe_matrix) }}
     uses: ./.github/workflows/_recipe_verify.yml
     with:
-      runner: linux-aarch64-a2b4-8
-      image: ${{ github.event.inputs.a2_image || 'swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/vllm-ascend:v0.23.0' }}
-      recipe_files: ${{ needs.prepare.outputs.a2_recipes }}
-      trigger_type: nightly
-      head_sha: ${{ github.sha }}
-    secrets:
-      obs_ak: ${{ secrets.obs_ak }}
-      obs_sk: ${{ secrets.obs_sk }}
-
-  verify-a3:
-    needs: prepare
-    if: needs.prepare.outputs.should_run == 'true' && needs.prepare.outputs.a3_count != '0' && (github.event_name != 'workflow_dispatch' || github.event.inputs.hardware_filter == 'all' || github.event.inputs.hardware_filter == 'a3')
-    uses: ./.github/workflows/_recipe_verify.yml
-    with:
-      runner: linux-aarch64-a3-800i-16-cn12-001
-      hardware_key: atlas_800_a3
-      image: ${{ github.event.inputs.a3_image || 'swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/vllm-ascend:v0.23.0-a3' }}
-      recipe_files: ${{ needs.prepare.outputs.a3_recipes }}
-      trigger_type: nightly
-      head_sha: ${{ github.sha }}
-    secrets:
-      obs_ak: ${{ secrets.obs_ak }}
-      obs_sk: ${{ secrets.obs_sk }}
-
-  verify-a5:
-    needs: prepare
-    if: needs.prepare.outputs.should_run == 'true' && needs.prepare.outputs.a5_count != '0' && (github.event_name != 'workflow_dispatch' || github.event.inputs.hardware_filter == 'all' || github.event.inputs.hardware_filter == 'a5')
-    uses: ./.github/workflows/_recipe_verify.yml
-    with:
-      runner: linux-aarch64-a5-8
-      hardware_key: ascend_950dt
-      image: ${{ github.event.inputs.a5_image || 'swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/vllm-ascend:v0.23.0-a5' }}
-      mount_share: true
-      recipe_files: ${{ needs.prepare.outputs.a5_recipes }}
+      plan_id: ${{ matrix.job_id }}
+      runner: ${{ matrix.runner }}
+      hardware_key: ${{ matrix.hardware_key }}
+      image: ${{ matrix.image }}
+      mount_share: ${{ matrix.mount_share }}
+      recipe_files: ${{ matrix.recipe_files }}
       trigger_type: nightly
       head_sha: ${{ github.sha }}
     secrets:
@@ -209,19 +116,37 @@ jobs:
       obs_sk: ${{ secrets.obs_sk }}
 
   summary:
-    needs: [prepare, verify-a2, verify-a3, verify-a5]
-    if: always() && needs.prepare.outputs.should_run == 'true'
+    needs: [prepare, verify]
+    if: always()
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v7
+        continue-on-error: true
+        with:
+          pattern: recipe-verify-results-${{ github.run_id }}-*
+          path: hardware-results/
+          merge-multiple: false
+      - name: Collect publisher-compatible recipe results
+        if: needs.prepare.result == 'success'
+        env:
+          EXPECTED_PLAN: ${{ needs.prepare.outputs.recipe_matrix }}
+        run: python3 .github/_scripts/collect_recipe_artifacts.py --input hardware-results --output combined-results --expected-plan "$EXPECTED_PLAN"
+      - uses: actions/upload-artifact@v6
+        with:
+          name: recipe-verify-results-${{ github.run_id }}
+          path: combined-results/
+          retention-days: 14
+          if-no-files-found: warn
       - name: Nightly summary
+        env:
+          HARDWARE_COUNT: ${{ needs.prepare.outputs.hardware_count }}
+          PREPARE_RESULT: ${{ needs.prepare.result }}
+          VERIFY_RESULT: ${{ needs.verify.result }}
         run: |
-          echo "=========================================="
-          echo "  Nightly Recipe Verification Summary"
-          echo "=========================================="
-          echo "A2 recipes submitted: ${{ needs.prepare.outputs.a2_count }}"
-          echo "A2 result: ${{ needs.verify-a2.result }}"
-          echo "A3 recipes submitted: ${{ needs.prepare.outputs.a3_count }}"
-          echo "A3 result: ${{ needs.verify-a3.result }}"
-          echo "A5 recipes submitted: ${{ needs.prepare.outputs.a5_count }}"
-          echo "A5 result: ${{ needs.verify-a5.result }}"
-          echo "Trigger: ${{ github.event_name == 'schedule' && 'cron' || github.event_name == 'workflow_dispatch' && 'manual' || 'push' }}"
+          echo "Hardware jobs selected: $HARDWARE_COUNT"
+          echo "Prepare: $PREPARE_RESULT"
+          echo "Verification: $VERIFY_RESULT"
+          test "$PREPARE_RESULT" = success
+          test "$VERIFY_RESULT" != failure
+          test "$VERIFY_RESULT" != cancelled

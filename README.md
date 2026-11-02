@@ -418,9 +418,9 @@ Pushes to `main` trigger GitHub Actions:
 - [`.github/workflows/lint.yml`](.github/workflows/lint.yml) — runs validate, typecheck, lint, format:check.
 - [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) — builds the static site and deploys to GitHub Pages.
 - [`.github/workflows/preview-build.yml`](.github/workflows/preview-build.yml) + [`preview-deploy.yml`](.github/workflows/preview-deploy.yml) — every PR gets a Netlify preview URL posted as a comment (artifacts expire in 3 days).
-- [`.github/workflows/pr-recipe-verify.yml`](.github/workflows/pr-recipe-verify.yml) — PR recipe validation (detect → validate → build).
-- [`.github/workflows/verify_multi_node.yaml`](.github/workflows/verify_multi_node.yaml) — runs the current multi-node Runtime verification on eligible same-repository PRs or by manual dispatch.
-- [`.github/workflows/nightly-recipe-verify.yml`](.github/workflows/nightly-recipe-verify.yml) — scheduled full scan of all recipes, classified by hardware.
+- [`.github/workflows/pr-recipe-verify.yml`](.github/workflows/pr-recipe-verify.yml) — validates PRs and discovers changed single-node recipes; no model whitelist is required. Fork workflow approval follows repository Actions settings.
+- [`.github/workflows/verify_multi_node.yaml`](.github/workflows/verify_multi_node.yaml) — runs the existing multi-node Runtime on scheduled/manual runs only, selected by `multi_node` in [`.github/nightly-recipes.yaml`](.github/nightly-recipes.yaml). Empty means disabled; PRs keep CPU-only multi-node checks.
+- [`.github/workflows/nightly-recipe-verify.yml`](.github/workflows/nightly-recipe-verify.yml) — daily and incremental verification of the `single_node` lists in [`.github/nightly-recipes.yaml`](.github/nightly-recipes.yaml). See [CI configuration](docs/CI_BUILD_NOTES.md#验证范围配置) for adding models and manual runs.
 
 Configure Pages in repo Settings → Pages → Source: **GitHub Actions**.
 

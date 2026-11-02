@@ -1,0 +1,20 @@
+{
+  "verification_scope": "single-node API smoke; not accuracy or full feature coverage",
+  "recipe_path": "models/en/Qwen/Qwen3-Embedding-0.6B.yaml",
+  "model_id": "Qwen/Qwen3-Embedding-0.6B",
+  "hw_key": "atlas_800_a2",
+  "head_sha": "0bef04d8d27d00f4e6a2c7043053ea4b16514229",
+  "trigger_type": "pr",
+  "image": "quay.io/ascend/vllm-ascend:v0.30.0rc2",
+  "started_at": "2026-10-19T08:18:33Z",
+  "scenarios": [
+    {
+      "index": 0,
+      "npu": "Atlas 800I A2",
+      "precision": "bf16",
+      "deployment": "Single-Node",
+      "case": "Single Node Single Card",
+      "serve_cmd": "vllm serve /root/.cache/modelscope/hub/models/Qwen/Qwen3-Embedding-0.6B \\\n    --served-model-name Qwen/Qwen3-Embedding-0.6B \\\n    --runner pooling \\\n    --port 8000 \\\n    --max-model-len 1024"
+    }
+  ]
+}

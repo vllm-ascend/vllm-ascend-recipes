@@ -1,0 +1,20 @@
+{
+  "verification_scope": "single-node API smoke; not accuracy or full feature coverage",
+  "recipe_path": "models/en/Qwen/Qwen3-VL-30B-A3B-Instruct.yaml",
+  "model_id": "Eco-Tech/Qwen3-VL-30B-A3B-Instruct-w8a8-mxfp8",
+  "hw_key": "ascend_950dt",
+  "head_sha": "3a25accd681de02e92e98a557374c2a1d498faf7",
+  "trigger_type": "pr",
+  "image": "swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/vllm-ascend:v0.23.0-a5",
+  "started_at": "2026-10-19T04:03:34Z",
+  "scenarios": [
+    {
+      "index": 0,
+      "npu": "Ascend 950DT",
+      "precision": "W8A8",
+      "deployment": "Single-Node",
+      "case": "Image-Only Online Serving (A5)",
+      "serve_cmd": "export VLLM_USE_MODELSCOPE=True\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\nexport HCCL_OP_EXPANSION_MODE=\"AIV\"\nexport HCCL_BUFFSIZE=400\nexport OMP_PROC_BIND=false\nexport OMP_NUM_THREADS=100\nexport TASK_QUEUE_ENABLE=1\nexport VLLM_ASCEND_ENABLE_FLASHCOMM1=1\n\nvllm serve /root/.cache/modelscope/hub/models/Eco-Tech/Qwen3-VL-30B-A3B-Instruct-w8a8-mxfp8 \\\n  --host 0.0.0.0 \\\n  --port 8000 \\\n  --distributed-executor-backend mp \\\n  --data-parallel-size 1 \\\n  --tensor-parallel-size 8 \\\n  --enable-expert-parallel \\\n  --seed 1024 \\\n  --quantization ascend \\\n  --served-model-name qwen3-vl-30b \\\n  --max-num-seqs 32 \\\n  --max-model-len 32768 \\\n  --max-num-batched-tokens 8192 \\\n  --trust-remote-code \\\n  --no-enable-prefix-caching \\\n  --mm-processor-cache-gb 0 \\\n  --limit-mm-per-prompt.image 1 \\\n  --limit-mm-per-prompt.video 0 \\\n  --gpu-memory-utilization 0.9 \\\n  --compilation-config '{\"cudagraph_mode\":\"FULL_DECODE_ONLY\"}'"
+    }
+  ]
+}

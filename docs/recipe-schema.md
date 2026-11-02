@@ -148,8 +148,8 @@ precision、deployment、case、`npu_per_node`、AISBench 选择、完整 script
 | --------- | -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
 | 本地校验  | `node scripts/build-recipes-api.mjs`(构建 JSON API,失败即报错) | `pnpm validate`(zod schema,scripts/validate-yaml.ts 扫 models/en、models/zh)                                                     |
 | 类型/格式 | 无独立 workflow;靠 build 脚本 + 人工 review                    | `pnpm typecheck` / `pnpm lint` / `prettier --check`                                                                              |
-| 合入前 CI | **无 GitHub Actions workflow**(`.github/` 不存在)              | PR 触发：`lint`（frontend/yaml/workflow/Converter）+ `pr-recipe-verify`（单节点部署验证）+ `verify_multi_node`（运行时转换模板并执行多节点 Runtime） |
-| 合入后 CI | 无                                                             | nightly-recipe-verify:定时/推送全量扫描,按硬件分类验证                                                                           |
+| 合入前 CI | **无 GitHub Actions workflow**(`.github/` 不存在)              | PR 触发：`lint`（frontend/yaml/workflow/Converter，CPU 检查）+ `pr-recipe-verify`（自动发现变更 recipe 的单机场景，无模型白名单）；不运行多机实机任务 |
+| 合入后 CI | 无                                                             | nightly-recipes.yaml 统一配置 single_node（按硬件的 recipe 名单）和 multi_node（验证目标 ID 名单）；空列表关闭对应回归，另支持手动指定 |
 | 页面预览  | recipes.vllm.ai 构建生成                                       | PR Preview Build + Netlify 部署,评论贴链接                                                                                       |
 
 > 本仓的 `pnpm validate` 是 CI `validate` 步骤的同一实现——本地过,CI 才可能过。

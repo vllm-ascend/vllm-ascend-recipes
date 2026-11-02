@@ -1,0 +1,24 @@
+{
+  "model": "Qwen3-Embedding-0.6B",
+  "last_pr_run": {
+    "kind": "pr",
+    "status": "pass",
+    "conclusion": "success",
+    "head_sha": "0bef04d8d27d00f4e6a2c7043053ea4b16514229",
+    "head_sha_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/commit/0bef04d8d27d00f4e6a2c7043053ea4b16514229",
+    "workflow_run_id": 39221851456,
+    "workflow_run_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/actions/runs/39221851456",
+    "recipe_path": "models/en/Qwen/Qwen3-Embedding-0.6B.yaml",
+    "recipe_yaml_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/blob/0bef04d8d27d00f4e6a2c7043053ea4b16514229/models/en/Qwen/Qwen3-Embedding-0.6B.yaml",
+    "params_url": "https://vllm-ascend.github.io/vllm-ascend-recipes/runs/0bef04d8d27d00f4e6a2c7043053ea4b16514229/Qwen3-Embedding-0.6B.params.json",
+    "started_at": "2026-10-19T08:18:33Z",
+    "finished_at": "2026-10-19T09:59:49Z",
+    "pr_number": null,
+    "pr_url": null,
+    "pr_title": null,
+    "pr_author": null
+  },
+  "last_nightly_run": null,
+  "last_manual_run": null,
+  "targets": {}
+}

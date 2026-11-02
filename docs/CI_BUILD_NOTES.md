@@ -6,11 +6,63 @@
 
 ```
 PR 合入前:
-  models/** 变更 → detect(路径识别) → validate(YAML+i18n+Build) → verify-deploy(A2 runner)
-    → CANN容器 → 解析recipe → vllm serve → curl验证 → aisbench → 停服务 → 上传OBS
+  Actions 审批放行（如需要）→ 变更的 recipe → 格式/构建检查 → 按单机场景选择 A2/A3/A5
+    → CANN容器 → vllm serve → 任务API验证 → 聊天场景aisbench → 停服务 → 上传artifact
 
 合入后:
-  定时/推送/手动 → nightly-recipe-verify → 扫描全部recipe → 按硬件分类 → 全量验证
+  定时/推送/手动 → nightly-recipe-verify → single_node 名单 → 单机验证 → OBS留证
+  定时/手动 → verify_multi_node → multi_node 名单 → 原有多机Runtime → OBS留证
+```
+
+## 验证范围配置
+
+PR 不设模型白名单，也不要求 GitHub label。新增或修改 `models/en/`、`models/zh/` 的 YAML 后，流水线自动找到对应英文 recipe，根据 `scenarios` 中的 `npu`、`deployment: Single-Node` 和可执行的 `vllm serve` 选择硬件。`experimental` 不阻止首次验证；明确标记 `unsupported` 的硬件不调度。仅包含多机场景的 recipe 不启动单机任务。
+
+外部 PR 如需审批，在 Actions 中点 **Approve and run workflows** 即可继续，不需要先另提 PR 修改名单。此按钮不是代码 Review 的 Approve。是否等待审批由仓库/组织的 Actions 设置控制；本次不修改审批策略、不启用 `pull_request_target`，也不给 fork PR 传递 OBS 等 secrets。维护者应先检查 PR 中的脚本和工作流，再批准它在自托管 runner 上执行。
+
+nightly 的资源名单统一在 [`.github/nightly-recipes.yaml`](../.github/nightly-recipes.yaml) 配置。`single_node` 按 `a2/a3/a5` 分组，`multi_node` 填已有验证目标的 ID。例如：
+
+```yaml
+single_node:
+  a2: []
+  a3: []
+  a5:
+    - models/en/Qwen/Qwen3-VL-30B-A3B-Instruct.yaml
+multi_node: []
+```
+
+单机每天北京时间 02:00 执行名单；合入 main 时只回归名单内有改动的 recipe。修改名单本身会验证整份单机名单。多机每天 02:30 执行自己的名单，沿用原有 Runtime，不在 PR 中申请实机；PR 仍保留不占 NPU 的 Converter/计划静态检查。列表设为 `[]` 即关闭对应范围，所有列表为空时不会申请自托管 runner。
+
+恢复多机回归时，从 `.github/verification-targets.yaml` 中选择 `mode: multi-node` 的 ID 放入 `multi_node`，例如 `deepseek-v2-lite-a2-w8a8-1p1d` 或 `qwen3-30b-a3b-a2-bf16-2node`。新多机用例仍需按原 Converter DSL 编写场景及 `test_id`、登记验证目标后再加入名单。关闭的目标不会被补写为失败。
+
+当前名单共六个单机模型/硬件组合：A2 为 Qwen3-30B-A3B、Qwen3.5/3.6-27B；A3 为 Qwen3-30B-A3B；A5 为 DeepSeek-V4-Flash、GLM-5、Qwen3.5/3.6-27B。多机默认关闭，待有资源再添加。A2/A5 使用现有 8 卡 runner；A3 使用现有 `linux-aarch64-a3-800i-16-cn12-001`，可容纳 TP16 单机场景。
+
+手动运行 `Nightly Recipe Verify` 时，默认使用上述单机名单。临时验证其他模型可填写 `recipe_allowlist`（英文路径、逗号分隔），不需要登记名单；`hardware_filter` 可限制硬件。`full_run` 则扫描全部英文 recipe，显式填写的 `recipe_allowlist` 优先。手动运行 `Multi-node framework` 默认使用多机名单，也可用 `target_ids` 临时指定已有目标。这些输入均不影响 PR，PR 审批时无需填写。
+
+单机镜像优先读取 recipe 的 `model.docker_image`；nightly 单项也可以写成 `{recipe: 路径, image: 镜像}` 覆盖已知 CI 环境，手动镜像输入优先级最高。选择完成后，PR、nightly 和手动运行统一将 `quay.io/` 前缀换为 `quay.nju.edu.cn/`，保留仓库路径、tag、digest 和硬件后缀，不改 recipe 或页面展示的原始地址。原先仅针对部分 0.23 标签的 Quay→SWR 转换由此统一规则替代；显式 SWR、GHCR、NJU 等其他地址及未声明镜像时的 SWR 默认值不变。镜像源说明见 [NJU Quay 文档](https://doc.nju.edu.cn/books/e1654/page/quay)。
+
+镜像转换在按硬件/镜像分组之前执行，同一 Quay 镜像及其 NJU 地址会合并到同一任务；状态记录使用实际执行的 NJU 地址。NJU 不可用时会按现有容器初始化机制报错，不自动切换镜像版本或关闭 TLS 校验。缓存命中和网络链路会影响下载速度，不保证固定加速比例。多机当前固定使用 SWR，不受此单机规划规则影响。
+
+权重不自动下载。容器内标准目录为 `/root/.cache/modelscope/hub/models/<org>/<name>`，与 `model.model_id` 一致且存在 `config.json` 时，新 recipe 不需要登记别名。自定义、量化或按硬件区分的目录继续由 `models/_cache_paths.yaml` 映射，已有别名优先。审批前确认权重已预置；缺失时明确跳过，不算通过。A5 沿用宿主机 `/mnt/weight` 到 `/root/.cache` 的挂载；实际挂载仍需集群环境验证。
+
+验证执行 recipe 的 curl/Python 请求并检查任务响应，支持聊天、文本补全、Embedding、Score/Rerank 和 ASR。只有 `/v1/models`、没有请求或未支持的请求方式不会当作通过；错误 JSON、无任务结果或请求到了其他服务均不能通过。非聊天场景不运行聊天 benchmark。这是单机 API 冒烟验证，不代表精度认证，也不覆盖 recipe 所有可选特性。
+
+`.github/verification-targets.yaml` 继续定义详情页的验证目标，不作为 PR 单机准入条件；其中多机目标由 nightly 的 `multi_node` 显式选择后才运行。
+
+各硬件独立上传原始产物，结束后在 GitHub 托管 runner 上汇总成发布器原先使用的产物名称。同名 recipe 的参数按硬件保留在 `hardware_runs` 中，避免互相覆盖；任一硬件失败或计划中的硬件缺失产物时，模型级汇总不标为通过。跳过的硬件不加入已执行场景列表。
+
+每个场景单独记录 `verification_status`，页面按精确场景和硬件读取结果，不能把模型汇总状态套给所有硬件。新快照保存运行 ID，避免同一 SHA 的其他重跑记录被串用。已核实的历史误报由 `.github/verification-corrections.json` 保存运行 ID、精确场景和日志证据；修改历史参数还需匹配快照指纹，不覆盖后续重跑数据。
+
+状态发布完成后显式触发 Pages 部署，读取最新 main；不能依赖 `GITHUB_TOKEN` push 再触发部署。生产和 PR 预览在构建前同步配置级结果，并复核已审计的历史结论。该目标登记表只控制点灯范围，不作为 PR 单机准入名单。
+
+本地生成执行计划不占用 NPU：
+
+```bash
+python .github/_scripts/verification_plan.py --trigger pr --base-ref origin/main
+python .github/_scripts/verification_plan.py --trigger nightly
+python .github/_scripts/nightly_multi_node_plan.py --trigger nightly
+python .github/_scripts/verification_plan.py --trigger manual \
+  --recipe-allowlist models/en/Qwen/Qwen3-VL-30B-A3B-Instruct.yaml --hardware-filter a5
 ```
 
 ## 踩坑记录
@@ -19,10 +71,10 @@ PR 合入前:
 
 | # | 问题 | 原因 | 解决 |
 |---|------|------|------|
-| 1 | `quay.io/ascend/vllm-ascend` 拉不到 | CI 集群网络不通 quay.io | 改用 `swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/vllm-ascend:v0.23.0rc1` |
+| 1 | Quay 镜像拉取慢或不可达 | 节点到仓库的网络或缓存未命中 | 单机计划默认将 `quay.io/` 转换为 `quay.nju.edu.cn/`；检查节点到 NJU 的连通性，必要时显式指定已核验的同版本 SWR 镜像，不降级版本 |
 | 2 | SWR `:latest` 标签实际指向 vllm 0.11.0 | latest 标签未更新，不支持 `--tokenizer-mode deepseek_v4` | 显式指定 `v0.23.0rc1` 标签 |
 | 3 | CANN 镜像 `pip install vllm vllm-ascend` 后 `vllm` CLI 找不到 | vllm 模块可 `import` 但二进制不在 `PATH` | `hash -r` + `export PATH="/usr/local/bin:/root/.local/bin:$PATH"`；或创建 `/usr/local/bin/vllm` wrapper 脚本 |
-| 4 | `pip install ais_bench_benchmark` SSL 证书错误 | 未配 pip 内部镜像，直连 PyPI 失败 | 先执行 `pip config set global.index-url http://cache-service.nginx-pypi-cache.svc.cluster.local/pypi/simple` |
+| 4 | `pip install ais_bench_benchmark` SSL 证书错误 | 直连公网源时网络抖动 | 重试安装步骤；runner 经集群 squid 缓存访问公网源，不再使用内部 pip 镜像 |
 
 ### 二、容器与环境
 
@@ -37,7 +89,7 @@ PR 合入前:
 |---|------|------|------|
 | 7 | Runner offline | 上轮 job 跑完 runner 进程断连 | 到 runner 机器重启 GitHub Actions runner service |
 | 8 | `gh-proxy.test.osinfra.cn` 502 Bad Gateway | Git 代理服务挂了 | 运维修复代理 |
-| 9 | Fork PR 无法使用主仓 self-hosted runner | GitHub Actions 安全策略禁止 fork 访问主仓 runner | 合并 PR 后在主仓分支测试 |
+| 9 | Fork PR 没有进入单机验证 | 旧工作流限定同仓 PR，或仓库 Actions 审批尚未放行 | 不再限定同仓；维护者检查代码后在 Actions 审批。还需组织允许该仓库使用目标 runner |
 
 ### 四、Recipe 解析
 
@@ -73,7 +125,7 @@ PR 合入前:
 |---|------|------|------|
 | 23 | GitHub 报 "This run likely failed because of a workflow file issue" | YAML 缩进不一致（OBS upload step 7空格 vs with 8空格） | 统一为 8 空格缩进 |
 | 24 | `devops-actions/actionlint@v0` 不存在 | action 版本号 `v0` 不是有效 tag | 改为 `reviewdog/action-actionlint@v1` |
-| 25 | Fork PR 中 `git diff origin/main...HEAD` 报 `fatal: bad revision` | merge commit checkout 没有 `origin/main` 分支引用 | 用 `dorny/paths-filter` 的 `list-files: csv` + GitHub API 获取文件变更列表 |
+| 25 | Fork PR 中 `git diff origin/main...HEAD` 报 `fatal: bad revision` | merge commit checkout 没有 `origin/main` 分支引用 | 完整拉取历史，使用事件中的 base SHA 与 checkout HEAD 比较 |
 | 26 | OBS 上传只在 Nightly 触发 | condition 写死 `trigger_type == 'nightly'` | 改为 `if: ${{ always() }}`（PR + Nightly 都上传） |
 | 27 | PR 未同步最新 fork commit | fork PR sync 延迟 | push 空 commit 或修改任意 workflow YAML 强制触发 |
 

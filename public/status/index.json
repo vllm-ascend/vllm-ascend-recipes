@@ -4,6 +4,9 @@
       "slug": "DeepSeek-V2-Lite-W8A8"
     },
     {
+      "slug": "DeepSeek-V3.1"
+    },
+    {
       "slug": "DeepSeek-V4-Flash"
     },
     {
@@ -19,10 +22,16 @@
       "slug": "Kimi-K2.6"
     },
     {
+      "slug": "PaddleOCR-VL"
+    },
+    {
       "slug": "Qwen3-235B-A22B"
     },
     {
       "slug": "Qwen3-30B-A3B"
+    },
+    {
+      "slug": "Qwen3-Embedding-0.6B"
     },
     {
       "slug": "Qwen3-VL-30B-A3B-Instruct"
