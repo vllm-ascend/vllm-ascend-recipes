@@ -111,6 +111,8 @@ prerequisites:
 
       Download weights to a directory accessible from the deployment environment (for example `/root/.cache/`).
 
+      Register the recipe `model.model_id` in `models/_cache_paths.yaml` so CI can resolve `your_model_path` from the runner cache.
+
       > **Path description**: Record the local path and ensure subsequent `vllm serve` commands use the same directory (or the ModelScope / HuggingFace model id with cache enabled).
   - title: Audio dependencies
     content: |-
@@ -246,7 +248,7 @@ verification: |-
   **Chat Completions API:**
 
   ```bash
-  curl http://localhost:8000/v1/chat/completions \
+  curl http://localhost:<port>/v1/chat/completions \
       -H "Content-Type: application/json" \
       -d '{
           "model": "qwen3-asr",
