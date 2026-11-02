@@ -4,6 +4,10 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  # Status commits use GITHUB_TOKEN, whose pushes do not trigger workflows.
+  workflow_run:
+    workflows: ['Publish Verification Status']
+    types: [completed]
 
 permissions:
   contents: read
@@ -16,16 +20,19 @@ concurrency:
 
 jobs:
   build:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
+        with:
+          ref: main
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: pnpm
@@ -35,6 +42,25 @@ jobs:
 
       - name: Validate YAML
         run: npx tsx scripts/validate-yaml.ts
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Refresh configuration verification data
+        run: |
+          set -euo pipefail
+          python -m pip install --quiet pyyaml
+          python .github/_scripts/seed_target_statuses.py \
+            --status-dir public/status --targets .github/verification-targets.yaml
+          python .github/_scripts/apply_verification_corrections.py
+          python .github/_scripts/sync_single_node_target_status.py \
+            --status-dir public/status --runs-dir public/runs --targets .github/verification-targets.yaml
+          # Legacy SHA-keyed archives may have been replaced by another run.
+          # Exact run-ID audits remain authoritative after synchronization.
+          python .github/_scripts/apply_verification_corrections.py
+          python .github/_scripts/build_status_index.py \
+            --status-dir public/status --output public/status/index.json
 
       - name: Build
         run: pnpm build
@@ -58,4 +84,4 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5

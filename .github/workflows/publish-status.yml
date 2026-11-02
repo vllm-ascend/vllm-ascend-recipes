@@ -8,8 +8,8 @@
 # any model YAML.
 #
 # Triggered by `workflow_run` → reacts to PR Recipe Verify / Nightly Recipe
-# Verify completions. The commit message deliberately does NOT carry `[skip ci]`
-# so deploy.yml fires on this push and ships the new status JSON immediately.
+# Verify completions. deploy.yml explicitly follows this workflow's completion:
+# GITHUB_TOKEN pushes do not trigger a second push workflow.
 # Other workflows are unaffected (paths-filter excludes public/** on
 # nightly-recipe-verify; pr-recipe-verify only listens to pull_request; lint
 # uses dorny/paths-filter to skip on public/**-only commits).
@@ -314,6 +314,10 @@ jobs:
             --status-dir public/status \
             --targets .github/verification-targets.yaml
 
+          # Correct only false positives with audited log evidence, preserving
+          # their original run links and unaffected hardware/history records.
+          python3 .github/_scripts/apply_verification_corrections.py
+
           # 4) Match recipe-verification params to the explicit single-node
           #    allowlist. This also refreshes historic pass/fail evidence
           #    without inventing a result for skipped or empty scenarios.
@@ -321,6 +325,10 @@ jobs:
             --status-dir public/status \
             --runs-dir public/runs \
             --targets .github/verification-targets.yaml
+
+          # Preserve exact audited verdicts even when a legacy SHA-keyed
+          # snapshot has since been replaced by another workflow run.
+          python3 .github/_scripts/apply_verification_corrections.py
 
           # 5) Only this run's explicitly selected multi-node targets may be
           #    synthesized as missing. Disabled resource-policy entries are
@@ -443,13 +451,8 @@ jobs:
             -m "Triggered by: ${RUN_URL}" \
             -m "Repo: ${REPO}"
 
-          # NOTE: no [skip ci] here — we WANT deploy.yml to fire on this push
-          # so the new status JSON ships to GitHub Pages immediately. Other
-          # workflows are unaffected:
-          #   - nightly-recipe-verify: paths-filter excludes public/**
-          #   - pr-recipe-verify:      pull_request trigger, not push
-          #   - lint:                  dorny/paths-filter makes all sub-jobs
-          #                             skip on public/**-only commits
+          # deploy.yml listens to this workflow's successful completion, not
+          # this GITHUB_TOKEN push. Always build the latest committed main.
 
           git push origin HEAD:main
           echo "Published status data to main."

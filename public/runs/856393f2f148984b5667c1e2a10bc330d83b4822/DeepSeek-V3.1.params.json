@@ -1,0 +1,37 @@
+{
+  "recipe_path": "models/en/DeepSeek/DeepSeek-V3.1.yaml",
+  "model_id": "",
+  "hw_key": "mixed",
+  "head_sha": "856393f2f148984b5667c1e2a10bc330d83b4822",
+  "trigger_type": "pr",
+  "image": "mixed; see hardware_runs",
+  "started_at": "2026-10-22T08:39:09Z",
+  "scenarios": [],
+  "skip_reason": "镜像未预装该权重 (model_id=deepseek-ai/DeepSeek-V3.1, 目录=DeepSeek-V3.1-w8a8-mtp-QuaRot, 已尝试 ['', 'Eco-Tech', 'vllm-ascend', 'models', '/root/.cache/'])",
+  "hardware_runs": [
+    {
+      "recipe_path": "models/en/DeepSeek/DeepSeek-V3.1.yaml",
+      "model_id": "",
+      "hw_key": "atlas_800_a3",
+      "head_sha": "856393f2f148984b5667c1e2a10bc330d83b4822",
+      "trigger_type": "pr",
+      "image": "swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/vllm-ascend:v0.23.0-a3",
+      "started_at": "2026-10-22T08:39:09Z",
+      "scenarios": [],
+      "skip_reason": "镜像未预装该权重 (model_id=deepseek-ai/DeepSeek-V3.1, 目录=DeepSeek-V3.1-w8a8-mtp-QuaRot, 已尝试 ['', 'Eco-Tech', 'vllm-ascend', 'models', '/root/.cache/'])",
+      "status": "skip"
+    },
+    {
+      "recipe_path": "models/en/DeepSeek/DeepSeek-V3.1.yaml",
+      "model_id": "",
+      "hw_key": "ascend_950dt",
+      "head_sha": "856393f2f148984b5667c1e2a10bc330d83b4822",
+      "trigger_type": "pr",
+      "image": "swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/vllm-ascend:v0.23.0-a5",
+      "started_at": "2026-10-22T08:39:09Z",
+      "scenarios": [],
+      "skip_reason": "镜像未预装该权重 (model_id=deepseek-ai/DeepSeek-V3.1, 目录=DeepSeek-V3.1-w4a4mlp-w8a8c8attn, 已尝试 ['', 'Eco-Tech', 'vllm-ascend', 'models', '/root/.cache/'])",
+      "status": "skip"
+    }
+  ]
+}

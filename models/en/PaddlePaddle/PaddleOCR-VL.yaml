@@ -1,0 +1,760 @@
+meta:
+  title: PaddleOCR-VL
+  slug: paddleocr-vl
+  provider: PaddlePaddle
+  description: Original PaddleOCR-VL-0.9B document recognition on Ascend, with single-NPU serving and PP-DocLayoutV2
+    document parsing.
+  date_added: '2026-10-12'
+  date_updated: '2026-10-19'
+  difficulty: intermediate
+  hardware:
+    atlas_800_a2: experimental
+    atlas_300i_duo: experimental
+model:
+  model_id: PaddlePaddle/PaddleOCR-VL
+  min_vllm_version: 0.11.1
+  architecture: dense
+  parameter_count: 0.9B
+  active_parameters: null
+  context_length: 131072
+  modality: multimodal
+  base_args:
+  - --trust-remote-code
+  - --served-model-name
+  - PaddlePaddle/PaddleOCR-VL
+  - PaddleOCR-VL-0.9B
+  - --no-enable-prefix-caching
+  - --mm-processor-cache-gb
+  - '0'
+  base_env:
+    VLLM_USE_MODELSCOPE: 'True'
+    ASCEND_RT_VISIBLE_DEVICES: '0'
+    TASK_QUEUE_ENABLE: '1'
+    PYTORCH_NPU_ALLOC_CONF: expandable_segments:True
+  docker_image:
+    atlas_800_a2: quay.io/ascend/vllm-ascend:v0.30.0rc2
+    atlas_300i_duo: quay.io/ascend/vllm-ascend:v0.30.0rc2-310p
+  nightly_required: false
+  install:
+    pip: false
+    docker:
+      note: Official v0.30.0rc2 image tags replace the expired 2026-10-12 nightly images. Tag-only references follow the CI maintainer's guidance.
+        Registry manifests and arm64 configs were checked on 2026-10-19; NPU regression of these replacement images
+        is pending, so hardware is marked experimental. Earlier A2 BF16 graph/native Paddle layout and 310P
+        graph/eager/OM manual results used the old complete image payloads under PRoot5.5.0, not these replacements.
+        Normal Docker and nightly CI were not validated by those manual runs.
+features:
+  cpu_binding:
+    label: CPU Binding
+    description: Request CPU binding; containers may skip it when NUMA affinity conflicts with their CPU quota.
+    args:
+    - --additional-config
+    - '{"enable_cpu_binding":true}'
+variants:
+  default:
+    precision: bf16
+    vram_minimum_gb: 3
+    description: Original 0.9B checkpoint on A2; model-card context is 131072, deployment limits are scenario-specific.
+    supported_hardware:
+    - atlas_800_a2
+  fp16:
+    precision: fp16
+    vram_minimum_gb: 3
+    description: Original checkpoint cast to FP16; required on Atlas 300I DUO.
+    supported_hardware:
+    - atlas_300i_duo
+    extra_args:
+    - --dtype
+    - float16
+compatible_strategies:
+- single_node_A2
+- single_node_310p
+hardware_overrides:
+  atlas_300i_duo:
+    extra_args:
+    - --dtype
+    - float16
+    - --max-model-len
+    - '16384'
+  atlas_800_a2:
+    extra_args:
+    - --max-num-batched-tokens
+    - '16384'
+    - --gpu-memory-utilization
+    - '0.80'
+    extra_env:
+      CPU_AFFINITY_CONF: '1'
+      TASK_QUEUE_ENABLE: '0'
+strategy_overrides: {}
+dependencies: []
+guide: ''
+overview: PaddleOCR-VL-0.9B combines a NaViT-style dynamic-resolution vision encoder with ERNIE-4.5-0.3B. It recognizes
+  text, tables, formulas and charts. PP-DocLayoutV2 supplies region detection and reading order for full document
+  parsing. This recipe preserves the original PaddlePaddle/PaddleOCR-VL checkpoint; VL-1.5 and VL-1.6 are separate
+  models.
+weight_download:
+- weight_version: Original PaddleOCR-VL-0.9B
+  sources:
+  - source: ModelScope
+    url: https://www.modelscope.cn/models/PaddlePaddle/PaddleOCR-VL
+    command: |-
+      ```bash
+      modelscope download --model PaddlePaddle/PaddleOCR-VL --local_dir /root/.cache/modelscope/hub/models/PaddlePaddle/PaddleOCR-VL
+      sha256sum /root/.cache/modelscope/hub/models/PaddlePaddle/PaddleOCR-VL/model.safetensors
+      ```
+  - source: HuggingFace
+    url: https://huggingface.co/PaddlePaddle/PaddleOCR-VL
+    command: |-
+      ```bash
+      hf download PaddlePaddle/PaddleOCR-VL --revision 7fa00a8c55b735ba51ba49a9058f3f9c57a99a11 --local-dir /root/.cache/modelscope/hub/models/PaddlePaddle/PaddleOCR-VL
+      ```
+prerequisites:
+- title: Local weight path
+  content: Before running a serving scenario manually, replace your_model_path with the local original checkpoint
+    directory, normally /root/.cache/modelscope/hub/models/PaddlePaddle/PaddleOCR-VL as used by the download commands.
+    Repository CI resolves this placeholder through models/_cache_paths.yaml; the registered cache_dir is
+    PaddlePaddle/PaddleOCR-VL. The directory must contain the complete original checkpoint, not a quantized variant.
+- title: Image validation scope
+  content: The commands now use official v0.30.0rc2 images (vLLM v0.30.0). Re-run the functional checks on the
+    selected image before relying on historical results. The former A2 index SHA256
+    6d2aa300863a4145249822c625affbe98ed4f231605789b9118ae137370250f3 (arm64
+    eb427a2f888262000dbf0fa53780b140ba2f7df9c9cb65ca3ad468ef591ac55b) and former 310P index SHA256
+    3706317b3a91fda5b7b53174d65d97aeb5c762068c8edf96387f0e9f462f9723 returned MANIFEST_UNKNOWN on 2026-10-19.
+    They identify the earlier manual evidence only; its accuracy and timing measurements do not validate the new images.
+- title: Hardware and precision
+  content: Use one logical NPU on Atlas 800I A2 or Atlas 300I DUO. The measured HiDevLab card is Ascend 310P3 with
+    about 44 GB per visible device; 64 GB in the environment selector is host RAM. Only FP16 is supported on 310P.
+    A2 BF16 graph and Paddle custom-NPU document parsing were manually tested on910B3/64GiB HBM.
+- title: Runtime versions
+  content: The source tutorial introduction records v0.21.0rc1 and its documentation macro currently resolves v0.23.0.
+    For the original migration, main was inspected at 0830899b4e3f55ea6ed9f3518385e9d81192ae29. The unavailable
+    nightly image pins were replaced with v0.30.0rc2 release-candidate pins on 2026-10-19. CANN >= 9.0.0 is required for 310P FULL_DECODE_ONLY; use the eager scenario
+    below on older supported CANN. Do not replace the host driver to match an image.
+- title: Exact checkpoint
+  content: The verified original model.safetensors is 1917255968 bytes with SHA256 3085f1042e184f68f8a412aa0f64f2c4b8562989598bbfba326aaa11fc685de8.
+    The declared 131072-token model context is not a validated 310P serving context; the tutorial uses 16384.
+- title: Serving and parsing environments
+  content: Keep vLLM and the Paddle layout pipeline in separate environments. The 310P path uses OM/ACL for layout
+    inference and CPU Paddle preprocessing, not Paddle custom-NPU. Disable document orientation and unwarping when
+    reproducing the ModelZoo path.
+- title: A2 tested settings
+  content: 'Validated on910B3/64GiB HBM with driver26.1.1/CANN9.1.0: TASK_QUEUE_ENABLE=0 and gpu-memory-utilization=0.80
+    passed BF16 graph four-task inference with both aliases. The tutorial defaults produced a visual-position indexing
+    failure and insufficient sampler headroom. These are measured task settings, not an accepted throughput target;
+    normal Docker and nightly CI are untested.'
+- title: Paddle NPU compiler environment
+  content: The separate CANN8.0/Paddle3.2 layout container needs genuine NumPy<2/compiler dependencies, ATB ABI0
+    and standard-library precedence for CANN worker processes. The commands below preserve all checks; full Paddle
+    run_check and native NPU document inference passed. This is distinct from the vLLM CANN9.1 environment.
+env_setup:
+  container:
+    A2:
+      content: |-
+        ```bash
+        export IMAGE='quay.io/ascend/vllm-ascend:v0.30.0rc2'
+        docker run --rm --name paddleocr-vl --shm-size=1g --net=host \
+            --device /dev/davinci0 --device /dev/davinci_manager \
+            --device /dev/devmm_svm --device /dev/hisi_hdc \
+            -v /usr/local/dcmi:/usr/local/dcmi \
+            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+            -v /usr/local/Ascend/driver:/usr/local/Ascend/driver:ro \
+            -v /etc/ascend_install.info:/etc/ascend_install.info:ro \
+            -v "$PWD":/work -v "$HOME/.cache":/root/.cache \
+            -w /work -it "$IMAGE" bash
+        ```
+    300I DUO:
+      content: |-
+        ```bash
+        export IMAGE='quay.io/ascend/vllm-ascend:v0.30.0rc2-310p'
+        docker run --rm --name paddleocr-vl --shm-size=1g --net=host \
+            --device /dev/davinci0 --device /dev/davinci_manager \
+            --device /dev/devmm_svm --device /dev/hisi_hdc \
+            -v /usr/local/dcmi:/usr/local/dcmi \
+            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+            -v /usr/local/Ascend/driver:/usr/local/Ascend/driver:ro \
+            -v /etc/ascend_install.info:/etc/ascend_install.info:ro \
+            -v "$PWD":/work -v "$HOME/.cache":/root/.cache \
+            -w /work -it "$IMAGE" bash
+        ```
+scenarios:
+- npu: Atlas 800I A2
+  precision: BF16
+  deployment: Single-Node
+  case: High Throughput (Graph)
+  tags:
+  - a2-single
+  strategy: single_node_A2
+  steps:
+  - title: Start the single-NPU server
+    content: |-
+      ```bash
+      export VLLM_USE_MODELSCOPE=True
+      export ASCEND_RT_VISIBLE_DEVICES=0
+      export TASK_QUEUE_ENABLE=0
+      export CPU_AFFINITY_CONF=1
+      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+
+      vllm serve your_model_path \
+          --max-num-batched-tokens 16384 \
+          --gpu-memory-utilization 0.80 \
+          --served-model-name PaddlePaddle/PaddleOCR-VL PaddleOCR-VL-0.9B \
+          --trust-remote-code \
+          --no-enable-prefix-caching \
+          --mm-processor-cache-gb 0 \
+          --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY"}' \
+          --additional-config '{"enable_cpu_binding":true}' \
+          --host 127.0.0.1 --port 8000
+      ```
+  - title: Verify real recognition
+    content: Run the four-task functional verification below after /health succeeds. Inspect raw outputs, finish
+      reasons and server errors. For 310P graph mode require CANN >= 9.0.0; eager is the documented fallback.
+- npu: Atlas 300I DUO
+  precision: FP16
+  deployment: Single-Node
+  case: High Throughput (Graph)
+  tags:
+  - 310p-single
+  strategy: single_node_310p
+  steps:
+  - title: Start the single-NPU server
+    content: |-
+      ```bash
+      export VLLM_USE_MODELSCOPE=True
+      export ASCEND_RT_VISIBLE_DEVICES=0
+      export TASK_QUEUE_ENABLE=1
+      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+
+      vllm serve your_model_path \
+          --max-model-len 16384 \
+          --served-model-name PaddlePaddle/PaddleOCR-VL PaddleOCR-VL-0.9B \
+          --trust-remote-code \
+          --no-enable-prefix-caching \
+          --mm-processor-cache-gb 0 \
+          --dtype float16 \
+          --max-num-batched-tokens 2048 \
+          --tensor-parallel-size 1 \
+          --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY"}' \
+          --additional-config '{"enable_cpu_binding":true}' \
+          --host 127.0.0.1 --port 8000
+      ```
+  - title: Verify real recognition
+    content: Run the four-task functional verification below after /health succeeds. Inspect raw outputs, finish
+      reasons and server errors. For 310P graph mode require CANN >= 9.0.0; eager is the documented fallback.
+- npu: Atlas 300I DUO
+  precision: FP16
+  deployment: Single-Node
+  case: Eager Fallback
+  tags:
+  - 310p-single
+  strategy: single_node_310p
+  steps:
+  - title: Start the single-NPU server
+    content: |-
+      ```bash
+      export VLLM_USE_MODELSCOPE=True
+      export ASCEND_RT_VISIBLE_DEVICES=0
+      export TASK_QUEUE_ENABLE=1
+      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+
+      vllm serve your_model_path \
+          --max-model-len 16384 \
+          --served-model-name PaddlePaddle/PaddleOCR-VL PaddleOCR-VL-0.9B \
+          --trust-remote-code \
+          --no-enable-prefix-caching \
+          --mm-processor-cache-gb 0 \
+          --dtype float16 \
+          --max-num-batched-tokens 2048 \
+          --tensor-parallel-size 1 \
+          --enforce-eager \
+          --additional-config '{"enable_cpu_binding":true}' \
+          --host 127.0.0.1 --port 8000
+      ```
+  - title: Verify real recognition
+    content: Run the four-task functional verification below after /health succeeds. Inspect raw outputs, finish
+      reasons and server errors. For 310P graph mode require CANN >= 9.0.0; eager is the documented fallback.
+- npu: Atlas 800I A2
+  precision: BF16
+  deployment: Offline Document Parsing
+  case: PP-DocLayoutV2
+  strategy: single_node_A2
+  steps:
+  - title: Prepare the separate layout environment
+    content: |-
+      ```bash
+      export IMAGE=ccr-2vdh3abv-pub.cnc.bj.baidubce.com/device/paddle-npu:cann800-ubuntu20-npu-910b-base-aarch64-gcc84@sha256:9bbc08c1bed9c064f0775da4a7bd1c857fa33d0d51bcd705e6829f4cbcf86911
+      docker run --rm -it --name paddleocr-layout-a2 --net=host --shm-size=1g \
+          --device /dev/davinci0 --device /dev/davinci_manager \
+          --device /dev/devmm_svm --device /dev/hisi_hdc \
+          -v /usr/local/Ascend/driver:/usr/local/Ascend/driver:ro \
+          -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+          -v /usr/local/dcmi:/usr/local/dcmi -v "$PWD":/work -w /work \
+          -e ASCEND_RT_VISIBLE_DEVICES=0 "$IMAGE" bash
+      # Inside the Paddle container (Python 3.10, aarch64):
+      source /usr/local/Ascend/ascend-toolkit/set_env.sh
+      source /usr/local/Ascend/nnal/atb/set_env.sh --cxx_abi=0
+      python -m pip install 'numpy<2' 'setuptools<81' 'protobuf==3.20.3' decorator sympy scipy attrs psutil paddlepaddle==3.2.0
+      python -m pip install https://paddle-whl.bj.bcebos.com/stable/npu/paddle-custom-npu/paddle_custom_npu-3.2.0-cp310-cp310-linux_aarch64.whl
+      python -m pip install 'paddleocr[doc-parser]==3.3.2' safetensors modelscope
+      python - <<'PY'
+      import sys
+      import sysconfig
+      import paddle
+
+      sys.path.insert(0, sysconfig.get_path('stdlib'))
+      assert 'npu' in paddle.device.get_all_custom_device_type()
+      paddle.utils.run_check()
+      PY
+      modelscope download --model PaddlePaddle/PP-DocLayoutV2 --local_dir PP-DocLayoutV2
+      ```
+  - title: Parse through the recognition server
+    content: |-
+      Keep the online vLLM server running in its own environment. Save this as parse_document.py in the layout environment. On 310P, the patched layout predictor executes the OM model; Paddle preprocessing stays on CPU.
+
+      ```python
+      import argparse
+      import json
+      import time
+      from pathlib import Path
+
+      from paddleocr import PaddleOCRVL
+
+      parser = argparse.ArgumentParser()
+      parser.add_argument('--input', required=True)
+      parser.add_argument('--layout-model', type=Path, required=True)
+      parser.add_argument('--output', type=Path, default=Path('document-output'))
+      parser.add_argument('--server-url', default='http://127.0.0.1:8000/v1')
+      parser.add_argument('--layout-device', choices=['cpu', 'npu'], default='cpu')
+      parser.add_argument('--page-batch-size', type=int, default=16)
+      args = parser.parse_args()
+      if args.layout_device == 'npu':
+          # OpenCV adds its package directory; CANN compiler workers need stdlib first.
+          import sys
+          import sysconfig
+          sys.path.insert(0, sysconfig.get_path('stdlib'))
+      if args.layout_device == 'cpu':
+          # CPU Paddle preprocessing + the ModelZoo-patched ACL InferSession(0).
+          # PP-DocLayoutV2 still runs on NPU; Paddle custom-NPU is not used on 310P.
+          assert (args.layout_model / 'inference_linux_aarch64.om').is_file(), 'Compile the aarch64 OM model first'
+      # Bound queued page images on the tested 32 GiB A2 host.
+      # Preserve every other official pipeline setting, including layout batches.
+      from paddlex.inference import load_pipeline_config
+      assert args.page_batch_size > 0
+      config = load_pipeline_config('PaddleOCR-VL')
+      config['batch_size'] = args.page_batch_size
+      config['use_queues'] = False
+      pipeline = PaddleOCRVL(
+          paddlex_config=config,
+          vl_rec_backend='vllm-server',
+          vl_rec_server_url=args.server_url,
+          layout_detection_model_name='PP-DocLayoutV2',
+          layout_detection_model_dir=str(args.layout_model),
+          use_doc_orientation_classify=False,
+          use_doc_unwarping=False,
+          device=args.layout_device,
+      )
+      args.output.mkdir(parents=True, exist_ok=True)
+      start = time.perf_counter()
+      count = 0
+      try:
+          for result in pipeline.predict_iter(args.input):
+              result.save_to_json(str(args.output))
+              result.save_to_markdown(str(args.output))
+              count += 1
+          elapsed = time.perf_counter() - start
+      finally:
+          pipeline.close()
+          if args.layout_device == 'cpu':
+              from ais_bench.infer.interface import InferSession
+              pipeline.paddlex_pipeline.layout_det_model.om_sess.free_resource()
+              InferSession.finalize()
+      assert count > 0, 'No pages parsed'
+      assert list(args.output.glob('*.md')), 'No Markdown output'
+      assert list(args.output.glob('*.json')), 'No JSON output'
+      (args.output / 'timing.json').write_text(json.dumps({'pages': count, 'seconds': elapsed, 'seconds_per_page': elapsed / count, 'scope': 'pipeline prediction only; excludes pipeline initialization', 'layout_device': args.layout_device, 'page_batch_size': args.page_batch_size, 'use_queues': config['use_queues']}, indent=2) + '\n')
+      print(f'Parsed {count} page(s) in {elapsed:.3f}s')
+      ```
+
+      The tested 32 GiB A2 host uses 16-page batches with preprocessing queues disabled. Queue-enabled runs reached the host memory limit with both 64- and 16-page batches because the layout queue buffers up to 64 batches independently. Keep both settings explicit when comparing memory and timing.
+
+      ```bash
+      python parse_document.py --input https://paddle-model-ecology.bj.bcebos.com/paddlex/imgs/demo_image/paddleocr_vl_demo.png --layout-model PP-DocLayoutV2 --layout-device npu --page-batch-size 16 --server-url http://127.0.0.1:8000/v1 --output document-output
+      ```
+- npu: Atlas 300I DUO
+  precision: FP16
+  deployment: Offline Document Parsing
+  case: PP-DocLayoutV2
+  strategy: single_node_310p
+  steps:
+  - title: Prepare the separate layout environment
+    content: |-
+      ```bash
+      python3 -m venv layout-venv
+      source layout-venv/bin/activate
+      python -m pip install --upgrade pip uv
+      git clone https://gitcode.com/Ascend/ModelZoo-PyTorch.git modelzoo
+      git -C modelzoo checkout e779117e8cfeba296a7105e26adac0741ab04768
+      export MODELZOO_DIR="$PWD/modelzoo/ACL_PyTorch/built-in/ocr/PP-DocLayoutV2"
+      python -m pip install -r "$MODELZOO_DIR/requirements.txt"
+      # The reference includes overlapping cv2 wheels; PaddleX requires contrib.
+      # Extract Ubuntu runtime libraries locally if the base image lacks libGL.
+      # This avoids changing the selected container's system package inventory.
+      mkdir -p layout-libs
+      (cd layout-libs && apt-get update && apt-get download \
+          libgl1 libglx0 libglvnd0 libglib2.0-0 libpcre3 \
+          libx11-6 libxcb1 libxau6 libxdmcp6 libxext6 libbsd0 libmd0 && \
+          for package in *.deb; do dpkg-deb -x "$package" .; done)
+      export LD_LIBRARY_PATH="$PWD/layout-libs/usr/lib/aarch64-linux-gnu:$PWD/layout-libs/lib/aarch64-linux-gnu:$LD_LIBRARY_PATH"
+      python -m pip install --force-reinstall --no-deps opencv-contrib-python==4.11.0.86
+      python -m pip install \
+          https://aisbench.obs.myhuaweicloud.com/packet/ais_bench_infer/0.0.2/ait/ais_bench-0.0.2-py3-none-any.whl \
+          https://aisbench.obs.myhuaweicloud.com/packet/ais_bench_infer/0.0.2/ait/aclruntime-0.0.2-cp312-cp312-linux_aarch64.whl
+      export PADDLEX_PACKAGE_DIR="$(python -c 'import importlib.util,pathlib; print(pathlib.Path(importlib.util.find_spec("paddlex").origin).parent)')"
+      (cd "$PADDLEX_PACKAGE_DIR" && patch --dry-run -p1 < "$MODELZOO_DIR/paddlex.patch")
+      (cd "$PADDLEX_PACKAGE_DIR" && patch -p1 < "$MODELZOO_DIR/paddlex.patch")
+      modelscope download --model PaddlePaddle/PP-DocLayoutV2 --local_dir PP-DocLayoutV2
+      ```
+  - title: Export and compile the OM layout model
+    content: |-
+      This is the pinned ModelZoo conversion sequence. Verify Python/ACL wheel compatibility and the actual chip. Compilation can take about 1.5 hours in the reference environment; preserve its logs.
+
+      ```bash
+      source /usr/local/Ascend/ascend-toolkit/set_env.sh
+      export DISABLE_MODEL_SOURCE_CHECK=True
+      # Activate layout-venv so PaddleX finds the pinned paddle2onnx executable.
+      source layout-venv/bin/activate
+      paddlex --paddle2onnx --paddle_model_dir PP-DocLayoutV2 --onnx_model_dir PP-DocLayoutV2
+      deactivate
+      # Surgeon requires ONNX Runtime wheels that are unavailable for Python 3.12.
+      # Use a separate Python 3.10 tool environment; keep the serving/layout environments.
+      layout-venv/bin/uv venv --python python3.10 --seed optimizer-venv
+      source optimizer-venv/bin/activate
+      python -m pip install --upgrade pip 'setuptools<81'
+      python -m pip install msit 'onnx==1.16.1' 'numpy<2' 'pandas<3'
+      msit install surgeon
+      python -m auto_optimizer optimize PP-DocLayoutV2/inference.onnx PP-DocLayoutV2/inference_opt.onnx
+      deactivate
+      # Confirm the chip with npu-smi; this example is for the tested 310P3.
+      atc --model=PP-DocLayoutV2/inference_opt.onnx --framework=5 \
+          --output=PP-DocLayoutV2/inference --soc_version=Ascend310P3 \
+          --input_shape 'im_shape:-1,2;image:-1,3,800,800;scale_factor:-1,2'
+      test -f PP-DocLayoutV2/inference_linux_aarch64.om
+      source layout-venv/bin/activate
+      ```
+  - title: Parse through the recognition server
+    content: |-
+      Keep the online vLLM server running in its own environment. Save this as parse_document.py in the layout environment. On 310P, the patched layout predictor executes the OM model; Paddle preprocessing stays on CPU.
+
+      ```python
+      import argparse
+      import json
+      import time
+      from pathlib import Path
+
+      from paddleocr import PaddleOCRVL
+
+      parser = argparse.ArgumentParser()
+      parser.add_argument('--input', required=True)
+      parser.add_argument('--layout-model', type=Path, required=True)
+      parser.add_argument('--output', type=Path, default=Path('document-output'))
+      parser.add_argument('--server-url', default='http://127.0.0.1:8000/v1')
+      parser.add_argument('--layout-device', choices=['cpu', 'npu'], default='cpu')
+      args = parser.parse_args()
+      if args.layout_device == 'npu':
+          # OpenCV adds its package directory; CANN compiler workers need stdlib first.
+          import sys
+          import sysconfig
+          sys.path.insert(0, sysconfig.get_path('stdlib'))
+      if args.layout_device == 'cpu':
+          # CPU Paddle preprocessing + the ModelZoo-patched ACL InferSession(0).
+          # PP-DocLayoutV2 still runs on NPU; Paddle custom-NPU is not used on 310P.
+          assert (args.layout_model / 'inference_linux_aarch64.om').is_file(), 'Compile the aarch64 OM model first'
+      pipeline = PaddleOCRVL(
+          vl_rec_backend='vllm-server',
+          vl_rec_server_url=args.server_url,
+          layout_detection_model_name='PP-DocLayoutV2',
+          layout_detection_model_dir=str(args.layout_model),
+          use_doc_orientation_classify=False,
+          use_doc_unwarping=False,
+          device=args.layout_device,
+      )
+      args.output.mkdir(parents=True, exist_ok=True)
+      start = time.perf_counter()
+      count = 0
+      try:
+          for result in pipeline.predict_iter(args.input):
+              result.save_to_json(str(args.output))
+              result.save_to_markdown(str(args.output))
+              count += 1
+          elapsed = time.perf_counter() - start
+      finally:
+          pipeline.close()
+          if args.layout_device == 'cpu':
+              from ais_bench.infer.interface import InferSession
+              pipeline.paddlex_pipeline.layout_det_model.om_sess.free_resource()
+              InferSession.finalize()
+      assert count > 0, 'No pages parsed'
+      assert list(args.output.glob('*.md')), 'No Markdown output'
+      assert list(args.output.glob('*.json')), 'No JSON output'
+      (args.output / 'timing.json').write_text(json.dumps({'pages': count, 'seconds': elapsed, 'seconds_per_page': elapsed / count, 'scope': 'pipeline prediction only; excludes pipeline initialization', 'layout_device': args.layout_device}, indent=2) + '\n')
+      print(f'Parsed {count} page(s) in {elapsed:.3f}s')
+      ```
+
+      ```bash
+      python parse_document.py --input https://paddle-model-ecology.bj.bcebos.com/paddlex/imgs/demo_image/paddleocr_vl_demo.png --layout-model PP-DocLayoutV2 --layout-device cpu --server-url http://127.0.0.1:8000/v1 --output document-output
+      ```
+verification: |-
+  Sample downloads try PaddlePaddle's official ModelScope dataset first, then the pinned Hugging Face dataset. Both copies must match the same SHA256 values; the manifest retains the pinned Hugging Face provenance. If both endpoints are unavailable, prefetch the exact originals into samples/ as described below. A download failure stops verification before inference.
+
+  Run this self-contained block in an empty working directory; it writes the sample and verification scripts and checks both served aliases. The tutorial receipt URL currently returns HTTP 400, so these checks use pinned official demonstration images and crop only input regions. Sources, coordinates and hashes are recorded. If the NPU container cannot reach Hugging Face, download the same four original source files on the client and transfer them into samples/ before running this block; their hashes are checked again. These are functional sample assertions, not OmniDocBench accuracy. Table output is OTSL; the document pipeline converts it to HTML.
+
+  ```bash
+  set -euo pipefail
+  cat > prepare_samples.py <<'PADDLE_SAMPLES_PY'
+  import argparse
+  import hashlib
+  import json
+  import time
+  import urllib.error
+  import urllib.request
+  from pathlib import Path
+
+  from PIL import Image
+
+  REVISION = '702b96b0a06740b0ed3d41ba382a5bf69986dcae'
+  SAMPLES = {
+      'ocr': ('text_english_arabic.jpg', (45, 159, 607, 449), 'f670627f3afa2e7ea312c71ce5c3c7b77a42938f9a1e62e5ba2505e19f5dede7'),
+      'table': ('table_01.jpg', (713, 81, 1302, 424), 'ca798601c74d70cbb34a3a0b91161d21b79513bb049791c96dfed14bb087ceaf'),
+      'formula': ('formula_EN.jpg', (126, 1328, 594, 1570), 'b9a96b4be44896a45df21103ba1b06af18621381b563707a42fa6cdf21f837d1'),
+      'chart': ('chart_01.jpg', (27, 81, 614, 400), 'd77acb00585d16f978123bc8288c41e7a589083df51e18076a20853892c0d4a9'),
+  }
+
+
+  def download_source(urls):
+      failures = []
+      for url in urls:
+          for attempt in range(1, 4):
+              print(f'Sample download {attempt}/3: GET {url}', flush=True)
+              try:
+                  with urllib.request.urlopen(url, timeout=90) as response:
+                      return response.read()
+              except OSError as error:
+                  retryable = not isinstance(error, urllib.error.HTTPError) or error.code in {408, 429, 500, 502, 503, 504}
+                  if not retryable or attempt == 3:
+                      failures.append(f'GET {url}: {error}')
+                      print(f'Sample source unavailable: {failures[-1]}', flush=True)
+                      break
+                  delay = 2 ** attempt
+                  print(f'Sample download failed: GET {url}: {error}; retrying in {delay}s', flush=True)
+                  time.sleep(delay)
+      raise OSError(
+          f'Sample download failed from all official sources: {"; ".join(failures)}. '
+          'Prefetch the same pinned original into samples/ on a network-enabled client; '
+          'the SHA256 check remains required.'
+      )
+
+
+  parser = argparse.ArgumentParser()
+  parser.add_argument('--output', type=Path, default=Path('samples'))
+  parser.add_argument('--source-dir', type=Path)
+  args = parser.parse_args()
+  args.output.mkdir(parents=True, exist_ok=True)
+  manifest = []
+  for task, (filename, box, expected_hash) in SAMPLES.items():
+      source = (args.source_dir or args.output) / filename
+      url = '/'.join(('https://huggingface.co', 'datasets', 'PaddlePaddle', 'PaddleOCR-VL_demo', 'resolve', REVISION, 'imgs', filename))
+      if not source.exists():
+          # Both official dataset copies must match the immutable source hash below.
+          modelscope_url = '/'.join(('https://modelscope.cn', 'datasets', 'PaddlePaddle', 'PaddleOCR-VL_demo', 'resolve', 'master', 'imgs', filename))
+          data = download_source((modelscope_url, url))
+          assert hashlib.sha256(data).hexdigest() == expected_hash, f'Source mismatch: {filename}'
+          source.write_bytes(data)
+      data = source.read_bytes()
+      assert hashlib.sha256(data).hexdigest() == expected_hash, f'Source mismatch: {filename}'
+      # The official demo collages contain input and expected output panels.
+      # Crop only the input element; record coordinates in original pixels.
+      with Image.open(source) as image:
+          sx, sy = image.width / 1335, image.height / 1888
+          coordinates = tuple(round(value * (sx if index % 2 == 0 else sy)) for index, value in enumerate(box))
+          crop = image.crop(coordinates)
+          crop.thumbnail((1536, 1536))
+          target = args.output / f'{task}-crop.png'
+          crop.save(target)
+      manifest.append({'task': task, 'source_url': url, 'source_sha256': expected_hash, 'crop_coordinates': coordinates, 'crop_sha256': hashlib.sha256(target.read_bytes()).hexdigest()})
+  (args.output / 'manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
+  PADDLE_SAMPLES_PY
+  cat > verify.py <<'PADDLE_VERIFY_PY'
+  import argparse
+  import base64
+  import hashlib
+  import json
+  import re
+  import time
+  import urllib.error
+  import urllib.request
+  from pathlib import Path
+
+  TASKS = {'ocr': 'OCR:', 'table': 'Table Recognition:', 'formula': 'Formula Recognition:', 'chart': 'Chart Recognition:'}
+
+
+  def open_api(request, timeout):
+      url = request.full_url if isinstance(request, urllib.request.Request) else request
+      method = request.get_method() if isinstance(request, urllib.request.Request) else 'GET'
+      print(f'API request: {method} {url}', flush=True)
+      try:
+          return urllib.request.urlopen(request, timeout=timeout)
+      except urllib.error.HTTPError as error:
+          detail = error.read(1024).decode('utf-8', errors='replace')
+          raise OSError(f'API request failed: {method} {url}: HTTP {error.code}; response: {detail}') from error
+      except OSError as error:
+          raise OSError(f'API request failed: {method} {url}: {error}') from error
+
+
+  def get_json(url):
+      with open_api(url, timeout=15) as response:
+          return json.load(response)
+
+
+  def check_content(task, content):
+      normalized = re.sub(r'\s+', '', content).lower()
+      if task == 'ocr':
+          expected = ['paddleocr', 'opensource', '2020', 'recognition']
+          normalized = re.sub(r'[^a-z0-9]', '', content.lower())
+      elif task == 'table':
+          expected = ['<fcel>', '<nl>', 'regularhours', 'monday'] + [f'11/{day}/2013' for day in range(1, 15)]
+      elif task == 'formula':
+          expected = ['f(x)', '2x', 'f(3)', '=27']
+          normalized = normalized.replace('\\left', '').replace('\\right', '').replace('{', '').replace('}', '')
+      else:
+          expected = ['2017', '2024', '37', '22']
+      missing = [value for value in expected if value not in normalized]
+      return {'expected_fragments': expected, 'missing_fragments': missing, 'otsl_row_count': content.count('<nl>') if task == 'table' else None, 'passed': not missing and (task != 'table' or content.count('<nl>') == 15)}
+
+
+  def main():
+      parser = argparse.ArgumentParser()
+      parser.add_argument('--base-url', required=True)
+      parser.add_argument('--model', default='PaddleOCR-VL-0.9B')
+      parser.add_argument('--samples', type=Path, required=True)
+      parser.add_argument('--output', type=Path, required=True)
+      parser.add_argument('--repeats', type=int, default=1)
+      parser.add_argument('--warmup', type=int, default=0)
+      args = parser.parse_args()
+      args.output.mkdir(parents=True, exist_ok=True)
+      with open_api(args.base_url + '/health', timeout=15) as response:
+          assert response.status == 200
+      models = get_json(args.base_url + '/v1/models')
+      (args.output / 'models.json').write_text(json.dumps(models, indent=2))
+      assert any(item['id'] == args.model for item in models['data'])
+      results = []
+      for repeat in range(-args.warmup, args.repeats):
+          for task, prompt in TASKS.items():
+              data = (args.samples / (task + '-crop.png')).read_bytes()
+              payload = {'model': args.model, 'messages': [{'role': 'user', 'content': [
+                  {'type': 'image_url', 'image_url': {'url': 'data:image/png;base64,' + base64.b64encode(data).decode()}},
+                  {'type': 'text', 'text': prompt}]}], 'temperature': 0.0, 'max_tokens': 2048, 'seed': 0}
+              request = urllib.request.Request(args.base_url + '/v1/chat/completions', data=json.dumps(payload).encode(), headers={'Content-Type': 'application/json'})
+              start = time.perf_counter()
+              with open_api(request, timeout=300) as response:
+                  result = json.load(response)
+              latency = time.perf_counter() - start
+              (args.output / f'{task}-{repeat}.json').write_text(json.dumps(result, indent=2, ensure_ascii=False) + '\n')
+              choice = result['choices'][0]
+              check = check_content(task, choice['message']['content'])
+              check['finish_reason'] = choice['finish_reason']
+              check['passed'] = check['passed'] and choice['finish_reason'] == 'stop'
+              row = {'task': task, 'repeat': repeat, 'warmup': repeat < 0, 'input_sha256': hashlib.sha256(data).hexdigest(), 'latency_seconds': latency, 'usage': result.get('usage'), 'validation': check}
+              results.append(row)
+              (args.output / 'summary.json').write_text(json.dumps({'definition': 'functional sample checks; not a dataset accuracy score', 'concurrency': 1, 'temperature': 0.0, 'seed': 0, 'max_tokens': 2048, 'warmup_rounds': args.warmup, 'repeats': args.repeats, 'results': results}, indent=2, ensure_ascii=False) + '\n')
+              print(json.dumps(row, ensure_ascii=False), flush=True)
+      if not all(row['validation']['passed'] for row in results):
+          raise SystemExit('Functional sample validation failed; inspect raw outputs')
+
+
+  if __name__ == '__main__':
+      main()
+  PADDLE_VERIFY_PY
+  python prepare_samples.py --output samples
+  python verify.py --base-url 'http://<server_ip>:<port>' --model PaddlePaddle/PaddleOCR-VL --samples samples --output request-results-canonical --warmup 0 --repeats 1
+  python verify.py --base-url 'http://<server_ip>:<port>' --model PaddleOCR-VL-0.9B --samples samples --output request-results-alias --warmup 0 --repeats 1
+  ```
+
+  For repeated observations after the functional check:
+
+  ```bash
+  python verify.py --base-url 'http://<server_ip>:<port>' --samples samples --output request-results-repeated --warmup 1 --repeats 3
+  ```
+evaluation:
+  accuracy:
+    content: |-
+      Use the ModelZoo PP-DocLayoutV2 end-to-end method, original PaddleOCR-VL-0.9B, OmniDocBench v1.5 (1355 pages) and evaluator commit 523fd1d529c3e9d0088c662e983aa70fb9585c9a. The public dataset v1_5 revision is 91fe284bbfacfa687959ae3eb00846ca852aa907. Do not use the newer main annotation set. Generate one Markdown prediction per ground-truth page; preserve page names and reading order. Configure configs/end2end.yaml with absolute paths to the exact annotations and prediction directory and enable CDM after installing the official CDM dependencies.
+
+      Use a fresh result directory for each prediction set: CDM caches renders by sample index, so reusing a demo or previous run can contaminate scores. The official CDM default is 32 workers; reduce its max_workers to fit available host RAM (this task uses two) and run memory-heavy evaluation separately from site builds.
+
+      ```bash
+      git clone https://github.com/opendatalab/OmniDocBench.git
+      git -C OmniDocBench checkout 523fd1d529c3e9d0088c662e983aa70fb9585c9a
+      # In a separate Python 3.10 evaluation environment:
+      python -m pip install -r OmniDocBench/requirements.txt
+      # Install Node.js, ImageMagick, XeLaTeX and Source Han Sans SC for CDM.
+      python -m pip install -r OmniDocBench/metrics/cdm/requirements.txt
+      cd OmniDocBench
+      PADDLE_EVAL_SOURCE="$(pwd)"
+      PADDLE_EVAL_DIR="$(mktemp -d "$PADDLE_EVAL_SOURCE/evaluation-run.XXXXXX")"
+      mkdir "$PADDLE_EVAL_DIR/result"
+      cd "$PADDLE_EVAL_DIR"
+      PYTHONPATH="$PADDLE_EVAL_SOURCE${PYTHONPATH:+:$PYTHONPATH}" PADDLE_EVAL_SOURCE="$PADDLE_EVAL_SOURCE" python - <<'PY_EVAL'
+      import functools, logging, os, runpy, sys
+      from metrics.cal_metric import call_CDM
+      call_CDM.evaluate = functools.partialmethod(call_CDM.evaluate, max_workers=2)
+      logging.basicConfig(filename='renderer.log', level=logging.INFO)
+      source = os.environ['PADDLE_EVAL_SOURCE']
+      sys.argv = ['pdf_validation.py', '--config', source + '/configs/end2end.yaml']
+      runpy.run_path(source + '/pdf_validation.py', run_name='__main__')
+      PY_EVAL
+      ```
+
+      Overall = ((1 - Text Edit Distance) * 100 + Table TEDS * 100 + Formula CDM * 100) / 3. Missing CDM is an incomplete Overall result, not zero or a pass. The ModelZoo reference is 92.43% on a single 300I DUO chip versus its cited official 92.86%; these are published reference values, not results claimed for this recipe.
+  performance:
+    content: |-
+      ModelZoo reports 12.10 seconds per input file on one 300I DUO chip. Its test.py measures the complete prediction loop after pipeline initialization, with orientation and unwarping disabled; it does not document warmup, concurrency, image resizing or output-token limits. Record those details and PDF/image input mode before comparing. The verify.py sample timings are API end-to-end latencies at concurrency 1, one warmup round, three measured repeats, temperature 0, seed 0 and max_tokens 2048; they are not the ModelZoo full-document benchmark. Capture NPU memory with npu-smi and torch allocator logs, keeping startup activation peak separate from observed runtime samples.
+
+      ```bash
+      npu-smi info
+      python verify.py --base-url 'http://127.0.0.1:8000' --samples samples --output benchmark-results --warmup 1 --repeats 3
+      npu-smi info
+      ```
+
+      For general serving benchmarks see [vLLM benchmarking](https://docs.vllm.ai/en/latest/cli/bench/serve/) and [AISBench](https://github.com/aisbench/benchmark). Use model-specific images and expected outputs; a text-only random dataset is not a PaddleOCR accuracy test.
+performance:
+  accuracy: The [ModelZoo reference](https://gitcode.com/Ascend/ModelZoo-PyTorch/tree/master/ACL_PyTorch/built-in/ocr/PP-DocLayoutV2)
+    defines OmniDocBench v1.5 Text Edit Distance, Table TEDS and Formula CDM. Full reproduction is reported separately
+    from functional checks.
+  benchmark: Use the ModelZoo document-pipeline timing method for its 12.10s reference; use [vLLM benchmark](https://docs.vllm.ai/en/latest/cli/bench/serve/)
+    or [AISBench](https://github.com/aisbench/benchmark) for separately defined service workloads. Preserve raw
+    requests, usage, warmup, concurrency and memory observations.
+tuning: Single-node, single-NPU serving is the tutorial baseline. On A2 use max-num-batched-tokens=16384; on 310P
+  use max-model-len=16384 and FP16. FULL_DECODE_ONLY requires CANN >= 9.0.0 on 310P. Keep prefix and multimodal
+  processor caching disabled for independent document regions. Adjust capacity only after recording correctness
+  and before/after timing. PD disaggregation is not supported by this tutorial.
+faq: |-
+  - **Does device="npu" in the Paddle example work on 310P?** The unmodified example is for A2. On 310P apply the pinned ModelZoo OM integration and use CPU Paddle preprocessing with ACL InferSession(0).
+  - **Why is table output not HTML?** Raw element recognition uses OTSL cell/row tags. The PaddleOCR document pipeline converts OTSL to HTML.
+  - **Why is CPU binding skipped?** Container CPU quotas may conflict with NUMA affinity. Preserve the warning and report the actual affinity state.
+  - **Why is only the model list insufficient?** Readiness must be followed by a real image request with expected content and finish_reason=stop.
+  - **Why can newer PaddleOCR select another model?** This recipe pins the original-compatible PaddleOCR 3.3.2. With newer APIs explicitly select pipeline_version="v1" and verify supported arguments.
+  - **What about triton on 310P?** Official 310P images omit Triton packages. Do not install CUDA wheels or blindly uninstall dependencies from a shared environment.
+references:
+- title: PaddleOCR-VL model card
+  url: https://huggingface.co/PaddlePaddle/PaddleOCR-VL
+- title: Ascend source tutorial
+  url: https://github.com/vllm-project/vllm-ascend/blob/0830899b4e3f55ea6ed9f3518385e9d81192ae29/docs/source/tutorials/models/PaddleOCR-VL.md
+- title: PP-DocLayoutV2 ModelZoo integration and evaluation
+  url: https://gitcode.com/Ascend/ModelZoo-PyTorch/tree/e779117e8cfeba296a7105e26adac0741ab04768/ACL_PyTorch/built-in/ocr/PP-DocLayoutV2
+- title: OmniDocBench v1.5 dataset
+  url: https://huggingface.co/datasets/opendatalab/OmniDocBench/tree/v1_5
+- title: Official demonstration assets
+  url: https://huggingface.co/datasets/PaddlePaddle/PaddleOCR-VL_demo/tree/702b96b0a06740b0ed3d41ba382a5bf69986dcae/imgs
+- title: Official demonstration assets on ModelScope (same SHA256 required)
+  url: https://modelscope.cn/datasets/PaddlePaddle/PaddleOCR-VL_demo
+- title: Ascend support matrix
+  url: https://docs.vllm.ai/projects/ascend/en/latest/user_guide/support_matrix/supported_models.html
