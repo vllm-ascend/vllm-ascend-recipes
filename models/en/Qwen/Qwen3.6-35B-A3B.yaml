@@ -37,12 +37,17 @@ model:
     ascend_950dt: "quay.io/ascend/vllm-ascend:v0.30.0-a5"
     atlas_300i_duo: "quay.io/ascend/vllm-ascend:v0.30.0-310p"
   nightly_required: false
-  # Pinned to v0.30.0: A3 serving is verified with HCCL_BUFFSIZE=1024
-  # (TP=2/EP/MTP=3/135168). Latest nightly is blocked by TransData groups=1.
+  # Pinned to v0.30.0 by task decision: A3 serving verified with HCCL_BUFFSIZE=1024
+  # (TP=2/EP/MTP=3/135168). latest-nightly is blocked by TransData groups=1 upstream;
+  # do not switch back to nightly until that is fixed. See recipes-validation.md.
   install:
     pip: false
 
 features:
+  spec_decoding:
+    label: "MTP Spec Decoding"
+    description: "Qwen3.5-style MTP with three speculative tokens."
+    args: ["--speculative-config", '{"method":"qwen3_5_mtp","num_speculative_tokens":3}']
   model_runner_v2:
     label: "Model Runner V2"
     description: "Use Model Runner V2 for the A2/A3 tutorial configuration."
@@ -54,14 +59,13 @@ features:
     args: ["--enable-prefix-caching"]
     flag_when_false: "--no-enable-prefix-caching"
 
-opt_in_features: [model_runner_v2]
+opt_in_features: [spec_decoding, model_runner_v2]
 
 variants:
   default:
     precision: W8A8
     vram_minimum_gb: 42
     description: "W8A8 quantized checkpoint for A2/A3 and Atlas 300I DUO."
-    supported_hardware: [atlas_800_a2, atlas_800_a3, atlas_300i_duo]
   bf16:
     model_id: "Qwen/Qwen3.6-35B-A3B"
     precision: bf16
@@ -132,14 +136,14 @@ weight_download:
 prerequisites:
   - title: Model weight and runtime
     content: |-
-      A2/A3 and Atlas 300I DUO use Eco-Tech/Qwen3.6-35B-A3B-w8a8. Ascend 950DT uses Eco-Tech/Qwen3.6-35B-A3B-w8a8-mxfp8. Use the v0.30.0 image matching the target hardware; latest nightly is blocked for this model by a TransData initialization error. Record the tutorial commit and image digest during verification.
+      A2/A3 and Atlas 300I DUO use Eco-Tech/Qwen3.6-35B-A3B-w8a8. Ascend 950DT uses Eco-Tech/Qwen3.6-35B-A3B-w8a8-mxfp8. Use the latest nightly image matching the target hardware and record the main tutorial commit and image digest during verification.
 
 env_setup:
   container:
     A3:
       content: |-
         ```bash
-        export IMAGE=quay.io/ascend/vllm-ascend:v0.30.0-a3
+        export IMAGE=quay.io/ascend/vllm-ascend:nightly-main-a3
         DEVS=""
         for i in $(seq 0 15); do DEVS="$DEVS --device /dev/davinci$i"; done
         docker run --rm --name vllm-ascend --net=host --shm-size=1g $DEVS \
@@ -156,7 +160,7 @@ env_setup:
     A2:
       content: |-
         ```bash
-        export IMAGE=quay.io/ascend/vllm-ascend:v0.30.0
+        export IMAGE=quay.io/ascend/vllm-ascend:nightly-main
         DEVS=""
         for i in $(seq 0 7); do DEVS="$DEVS --device /dev/davinci$i"; done
         docker run --rm --name vllm-ascend --net=host --shm-size=1g $DEVS \
@@ -173,7 +177,7 @@ env_setup:
     Ascend 950DT:
       content: |-
         ```bash
-        export IMAGE=quay.io/ascend/vllm-ascend:v0.30.0-a5
+        export IMAGE=quay.io/ascend/vllm-ascend:nightly-main-a5
         DEVS=""
         for i in $(seq 0 7); do DEVS="$DEVS --device /dev/davinci$i"; done
         docker run --rm --name vllm-ascend --net=host --shm-size=500g $DEVS \
@@ -190,7 +194,7 @@ env_setup:
     Atlas 300I DUO:
       content: |-
         ```bash
-        export IMAGE=quay.io/ascend/vllm-ascend:v0.30.0-310p
+        export IMAGE=quay.io/ascend/vllm-ascend:nightly-main-310p
         docker run --rm --name vllm-ascend --shm-size=10g --net=host \
           --device /dev/davinci0 --device /dev/davinci1 \
           --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc \
@@ -235,7 +239,7 @@ scenarios:
       - title: Verify inference
         content: |-
           ```bash
-          curl http://<server_ip>:<port>/v1/completions \
+          curl http://127.0.0.1:8000/v1/completions \
             -H "Content-Type: application/json" \
             -d '{"model":"qwen3.6","prompt":"The future of AI is","max_tokens":50,"temperature":0}'
           ```
@@ -258,8 +262,8 @@ scenarios:
             --host 0.0.0.0 --port 8000 \
             --data-parallel-size 1 --tensor-parallel-size 2 --enable-expert-parallel \
             --quantization ascend --served-model-name qwen3.6 \
-            --max-num-seqs {{max_num_seqs}} --max-model-len {{max_model_len}} \
-            --max-num-batched-tokens {{max_num_batched_tokens}} \
+            --max-num-seqs 128 --max-model-len 32768 \
+            --max-num-batched-tokens 1024 \
             --trust-remote-code --safetensors-load-strategy lazy \
             --gpu-memory-utilization {{gpu_memory_utilization}} \
             --speculative-config '{"method":"qwen3_5_mtp","num_speculative_tokens":3}' \
@@ -270,7 +274,7 @@ scenarios:
       - title: Verify inference
         content: |-
           ```bash
-          curl http://<server_ip>:<port>/v1/completions \
+          curl http://127.0.0.1:8000/v1/completions \
             -H "Content-Type: application/json" \
             -d '{"model":"qwen3.6","prompt":"The future of AI is","max_tokens":50,"temperature":0}'
           ```
@@ -303,7 +307,7 @@ scenarios:
       - title: Verify inference
         content: |-
           ```bash
-          curl http://<server_ip>:<port>/v1/completions \
+          curl http://127.0.0.1:8000/v1/completions \
             -H "Content-Type: application/json" \
             -d '{"model":"qwen3.6","prompt":"The future of AI is","max_tokens":50,"temperature":0}'
           ```
@@ -329,43 +333,13 @@ scenarios:
       - title: Verify inference
         content: |-
           ```bash
-          curl http://<server_ip>:<port>/v1/completions \
-            -H "Content-Type: application/json" \
-            -d '{"model":"qwen3.6","prompt":"The future of AI is","max_tokens":50,"temperature":0}'
-          ```
-
-  - npu: Atlas 300I DUO
-    precision: W8A8
-    deployment: Single-Node
-    case: TP2 Conservative Context with MTP
-    tags: [310p-single]
-    strategy: single_node_310p
-    steps:
-      - title: Start the server
-        content: |-
-          ```bash
-          export VLLM_USE_MODELSCOPE=True ASCEND_RT_VISIBLE_DEVICES=0,1
-          vllm serve Eco-Tech/Qwen3.6-35B-A3B-w8a8 \
-            --host 127.0.0.1 --port 8080 --tensor-parallel-size 2 \
-            --gpu-memory-utilization 0.90 --max-num-seqs 16 \
-            --served-model-name qwen3.6 --dtype float16 \
-            --additional-config '{"ascend_compilation_config":{"enable_npugraph_ex":false}}' \
-            --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY","cudagraph_capture_sizes":[1,8]}' \
-            --quantization ascend --max-model-len 20480 --no-enable-prefix-caching \
-            --speculative-config '{"method":"mtp","num_speculative_tokens":1}'
-          ```
-      - title: Verify inference
-        content: |-
-          ```bash
-          curl http://<server_ip>:<port>/v1/completions \
+          curl http://127.0.0.1:8080/v1/completions \
             -H "Content-Type: application/json" \
             -d '{"model":"qwen3.6","prompt":"The future of AI is","max_tokens":50,"temperature":0}'
           ```
 
 verification: |-
-  Verified on two Atlas 800T A3 NPUs with checkpoint revision 1a118d717bcbd59480f4a110fe22181d21711b4d, vLLM and vllm-ascend 0.30.0, and CANN 9.2.1. With HCCL_BUFFSIZE=1024, TP2, expert parallelism, three-token MTP, max_model_len=135168, prefix caching, FULL_AND_PIECEWISE ACLGraph and CPU binding, the service reached Application startup complete. GET /health returned HTTP 200 and an OpenAI-compatible chat request returned normally with 19 prompt tokens, 32 completion tokens and 51 total tokens. The service log contains no ERROR or Traceback entries.
-
-  Latest nightly remains blocked during initialization by `Transdata op, groups should be greater than 1, but now is 1`; disabling multistream_overlap_shared_expert did not remove it. This does not change the pinned v0.30.0 result and is not a main-verified claim. A2, 950DT and Atlas 300I DUO scenarios were not verified on real hardware in this round.
+  On two Atlas 800T A3 NPUs with checkpoint revision 1a118d717bcbd59480f4a110fe22181d21711b4d, vLLM Ascend 0.19.1rc2.dev3230+g469c6c260 and CANN 9.2.1, the W8A8 tutorial configuration failed during initialization with both Model Runner V1 and V2. The runtime reports `Transdata op, groups should be greater than 1, but now is 1`. Disabling `multistream_overlap_shared_expert` did not remove the error. The original configuration remains experimental and has not passed end-to-end acceptance on this nightly image.
 
 performance:
   accuracy: |-
