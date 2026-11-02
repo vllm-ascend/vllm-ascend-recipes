@@ -168,7 +168,7 @@ scenarios:
       export HCCL_BUFFSIZE=512
       export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
 
-      vllm serve $MODEL_PATH \
+      vllm serve your_model_path \
           --host 0.0.0.0 \
           --port 8000 \
           --data-parallel-size 1 \
@@ -189,7 +189,7 @@ scenarios:
     title: Smoke chat
     content: |-
       ```bash
-      curl http://127.0.0.1:8000/v1/chat/completions \
+      curl http://localhost:<port>/v1/chat/completions \
         -H "Content-Type: application/json" \
         -d '{
           "model": "qwen3.8",
