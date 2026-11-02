@@ -4,7 +4,7 @@ meta:
   provider: "Qwen"
   description: "Qwen3.5-2B/4B/9B dense hybrid Mamba-Transformer models. Single-node serving on Atlas 300I DUO / Atlas 200I Pro (310P) with vLLM Ascend ≥ v0.23.0rc1."
   date_added: "2026-10-28"
-  date_updated: "2026-10-30"
+  date_updated: "2026-11-02"
   difficulty: beginner
   tasks:
     - text
@@ -14,7 +14,7 @@ meta:
   hardware:
     atlas_300i_duo: verified
     # Verified: function smoke + AISBench gsm8k on 310P3 (~21GB) image v0.30.0rc1-310p (2026-10-29).
-    # Follow-up 2026-10-30: 9B W8A8 TP2+MTP function smoke PASS on two ~21GB chips. textvqa/perf still open.
+    # Follow-up 2026-10-30: 9B W8A8 TP2+MTP function smoke PASS on two ~21GB chips. AISBench gsm8k perf measured 2026-11-02; textvqa still open.
 
 model:
   model_id: "Qwen/Qwen3.5-4B"
@@ -443,10 +443,20 @@ evaluation:
       | 9B | gsm8k | accuracy | 95.30 |
       | 9B | textvqa | accuracy | 82.33 |
 
-      TP2 + MTP function smoke for 9B W8A8 on two ~21GB chips: **PASS** (2026-10-30 Asia/Shanghai; chat OK). gsm8k numbers above are unchanged (TP1). textvqa / AISBench perf not run on this host yet. Follow vllm-ascend AISBench guide; use `enable_thinking: False` postprocessor as in tutorial.
+      TP2 + MTP function smoke for 9B W8A8 on two ~21GB chips: **PASS** (2026-10-30 Asia/Shanghai; chat OK). gsm8k numbers above are unchanged (TP1). AISBench gsm8k **perf** measured 2026-11-02 (see performance). textvqa not run on this host. Follow vllm-ascend AISBench guide; use `enable_thinking: False` postprocessor as in tutorial.
   performance:
     content: |-
-      Not measured yet on this host. Use AISBench performance mode or `vllm bench serve`. Do not invent numbers.
+      Local AISBench gsm8k **perf** (Atlas 310P3 ~21GB, image `v0.30.0rc1-310p`, 2026-11-02 Asia/Shanghai).
+      Dataset `gsm8k_gen_0_shot_cot_str_perf` via `ais_bench --models vllm_api_stream_chat --mode perf`; N=1319, FAIL=0.
+      Concurrency = recipe floor `max-num-seqs` (32 / 16 / 8).
+
+      | Model | Conc (max) | Req/s | Out tok/s | Total tok/s | TTFT avg | TPOT avg | Serve notes |
+      |-------|-----------:|------:|----------:|------------:|---------:|---------:|-------------|
+      | 2B FP16+MTP | 31.82 (32) | 1.5978 | 384.15 | 501.14 | 623.1 ms | 80.6 ms | TP1, len=16384, seqs=32, MTP×1, cudagraph [2,16] |
+      | 4B FP16+MTP | 15.98 (16) | 0.84 | 214.51 | 274.34 | 765.3 ms | 71.7 ms | TP1, len=8192, seqs=16, MTP×1, mm-cache=0 |
+      | 9B W8A8 TP1 | 7.99 (8) | 0.3768 | 96.45 | 123.29 | 1099.8 ms | 78.9 ms | TP1 no-MTP, len=8192, seqs=8, cudagraph [1,8] |
+
+      textvqa not run on this host.
 
 tuning: |-
   - Only TP on these platforms; prefer TP=1 on single-NPU 200I Pro / 310P3; use TP=2 when two ~21GB chips are available for 9B W8A8 + MTP.
