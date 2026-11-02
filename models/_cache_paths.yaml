@@ -21,7 +21,11 @@
 # separate repo coordinates the image build), then append one entry here.
 aliases:
   - model_id: Eco-Tech/Qwen3-VL-30B-A3B-Instruct-w8a8-mxfp8
-    cache_dir: Qwen3-VL-30B-A3B-Instruct-w8a8-mxfp8
+    # The A3 scenarios use this BF16 checkpoint while the recipe keeps the
+    # W8A8 checkpoint as its top-level model_id for the A5 scenarios.
+    cache_dir:
+      default: Qwen3-VL-30B-A3B-Instruct-w8a8-mxfp8
+      atlas_800_a3: Qwen/Qwen3-VL-30B-A3B-Instruct
 
   - model_id: Qwen/Qwen3-30B-A3B
     cache_dir: Qwen3-30B-A3B-w8a8

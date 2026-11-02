@@ -1,0 +1,64 @@
+{
+  "audits": [
+    {
+      "workflow_run_id": 39331407613,
+      "evidence_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/actions/runs/39331407613/job/118330365890",
+      "results": [
+        {
+          "recipe": "models/en/Qwen/Qwen3.5-27B-Qwen3.6-27B.yaml",
+          "selector": {"npu": "Ascend 950DT", "precision": "MXFP8 / BF16", "deployment": "Single-Node", "case": "Multi Card"},
+          "status": "fail",
+          "reason": "Startup exited with ModelScope CacheNotFound; the wrapper incorrectly recorded pass.",
+          "params_sha256": "cb1dfbb3b7e0f9e1ba0065a9e2875411e2df699fa7883c53dddb6eb94237c501"
+        },
+        {
+          "recipe": "models/en/THUDM/GLM-5.yaml",
+          "selector": {"npu": "Ascend 950DT", "precision": "W4A4", "deployment": "Single-Node", "case": "Single Node Multi Card (A5)"},
+          "status": "fail",
+          "reason": "Task validation failed: null content and length-truncated reasoning; the wrapper incorrectly recorded pass.",
+          "params_sha256": "a48f266c8eaca709a016b4d26a87f55b51d5436f140b4715a4f1ef1f1b321599"
+        }
+      ]
+    },
+    {
+      "workflow_run_id": 39197394594,
+      "evidence_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/actions/runs/39197394594/job/117883078259",
+      "results": [
+        {
+          "recipe": "models/en/Qwen/Qwen3.5-27B-Qwen3.6-27B.yaml",
+          "selector": {"npu": "Ascend 950DT", "precision": "MXFP8 / BF16", "deployment": "Single-Node", "case": "Multi Card"},
+          "status": "fail",
+          "reason": "Model server did not become ready; the wrapper incorrectly recorded pass.",
+          "params_sha256": "961c1bcf8acc66f4b5b0978977b8d641c545e16e97b44b14e3e236a79f3bc50b"
+        },
+        {
+          "recipe": "models/en/THUDM/GLM-5.yaml",
+          "selector": {"npu": "Ascend 950DT", "precision": "W4A4", "deployment": "Single-Node", "case": "Single Node Multi Card (A5)"},
+          "status": "fail",
+          "reason": "Task validation failed: no final answer within the request token budget.",
+          "params_sha256": "15cef562758f5dfb99c10616932dd10a4209a7e33a428f708e168510cb2404ca"
+        }
+      ]
+    },
+    {
+      "workflow_run_id": 35783189409,
+      "evidence_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/actions/runs/35783189409/job/106933637957",
+      "results": [
+        {
+          "recipe": "models/en/Qwen/Qwen3.5-27B-Qwen3.6-27B.yaml",
+          "selector": {"npu": "Ascend 950DT", "precision": "MXFP8 / BF16", "deployment": "Single-Node", "case": "Multi Card"},
+          "status": "fail",
+          "reason": "Inference returned HTTP 404: the requested qwen3.5 served-model name did not exist.",
+          "params_sha256": "e2246ab9fb417e4bf30f2b60f73e759f0cd7e8a6cc65d6dd7b782fcf6636eb73"
+        },
+        {
+          "recipe": "models/en/THUDM/GLM-5.yaml",
+          "selector": {"npu": "Ascend 950DT", "precision": "W4A4", "deployment": "Single-Node", "case": "Single Node Multi Card (A5)"},
+          "status": "fail",
+          "reason": "Both chat responses had null content and finish_reason=length; curl exit alone was not inference proof.",
+          "params_sha256": "dc7107dc262d7f4214a30caf677e374110bf8b6f58c1ce0eb72306c900b71e0c"
+        }
+      ]
+    }
+  ]
+}
