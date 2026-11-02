@@ -37,12 +37,17 @@ model:
     ascend_950dt: "quay.io/ascend/vllm-ascend:v0.30.0-a5"
     atlas_300i_duo: "quay.io/ascend/vllm-ascend:v0.30.0-310p"
   nightly_required: false
-  # Pinned to v0.30.0: A3 serving is verified with HCCL_BUFFSIZE=1024
-  # (TP=2/EP/MTP=3/135168). Latest nightly is blocked by TransData groups=1.
+  # Pinned to v0.30.0 by task decision: A3 serving verified with HCCL_BUFFSIZE=1024
+  # (TP=2/EP/MTP=3/135168). latest-nightly is blocked by TransData groups=1 upstream;
+  # do not switch back to nightly until that is fixed. See recipes-validation.md.
   install:
     pip: false
 
 features:
+  spec_decoding:
+    label: "MTP 投机解码"
+    description: "Qwen3.5 风格 MTP，每步使用三个候选 token。"
+    args: ["--speculative-config", '{"method":"qwen3_5_mtp","num_speculative_tokens":3}']
   model_runner_v2:
     label: "Model Runner V2"
     description: "在 A2/A3 教程配置中使用 Model Runner V2。"
@@ -54,14 +59,13 @@ features:
     args: ["--enable-prefix-caching"]
     flag_when_false: "--no-enable-prefix-caching"
 
-opt_in_features: [model_runner_v2]
+opt_in_features: [spec_decoding, model_runner_v2]
 
 variants:
   default:
     precision: W8A8
     vram_minimum_gb: 42
     description: "用于 A2/A3 和 Atlas 300I DUO 的 W8A8 量化权重。"
-    supported_hardware: [atlas_800_a2, atlas_800_a3, atlas_300i_duo]
   bf16:
     model_id: "Qwen/Qwen3.6-35B-A3B"
     precision: bf16
@@ -132,14 +136,14 @@ weight_download:
 prerequisites:
   - title: 模型权重与运行环境
     content: |-
-      A2/A3 和 Atlas 300I DUO 使用 Eco-Tech/Qwen3.6-35B-A3B-w8a8，Ascend 950DT 使用 Eco-Tech/Qwen3.6-35B-A3B-w8a8-mxfp8。请使用与目标硬件匹配的 v0.30.0 镜像；该模型的最新 nightly 存在 TransData 初始化阻塞。验证时请记录教程提交与准确的镜像摘要。
+      A2/A3 和 Atlas 300I DUO 使用 Eco-Tech/Qwen3.6-35B-A3B-w8a8，Ascend 950DT 使用 Eco-Tech/Qwen3.6-35B-A3B-w8a8-mxfp8。请使用与目标硬件匹配的最新 nightly 镜像，并在验证时记录 main 教程提交与准确的镜像摘要。
 
 env_setup:
   container:
     A3:
       content: |-
         ```bash
-        export IMAGE=quay.io/ascend/vllm-ascend:v0.30.0-a3
+        export IMAGE=quay.io/ascend/vllm-ascend:nightly-main-a3
         DEVS=""
         for i in $(seq 0 15); do DEVS="$DEVS --device /dev/davinci$i"; done
         docker run --rm --name vllm-ascend --net=host --shm-size=1g $DEVS \
@@ -156,7 +160,7 @@ env_setup:
     A2:
       content: |-
         ```bash
-        export IMAGE=quay.io/ascend/vllm-ascend:v0.30.0
+        export IMAGE=quay.io/ascend/vllm-ascend:nightly-main
         DEVS=""
         for i in $(seq 0 7); do DEVS="$DEVS --device /dev/davinci$i"; done
         docker run --rm --name vllm-ascend --net=host --shm-size=1g $DEVS \
@@ -173,7 +177,7 @@ env_setup:
     Ascend 950DT:
       content: |-
         ```bash
-        export IMAGE=quay.io/ascend/vllm-ascend:v0.30.0-a5
+        export IMAGE=quay.io/ascend/vllm-ascend:nightly-main-a5
         DEVS=""
         for i in $(seq 0 7); do DEVS="$DEVS --device /dev/davinci$i"; done
         docker run --rm --name vllm-ascend --net=host --shm-size=500g $DEVS \
@@ -190,7 +194,7 @@ env_setup:
     Atlas 300I DUO:
       content: |-
         ```bash
-        export IMAGE=quay.io/ascend/vllm-ascend:v0.30.0-310p
+        export IMAGE=quay.io/ascend/vllm-ascend:nightly-main-310p
         docker run --rm --name vllm-ascend --shm-size=10g --net=host \
           --device /dev/davinci0 --device /dev/davinci1 \
           --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc \
@@ -235,7 +239,7 @@ scenarios:
       - title: 推理验证
         content: |-
           ```bash
-          curl http://<server_ip>:<port>/v1/completions \
+          curl http://127.0.0.1:8000/v1/completions \
             -H "Content-Type: application/json" \
             -d '{"model":"qwen3.6","prompt":"The future of AI is","max_tokens":50,"temperature":0}'
           ```
@@ -258,8 +262,8 @@ scenarios:
             --host 0.0.0.0 --port 8000 \
             --data-parallel-size 1 --tensor-parallel-size 2 --enable-expert-parallel \
             --quantization ascend --served-model-name qwen3.6 \
-            --max-num-seqs {{max_num_seqs}} --max-model-len {{max_model_len}} \
-            --max-num-batched-tokens {{max_num_batched_tokens}} \
+            --max-num-seqs 128 --max-model-len 32768 \
+            --max-num-batched-tokens 1024 \
             --trust-remote-code --safetensors-load-strategy lazy \
             --gpu-memory-utilization {{gpu_memory_utilization}} \
             --speculative-config '{"method":"qwen3_5_mtp","num_speculative_tokens":3}' \
@@ -270,7 +274,7 @@ scenarios:
       - title: 推理验证
         content: |-
           ```bash
-          curl http://<server_ip>:<port>/v1/completions \
+          curl http://127.0.0.1:8000/v1/completions \
             -H "Content-Type: application/json" \
             -d '{"model":"qwen3.6","prompt":"The future of AI is","max_tokens":50,"temperature":0}'
           ```
@@ -303,7 +307,7 @@ scenarios:
       - title: 推理验证
         content: |-
           ```bash
-          curl http://<server_ip>:<port>/v1/completions \
+          curl http://127.0.0.1:8000/v1/completions \
             -H "Content-Type: application/json" \
             -d '{"model":"qwen3.6","prompt":"The future of AI is","max_tokens":50,"temperature":0}'
           ```
@@ -329,43 +333,13 @@ scenarios:
       - title: 推理验证
         content: |-
           ```bash
-          curl http://<server_ip>:<port>/v1/completions \
-            -H "Content-Type: application/json" \
-            -d '{"model":"qwen3.6","prompt":"The future of AI is","max_tokens":50,"temperature":0}'
-          ```
-
-  - npu: Atlas 300I DUO
-    precision: W8A8
-    deployment: 单节点
-    case: TP2 保守上下文配置与 MTP
-    tags: [310p-single]
-    strategy: single_node_310p
-    steps:
-      - title: 启动服务
-        content: |-
-          ```bash
-          export VLLM_USE_MODELSCOPE=True ASCEND_RT_VISIBLE_DEVICES=0,1
-          vllm serve Eco-Tech/Qwen3.6-35B-A3B-w8a8 \
-            --host 127.0.0.1 --port 8080 --tensor-parallel-size 2 \
-            --gpu-memory-utilization 0.90 --max-num-seqs 16 \
-            --served-model-name qwen3.6 --dtype float16 \
-            --additional-config '{"ascend_compilation_config":{"enable_npugraph_ex":false}}' \
-            --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY","cudagraph_capture_sizes":[1,8]}' \
-            --quantization ascend --max-model-len 20480 --no-enable-prefix-caching \
-            --speculative-config '{"method":"mtp","num_speculative_tokens":1}'
-          ```
-      - title: 推理验证
-        content: |-
-          ```bash
-          curl http://<server_ip>:<port>/v1/completions \
+          curl http://127.0.0.1:8080/v1/completions \
             -H "Content-Type: application/json" \
             -d '{"model":"qwen3.6","prompt":"The future of AI is","max_tokens":50,"temperature":0}'
           ```
 
 verification: |-
-  已在两卡 Atlas 800T A3、权重 revision 1a118d717bcbd59480f4a110fe22181d21711b4d、vLLM 与 vllm-ascend 0.30.0、CANN 9.2.1 环境中完成验证。配置为 HCCL_BUFFSIZE=1024、TP2、专家并行、三 token MTP、max_model_len=135168、前缀缓存、FULL_AND_PIECEWISE ACLGraph 与 CPU binding。服务日志出现 Application startup complete，GET /health 返回 HTTP 200，OpenAI 兼容 chat 请求正常返回，prompt 为 19 tokens、completion 为 32 tokens、合计 51 tokens。服务日志没有 ERROR 或 Traceback。
-
-  最新 nightly 仍在初始化阶段出现 `Transdata op, groups should be greater than 1, but now is 1`；关闭 multistream_overlap_shared_expert 后错误仍存在。该已知阻塞不改变上述 v0.30.0 固定版本结果，也不构成 main verified 声明。本轮未在 A2、950DT 和 Atlas 300I DUO 真机上验证。
+  在两卡 Atlas 800T A3、权重 revision 1a118d717bcbd59480f4a110fe22181d21711b4d、vLLM Ascend 0.19.1rc2.dev3230+g469c6c260 与 CANN 9.2.1 环境中，W8A8 教程配置在 Model Runner V1 和 V2 的初始化阶段均失败，底层错误为 `Transdata op, groups should be greater than 1, but now is 1`。关闭 `multistream_overlap_shared_expert` 后错误仍存在。原始配置保持 experimental，尚未通过该 nightly 镜像的端到端验收。
 
 performance:
   accuracy: |-
