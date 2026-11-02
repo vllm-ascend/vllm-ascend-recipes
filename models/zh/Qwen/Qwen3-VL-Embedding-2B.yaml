@@ -108,6 +108,8 @@ prerequisites:
 
       将权重下载到服务进程可读的目录（例如 `/root/.cache/`）。
 
+      在 `models/_cache_paths.yaml` 登记本 recipe 的 `model.model_id`，以便 CI 从 runner cache 解析 `your_model_path`。
+
       > **路径说明**：记下本地路径，后续 `vllm serve` 使用同一目录，或使用已启用缓存的模型 ID。
 
 env_setup:
@@ -285,7 +287,7 @@ verification: |-
   服务启动后，用 tutorial 中的两句文本请求向量。
 
   ```bash
-  curl -sS http://localhost:8000/v1/embeddings \
+  curl -sS http://localhost:<port>/v1/embeddings \
       -H "Content-Type: application/json" \
       -d '{
           "model": "Qwen/Qwen3-VL-Embedding-2B",
