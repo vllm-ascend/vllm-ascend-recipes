@@ -110,6 +110,8 @@ prerequisites:
 
       > **Path description**: Record the local path and pass the same directory to `vllm serve`, or pass the model id with the cache enabled.
 
+      Register the recipe `model.model_id` in `models/_cache_paths.yaml` so CI can resolve `your_model_path` from the runner cache.
+
 env_setup:
   container:
     A3:
@@ -285,7 +287,7 @@ verification: |-
   After the service is started, request embeddings for the tutorial sentences.
 
   ```bash
-  curl -sS http://localhost:8000/v1/embeddings \
+  curl -sS http://localhost:<port>/v1/embeddings \
       -H "Content-Type: application/json" \
       -d '{
           "model": "Qwen/Qwen3-VL-Embedding-2B",
