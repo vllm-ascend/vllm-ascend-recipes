@@ -294,7 +294,7 @@ scenarios:
           export ASCEND_RT_VISIBLE_DEVICES=0
           export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
 
-          vllm serve Qwen/Qwen3-VL-8B-Instruct \
+          vllm serve your_model_path \
             --host 0.0.0.0 \
             --port {{port}} \
             --dtype bfloat16 \
@@ -332,7 +332,7 @@ scenarios:
           export ASCEND_RT_VISIBLE_DEVICES=0,1
           export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
 
-          vllm serve Qwen/Qwen3-VL-32B-Instruct \
+          vllm serve your_model_path \
             --host 0.0.0.0 \
             --port {{port}} \
             --dtype bfloat16 \
@@ -364,7 +364,7 @@ scenarios:
           export ASCEND_RT_VISIBLE_DEVICES=0
           export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
 
-          vllm serve Qwen/Qwen3-VL-8B-Instruct \
+          vllm serve your_model_path \
             --host 0.0.0.0 \
             --port {{port}} \
             --dtype bfloat16 \
@@ -399,7 +399,7 @@ scenarios:
           export ASCEND_RT_VISIBLE_DEVICES=0
           export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
 
-          vllm serve Qwen/Qwen3-VL-8B-Instruct \
+          vllm serve your_model_path \
             --host 0.0.0.0 \
             --port {{port}} \
             --dtype float16 \
@@ -434,7 +434,7 @@ scenarios:
           export ASCEND_RT_VISIBLE_DEVICES=0
           export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
 
-          vllm serve vllm-ascend/Qwen3-VL-8B-Instruct-W8A8 \
+          vllm serve your_model_path \
             --host 0.0.0.0 \
             --port {{port}} \
             --quantization ascend \
@@ -466,7 +466,7 @@ scenarios:
           export ASCEND_RT_VISIBLE_DEVICES=0
           export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
 
-          vllm serve Eco-Tech/Qwen3-VL-32B-Instruct-w8a8-QuaRot \
+          vllm serve your_model_path \
             --host 0.0.0.0 \
             --port {{port}} \
             --quantization ascend \
@@ -489,7 +489,7 @@ verification: |-
   Once the server is up:
 
   ```bash
-  curl http://127.0.0.1:8000/v1/chat/completions \
+  curl http://localhost:<port>/v1/chat/completions \
     -H "Content-Type: application/json" \
     -d '{
       "model": "qwen3vl",
