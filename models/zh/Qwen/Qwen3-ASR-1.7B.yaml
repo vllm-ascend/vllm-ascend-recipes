@@ -111,6 +111,8 @@ prerequisites:
 
       将权重下载到部署环境可访问的目录（例如 `/root/.cache/`）。
 
+      在 `models/_cache_paths.yaml` 登记本 recipe 的 `model.model_id`，以便 CI 从 runner cache 解析 `your_model_path`。
+
       > **路径说明**：记下本地路径，后续 `vllm serve` 使用同一目录（或启用缓存的 ModelScope / HuggingFace 模型 ID）。
   - title: Audio dependencies
     content: |-
@@ -246,7 +248,7 @@ verification: |-
   **Chat Completions API:**
 
   ```bash
-  curl http://localhost:8000/v1/chat/completions \
+  curl http://localhost:<port>/v1/chat/completions \
       -H "Content-Type: application/json" \
       -d '{
           "model": "qwen3-asr",
