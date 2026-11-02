@@ -1,0 +1,34 @@
+{
+  "recipe_path": "models/en/Qwen/Qwen3-VL-Dense.yaml",
+  "hw_key": "mixed",
+  "image": "mixed; see hardware_runs",
+  "scenarios": [],
+  "missing_reason": "selected hardware job did not provide results",
+  "hardware_runs": [
+    {
+      "recipe_path": "models/en/Qwen/Qwen3-VL-Dense.yaml",
+      "hw_key": "atlas_800_a2",
+      "image": "quay.nju.edu.cn/ascend/vllm-ascend:v0.23.0",
+      "scenarios": [],
+      "missing_reason": "selected hardware job did not provide results",
+      "status": "unknown"
+    },
+    {
+      "recipe_path": "models/en/Qwen/Qwen3-VL-Dense.yaml",
+      "hw_key": "atlas_800_a3",
+      "image": "quay.nju.edu.cn/ascend/vllm-ascend:v0.23.0-a3",
+      "scenarios": [],
+      "missing_reason": "selected hardware job did not provide results",
+      "status": "unknown"
+    },
+    {
+      "recipe_path": "models/en/Qwen/Qwen3-VL-Dense.yaml",
+      "hw_key": "ascend_950dt",
+      "image": "quay.nju.edu.cn/ascend/vllm-ascend:v0.23.0-a5",
+      "scenarios": [],
+      "missing_reason": "selected hardware job did not provide results",
+      "status": "unknown"
+    }
+  ],
+  "head_sha": "4b1e8b20a9ae9962d55d4d677cb5a74e22629a43"
+}
