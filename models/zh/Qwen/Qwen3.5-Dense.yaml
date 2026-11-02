@@ -4,7 +4,7 @@ meta:
   provider: "Qwen"
   description: "Qwen3.5-2B/4B/9B 稠密混合 Mamba-Transformer。Atlas 300I DUO / Atlas 200I Pro（310P）单机，vLLM Ascend ≥ v0.23.0rc1。"
   date_added: "2026-10-28"
-  date_updated: "2026-10-30"
+  date_updated: "2026-11-02"
   difficulty: beginner
   tasks:
     - text
@@ -395,11 +395,20 @@ evaluation:
       2B FP16 **80.06**（FAIL=0；教程 77.71）；
       4B FP16 **93.56**（FAIL=0，干净重跑 2026-10-29 16:50 CST；教程 93.18）；
       9B W8A8 **95.15**（FAIL=0；教程 95.30）。
-      9B W8A8 TP2+MTP 功能冒烟（双卡约 21GB）：**PASS**（2026-10-30 Asia/Shanghai；chat OK）。gsm8k 上表数字未改（仍为 TP1）。
-      textvqa 本机未跑。Tutorial 参考（300I DUO）：2B 77.71 / 4B 93.18 / 9B 95.30。
+      9B W8A8 TP2+MTP 功能冒烟（双卡约 21GB）：**PASS**（2026-10-30 Asia/Shanghai；chat OK）。gsm8k 上表数字未改（仍为 TP1）。AISBench gsm8k **perf** 已于 2026-11-02 测完（见 performance）。textvqa 本机未跑。Tutorial 参考（300I DUO）：2B 77.71 / 4B 93.18 / 9B 95.30。
   performance:
     content: |-
-      本机尚未测性能；勿编造数字。可用 AISBench perf 或 `vllm bench serve`。
+      本地 AISBench gsm8k **perf**（310P3 约 21GB，镜像 `v0.30.0rc1-310p`，2026-11-02 Asia/Shanghai）。
+      数据集 `gsm8k_gen_0_shot_cot_str_perf`（`ais_bench --models vllm_api_stream_chat --mode perf`）；N=1319，FAIL=0。
+      并发取 recipe 楼层 `max-num-seqs`（32 / 16 / 8）。
+
+      | 模型 | Conc (max) | Req/s | Out tok/s | Total tok/s | TTFT avg | TPOT avg | 起服要点 |
+      |------|-----------:|------:|----------:|------------:|---------:|---------:|----------|
+      | 2B FP16+MTP | 31.82 (32) | 1.5978 | 384.15 | 501.14 | 623.1 ms | 80.6 ms | TP1，len=16384，seqs=32，MTP×1，cudagraph [2,16] |
+      | 4B FP16+MTP | 15.98 (16) | 0.84 | 214.51 | 274.34 | 765.3 ms | 71.7 ms | TP1，len=8192，seqs=16，MTP×1，mm-cache=0 |
+      | 9B W8A8 TP1 | 7.99 (8) | 0.3768 | 96.45 | 123.29 | 1099.8 ms | 78.9 ms | TP1 无 MTP，len=8192，seqs=8，cudagraph [1,8] |
+
+      textvqa 本机未跑。
 
 tuning: |-
   仅 TP；单卡优先 TP=1；有两张约 21GB 卡时 9B W8A8 + MTP 可用 TP=2。
