@@ -244,7 +244,7 @@ scenarios:
             -d '{"model":"qwen3.6","prompt":"The future of AI is","max_tokens":50,"temperature":0}'
           ```
   - npu: Atlas 800 A2
-    precision: W8A8
+    precision: bf16
     deployment: 单节点
     case: MRV2 长上下文与 MTP
     tags: [a2-single]
@@ -253,21 +253,21 @@ scenarios:
       - title: 启动服务
         content: |-
           ```bash
-          export HCCL_BUFFSIZE=1024 ASCEND_RT_VISIBLE_DEVICES=0,1
+          export HCCL_BUFFSIZE=1024 ASCEND_RT_VISIBLE_DEVICES=0,1,2,3
           export VLLM_USE_V2_MODEL_RUNNER=1 VLLM_EXECUTE_MODEL_TIMEOUT_SECONDS=3000
           export HCCL_OP_EXPANSION_MODE=AIV PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
           export OMP_PROC_BIND=false OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 TASK_QUEUE_ENABLE=1
 
-          vllm serve Eco-Tech/Qwen3.6-35B-A3B-w8a8 \
+          vllm serve Qwen/Qwen3.6-35B-A3B \
             --host 0.0.0.0 --port 8000 \
-            --data-parallel-size 1 --tensor-parallel-size 2 --enable-expert-parallel \
-            --quantization ascend --served-model-name qwen3.6 \
+            --data-parallel-size 1 --tensor-parallel-size 4 --enable-expert-parallel \
+            --served-model-name qwen3.6 \
             --max-num-seqs 128 --max-model-len 32768 \
             --max-num-batched-tokens 1024 \
             --trust-remote-code --safetensors-load-strategy lazy \
             --gpu-memory-utilization {{gpu_memory_utilization}} \
             --speculative-config '{"method":"qwen3_5_mtp","num_speculative_tokens":3}' \
-            --dtype float16 --enable-prefix-caching \
+            --dtype bfloat16 --enable-prefix-caching \
             --compilation-config '{"cudagraph_mode":"NONE"}' \
             --additional-config '{"enable_cpu_binding":true,"multistream_overlap_shared_expert":true}'
           ```
@@ -349,6 +349,10 @@ performance:
 
 tuning: |-
   长上下文场景使用 TP2 或更高配置，显存不足时降低 `--max-num-seqs`。高吞吐场景使用多个本地 DP 组并调整 `--max-num-batched-tokens`。低时延场景优先使用全量 Decode ACLGraph，并默认关闭投机解码。
+
+  Atlas 800 A2 场景使用 BF16 权重与 TP=4。W8A8 路径当前在 910B4 上会触发 grouped-matmul 的
+  scale dtype 限制（已由上游 vllm-ascend#20702 修复，尚未进入公开镜像）；待修复进入镜像后
+  恢复 A2 的 W8A8 场景。
 
 references:
   - title: "官方 vLLM-Ascend 教程（main）"
