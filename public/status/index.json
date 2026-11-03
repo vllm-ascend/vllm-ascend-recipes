@@ -43,6 +43,9 @@
       "slug": "Qwen3-VL-30B-A3B-Instruct"
     },
     {
+      "slug": "Qwen3-VL-Dense"
+    },
+    {
       "slug": "Qwen3-VL-Embedding-2B"
     },
     {
@@ -50,6 +53,9 @@
     },
     {
       "slug": "Qwen3.5-27B-Qwen3.6-27B"
+    },
+    {
+      "slug": "Qwen3.6-35B-A3B"
     },
     {
       "slug": "template2_non_pd"
