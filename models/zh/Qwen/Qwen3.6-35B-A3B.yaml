@@ -350,8 +350,9 @@ performance:
 tuning: |-
   长上下文场景使用 TP2 或更高配置，显存不足时降低 `--max-num-seqs`。高吞吐场景使用多个本地 DP 组并调整 `--max-num-batched-tokens`。低时延场景优先使用全量 Decode ACLGraph，并默认关闭投机解码。
 
-  Atlas 800 A2 场景保留 W8A8 权重，并关闭专家并行，以避开 910B4 上的 grouped-matmul
-  scale dtype 路径。待上游 vllm-ascend#20702 进入公开镜像后，恢复专家并行。
+  Atlas 800 A2 场景保留 W8A8 权重，关闭专家并行，并使用 `--dtype bfloat16` 避开触发
+  910B4 grouped-matmul scale dtype 限制的 FP16 激活路径；该组合已在 32 GB A2 runner 上
+  成功启动。待上游 vllm-ascend#20702 进入公开镜像后，恢复专家并行。
 
 references:
   - title: "官方 vLLM-Ascend 教程（main）"
