@@ -1,0 +1,174 @@
+{
+  "meta.title": {
+    "en": "Qwen3-VL-Reranker-2B",
+    "zh": "Qwen3-VL-Reranker-2B"
+  },
+  "meta.description": {
+    "en": "A 2B vision-language reranker in the Qwen3 series, producing relevance scores for query-document pairs across text and multimodal inputs, with single-card deployment on Ascend NPUs.",
+    "zh": "Qwen3 系列 2B 视觉-语言重排序模型，为查询-文档对输出相关性分数，支持文本与多模态输入，可在单张昇腾 NPU 上部署。"
+  },
+  "meta.performance_headline": {
+    "en": "Single-node single-card pooling deployment on Atlas 800I A3 / Atlas 800I A2 / Atlas 300I DUO with vLLM-Ascend",
+    "zh": "Atlas 800I A3 / Atlas 800I A2 / Atlas 300I DUO 单节点单卡 pooling 部署"
+  },
+  "model.install.docker.note": {
+    "en": "Official Ascend image; full device/driver mounts are covered in env_setup.container.",
+    "zh": "官方昇腾镜像；完整设备/驱动挂载见环境准备中的容器配置。"
+  },
+  "config_params.max_model_len.description": {
+    "en": "Maximum context length (input + output tokens). Keep an explicit conservative value, otherwise the attention mask (O(max_model_len^2)) may exceed NPU memory.",
+    "zh": "最大上下文长度（输入 + 输出 token 数）。请显式设置保守值，否则注意力掩码（O(max_model_len^2)）可能超出 NPU 显存。"
+  },
+  "overview": {
+    "en": "The Qwen3-VL-Reranker-2B is a vision-language reranking model in the Qwen3 series. It produces relevance scores for query-document pairs across text and multimodal inputs, and is suitable for search, retrieval, and RAG pipelines. vLLM Ascend 0.9.2rc1 and higher supports this model.",
+    "zh": "Qwen3-VL-Reranker-2B 是 Qwen3 系列的视觉-语言重排序模型，为查询-文档对输出相关性分数，支持文本与多模态输入，适用于搜索、检索与 RAG 流水线。vLLM Ascend 0.9.2rc1 及以上版本支持该模型。"
+  },
+  "weight_download[0].weight_version": {
+    "en": "BF16",
+    "zh": "BF16"
+  },
+  "prerequisites[0].title": {
+    "en": "Model Weight",
+    "zh": "模型权重"
+  },
+  "prerequisites[0].content": {
+    "en": "It is recommended to download the model weight to a shared directory, such as `/root/.cache/`.\n\n| Weight Version | Download Links |\n| -------------- | -------------- |\n| Qwen3-VL-Reranker-2B | [ModelScope](https://www.modelscope.cn/models/Qwen/Qwen3-VL-Reranker-2B) / [HuggingFace](https://huggingface.co/Qwen/Qwen3-VL-Reranker-2B) |",
+    "zh": "建议将模型权重下载到多节点共享目录，例如 `/root/.cache/`。\n\n| 权重版本 | 下载链接 |\n| -------- | -------- |\n| Qwen3-VL-Reranker-2B | [ModelScope](https://www.modelscope.cn/models/Qwen/Qwen3-VL-Reranker-2B) / [HuggingFace](https://huggingface.co/Qwen/Qwen3-VL-Reranker-2B) |"
+  },
+  "env_setup.container.A2.content": {
+    "en": "You can use the official all-in-one Docker image to run `Qwen3-VL-Reranker-2B` directly.\n\n**Docker Pull:**\n\n```bash\ndocker pull quay.io/ascend/vllm-ascend:nightly-main\n```\n\n**Docker Run:**\n\n```bash\nexport IMAGE=quay.io/ascend/vllm-ascend:nightly-main\n\ndocker run --rm \\\n    --name vllm-ascend \\\n    --shm-size=1g \\\n    --net=host \\\n    --privileged=true \\\n    --device /dev/davinci0 \\\n    --device /dev/davinci_manager \\\n    --device /dev/devmm_svm \\\n    --device /dev/hisi_hdc \\\n    -v /usr/local/dcmi:/usr/local/dcmi \\\n    -v /usr/local/Ascend/driver/tools/hccn_tool:/usr/local/Ascend/driver/tools/hccn_tool \\\n    -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \\\n    -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \\\n    -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \\\n    -v /etc/ascend_install.info:/etc/ascend_install.info \\\n    -v /root/.cache:/root/.cache \\\n    -it $IMAGE bash\n```\n\nAfter a successful docker run, you can verify the running container service by executing the `docker ps` command.",
+    "zh": "可以使用官方一体化 Docker 镜像直接运行 `Qwen3-VL-Reranker-2B`。\n\n**拉取镜像：**\n\n```bash\ndocker pull quay.io/ascend/vllm-ascend:nightly-main\n```\n\n**启动容器：**\n\n```bash\nexport IMAGE=quay.io/ascend/vllm-ascend:nightly-main\n\ndocker run --rm \\\n    --name vllm-ascend \\\n    --shm-size=1g \\\n    --net=host \\\n    --privileged=true \\\n    --device /dev/davinci0 \\\n    --device /dev/davinci_manager \\\n    --device /dev/devmm_svm \\\n    --device /dev/hisi_hdc \\\n    -v /usr/local/dcmi:/usr/local/dcmi \\\n    -v /usr/local/Ascend/driver/tools/hccn_tool:/usr/local/Ascend/driver/tools/hccn_tool \\\n    -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \\\n    -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \\\n    -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \\\n    -v /etc/ascend_install.info:/etc/ascend_install.info \\\n    -v /root/.cache:/root/.cache \\\n    -it $IMAGE bash\n```\n\n容器启动成功后，可执行 `docker ps` 命令确认容器服务正在运行。"
+  },
+  "env_setup.container.A3.content": {
+    "en": "You can use the official all-in-one Docker image to run `Qwen3-VL-Reranker-2B` directly.\n\n```bash\nexport IMAGE=quay.io/ascend/vllm-ascend:nightly-main-a3\n\ndocker run --rm \\\n    --name vllm-ascend \\\n    --shm-size=1g \\\n    --net=host \\\n    --privileged=true \\\n    --device /dev/davinci0 \\\n    --device /dev/davinci_manager \\\n    --device /dev/devmm_svm \\\n    --device /dev/hisi_hdc \\\n    -v /usr/local/dcmi:/usr/local/dcmi \\\n    -v /usr/local/Ascend/driver/tools/hccn_tool:/usr/local/Ascend/driver/tools/hccn_tool \\\n    -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \\\n    -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \\\n    -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \\\n    -v /etc/ascend_install.info:/etc/ascend_install.info \\\n    -v /root/.cache:/root/.cache \\\n    -it $IMAGE bash\n```",
+    "zh": "可以使用官方一体化 Docker 镜像直接运行 `Qwen3-VL-Reranker-2B`。\n\n```bash\nexport IMAGE=quay.io/ascend/vllm-ascend:nightly-main-a3\n\ndocker run --rm \\\n    --name vllm-ascend \\\n    --shm-size=1g \\\n    --net=host \\\n    --privileged=true \\\n    --device /dev/davinci0 \\\n    --device /dev/davinci_manager \\\n    --device /dev/devmm_svm \\\n    --device /dev/hisi_hdc \\\n    -v /usr/local/dcmi:/usr/local/dcmi \\\n    -v /usr/local/Ascend/driver/tools/hccn_tool:/usr/local/Ascend/driver/tools/hccn_tool \\\n    -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \\\n    -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \\\n    -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \\\n    -v /etc/ascend_install.info:/etc/ascend_install.info \\\n    -v /root/.cache:/root/.cache \\\n    -it $IMAGE bash\n```"
+  },
+  "env_setup.container.A5.content": {
+    "en": "The following command uses the Ubuntu image for Ascend 950DT&950PR Products to start the container.\n\n```bash\nexport IMAGE=quay.io/ascend/vllm-ascend:nightly-main-a5\n\ndocker run --rm \\\n    --name vllm-ascend \\\n    --net=host \\\n    --shm-size=1g \\\n    --device /dev/davinci0 \\\n    --device /dev/davinci_manager \\\n    --device /dev/devmm_svm \\\n    --device /dev/hisi_hdc \\\n    -v /usr/local/dcmi:/usr/local/dcmi \\\n    -v /usr/local/Ascend/driver/tools/hccn_tool:/usr/local/Ascend/driver/tools/hccn_tool \\\n    -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \\\n    -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \\\n    -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \\\n    -v /etc/ascend_install.info:/etc/ascend_install.info \\\n    -v /root/.cache:/root/.cache \\\n    -it $IMAGE bash\n```",
+    "zh": "以下命令使用面向 Ascend 950DT&950PR 产品的 Ubuntu 镜像启动容器。\n\n```bash\nexport IMAGE=quay.io/ascend/vllm-ascend:nightly-main-a5\n\ndocker run --rm \\\n    --name vllm-ascend \\\n    --net=host \\\n    --shm-size=1g \\\n    --device /dev/davinci0 \\\n    --device /dev/davinci_manager \\\n    --device /dev/devmm_svm \\\n    --device /dev/hisi_hdc \\\n    -v /usr/local/dcmi:/usr/local/dcmi \\\n    -v /usr/local/Ascend/driver/tools/hccn_tool:/usr/local/Ascend/driver/tools/hccn_tool \\\n    -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \\\n    -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \\\n    -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \\\n    -v /etc/ascend_install.info:/etc/ascend_install.info \\\n    -v /root/.cache:/root/.cache \\\n    -it $IMAGE bash\n```"
+  },
+  "env_setup.container.300I DUO.content": {
+    "en": "For Atlas 300I DUO, use the `-310p` image:\n\n```bash\nexport IMAGE=quay.io/ascend/vllm-ascend:nightly-main-310p\n\ndocker run --rm \\\n    --name vllm-ascend \\\n    --shm-size=1g \\\n    --net=host \\\n    --privileged=true \\\n    --device /dev/davinci0 \\\n    --device /dev/davinci_manager \\\n    --device /dev/devmm_svm \\\n    --device /dev/hisi_hdc \\\n    -v /usr/local/dcmi:/usr/local/dcmi \\\n    -v /usr/local/Ascend/driver/tools/hccn_tool:/usr/local/Ascend/driver/tools/hccn_tool \\\n    -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \\\n    -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \\\n    -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \\\n    -v /etc/ascend_install.info:/etc/ascend_install.info \\\n    -v /root/.cache:/root/.cache \\\n    -it $IMAGE bash\n```",
+    "zh": "Atlas 300I DUO 请使用 `-310p` 镜像：\n\n```bash\nexport IMAGE=quay.io/ascend/vllm-ascend:nightly-main-310p\n\ndocker run --rm \\\n    --name vllm-ascend \\\n    --shm-size=1g \\\n    --net=host \\\n    --privileged=true \\\n    --device /dev/davinci0 \\\n    --device /dev/davinci_manager \\\n    --device /dev/devmm_svm \\\n    --device /dev/hisi_hdc \\\n    -v /usr/local/dcmi:/usr/local/dcmi \\\n    -v /usr/local/Ascend/driver/tools/hccn_tool:/usr/local/Ascend/driver/tools/hccn_tool \\\n    -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \\\n    -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \\\n    -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \\\n    -v /etc/ascend_install.info:/etc/ascend_install.info \\\n    -v /root/.cache:/root/.cache \\\n    -it $IMAGE bash\n```"
+  },
+  "env_setup.pip.content": {
+    "en": "If you do not want to use the Docker image, you can also build all from source:\n\n- Install `vllm-ascend` from source, refer to the [installation guide](https://docs.vllm.ai/projects/ascend/en/latest/installation.html).\n\nIf you want to deploy a multi-node environment, you need to set up the environment on each node.",
+    "zh": "如果不使用 Docker 镜像，也可以从源码构建：\n\n- 从源码安装 `vllm-ascend`，参考[安装指南](https://docs.vllm.ai/projects/ascend/en/latest/installation.html)。\n\n如需部署多节点环境，需要在每个节点上配置环境。"
+  },
+  "scenarios[0].deployment": {
+    "en": "Single-Node",
+    "zh": "单节点"
+  },
+  "scenarios[0].case": {
+    "en": "Single Node Single Card (A3)",
+    "zh": "单节点单卡（A3）"
+  },
+  "scenarios[0].steps[0].title": {
+    "en": "Start the server",
+    "zh": "启动服务"
+  },
+  "scenarios[0].steps[0].content": {
+    "en": "Single-card pooling deployment on Atlas 800I A3, using the required official reranker chat template.\n\n```bash\nvllm serve Qwen/Qwen3-VL-Reranker-2B \\\n    --served-model-name Qwen/Qwen3-VL-Reranker-2B \\\n    --runner pooling \\\n    --hf_overrides '{\"architectures\": [\"Qwen3VLForSequenceClassification\"],\"classifier_from_token\": [\"no\", \"yes\"],\"is_original_qwen3_reranker\": true}' \\\n    --chat-template /vllm-workspace/vllm/examples/pooling/score/template/qwen3_vl_reranker.jinja \\\n    --port 8000 \\\n    --max-model-len {{max_model_len}}\n```\n\n> - `--chat-template` is required for correct query-document formatting. Use the template bundled in the official image or the same file from the vLLM repository.\n> - `--max-model-len` represents the context length, which is the maximum value of the input plus output for a single request. Keep an explicit conservative value, such as 1024, to avoid excessive attention-mask allocation.\n> - Replace `Qwen/Qwen3-VL-Reranker-2B` with your local weight directory if you pre-downloaded the model.",
+    "zh": "Atlas 800I A3 单卡 pooling 部署，使用模型必需的官方重排序对话模板。\n\n```bash\nvllm serve Qwen/Qwen3-VL-Reranker-2B \\\n    --served-model-name Qwen/Qwen3-VL-Reranker-2B \\\n    --runner pooling \\\n    --hf_overrides '{\"architectures\": [\"Qwen3VLForSequenceClassification\"],\"classifier_from_token\": [\"no\", \"yes\"],\"is_original_qwen3_reranker\": true}' \\\n    --chat-template /vllm-workspace/vllm/examples/pooling/score/template/qwen3_vl_reranker.jinja \\\n    --port 8000 \\\n    --max-model-len {{max_model_len}}\n```\n\n> - `--chat-template` 是正确格式化查询与文档的必需参数。请使用官方镜像内置模板或 vLLM 仓库中的同一文件。\n> - `--max-model-len` 表示上下文长度，即单条请求输入与输出的最大 token 数。请显式设置保守值，例如 1024，以避免注意力掩存分配过大。\n> - 如已提前下载权重，请将 `Qwen/Qwen3-VL-Reranker-2B` 替换为本地权重目录。"
+  },
+  "scenarios[0].steps[1].title": {
+    "en": "Service Verification",
+    "zh": "服务验证"
+  },
+  "scenarios[0].steps[1].content": {
+    "en": "After the service is started, verify it by sending a rerank request. Refer to the verification section below for a usage example.",
+    "zh": "服务启动后，发送一条重排序请求进行验证。用法示例参见下方\"服务验证\"部分。"
+  },
+  "scenarios[1].deployment": {
+    "en": "Single-Node",
+    "zh": "单节点"
+  },
+  "scenarios[1].case": {
+    "en": "Single Node Single Card",
+    "zh": "单节点单卡"
+  },
+  "scenarios[1].steps[0].title": {
+    "en": "Start the server",
+    "zh": "启动服务"
+  },
+  "scenarios[1].steps[0].content": {
+    "en": "Single-card pooling deployment, suitable for development, testing, and small-to-medium scale reranking scenarios.\n\n```bash\nvllm serve Qwen/Qwen3-VL-Reranker-2B \\\n    --served-model-name Qwen/Qwen3-VL-Reranker-2B \\\n    --runner pooling \\\n    --hf_overrides '{\"architectures\": [\"Qwen3VLForSequenceClassification\"],\"classifier_from_token\": [\"no\", \"yes\"],\"is_original_qwen3_reranker\": true}' \\\n    --chat-template /vllm-workspace/vllm/examples/pooling/score/template/qwen3_vl_reranker.jinja \\\n    --port 8000 \\\n    --max-model-len {{max_model_len}}\n```\n\n> - `--max-model-len` represents the context length, which is the maximum value of the input plus output for a single request. If automatic parsing resolves to a large context length, allocating this mask (O(max_model_len^2)) may exceed NPU memory and trigger OOM. Be sure to set an explicit and conservative value, such as 1024.\n> - Replace `Qwen/Qwen3-VL-Reranker-2B` with your local weight directory if you pre-downloaded the model.",
+    "zh": "单卡 pooling 部署，适合开发、测试与中小规模重排序场景。\n\n```bash\nvllm serve Qwen/Qwen3-VL-Reranker-2B \\\n    --served-model-name Qwen/Qwen3-VL-Reranker-2B \\\n    --runner pooling \\\n    --hf_overrides '{\"architectures\": [\"Qwen3VLForSequenceClassification\"],\"classifier_from_token\": [\"no\", \"yes\"],\"is_original_qwen3_reranker\": true}' \\\n    --chat-template /vllm-workspace/vllm/examples/pooling/score/template/qwen3_vl_reranker.jinja \\\n    --port 8000 \\\n    --max-model-len {{max_model_len}}\n```\n\n> - `--max-model-len` 表示上下文长度，即单条请求输入与输出的最大 token 数。若自动解析得到较大的上下文长度，分配该掩码（O(max_model_len^2)）可能超出 NPU 显存并导致 OOM。请务必显式设置保守值，例如 1024。\n> - 如已提前下载权重，请将 `Qwen/Qwen3-VL-Reranker-2B` 替换为本地权重目录。"
+  },
+  "scenarios[1].steps[1].title": {
+    "en": "Service Verification",
+    "zh": "服务验证"
+  },
+  "scenarios[1].steps[1].content": {
+    "en": "After the service is started, verify it by sending a rerank request. Refer to the verification section below for a usage example.",
+    "zh": "服务启动后，发送一条重排序请求进行验证。用法示例参见下方\"服务验证\"部分。"
+  },
+  "scenarios[2].deployment": {
+    "en": "Single-Node",
+    "zh": "单节点"
+  },
+  "scenarios[2].case": {
+    "en": "300I DUO (TP1)",
+    "zh": "300I DUO (TP1)"
+  },
+  "scenarios[2].steps[0].title": {
+    "en": "Start the server",
+    "zh": "启动服务"
+  },
+  "scenarios[2].steps[0].content": {
+    "en": "Atlas 300I DUO single-node pooling deployment (TP=1).\n\n```bash\nvllm serve Qwen/Qwen3-VL-Reranker-2B \\\n    --served-model-name Qwen/Qwen3-VL-Reranker-2B \\\n    --runner pooling \\\n    --hf_overrides '{\"architectures\": [\"Qwen3VLForSequenceClassification\"],\"classifier_from_token\": [\"no\", \"yes\"],\"is_original_qwen3_reranker\": true}' \\\n    --chat-template /vllm-workspace/vllm/examples/pooling/score/template/qwen3_vl_reranker.jinja \\\n    --compilation-config '{\"cudagraph_capture_sizes\": [1024,512]}' \\\n    --additional-config '{\"ascend_compilation_config\": {\"fuse_norm_quant\": false}}' \\\n    --dtype float16 \\\n    --port 8000 \\\n    --max-model-len {{max_model_len}}\n```\n\n> - `--compilation-config`: For Atlas 300I DUO, due to limited hardware streams, the size of `cudagraph_capture_sizes` is restricted.\n> - `--dtype float16` matches the Atlas 300I DUO inference execution path.\n> - `--max-model-len`: if automatic parsing resolves to a large context length, allocating this mask (O(max_model_len^2)) may exceed NPU memory and trigger OOM. Be sure to set an explicit and conservative value, such as 1024.",
+    "zh": "Atlas 300I DUO 单节点 pooling 部署（TP=1）。\n\n```bash\nvllm serve Qwen/Qwen3-VL-Reranker-2B \\\n    --served-model-name Qwen/Qwen3-VL-Reranker-2B \\\n    --runner pooling \\\n    --hf_overrides '{\"architectures\": [\"Qwen3VLForSequenceClassification\"],\"classifier_from_token\": [\"no\", \"yes\"],\"is_original_qwen3_reranker\": true}' \\\n    --chat-template /vllm-workspace/vllm/examples/pooling/score/template/qwen3_vl_reranker.jinja \\\n    --compilation-config '{\"cudagraph_capture_sizes\": [1024,512]}' \\\n    --additional-config '{\"ascend_compilation_config\": {\"fuse_norm_quant\": false}}' \\\n    --dtype float16 \\\n    --port 8000 \\\n    --max-model-len {{max_model_len}}\n```\n\n> - `--compilation-config`：Atlas 300I DUO 受硬件流数量限制，需要限制 `cudagraph_capture_sizes` 的规模。\n> - `--dtype float16`：与 Atlas 300I DUO 推理执行路径一致。\n> - `--max-model-len`：若自动解析得到较大的上下文长度，分配该掩码（O(max_model_len^2)）可能超出 NPU 显存并导致 OOM。请务必显式设置保守值，例如 1024。"
+  },
+  "scenarios[2].steps[1].title": {
+    "en": "Service Verification",
+    "zh": "服务验证"
+  },
+  "scenarios[2].steps[1].content": {
+    "en": "After the service is started, verify it by sending a rerank request. Refer to the verification section below for a usage example.",
+    "zh": "服务启动后，发送一条重排序请求进行验证。用法示例参见下方\"服务验证\"部分。"
+  },
+  "verification": {
+    "en": "Once your server is started, you can verify by the following command:\n\n```bash\ncurl http://localhost:<port>/v1/rerank \\\n    -X POST \\\n    -d '{\"query\":\"What is the capital of China?\", \"documents\": [\"The capital of China is Beijing.\", \"Gravity is a force that attracts two bodies towards each other. It gives weight to physical objects and is responsible for the movement of planets around the sun.\"]}' \\\n    -H 'Content-Type: application/json'\n```\n\nExpected result: The service returns HTTP 200 OK with a JSON response containing the `relevance_score` field. The capital-of-China document should receive a much higher score than the gravity document. Example output:\n\n```json\n{\n    \"id\": \"score-xxxxx\",\n    \"model\": \"Qwen/Qwen3-VL-Reranker-2B\",\n    \"usage\": {\n        \"prompt_tokens\": 179,\n        \"total_tokens\": 179\n    },\n    \"results\": [\n        {\n            \"index\": 0,\n            \"document\": {\n                \"text\": \"The capital of China is Beijing.\",\n                \"multi_modal\": null\n            },\n            \"relevance_score\": 0.7209711670875549\n        },\n        {\n            \"index\": 1,\n            \"document\": {\n                \"text\": \"Gravity is a force that attracts two bodies towards each other. It gives weight to physical objects and is responsible for the movement of planets around the sun.\",\n                \"multi_modal\": null\n            },\n            \"relevance_score\": 0.18871910870075226\n        }\n    ]\n}\n```\n\nFor more usage examples, please reference the [score examples](https://github.com/vllm-project/vllm/tree/main/examples/pooling/score).",
+    "zh": "服务启动后，可通过以下命令进行验证：\n\n```bash\ncurl http://localhost:<port>/v1/rerank \\\n    -X POST \\\n    -d '{\"query\":\"What is the capital of China?\", \"documents\": [\"The capital of China is Beijing.\", \"Gravity is a force that attracts two bodies towards each other. It gives weight to physical objects and is responsible for the movement of planets around the sun.\"]}' \\\n    -H 'Content-Type: application/json'\n```\n\n预期结果：服务返回 HTTP 200 OK，JSON 响应包含 `relevance_score` 字段，北京文档的相关性分数应显著高于重力文档。示例输出：\n\n```json\n{\n    \"id\": \"score-xxxxx\",\n    \"model\": \"Qwen/Qwen3-VL-Reranker-2B\",\n    \"usage\": {\n        \"prompt_tokens\": 179,\n        \"total_tokens\": 179\n    },\n    \"results\": [\n        {\n            \"index\": 0,\n            \"document\": {\n                \"text\": \"The capital of China is Beijing.\",\n                \"multi_modal\": null\n            },\n            \"relevance_score\": 0.7209711670875549\n        },\n        {\n            \"index\": 1,\n            \"document\": {\n                \"text\": \"Gravity is a force that attracts two bodies towards each other. It gives weight to physical objects and is responsible for the movement of planets around the sun.\",\n                \"multi_modal\": null\n            },\n            \"relevance_score\": 0.18871910870075226\n        }\n    ]\n}\n```\n\n更多用法示例请参考[打分示例](https://github.com/vllm-project/vllm/tree/main/examples/pooling/score)。"
+  },
+  "evaluation.accuracy.content": {
+    "en": "### Using MTEB\n\nRefer to [MTEB](https://docs.mteb.org/) for details.\n\nRun the following code to execute the accuracy evaluation:\n\n```python\nimport os\n\nfrom mteb.models.vllm_wrapper import VllmCrossEncoderWrapper\n\nif __name__ == \"__main__\":\n    import mteb\n\n    data_path = \"/home/data/mteb_data\"\n    os.environ[\"HF_DATASETS_CACHE\"] = data_path\n    os.environ[\"HF_ENDPOINT\"] = \"https://hf-mirror.com\"\n\n    model = VllmCrossEncoderWrapper(\"/root/.cache/models/Qwen3-VL-Reranker-2B\",\n                                revision=\"norm\",\n                                dtype=\"float16\",\n                                enforce_eager=True,\n                                max_model_len=1024,\n                                hf_overrides={\"architectures\": [\"Qwen3VLForSequenceClassification\"],\"classifier_from_token\": [\"no\", \"yes\"],\"is_original_qwen3_reranker\": True})\n\n    cache = mteb.ResultCache(data_path)\n    tasks = mteb.get_tasks(\n        task_types=[\"Reranking\"],\n        languages=[\"zho\"]\n    ) + mteb.get_tasks(tasks=[\"MultiLongDocReranking\"])\n    results = mteb.evaluate(model, tasks=tasks, cache=cache, overwrite_strategy=\"always\")\n    print(results)\n```\n\nAfter execution, you can get the evaluation result.",
+    "zh": "### 使用 MTEB\n\n详见 [MTEB](https://docs.mteb.org/)。\n\n运行以下代码执行精度评测：\n\n```python\nimport os\n\nfrom mteb.models.vllm_wrapper import VllmCrossEncoderWrapper\n\nif __name__ == \"__main__\":\n    import mteb\n\n    data_path = \"/home/data/mteb_data\"\n    os.environ[\"HF_DATASETS_CACHE\"] = data_path\n    os.environ[\"HF_ENDPOINT\"] = \"https://hf-mirror.com\"\n\n    model = VllmCrossEncoderWrapper(\"/root/.cache/models/Qwen3-VL-Reranker-2B\",\n                                revision=\"norm\",\n                                dtype=\"float16\",\n                                enforce_eager=True,\n                                max_model_len=1024,\n                                hf_overrides={\"architectures\": [\"Qwen3VLForSequenceClassification\"],\"classifier_from_token\": [\"no\", \"yes\"],\"is_original_qwen3_reranker\": True})\n\n    cache = mteb.ResultCache(data_path)\n    tasks = mteb.get_tasks(\n        task_types=[\"Reranking\"],\n        languages=[\"zho\"]\n    ) + mteb.get_tasks(tasks=[\"MultiLongDocReranking\"])\n    results = mteb.evaluate(model, tasks=tasks, cache=cache, overwrite_strategy=\"always\")\n    print(results)\n```\n\n执行完成后即可得到评测结果。"
+  },
+  "evaluation.performance.content": {
+    "en": "### Using vLLM Benchmark\n\nRun performance of `Qwen3-VL-Reranker-2B` as an example. Refer to [vllm benchmark](https://docs.vllm.ai/en/latest/benchmarking/cli/) for more details.\n\nTake the `serve` as an example. Run the code as follows:\n\n```bash\nvllm bench serve --model Qwen/Qwen3-VL-Reranker-2B --backend vllm-rerank --port 8000 --dataset-name random-rerank --endpoint /v1/rerank --random-input 200 --save-result --result-dir ./\n```\n\nAfter about several minutes, you can get the performance evaluation result.",
+    "zh": "### 使用 vLLM Benchmark\n\n以 `Qwen3-VL-Reranker-2B` 的性能评测为例，详见 [vllm benchmark](https://docs.vllm.ai/en/latest/benchmarking/cli/)。\n\n以 `serve` 子命令为例，运行以下命令：\n\n```bash\nvllm bench serve --model Qwen/Qwen3-VL-Reranker-2B --backend vllm-rerank --port 8000 --dataset-name random-rerank --endpoint /v1/rerank --random-input 200 --save-result --result-dir ./\n```\n\n等待数分钟即可获得性能评测结果。"
+  },
+  "performance.accuracy": {
+    "en": "The official tutorial does not publish fixed accuracy numbers for this model. Run the MTEB evaluation in the \"More Info\" tab to measure retrieval accuracy on your own deployment.",
+    "zh": "官方教程未发布该模型的固定精度数据。请使用\"更多信息\"页签中的 MTEB 评测在自己的部署环境实测检索精度。"
+  },
+  "performance.benchmark": {
+    "en": "No fixed throughput/latency numbers are published for this model; results depend on hardware resources, input length, concurrency, and runtime configuration.\n\nUse the reproducible `vllm bench serve --backend vllm-rerank` command in the \"More Info\" tab to measure rerank throughput and latency on your own deployment.",
+    "zh": "官方未发布该模型的固定吞吐/延迟数据；实际结果取决于硬件资源、输入长度、并发数与运行时配置。\n\n请使用\"更多信息\"页签中可复现的 `vllm bench serve --backend vllm-rerank` 命令，在自己的部署环境实测重排序吞吐与延迟。"
+  },
+  "tuning": {
+    "en": "### Tuning Guidelines\n\nPlease refer to the [Public Performance Tuning Documentation](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/performance_and_debug/optimization_and_tuning.html) for tuning methods.\nPlease refer to the [Feature Guide](https://docs.vllm.ai/projects/ascend/en/latest/user_guide/support_matrix/feature_matrix.html) for detailed feature descriptions.",
+    "zh": "### 调优指南\n\n调优方法请参考[公开性能调优文档](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/performance_and_debug/optimization_and_tuning.html)。\n特性详细说明请参考[特性指南](https://docs.vllm.ai/projects/ascend/en/latest/user_guide/support_matrix/feature_matrix.html)。"
+  },
+  "faq": {
+    "en": "For common environment, installation, and general parameter issues, please refer to the [Public FAQs](https://docs.vllm.ai/projects/ascend/en/latest/faqs.html). This chapter only covers model-specific issues.",
+    "zh": "常见环境、安装与通用参数问题请参考[公开 FAQ](https://docs.vllm.ai/projects/ascend/en/latest/faqs.html)。本节仅覆盖模型特定问题。"
+  },
+  "references[0].title": {
+    "en": "vllm-ascend Documentation",
+    "zh": "vllm-ascend 官方文档"
+  },
+  "references[1].title": {
+    "en": "ModelScope Model Download",
+    "zh": "ModelScope 模型下载"
+  },
+  "references[2].title": {
+    "en": "HuggingFace Model Card",
+    "zh": "HuggingFace 模型卡"
+  },
+  "references[3].title": {
+    "en": "vllm-ascend GitHub",
+    "zh": "vllm-ascend GitHub"
+  }
+}
