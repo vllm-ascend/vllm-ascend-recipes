@@ -386,7 +386,7 @@ scenarios:
           TP2 未重跑 gsm8k/perf，精度表仍为 TP1 数字。
 
 verification: |-
-  Completions / Chat 见英文版同结构；model 名 `qwen3.5`，端口 8080，期望 HTTP 200。
+  Completions / Chat 见英文版同结构；model 名 `qwen3.5`，URL 使用 http://localhost:<port>/...，期望 HTTP 200。
 
 evaluation:
   accuracy:
@@ -427,5 +427,7 @@ references:
     url: https://docs.vllm.ai/projects/ascend/en/latest/tutorials/models/Qwen3.5-Dense.html
   - title: Tutorial 源码
     url: https://github.com/vllm-project/vllm-ascend/blob/main/docs/source/tutorials/models/Qwen3.5-Dense.md
+  - title: Qwen3.5-2B ModelScope
+    url: https://www.modelscope.cn/models/Qwen/Qwen3.5-2B
   - title: Eco-Tech 9B W8A8-310P
     url: https://www.modelscope.cn/models/Eco-Tech/Qwen3.5-9B-W8A8-310P
