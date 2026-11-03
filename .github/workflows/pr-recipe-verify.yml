@@ -69,9 +69,10 @@ jobs:
         id: recipes
         env:
           BASE_REF: ${{ github.event.pull_request.base.sha }}
+          HEAD_REF: ${{ github.event.pull_request.head.sha }}
         run: |
           python .github/_scripts/verification_plan.py \
-            --trigger pr --base-ref "$BASE_REF" > /tmp/verification-plan.json
+            --trigger pr --base-ref "$BASE_REF" --head-ref "$HEAD_REF" > /tmp/verification-plan.json
           {
             echo "matrix=$(jq -c . /tmp/verification-plan.json)"
             echo "count=$(jq '.include | length' /tmp/verification-plan.json)"
