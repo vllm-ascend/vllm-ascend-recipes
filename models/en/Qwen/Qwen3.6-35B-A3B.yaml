@@ -350,9 +350,10 @@ performance:
 tuning: |-
   For long context, use TP2 or more and reduce `--max-num-seqs` if HBM is insufficient. For high throughput, use multiple local DP groups and tune `--max-num-batched-tokens`. For low latency, prefer full decode ACLGraph and disable speculative decoding by default.
 
-  On Atlas 800 A2 this scenario keeps the W8A8 checkpoint and runs without expert parallelism
-  to avoid the grouped-matmul scale dtype path on 910B4. Expert parallelism will be restored
-  once vllm-ascend#20702 ships in the public image.
+  On Atlas 800 A2 this scenario keeps the W8A8 checkpoint, disables expert parallelism and
+  uses `--dtype bfloat16` to avoid the FP16 activation path that triggers the grouped-matmul
+  scale dtype limitation on 910B4. This combination starts successfully on the 32 GB A2
+  runner. Expert parallelism will be restored once vllm-ascend#20702 ships in the public image.
 
 references:
   - title: "Official vLLM-Ascend tutorial (main)"
