@@ -267,7 +267,7 @@ scenarios:
             --trust-remote-code --safetensors-load-strategy lazy \
             --gpu-memory-utilization {{gpu_memory_utilization}} \
             --speculative-config '{"method":"qwen3_5_mtp","num_speculative_tokens":3}' \
-            --dtype float16 --enable-prefix-caching \
+            --dtype bfloat16 --enable-prefix-caching \
             --compilation-config '{"cudagraph_mode":"NONE"}' \
             --additional-config '{"enable_cpu_binding":true,"multistream_overlap_shared_expert":true}'
           ```
