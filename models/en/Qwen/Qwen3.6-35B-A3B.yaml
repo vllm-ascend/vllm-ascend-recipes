@@ -225,14 +225,14 @@ scenarios:
 
           vllm serve Eco-Tech/Qwen3.6-35B-A3B-w8a8 \
             --host 0.0.0.0 --port 8000 \
-            --data-parallel-size 1 --tensor-parallel-size 2 --enable-expert-parallel \
+            --data-parallel-size 1 --tensor-parallel-size 2 \
             --quantization ascend --served-model-name qwen3.6 \
             --max-num-seqs {{max_num_seqs}} --max-model-len {{max_model_len}} \
             --max-num-batched-tokens {{max_num_batched_tokens}} \
             --trust-remote-code --safetensors-load-strategy lazy \
             --gpu-memory-utilization {{gpu_memory_utilization}} \
             --speculative-config '{"method":"qwen3_5_mtp","num_speculative_tokens":3}' \
-            --dtype float16 --enable-prefix-caching \
+            --dtype bfloat16 --enable-prefix-caching \
             --compilation-config '{"cudagraph_mode":"FULL_AND_PIECEWISE"}' \
             --additional-config '{"enable_cpu_binding":true,"multistream_overlap_shared_expert":true}'
           ```
@@ -354,6 +354,11 @@ tuning: |-
   uses `--dtype bfloat16` to avoid the FP16 activation path that triggers the grouped-matmul
   scale dtype limitation on 910B4. This combination starts successfully on the 32 GB A2
   runner. Expert parallelism will be restored once vllm-ascend#20702 ships in the public image.
+
+  On Atlas 800 A3, the W8A8 scenario uses the same BF16 and no-expert-parallel combination
+  as a temporary workaround for the public v0.30.0-a3 image. This does not verify the original
+  FP16 + expert-parallel tutorial scenario, which remains blocked until vllm-ascend#20702 or
+  an equivalent scale-dtype fix is available in the image.
 
 references:
   - title: "Official vLLM-Ascend tutorial (main)"

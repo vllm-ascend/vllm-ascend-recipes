@@ -225,14 +225,14 @@ scenarios:
 
           vllm serve Eco-Tech/Qwen3.6-35B-A3B-w8a8 \
             --host 0.0.0.0 --port 8000 \
-            --data-parallel-size 1 --tensor-parallel-size 2 --enable-expert-parallel \
+            --data-parallel-size 1 --tensor-parallel-size 2 \
             --quantization ascend --served-model-name qwen3.6 \
             --max-num-seqs {{max_num_seqs}} --max-model-len {{max_model_len}} \
             --max-num-batched-tokens {{max_num_batched_tokens}} \
             --trust-remote-code --safetensors-load-strategy lazy \
             --gpu-memory-utilization {{gpu_memory_utilization}} \
             --speculative-config '{"method":"qwen3_5_mtp","num_speculative_tokens":3}' \
-            --dtype float16 --enable-prefix-caching \
+            --dtype bfloat16 --enable-prefix-caching \
             --compilation-config '{"cudagraph_mode":"FULL_AND_PIECEWISE"}' \
             --additional-config '{"enable_cpu_binding":true,"multistream_overlap_shared_expert":true}'
           ```
@@ -353,6 +353,10 @@ tuning: |-
   Atlas 800 A2 场景保留 W8A8 权重，关闭专家并行，并使用 `--dtype bfloat16` 避开触发
   910B4 grouped-matmul scale dtype 限制的 FP16 激活路径；该组合已在 32 GB A2 runner 上
   成功启动。待上游 vllm-ascend#20702 进入公开镜像后，恢复专家并行。
+
+  Atlas 800 A3 的 W8A8 场景同样采用 BF16 并关闭专家并行，作为公开 v0.30.0-a3 镜像的
+  临时绕过方案。这不代表原 FP16 + 专家并行教程场景已通过验证；该场景仍需等待
+  vllm-ascend#20702 或等价的 scale dtype 修复进入镜像。
 
 references:
   - title: "官方 vLLM-Ascend 教程（main）"
