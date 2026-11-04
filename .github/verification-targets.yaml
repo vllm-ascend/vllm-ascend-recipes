@@ -3,6 +3,42 @@
 targets:
   # Single-node entries are explicitly allowlisted and kept fresh from the
   # scenario list captured in recipe verification params.json.
+  - id: qwen3-embedding-06b-a2-bf16-single-node-single-card
+    recipe: models/en/Qwen/Qwen3-Embedding-0.6B.yaml
+    mode: single-node
+    runner: linux-aarch64-a2b4-2
+    selector:
+      npu: Atlas 800I A2
+      precision: bf16
+      deployment: Single-Node
+      case: Single Node Single Card
+  - id: paddleocr-vl-a2-bf16-single-node-high-throughput-graph
+    recipe: models/en/PaddlePaddle/PaddleOCR-VL.yaml
+    mode: single-node
+    runner: linux-aarch64-a2b4-2
+    selector:
+      npu: Atlas 800I A2
+      precision: BF16
+      deployment: Single-Node
+      case: High Throughput (Graph)
+  - id: qwen3-reranker-06b-a2-bf16-single-node-single-card
+    recipe: models/en/Qwen/Qwen3-Reranker.yaml
+    mode: single-node
+    runner: linux-aarch64-a2b4-2
+    selector:
+      npu: Atlas 800I A2
+      precision: bf16
+      deployment: Single-Node
+      case: Single Node Single Card (A2)
+  - id: qwen3-vl-reranker-2b-a2-bf16-single-node-single-card
+    recipe: models/en/Qwen/Qwen3-VL-Reranker-2B.yaml
+    mode: single-node
+    runner: linux-aarch64-a2b4-2
+    selector:
+      npu: Atlas 800I A2
+      precision: bf16
+      deployment: Single-Node
+      case: Single Node Single Card
   - id: deepseek-v4-flash-a5-mxfp4-mxfp8-single-node-high-throughput
     recipe: models/en/DeepSeek/DeepSeek-V4-Flash.yaml
     mode: single-node

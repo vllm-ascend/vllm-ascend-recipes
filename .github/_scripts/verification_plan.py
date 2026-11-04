@@ -212,6 +212,7 @@ def main() -> None:
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[2])
     parser.add_argument("--trigger", choices=("pr", "nightly", "manual"), required=True)
     parser.add_argument("--base-ref", help="Git base ref for incremental PR/push selection")
+    parser.add_argument("--head-ref", help="Commit to compare against the base (PR head); defaults to HEAD")
     parser.add_argument("--recipe-allowlist", default="")
     parser.add_argument("--full-run", action="store_true")
     parser.add_argument("--hardware-filter", default="all")
@@ -221,8 +222,18 @@ def main() -> None:
     try:
         changed = None
         if args.base_ref:
+            # On pull_request events the checkout is the merge ref (PR head +
+            # the base tip at fetch time), which can be newer than the base sha
+            # recorded in the event payload. Diffing base..HEAD would then
+            # report unrelated base-branch commits as PR changes, so always
+            # compare from the merge base to the requested head commit.
+            head = args.head_ref or "HEAD"
+            base = subprocess.check_output(
+                ["git", "merge-base", args.base_ref, head],
+                cwd=args.root, text=True, encoding="utf-8",
+            ).strip()
             changed = subprocess.check_output(
-                ["git", "diff", "--name-only", "--diff-filter=ACDMRT", args.base_ref, "HEAD", "--"],
+                ["git", "diff", "--name-only", "--diff-filter=ACDMRT", base, head, "--"],
                 cwd=args.root, text=True, encoding="utf-8",
             ).splitlines()
         result = build_plan(args.root, args.trigger, changed_files=changed,

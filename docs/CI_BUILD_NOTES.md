@@ -74,7 +74,7 @@ python .github/_scripts/verification_plan.py --trigger manual \
 | 1 | Quay 镜像拉取慢或不可达 | 节点到仓库的网络或缓存未命中 | 单机计划默认将 `quay.io/` 转换为 `quay.nju.edu.cn/`；检查节点到 NJU 的连通性，必要时显式指定已核验的同版本 SWR 镜像，不降级版本 |
 | 2 | SWR `:latest` 标签实际指向 vllm 0.11.0 | latest 标签未更新，不支持 `--tokenizer-mode deepseek_v4` | 显式指定 `v0.23.0rc1` 标签 |
 | 3 | CANN 镜像 `pip install vllm vllm-ascend` 后 `vllm` CLI 找不到 | vllm 模块可 `import` 但二进制不在 `PATH` | `hash -r` + `export PATH="/usr/local/bin:/root/.local/bin:$PATH"`；或创建 `/usr/local/bin/vllm` wrapper 脚本 |
-| 4 | `pip install ais_bench_benchmark` SSL 证书错误 | 未配 pip 内部镜像，直连 PyPI 失败 | 先执行 `pip config set global.index-url http://cache-service.nginx-pypi-cache.svc.cluster.local/pypi/simple` |
+| 4 | `pip install ais_bench_benchmark` SSL 证书错误 | 直连公网源时网络抖动 | 重试安装步骤；runner 经集群 squid 缓存访问公网源，不再使用内部 pip 镜像 |
 
 ### 二、容器与环境
 
