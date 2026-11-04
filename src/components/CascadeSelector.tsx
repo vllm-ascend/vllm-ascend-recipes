@@ -22,6 +22,7 @@ import {
 function hwKeyForNpu(npu: string): string {
   const n = npu.toLowerCase();
   if (n.includes('300i') || n.includes('duo')) return 'atlas_300i_duo';
+  if (n.includes('200i')) return 'atlas_200i_pro';
   if (n.includes('950') || n.includes('a5')) return 'ascend_950dt';
   if (n.includes('a2')) return 'atlas_800_a2';
   if (n.includes('a3')) return 'atlas_800_a3';
