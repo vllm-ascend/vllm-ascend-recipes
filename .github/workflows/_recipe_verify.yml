@@ -55,6 +55,16 @@ on:
         type: boolean
         default: false
         description: 'Mount runner host /mnt/weight at /root/.cache in the job container'
+      engine_ready_timeout_s:
+        required: false
+        type: number
+        default: 1800
+        description: 'vLLM engine startup timeout in seconds'
+      server_ready_timeout_s:
+        required: false
+        type: number
+        default: 2400
+        description: 'CI readiness timeout in seconds; must exceed the engine timeout'
     secrets:
       obs_ak:
         required: false
@@ -79,6 +89,8 @@ jobs:
       options: ${{ inputs.mount_share && '--volume /mnt/weight:/root/.cache' || '' }}
       env:
         VLLM_LOGGING_LEVEL: ERROR
+        VLLM_ENGINE_READY_TIMEOUT_S: ${{ inputs.engine_ready_timeout_s }}
+        RECIPE_SERVER_READY_TIMEOUT_S: ${{ inputs.server_ready_timeout_s }}
         VLLM_USE_MODELSCOPE: True
         HF_HUB_OFFLINE: 1
         UV_EXTRA_INDEX_URL: 'https://repo.huaweicloud.com/ascend/repos/pypi'
