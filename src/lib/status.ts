@@ -227,11 +227,14 @@ export function verificationDotPresentation(
   return verificationDotPresentations[summary];
 }
 
-/** Summarize the latest nightly result for every allowlisted configuration. */
+/** Summarize registered targets' latest nightly results, optionally scoped to one NPU. */
 export function summarizeModelVerification(
   status: Pick<ModelStatus, 'targets'> | null | undefined,
+  npu?: string,
 ): ModelVerificationSummary {
-  const targets = Object.values(status?.targets ?? {});
+  const targets = Object.values(status?.targets ?? {}).filter(
+    (target) => npu === undefined || target.selector.npu === npu,
+  );
   if (targets.length === 0) return 'untracked';
   const passed = targets.filter((target) => isNightlyVerified(target)).length;
   if (passed === targets.length) return 'all-pass';

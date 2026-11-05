@@ -1,0 +1,83 @@
+{
+  "verification_scope": "single-node API smoke; not accuracy or full feature coverage",
+  "recipe_path": "models/en/Qwen/Qwen3-Reranker.yaml",
+  "model_id": "Qwen/Qwen3-Reranker-0.6B",
+  "hw_key": "mixed",
+  "head_sha": "7048d04ad5030bf308133be2c1729781c03bc30b",
+  "workflow_run_id": "41405526859",
+  "trigger_type": "pr",
+  "image": "mixed; see hardware_runs",
+  "started_at": "2026-11-02T07:19:07Z",
+  "scenarios": [
+    {
+      "index": 0,
+      "npu": "Atlas 800I A2",
+      "precision": "bf16",
+      "deployment": "Single-Node",
+      "case": "Single Node Single Card (A2)",
+      "serve_cmd": "export ASCEND_RT_VISIBLE_DEVICES=0\nexport OMP_PROC_BIND=false\nexport OMP_NUM_THREADS=1\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\n\nvllm serve /root/.cache/modelscope/hub/models/Qwen/Qwen3-Reranker-0.6B \\\n    --served-model-name Qwen/Qwen3-Reranker-0.6B \\\n    --runner pooling \\\n    --hf_overrides '{\"architectures\": [\"Qwen3ForSequenceClassification\"],\"classifier_from_token\": [\"no\", \"yes\"],\"is_original_qwen3_reranker\": true}' \\\n    --port 8000 \\\n    --max-model-len 1024",
+      "verification_status": "pass",
+      "verification_reason": "Task API response validated"
+    },
+    {
+      "index": 0,
+      "npu": "Atlas 800I A3",
+      "precision": "bf16",
+      "deployment": "Single-Node",
+      "case": "Single Node Single Card",
+      "serve_cmd": "export ASCEND_RT_VISIBLE_DEVICES=0\nexport OMP_PROC_BIND=false\nexport OMP_NUM_THREADS=1\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\n\nvllm serve /root/.cache/modelscope/hub/models/Qwen/Qwen3-Reranker-0.6B \\\n    --served-model-name Qwen/Qwen3-Reranker-0.6B \\\n    --runner pooling \\\n    --hf_overrides '{\"architectures\": [\"Qwen3ForSequenceClassification\"],\"classifier_from_token\": [\"no\", \"yes\"],\"is_original_qwen3_reranker\": true}' \\\n    --port 8000 \\\n    --max-model-len 1024",
+      "verification_status": "pass",
+      "verification_reason": "Task API response validated"
+    }
+  ],
+  "hardware_runs": [
+    {
+      "verification_scope": "single-node API smoke; not accuracy or full feature coverage",
+      "recipe_path": "models/en/Qwen/Qwen3-Reranker.yaml",
+      "model_id": "Qwen/Qwen3-Reranker-0.6B",
+      "hw_key": "atlas_800_a2",
+      "head_sha": "7048d04ad5030bf308133be2c1729781c03bc30b",
+      "workflow_run_id": "41405526859",
+      "trigger_type": "pr",
+      "image": "quay.nju.edu.cn/ascend/vllm-ascend:v0.23.0rc1",
+      "started_at": "2026-11-02T07:19:07Z",
+      "scenarios": [
+        {
+          "index": 0,
+          "npu": "Atlas 800I A2",
+          "precision": "bf16",
+          "deployment": "Single-Node",
+          "case": "Single Node Single Card (A2)",
+          "serve_cmd": "export ASCEND_RT_VISIBLE_DEVICES=0\nexport OMP_PROC_BIND=false\nexport OMP_NUM_THREADS=1\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\n\nvllm serve /root/.cache/modelscope/hub/models/Qwen/Qwen3-Reranker-0.6B \\\n    --served-model-name Qwen/Qwen3-Reranker-0.6B \\\n    --runner pooling \\\n    --hf_overrides '{\"architectures\": [\"Qwen3ForSequenceClassification\"],\"classifier_from_token\": [\"no\", \"yes\"],\"is_original_qwen3_reranker\": true}' \\\n    --port 8000 \\\n    --max-model-len 1024",
+          "verification_status": "pass",
+          "verification_reason": "Task API response validated"
+        }
+      ],
+      "status": "pass"
+    },
+    {
+      "verification_scope": "single-node API smoke; not accuracy or full feature coverage",
+      "recipe_path": "models/en/Qwen/Qwen3-Reranker.yaml",
+      "model_id": "Qwen/Qwen3-Reranker-0.6B",
+      "hw_key": "atlas_800_a3",
+      "head_sha": "7048d04ad5030bf308133be2c1729781c03bc30b",
+      "workflow_run_id": "41405526859",
+      "trigger_type": "pr",
+      "image": "quay.nju.edu.cn/ascend/vllm-ascend:v0.23.0rc1-a3",
+      "started_at": "2026-11-02T07:19:07Z",
+      "scenarios": [
+        {
+          "index": 0,
+          "npu": "Atlas 800I A3",
+          "precision": "bf16",
+          "deployment": "Single-Node",
+          "case": "Single Node Single Card",
+          "serve_cmd": "export ASCEND_RT_VISIBLE_DEVICES=0\nexport OMP_PROC_BIND=false\nexport OMP_NUM_THREADS=1\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\n\nvllm serve /root/.cache/modelscope/hub/models/Qwen/Qwen3-Reranker-0.6B \\\n    --served-model-name Qwen/Qwen3-Reranker-0.6B \\\n    --runner pooling \\\n    --hf_overrides '{\"architectures\": [\"Qwen3ForSequenceClassification\"],\"classifier_from_token\": [\"no\", \"yes\"],\"is_original_qwen3_reranker\": true}' \\\n    --port 8000 \\\n    --max-model-len 1024",
+          "verification_status": "pass",
+          "verification_reason": "Task API response validated"
+        }
+      ],
+      "status": "pass"
+    }
+  ]
+}
