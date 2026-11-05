@@ -96,6 +96,45 @@ test('summarizes model targets as all, partial, none, or untracked', () => {
   assert.equal(summarizeModelVerification(null), 'untracked');
 });
 
+test('isolates NPU verification from other hardware and model-level results', () => {
+  const status = {
+    last_nightly_run: run('pass'),
+    targets: { a2: target },
+  };
+
+  assert.equal(summarizeModelVerification(status, 'Atlas 800I A2'), 'all-pass');
+  for (const npu of ['Atlas 800I A3', 'Ascend 950DT', 'Atlas 300I DUO']) {
+    assert.equal(summarizeModelVerification(status, npu), 'untracked');
+  }
+});
+
+test('aggregates only the selected NPU configurations', () => {
+  const failing = { ...target, last_nightly_run: run('fail') };
+  const a3 = { ...target, selector: { ...target.selector, npu: 'Atlas 800I A3' } };
+  const status = { targets: { a2: target, failing, a3 } };
+
+  assert.equal(summarizeModelVerification(status, 'Atlas 800I A2'), 'partial-pass');
+  assert.equal(summarizeModelVerification(status, 'Atlas 800I A3'), 'all-pass');
+  assert.equal(
+    summarizeModelVerification({ targets: { failing, a3 } }, 'Atlas 800I A2'),
+    'no-pass',
+  );
+});
+
+test('does not use PR passes or old nightly passes for an NPU green dot', () => {
+  const prOnly = { ...target, last_nightly_run: null };
+  const latestFailure = { ...target, last_nightly_run: run('fail'), history: [run('pass')] };
+
+  for (const entry of [prOnly, latestFailure]) {
+    assert.equal(
+      summarizeModelVerification({ targets: { a2: entry } }, 'Atlas 800I A2'),
+      'no-pass',
+    );
+  }
+  assert.equal(summarizeModelVerification(undefined, 'Atlas 800I A2'), 'untracked');
+  assert.equal(summarizeModelVerification({ targets: {} }, 'Atlas 800I A2'), 'untracked');
+});
+
 test('limits verification history to the latest 20 runs without reordering it', () => {
   const history = Array.from({ length: 25 }, (_, index) => ({
     ...run('pass'),
