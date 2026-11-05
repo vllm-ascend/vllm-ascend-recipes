@@ -51,3 +51,6 @@ aliases:
 
   - model_id: PaddlePaddle/PaddleOCR-VL
     cache_dir: PaddlePaddle/PaddleOCR-VL
+
+  - model_id: vllm-ascend/DeepSeek-V4-Pro-w4a8-mtp
+    cache_dir: Eco-Tech/DeepSeek-V4-Pro-w4a8-mtp
