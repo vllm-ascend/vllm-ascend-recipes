@@ -208,9 +208,15 @@ faq:
   - q: Why lower `--gpu-memory-utilization`?
     a: Shared 2-die containers often retain residual HBM. Kill leftover `VLLMWorker_TP` processes before raising utilization toward the tutorial 0.85 default.
   - q: A2 wheel on A3?
-    a: `vllm_ascend._build_info.__device_type__` must be `A3`. Install the `…-a3.whl` variant (rename for plain pip).
-  - q: Worker fails with `libtbe_adapter.so: undefined symbol: Mki::Dl(std::__cxx11::string)`?
-    a: Another `libmki.so` (for example under `nnal/asdsip`) is earlier on `LD_LIBRARY_PATH` than ATB `cxx_abi_1`. Keep `/usr/local/Ascend/nnal/atb/.../cxx_abi_1/lib` ahead of asdsip, or omit asdsip from the path when only ATB is needed.
+    a: >-
+      `vllm_ascend._build_info.__device_type__` must be `A3`. Install the
+      `…-a3.whl` variant (rename for plain pip).
+  - q: Worker fails with libtbe_adapter.so undefined symbol Mki::Dl?
+    a: >-
+      Another libmki.so (for example under nnal/asdsip) is earlier on
+      LD_LIBRARY_PATH than ATB cxx_abi_1. Keep
+      /usr/local/Ascend/nnal/atb/.../cxx_abi_1/lib ahead of asdsip, or omit
+      asdsip from the path when only ATB is needed.
 
 references:
   - title: vLLM Ascend tutorial Qwen3.8-27B
