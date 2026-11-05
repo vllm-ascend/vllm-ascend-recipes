@@ -244,8 +244,44 @@ scenarios:
           ```
       - title: "Start the server (node 1, headless)"
         content: |-
-          Same env set; the serve command adds `--headless` and `--data-parallel-start-rank 1`
-          with `--data-parallel-address $node0_ip` (tutorial §5.1 Node1 block).
+          Same environment variables as node 0. The node-1 serve command adds `--headless`
+          and `--data-parallel-start-rank 1` (tutorial §5.1 Node1 block):
+
+          ```bash
+          vllm serve your_model_path \
+            --host 0.0.0.0 \
+            --port 8000 \
+            --headless \
+            --data-parallel-address $node0_ip \
+            --data-parallel-rpc-port 13399 \
+            --data-parallel-size 2 \
+            --data-parallel-size-local 1 \
+            --data-parallel-start-rank 1 \
+            --tensor-parallel-size 16 \
+            --enable-expert-parallel \
+            --served-model-name dsv4 \
+            --max-model-len 135000 \
+            --max-num-batched-tokens 4096 \
+            --max-num-seqs 32 \
+            --gpu-memory-utilization 0.9 \
+            --block-size 128 \
+            --tokenizer-mode deepseek_v4 \
+            --tool-call-parser deepseek_v4 \
+            --enable-auto-tool-choice \
+            --reasoning-parser deepseek_v4 \
+            --model-loader-extra-config='{"enable_multithread_load": true, "num_threads": 128}' \
+            --quantization ascend \
+            --speculative-config '{"num_speculative_tokens": 1,"method": "mtp","enforce_eager": true}' \
+            --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY"}' \
+            --additional-config '
+              {"ascend_compilation_config":{
+                  "enable_npugraph_ex":true,
+                  "enable_static_kernel":false
+                  },
+              "enable_cpu_binding": true,
+              "enable_flashcomm1": true,
+              "multistream_overlap_shared_expert":true}'
+          ```
 
           Key parameter facts (tutorial §5.1): never set `--data-parallel-start-rank` on node 0;
           `--data-parallel-rpc-port` must match on all nodes; `--max-num-seqs` x
@@ -278,18 +314,59 @@ scenarios:
       - title: "Switch to the 0813-w4a8 checkpoint with DSpark"
         content: |-
           The official `DeepSeek-V4-Pro-0813-w4a8` checkpoint supports DSpark without a separate
-          draft-model path. Keep the DP2/TP16 topology and change (tutorial §5.1 "A3 series with
-          DSpark"): serve path to `/path/to/DeepSeek-V4-Pro-0813-w4a8`; `--block-size 32`;
-          `--max-num-seqs 16`; `--gpu-memory-utilization 0.9`; speculative config to
-          `{"num_speculative_tokens":5,"method":"dspark","enforce_eager":true}`; and add the env
-          set `HCCL_BUFFSIZE=1024` (replacing the scenario-0 value 2048),
-          `VLLM_ENGINE_READY_TIMEOUT_S=7200`, `HCCL_CONNECT_TIMEOUT=7200`, `ASCEND_CONNECT_TIMEOUT=10000`,
-          `ASCEND_TRANSFER_TIMEOUT=10000`, `VLLM_RPC_TIMEOUT=1800000`,
-          `LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib/`,
-          `VLLM_PREFIX_CACHE_RETENTION_INTERVAL=4096` requires prefix caching to stay enabled: if
-          the base args carry `--no-enable-prefix-caching`, remove it for this scenario. The
-          retention value must be a non-negative multiple of `--block-size`. DSpark `num_speculative_tokens` must match on
-          all ranks (tutorial §5.1).
+          draft-model path. Keep the DP2/TP16 topology; relative to scenario 0, change the serve
+          path to `your_model_path` pointing at the 0813-w4a8 checkpoint, `--block-size 32`,
+          `--max-num-seqs 16`, the speculative config, and the env set below
+          (tutorial §5.1 "A3 series with DSpark"). DSpark `num_speculative_tokens` must match on
+          all ranks. `VLLM_PREFIX_CACHE_RETENTION_INTERVAL` (4096) requires prefix caching to stay
+          enabled — remove `--no-enable-prefix-caching` for this scenario; the retention value must
+          be a non-negative multiple of `--block-size`:
+
+          ```bash
+          # env deltas vs scenario 0:
+          export HCCL_BUFFSIZE=1024
+          export VLLM_ENGINE_READY_TIMEOUT_S=7200
+          export HCCL_CONNECT_TIMEOUT=7200
+          export ASCEND_CONNECT_TIMEOUT=10000
+          export ASCEND_TRANSFER_TIMEOUT=10000
+          export VLLM_RPC_TIMEOUT=1800000
+          export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib/
+          # prefix caching must stay enabled for VLLM_PREFIX_CACHE_RETENTION_INTERVAL:
+          # (remove --no-enable-prefix-caching if present)
+          export VLLM_PREFIX_CACHE_RETENTION_INTERVAL=4096
+
+          vllm serve your_model_path \
+            --host 0.0.0.0 \
+            --port 8000 \
+            --data-parallel-address $node0_ip \
+            --data-parallel-rpc-port 13399 \
+            --data-parallel-size 2 \
+            --data-parallel-size-local 1 \
+            --tensor-parallel-size 16 \
+            --enable-expert-parallel \
+            --served-model-name dsv4 \
+            --max-model-len 135000 \
+            --max-num-batched-tokens 4096 \
+            --max-num-seqs 16 \
+            --gpu-memory-utilization 0.9 \
+            --block-size 32 \
+            --tokenizer-mode deepseek_v4 \
+            --tool-call-parser deepseek_v4 \
+            --enable-auto-tool-choice \
+            --reasoning-parser deepseek_v4 \
+            --model-loader-extra-config='{"enable_multithread_load": true, "num_threads": 128}' \
+            --quantization ascend \
+            --speculative-config '{"num_speculative_tokens": 5,"method": "dspark","enforce_eager": true}' \
+            --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY"}' \
+            --additional-config '
+              {"ascend_compilation_config":{
+                  "enable_npugraph_ex":true,
+                  "enable_static_kernel":false
+                  },
+              "enable_cpu_binding": true,
+              "enable_flashcomm1": true,
+              "multistream_overlap_shared_expert":true}'
+          ```
   - npu: Atlas 800I A3
     precision: W4A8
     deployment: "Multi-Node PD Separation"
@@ -316,6 +393,10 @@ scenarios:
           ```
       - title: "Per-role key configuration (from tutorial §5.2.1 templates)"
         content: |-
+          Key-point summary from the tutorial §5.2.1 MooncakeHybrid templates (not a
+          standalone executable command; full orchestration templates per the linked
+          tutorial section):
+
           - Prefill: `VLLM_RPC_TIMEOUT=3600000`, `VLLM_EXECUTE_MODEL_TIMEOUT_SECONDS=30000`,
             `HCCL_EXEC_TIMEOUT=204`, `HCCL_CONNECT_TIMEOUT=120`, `HCCL_BUFFSIZE=1024`,
             `--max-model-len 131072 --max-num-batched-tokens 4096 --max-num-seqs 16

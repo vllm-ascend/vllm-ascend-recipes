@@ -243,8 +243,44 @@ scenarios:
           ```
       - title: "启动服务(节点 1,headless)"
         content: |-
-          环境集相同;serve 命令追加 `--headless` 与 `--data-parallel-start-rank 1`,
-          `--data-parallel-address $node0_ip`(教程 §5.1 Node1 块)。
+          环境集与节点 0 相同。节点 1 的 serve 命令追加 `--headless` 与
+          `--data-parallel-start-rank 1`(教程 §5.1 Node1 块):
+
+          ```bash
+          vllm serve your_model_path \
+            --host 0.0.0.0 \
+            --port 8000 \
+            --headless \
+            --data-parallel-address $node0_ip \
+            --data-parallel-rpc-port 13399 \
+            --data-parallel-size 2 \
+            --data-parallel-size-local 1 \
+            --data-parallel-start-rank 1 \
+            --tensor-parallel-size 16 \
+            --enable-expert-parallel \
+            --served-model-name dsv4 \
+            --max-model-len 135000 \
+            --max-num-batched-tokens 4096 \
+            --max-num-seqs 32 \
+            --gpu-memory-utilization 0.9 \
+            --block-size 128 \
+            --tokenizer-mode deepseek_v4 \
+            --tool-call-parser deepseek_v4 \
+            --enable-auto-tool-choice \
+            --reasoning-parser deepseek_v4 \
+            --model-loader-extra-config='{"enable_multithread_load": true, "num_threads": 128}' \
+            --quantization ascend \
+            --speculative-config '{"num_speculative_tokens": 1,"method": "mtp","enforce_eager": true}' \
+            --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY"}' \
+            --additional-config '
+              {"ascend_compilation_config":{
+                  "enable_npugraph_ex":true,
+                  "enable_static_kernel":false
+                  },
+              "enable_cpu_binding": true,
+              "enable_flashcomm1": true,
+              "multistream_overlap_shared_expert":true}'
+          ```
 
           关键参数事实(教程 §5.1):节点 0 禁设 `--data-parallel-start-rank`;
           `--data-parallel-rpc-port` 全节点一致;压测时 `--max-num-seqs` ×
@@ -276,16 +312,57 @@ scenarios:
       - title: "切换到内置 DSpark 的 0813-w4a8 检查点"
         content: |-
           官方 `DeepSeek-V4-Pro-0813-w4a8` 检查点无需单独 draft 路径即可用 DSpark。保持
-          DP2/TP16 拓扑,仅改(教程 §5.1 "A3 series with DSpark"):serve 路径换
-          `/path/to/DeepSeek-V4-Pro-0813-w4a8`;`--block-size 32`;`--max-num-seqs 16`;
-          `--gpu-memory-utilization 0.9`;speculative 换
-          `{"num_speculative_tokens":5,"method":"dspark","enforce_eager":true}`;并加环境
-          `HCCL_BUFFSIZE=1024`(替换场景 0 的 2048 取值)、
-          `VLLM_ENGINE_READY_TIMEOUT_S=7200`、`HCCL_CONNECT_TIMEOUT=7200`、`ASCEND_CONNECT_TIMEOUT=10000`、
-          `ASCEND_TRANSFER_TIMEOUT=10000`、`VLLM_RPC_TIMEOUT=1800000`、
-          `LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib/`、
-          `VLLM_PREFIX_CACHE_RETENTION_INTERVAL=4096` 要求前缀缓存保持启用:若基础参数携带
-          `--no-enable-prefix-caching` 须移除;该值须为 `--block-size` 的非负整数倍。DSpark `num_speculative_tokens` 全 rank 一致(教程 §5.1)。
+          DP2/TP16 拓扑;相对场景 0,变更:serve 路径换为指向 0813-w4a8 检查点的
+          `your_model_path`、`--block-size 32`、`--max-num-seqs 16`、speculative 配置、
+          以及下方环境集(教程 §5.1 "A3 series with DSpark")。DSpark `num_speculative_tokens`
+          全 rank 一致。`VLLM_PREFIX_CACHE_RETENTION_INTERVAL`(4096)要求前缀缓存保持启用
+          ——本场景须移除 `--no-enable-prefix-caching`;该值须为 `--block-size` 的非负整数倍:
+
+          ```bash
+          # env deltas vs scenario 0:
+          export HCCL_BUFFSIZE=1024
+          export VLLM_ENGINE_READY_TIMEOUT_S=7200
+          export HCCL_CONNECT_TIMEOUT=7200
+          export ASCEND_CONNECT_TIMEOUT=10000
+          export ASCEND_TRANSFER_TIMEOUT=10000
+          export VLLM_RPC_TIMEOUT=1800000
+          export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib/
+          # prefix caching must stay enabled for VLLM_PREFIX_CACHE_RETENTION_INTERVAL:
+          # (remove --no-enable-prefix-caching if present)
+          export VLLM_PREFIX_CACHE_RETENTION_INTERVAL=4096
+
+          vllm serve your_model_path \
+            --host 0.0.0.0 \
+            --port 8000 \
+            --data-parallel-address $node0_ip \
+            --data-parallel-rpc-port 13399 \
+            --data-parallel-size 2 \
+            --data-parallel-size-local 1 \
+            --tensor-parallel-size 16 \
+            --enable-expert-parallel \
+            --served-model-name dsv4 \
+            --max-model-len 135000 \
+            --max-num-batched-tokens 4096 \
+            --max-num-seqs 16 \
+            --gpu-memory-utilization 0.9 \
+            --block-size 32 \
+            --tokenizer-mode deepseek_v4 \
+            --tool-call-parser deepseek_v4 \
+            --enable-auto-tool-choice \
+            --reasoning-parser deepseek_v4 \
+            --model-loader-extra-config='{"enable_multithread_load": true, "num_threads": 128}' \
+            --quantization ascend \
+            --speculative-config '{"num_speculative_tokens": 5,"method": "dspark","enforce_eager": true}' \
+            --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY"}' \
+            --additional-config '
+              {"ascend_compilation_config":{
+                  "enable_npugraph_ex":true,
+                  "enable_static_kernel":false
+                  },
+              "enable_cpu_binding": true,
+              "enable_flashcomm1": true,
+              "multistream_overlap_shared_expert":true}'
+          ```
   - npu: Atlas 800I A3
     precision: W4A8
     deployment: "多节点-PD分离"
@@ -312,6 +389,9 @@ scenarios:
           ```
       - title: "各角色关键配置(自教程 §5.2.1 模板)"
         content: |-
+          以下为教程 §5.2.1 MooncakeHybrid 模板的关键配置要点(非独立可执行命令;
+          完整编排模板见教程对应小节):
+
           - Prefill:`VLLM_RPC_TIMEOUT=3600000`、`VLLM_EXECUTE_MODEL_TIMEOUT_SECONDS=30000`、
             `HCCL_EXEC_TIMEOUT=204`、`HCCL_CONNECT_TIMEOUT=120`、`HCCL_BUFFSIZE=1024`、
             `--max-model-len 131072 --max-num-batched-tokens 4096 --max-num-seqs 16
