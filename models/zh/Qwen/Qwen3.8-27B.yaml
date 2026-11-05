@@ -208,9 +208,14 @@ faq:
   - q: 为什么降低 `--gpu-memory-utilization`？
     a: 共享双芯容器常有残余 HBM。先清理残留 `VLLMWorker_TP`，再向教程默认 0.85 提高。
   - q: A2 wheel 装到 A3 上？
-    a: `vllm_ascend._build_info.__device_type__` 必须为 `A3`。请安装 `…-a3.whl` 变体（plain pip 需改名）。
-  - q: Worker 报 `libtbe_adapter.so: undefined symbol: Mki::Dl(std::__cxx11::string)`？
-    a: `LD_LIBRARY_PATH` 里另有一份 `libmki.so`（常见于 `nnal/asdsip`）排在 ATB `cxx_abi_1` 前面。请把 `/usr/local/Ascend/nnal/atb/.../cxx_abi_1/lib` 放在 asdsip 之前，或仅跑 ATB 时不要把 asdsip 加进路径。
+    a: >-
+      `vllm_ascend._build_info.__device_type__` 必须为 `A3`。请安装
+      `…-a3.whl` 变体（plain pip 需改名）。
+  - q: Worker 报 libtbe_adapter.so undefined symbol Mki::Dl？
+    a: >-
+      LD_LIBRARY_PATH 里另有一份 libmki.so（常见于 nnal/asdsip）排在 ATB
+      cxx_abi_1 前面。请把 /usr/local/Ascend/nnal/atb/.../cxx_abi_1/lib
+      放在 asdsip 之前，或仅跑 ATB 时不要把 asdsip 加进路径。
 
 references:
   - title: vLLM Ascend 教程 Qwen3.8-27B
