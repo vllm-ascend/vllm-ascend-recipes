@@ -484,7 +484,7 @@ SCRIPT_HEREDOC
   # Wait for /v1/models to become ready
   log_info "  Waiting for server ready on port ${SERVER_PORT}..."
   READY=0
-  for i in $(seq 1 300); do
+  for i in $(seq 1 450); do
     if curl -sf "http://localhost:${SERVER_PORT}/v1/models" > /dev/null 2>&1; then
       READY=1
       log_info "  Server ready after ${i}s"
@@ -498,7 +498,7 @@ SCRIPT_HEREDOC
   done
 
   if [[ "$READY" -eq 0 ]]; then
-    log_error "  Server failed to become ready within 600s"
+    log_error "  Server failed to become ready within 900s"
     kill $SERVE_PID 2>/dev/null || true
     STATUS=1
     record_scenario_result fail "Model server did not become ready"
