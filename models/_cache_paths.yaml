@@ -51,3 +51,15 @@ aliases:
 
   - model_id: PaddlePaddle/PaddleOCR-VL
     cache_dir: PaddlePaddle/PaddleOCR-VL
+
+  - model_id: Qwen/Qwen3-VL-8B-Instruct
+    cache_dir: Qwen/Qwen3-VL-8B-Instruct
+
+  - model_id: Qwen/Qwen3-VL-32B-Instruct
+    cache_dir: Qwen/Qwen3-VL-32B-Instruct
+
+  - model_id: vllm-ascend/Qwen3-VL-8B-Instruct-W8A8
+    cache_dir: vllm-ascend/Qwen3-VL-8B-Instruct-W8A8
+
+  - model_id: Eco-Tech/Qwen3-VL-32B-Instruct-w8a8-QuaRot
+    cache_dir: Eco-Tech/Qwen3-VL-32B-Instruct-w8a8-QuaRot
