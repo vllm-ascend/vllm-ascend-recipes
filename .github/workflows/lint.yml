@@ -40,7 +40,6 @@ jobs:
               - '.github/verification-targets.yaml'
               - '.github/nightly-recipes.yaml'
               - 'scripts/verify-recipe.sh'
-              - 'scripts/recipe-server.sh'
               - 'public/status/**'
               - 'test/unit/**'
             config:
@@ -159,7 +158,6 @@ jobs:
 
       - name: Check shell entrypoints
         run: |
-          bash -n scripts/verify-recipe.sh scripts/recipe-server.sh
           find test/recipe/multi_node -type f -name '*.sh' -print0 |
             while IFS= read -r -d '' script; do
               bash -n "$script"

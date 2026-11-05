@@ -32,11 +32,6 @@ fi
 # so it works in CI (working-directory=./recipes) and locally. Override via
 # CACHE_PATHS_FILE for unusual layouts.
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-source "$SCRIPT_DIR/recipe-server.sh"
-configure_recipe_server
-trap stop_recipe_server EXIT
-trap 'exit 130' INT
-trap 'exit 143' TERM
 export RECIPE_REPO_ROOT="${SCRIPT_DIR}/.."
 export CACHE_PATHS_FILE="${CACHE_PATHS_FILE:-${SCRIPT_DIR}/../models/_cache_paths.yaml}"
 if [[ ! -f "$CACHE_PATHS_FILE" ]]; then
@@ -478,30 +473,47 @@ SCRIPT_HEREDOC
   chmod +x "$VLLM_SCRIPT"
 
   log_info "  Starting vllm serve..."
-  start_recipe_server "$VLLM_SCRIPT"
+  bash "$VLLM_SCRIPT" &
+  SERVE_PID=$!
 
   # Recipes may use a non-default API port. Keep readiness checks and
   # benchmark configuration aligned with the port passed to vllm serve.
   SERVER_PORT=$(printf '%s\n' "$SERVE_CMD" | sed -nE 's/.*--port[[:space:]]+([0-9]+).*/\1/p' | tail -1)
   SERVER_PORT=${SERVER_PORT:-8000}
 
-  if ! wait_recipe_server "$SERVER_PORT"; then
+  # Wait for /v1/models to become ready
+  log_info "  Waiting for server ready on port ${SERVER_PORT}..."
+  READY=0
+  for i in $(seq 1 450); do
+    if curl -sf "http://localhost:${SERVER_PORT}/v1/models" > /dev/null 2>&1; then
+      READY=1
+      log_info "  Server ready after ${i}s"
+      break
+    fi
+    if [[ $((i % 30)) -eq 0 ]]; then
+      log_info "  Still waiting... (${i}s elapsed)"
+      npu-smi info || true
+    fi
+    sleep 2
+  done
+
+  if [[ "$READY" -eq 0 ]]; then
+    log_error "  Server failed to become ready within 900s"
+    kill $SERVE_PID 2>/dev/null || true
     STATUS=1
-    record_scenario_result fail "$SERVER_FAILURE_REASON"
-    stop_recipe_server
+    record_scenario_result fail "Model server did not become ready"
     continue
   fi
 
   # Verify /v1/models returns expected content
-  if MODELS_RESP=$(curl --noproxy '*' --connect-timeout 5 --max-time 5 \
-    -sf "http://localhost:${SERVER_PORT}/v1/models") && \
-    echo "$MODELS_RESP" | grep -qi "model"; then
+  MODELS_RESP=$(curl -sf "http://localhost:${SERVER_PORT}/v1/models")
+  if echo "$MODELS_RESP" | grep -qi "model"; then
     log_info "  /v1/models OK"
   else
     log_error "  /v1/models returned unexpected response"
+    kill $SERVE_PID 2>/dev/null || true
     STATUS=1
     record_scenario_result fail "Invalid model readiness response"
-    stop_recipe_server
     continue
   fi
 
@@ -575,7 +587,14 @@ SCRIPT_HEREDOC
 
   # Kill the server and all children
   log_info "  Stopping vllm serve..."
-  stop_recipe_server
+  if [[ -n "$SERVE_PID" ]] && kill -0 $SERVE_PID 2>/dev/null; then
+    kill -TERM -- -$SERVE_PID 2>/dev/null || kill $SERVE_PID 2>/dev/null || true
+    sleep 2
+    kill -KILL -- -$SERVE_PID 2>/dev/null || kill -9 $SERVE_PID 2>/dev/null || true
+    timeout 30 wait $SERVE_PID 2>/dev/null || true
+  fi
+  # Force cleanup any remaining vllm processes
+  pkill -f "vllm serve" 2>/dev/null || true
   log_info "  Server stopped."
 
   if [[ "$SCENARIO_FAILED" -ne 0 ]]; then
