@@ -7,6 +7,8 @@ import {
   findScenarioTarget,
   fetchModelStatus,
   limitVerificationHistory,
+  summarizeModelVerification,
+  verificationDotPresentation,
   type ModelStatus,
   type RunStatus,
 } from '../lib/status';
@@ -83,7 +85,6 @@ interface CascadeSelectorProps {
   optInFeaturesZh?: string[];
   variantsEn?: Record<string, Variant>;
   variantsZh?: Record<string, Variant>;
-  hardwareStatus?: Record<string, string>;
   selectorLabelsEn?: Partial<Record<'npu' | 'precision' | 'deployment' | 'case', string>>;
   selectorLabelsZh?: Partial<Record<'npu' | 'precision' | 'deployment' | 'case', string>>;
   pdCluster?: {
@@ -186,19 +187,6 @@ function RowHint({ text }: { text: string }) {
         i
       </span>
     </Tooltip>
-  );
-}
-
-// Verified / experimental status dot for NPU pills (vllm HwStatusDot).
-function StatusDot({ status }: { status?: string }) {
-  const cls =
-    status === 'verified'
-      ? 'bg-emerald-400'
-      : status === 'experimental'
-        ? 'bg-amber-400'
-        : 'bg-ink-600';
-  return (
-    <span className={`inline-block w-2 h-2 rounded-full ${cls} mr-1.5 shrink-0`} aria-hidden />
   );
 }
 
@@ -694,7 +682,6 @@ export default function CascadeSelector({
   optInFeaturesZh,
   variantsEn,
   variantsZh,
-  hardwareStatus,
   selectorLabelsEn,
   selectorLabelsZh,
   pdCluster,
@@ -1011,12 +998,25 @@ export default function CascadeSelector({
     selectorLabels?.npu ?? t('labelNpu'),
     undefined,
     npus.map((opt) => {
-      const status = hardwareStatus?.[hwKeyForNpu(opt)];
-      const tooltip = npuInfo(opt, lang);
+      // Published target selectors use the English recipe's hardware names.
+      const idx = scenarios.findIndex((scenario) => scenario.npu === opt);
+      const npu = scenariosEn[idx]?.npu ?? opt;
+      const presentation = verificationDotPresentation(
+        summarizeModelVerification(modelStatus, npu),
+      );
+      const label = `${opt}: ${presentation.label}`;
+      const tooltip = [npuInfo(opt, lang), label].filter(Boolean).join('\n');
       return (
         <Tooltip key={opt} content={tooltip}>
-          <button onClick={() => setSelectedNpu(opt)} className={chipClass(selectedNpu === opt)}>
-            <StatusDot status={status} />
+          <button
+            onClick={() => setSelectedNpu(opt)}
+            className={chipClass(selectedNpu === opt)}
+            aria-label={label}
+          >
+            <span
+              className={`inline-block w-2 h-2 rounded-full ${presentation.classes.join(' ')} mr-1.5 shrink-0`}
+              aria-hidden
+            />
             <span className="font-semibold">{opt}</span>
           </button>
         </Tooltip>
