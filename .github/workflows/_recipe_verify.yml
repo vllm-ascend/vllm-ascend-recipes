@@ -79,6 +79,7 @@ jobs:
       options: ${{ inputs.mount_share && '--volume /mnt/weight:/root/.cache' || '' }}
       env:
         VLLM_LOGGING_LEVEL: ERROR
+        VLLM_ENGINE_READY_TIMEOUT_S: 900
         VLLM_USE_MODELSCOPE: True
         HF_HUB_OFFLINE: 1
         UV_EXTRA_INDEX_URL: 'https://repo.huaweicloud.com/ascend/repos/pypi'
