@@ -1,0 +1,132 @@
+#
+# Copyright (c) 2026 Huawei Technologies Co., Ltd. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# This file is a part of the vllm-ascend project.
+#
+
+name: Recipe E2E
+
+# Serve-recipe E2E validation driven by recipes/ci/map.json
+# (design: recipes/ci/recipe-ci-template.md).
+#
+# - "generate" renders every MAP combo on ubuntu-latest: fetch from the
+#   recipes site, run the content assertions (fallback / single-node gate /
+#   speculative method), and emit run.sh + meta.json artifacts.
+# - "execute" runs the generated scripts on NPU runners inside the recipe's
+#   container image. It is gated on the `recipe-e2e` label (PRs) or a manual
+#   workflow_dispatch to protect the NPU pool; the generate stage always runs
+#   on recipes/** changes.
+
+on:
+  pull_request:
+    paths:
+      - 'recipes/**'
+      - '.github/workflows/recipe-e2e.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  generate:
+    name: Generate serve scripts
+    if: github.repository_owner == 'vllm-project'
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+      has-runnable: ${{ steps.matrix.outputs.has-runnable }}
+    steps:
+      - name: Checkout vllm-ascend repo
+        uses: actions/checkout@v7
+
+      - name: Generate run.sh from recipes site
+        run: |
+          python3 recipes/ci/generate.py \
+            --map recipes/ci/map.json \
+            --out dist \
+            --runner-labels .github/workflows/scripts/runner_label.json
+
+      - name: Generate summary
+        run: cat dist/summary.md
+
+      - name: Upload generated scripts
+        uses: actions/upload-artifact@v7
+        with:
+          name: recipe-e2e-scripts
+          path: dist/
+          retention-days: 7
+
+      - name: Set NPU matrix
+        id: matrix
+        run: |
+          echo "matrix=$(cat dist/matrix.json)" >> "$GITHUB_OUTPUT"
+          python3 - <<'EOF' >> "$GITHUB_OUTPUT"
+          import json
+          matrix = json.load(open("dist/matrix.json"))
+          print(f"has-runnable={str(bool(matrix.get('include'))).lower()}")
+          EOF
+
+  execute:
+    name: ${{ matrix.combo }}
+    needs: generate
+    if: >-
+      github.repository_owner == 'vllm-project' &&
+      needs.generate.outputs.has-runnable == 'true' &&
+      (github.event_name == 'workflow_dispatch' ||
+       contains(github.event.pull_request.labels.*.name, 'recipe-e2e'))
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.generate.outputs.matrix) }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: ${{ matrix.timeout_minutes }}
+    container:
+      image: ${{ matrix.image }}
+    steps:
+      - name: Checkout vllm-ascend repo
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+
+      - name: Download generated scripts
+        uses: actions/download-artifact@v7
+        with:
+          name: recipe-e2e-scripts
+          path: dist
+
+      - name: Run combo
+        env:
+          CI_NPU_LIST: ${{ matrix.npu_list }}
+          VLLM_ASCEND_IMAGE: ${{ matrix.image }}
+        run: |
+          python3 recipes/ci/execute.py \
+            --combo-dir "dist/combo/${{ matrix.combo }}" \
+            --results-dir results
+
+      - name: Write step summary
+        if: always()
+        run: |
+          python3 recipes/ci/execute.py --summarize --results-dir results >> "$GITHUB_STEP_SUMMARY" || true
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: recipe-e2e-results-${{ matrix.combo }}
+          path: results/
+          if-no-files-found: warn
+          retention-days: 7
