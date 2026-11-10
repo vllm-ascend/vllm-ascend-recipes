@@ -73,10 +73,10 @@ jobs:
       - name: Set NPU matrix
         id: matrix
         run: |
-          echo "matrix=$(cat dist/matrix.json)" >> "$GITHUB_OUTPUT"
           python3 - <<'EOF' >> "$GITHUB_OUTPUT"
           import json
           matrix = json.load(open("dist/matrix.json"))
+          print("matrix=" + json.dumps(matrix, separators=(",", ":")))
           print(f"has-runnable={str(bool(matrix.get('include'))).lower()}")
           EOF
 
