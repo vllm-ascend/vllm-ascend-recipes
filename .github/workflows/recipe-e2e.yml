@@ -109,7 +109,6 @@ jobs:
 
       - name: Run combo
         env:
-          CI_NPU_LIST: ${{ matrix.npu_list }}
           VLLM_ASCEND_IMAGE: ${{ matrix.image }}
         run: |
           python3 recipes/ci/execute.py \
