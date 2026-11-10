@@ -44,7 +44,7 @@ permissions:
 jobs:
   generate:
     name: Generate serve scripts
-    if: github.repository_owner == 'vllm-project'
+    if: github.repository_owner == 'vllm-ascend'
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.matrix.outputs.matrix }}
@@ -84,7 +84,7 @@ jobs:
     name: ${{ matrix.combo }}
     needs: generate
     if: >-
-      github.repository_owner == 'vllm-project' &&
+      github.repository_owner == 'vllm-ascend' &&
       needs.generate.outputs.has-runnable == 'true' &&
       (github.event_name == 'workflow_dispatch' ||
        contains(github.event.pull_request.labels.*.name, 'recipe-e2e'))
