@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "site": "https://recipes.vllm.ai",
+  "runner_image_rewrites": [
+    {
+      "from": "quay.io/ascend/",
+      "to": "swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/"
+    }
+  ],
+  "entries": [
+    {
+      "name": "DeepSeek-V4-Flash",
+      "yaml": "recipes/overlays/deepseek-ai/DeepSeek-V4-Flash.yaml",
+      "hf_id": "deepseek-ai/DeepSeek-V4-Flash",
+      "combos": [
+        {
+          "id": "a5-950dt-default",
+          "hardware": "ascend_950dt_8x",
+          "variant": "default",
+          "features": {},
+          "expect": { "spec_decoding": "dspark", "dp": 4 },
+          "nodes": 1
+        },
+        {
+          "id": "a5-950dt-default-dflash",
+          "hardware": "ascend_950dt_8x",
+          "variant": "default",
+          "features": { "spec_decoding": "dflash" },
+          "expect": { "dp": 4 },
+          "nodes": 1
+        },
+        {
+          "id": "a3-910c-w8a8-mtp",
+          "hardware": "ascend_910c",
+          "variant": "ascend_w8a8",
+          "features": { "spec_decoding": "mtp" },
+          "expect": { "dp": 4 },
+          "nodes": 1
+        }
+      ]
+    }
+  ]
+}
