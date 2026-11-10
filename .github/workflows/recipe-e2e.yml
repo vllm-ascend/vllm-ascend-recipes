@@ -26,12 +26,11 @@ name: Recipe E2E
 # - "execute" runs the generated scripts on NPU runners inside the recipe's
 #   container image. It is gated on the `recipe-e2e` label (PRs) or a manual
 #   workflow_dispatch to protect the NPU pool; the generate stage always runs
-#   on recipes/** changes.
+#   on workflow changes.
 
 on:
   pull_request:
     paths:
-      - 'recipes/**'
       - '.github/workflows/recipe-e2e.yml'
   workflow_dispatch:
 
