@@ -34,6 +34,7 @@
           "hardware": "ascend_910c",
           "variant": "ascend_w8a8",
           "features": { "spec_decoding": "mtp" },
+          "frontend": "python",
           "expect": { "dp": 4 },
           "nodes": 1
         }
