@@ -498,6 +498,11 @@ def main(argv: list[str] | None = None) -> int:
         type=Path,
         help="runner inventory (.github/workflows/scripts/runner_label.json)",
     )
+    parser.add_argument(
+        "--hardware",
+        default="",
+        help="comma-separated chips to run (a2/a3/a5); empty = all (manual dispatch filter)",
+    )
     args = parser.parse_args(argv)
 
     map_data = json.loads(args.map.read_text(encoding="utf-8"))
@@ -507,10 +512,14 @@ def main(argv: list[str] | None = None) -> int:
     runner_labels = json.loads(args.runner_labels.read_text(encoding="utf-8"))
     site = str(map_data.get("site") or DEFAULT_SITE)
     rewrites = list(map_data.get("runner_image_rewrites") or [])
+    wanted = {h.strip() for h in args.hardware.split(",") if h.strip()}
 
     rows = []
     for entry in map_data.get("entries", []):
         for combo in entry.get("combos", []):
+            if wanted and HARDWARE_CHIP.get(str(combo.get("hardware"))) not in wanted:
+                print(f"[{combo.get('id')}] filtered out by --hardware {','.join(sorted(wanted))}")
+                continue
             row = process_combo(entry, combo, site, runner_labels, rewrites, args.out)
             rows.append(row)
             print(f"[{row['combo_id']}] {row['status']}" + (f": {row['reason']}" if row["reason"] else ""))

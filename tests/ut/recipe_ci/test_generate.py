@@ -23,6 +23,7 @@ CI workflow itself.
 """
 
 import importlib.util
+import json
 import shlex
 from pathlib import Path
 
@@ -347,3 +348,44 @@ def test_pick_runner_prefers_smallest_fitting():
 def test_pick_runner_unknown_hardware_fails():
     with pytest.raises(gen.ComboFailure, match="unknown hardware"):
         gen.pick_runner(RUNNER_LABELS, "ascend_960c", 4, None)
+
+
+# --- --hardware chip filter (manual dispatch) ---------------------------------
+
+
+def test_main_hardware_filter(tmp_path, monkeypatch):
+    # map with one A5 combo and one A3 combo; --hardware a5 must plan only the A5 one.
+    map_file = tmp_path / "map.json"
+    map_file.write_text(
+        json.dumps(
+            {
+                "schema_version": gen.SCHEMA_VERSION,
+                "entries": [
+                    {
+                        "name": "M",
+                        "yaml": "recipes/overlays/org/M.yaml",
+                        "hf_id": "org/M",
+                        "combos": [
+                            {"id": "a5-c", "hardware": "ascend_950dt_8x", "variant": "default", "nodes": 1},
+                            {"id": "a3-c", "hardware": "ascend_910c", "variant": "default", "nodes": 1},
+                        ],
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    labels_file = tmp_path / "runner_label.json"
+    labels_file.write_text(
+        json.dumps({"linux-aarch64-a5-4": {"chip": "a5", "npu_num": 4}, "linux-aarch64-a3-4": {"chip": "a3", "npu_num": 4}}),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(gen, "fetch_render", lambda *a, **k: (dict(A5_RENDER), "https://s/x.json"))
+
+    out_dir = tmp_path / "out"
+    rc = gen.main(["--map", str(map_file), "--out", str(out_dir), "--runner-labels", str(labels_file), "--hardware", "a5"])
+    assert rc == 0
+    manifest = json.loads((out_dir / "manifest.json").read_text(encoding="utf-8"))
+    assert [r["combo_id"] for r in manifest["combos"]] == ["a5-c"]
+    matrix = json.loads((out_dir / "matrix.json").read_text(encoding="utf-8"))
+    assert [m["combo"] for m in matrix["include"]] == ["a5-c"]
