@@ -8,7 +8,7 @@ meta:
   difficulty: beginner
   performance_headline: 'Single-node single-card pooling deployment on Atlas 800I A3 / Atlas 800I A2 / Atlas 300I DUO with vLLM-Ascend'
   hardware:
-    atlas_800_a3: verified
+    atlas_800_a3: experimental
     atlas_800_a2: experimental
 
 model:
@@ -27,16 +27,16 @@ model:
     - '--chat-template'
     - '/vllm-workspace/vllm/examples/pooling/score/template/qwen3_vl_reranker.jinja'
   docker_image:
-    atlas_800_a2: 'quay.io/ascend/vllm-ascend:nightly-main'
-    atlas_800_a3: 'quay.io/ascend/vllm-ascend:nightly-main-a3'
-    ascend_950dt: 'quay.io/ascend/vllm-ascend:nightly-main-a5'
-    atlas_300i_duo: 'quay.io/ascend/vllm-ascend:nightly-main-310p'
-  nightly_required: true
+    atlas_800_a2: 'quay.io/ascend/vllm-ascend:v0.23.0.post1'
+    atlas_800_a3: 'quay.io/ascend/vllm-ascend:v0.23.0.post1-a3'
+    ascend_950dt: 'quay.io/ascend/vllm-ascend:v0.23.0.post1-a5'
+    atlas_300i_duo: 'quay.io/ascend/vllm-ascend:v0.23.0.post1-310p'
+  nightly_required: false
   install:
     # Ascend recommends Docker; pip requires source build (no official wheel), so the pip tab is hidden.
     pip: false
     docker:
-      command: 'docker run --rm --name vllm-ascend --shm-size=1g --net=host --device /dev/davinci0 --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc -v /root/.cache:/root/.cache -it quay.io/ascend/vllm-ascend:nightly-main bash'
+      command: 'docker run --rm --name vllm-ascend --shm-size=1g --net=host --device /dev/davinci0 --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc -v /root/.cache:/root/.cache -it quay.io/ascend/vllm-ascend:v0.23.0.post1 bash'
       note: 'Official Ascend image; full device/driver mounts are covered in env_setup.container.'
 
 guide: ""
@@ -96,13 +96,13 @@ env_setup:
         **Docker Pull:**
 
         ```bash
-        docker pull quay.io/ascend/vllm-ascend:nightly-main
+        docker pull quay.io/ascend/vllm-ascend:v0.23.0.post1
         ```
 
         **Docker Run:**
 
         ```bash
-        export IMAGE=quay.io/ascend/vllm-ascend:nightly-main
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0.post1
 
         docker run --rm \
             --name vllm-ascend \
@@ -129,7 +129,7 @@ env_setup:
         You can use the official all-in-one Docker image to run `Qwen3-VL-Reranker-2B` directly.
 
         ```bash
-        export IMAGE=quay.io/ascend/vllm-ascend:nightly-main-a3
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0.post1-a3
 
         docker run --rm \
             --name vllm-ascend \
@@ -154,7 +154,7 @@ env_setup:
         The following command uses the Ubuntu image for Ascend 950DT&950PR Products to start the container.
 
         ```bash
-        export IMAGE=quay.io/ascend/vllm-ascend:nightly-main-a5
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0.post1-a5
 
         docker run --rm \
             --name vllm-ascend \
@@ -178,7 +178,7 @@ env_setup:
         For Atlas 300I DUO, use the `-310p` image:
 
         ```bash
-        export IMAGE=quay.io/ascend/vllm-ascend:nightly-main-310p
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0.post1-310p
 
         docker run --rm \
             --name vllm-ascend \
