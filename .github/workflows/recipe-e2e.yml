@@ -113,6 +113,13 @@ jobs:
           name: recipe-e2e-scripts
           path: dist
 
+      # The images ship an old modelscope_hub whose file-list parser breaks on
+      # the current ModelScope API response (KeyError 'Type'); upgrade before
+      # serve starts so repo metadata resolves and the local weights cache
+      # (host-mounted) is used without re-downloading.
+      - name: Upgrade modelscope_hub
+        run: pip install --no-cache-dir -U modelscope-hub
+
       - name: Run combo
         env:
           VLLM_ASCEND_IMAGE: ${{ matrix.image }}
