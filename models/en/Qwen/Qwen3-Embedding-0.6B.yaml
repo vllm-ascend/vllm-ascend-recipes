@@ -8,7 +8,7 @@ meta:
   difficulty: beginner
   performance_headline: 'Single-node single-card pooling deployment on Atlas 800I A2 / Atlas 300I DUO with vLLM-Ascend'
   hardware:
-    atlas_800_a2: experimental
+    atlas_800_a2: verified
 
 model:
   model_id: 'Qwen/Qwen3-Embedding-0.6B'
