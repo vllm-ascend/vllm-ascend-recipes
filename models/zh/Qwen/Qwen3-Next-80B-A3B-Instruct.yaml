@@ -1,0 +1,293 @@
+meta:
+  title: "Qwen3-Next-80B-A3B-Instruct"
+  slug: "qwen3-next-80b-a3b-instruct"
+  provider: "Qwen"
+  description: "Qwen3-Next 混合注意力稀疏 MoE 模型，总参数量 80B、激活参数 3B，通过 Triton Ascend 在单台 8 卡 Atlas 800 A3 或 Atlas 800 A2 节点上以 BF16 权重提供服务。"
+  date_added: 2026-11-10
+  difficulty: intermediate
+  tasks: [text]
+  performance_headline: "Atlas 800 A3 上 BF16 + TP4 + 全量 Decode ACLGraph：教程实测 2k/2k 下 580 tps、TPOT 54 ms"
+  related_recipes: []
+  hardware:
+    atlas_800_a3: experimental
+    atlas_800_a2: experimental
+
+model:
+  model_id: "Qwen/Qwen3-Next-80B-A3B-Instruct"
+  min_vllm_version: "0.16.0"
+  architecture: moe
+  parameter_count: "80B"
+  active_parameters: "3B"
+  context_length: 1048576
+  modality: text
+  base_args:
+    - "--served-model-name"
+    - "qwen3_next"
+  base_env:
+    VLLM_USE_MODELSCOPE: "True"
+  docker_image:
+    atlas_800_a3: "quay.io/ascend/vllm-ascend:v0.23.0-a3"
+    atlas_800_a2: "quay.io/ascend/vllm-ascend:v0.23.0"
+  nightly_required: false
+  # vLLM-Ascend 自 v0.30.0 起已停止支持该模型，main 上的教程只剩 295 字节的废弃提示。
+  # 本 recipe 的所有命令均取自 v0.23.0 教程 tag，并对应 v0.23.0 镜像；
+  # 若没有新的教程可引用，不要把这些 tag 换成更新的版本。
+  install:
+    pip: false
+
+features:
+  spec_decoding:
+    label: "MTP 投机解码"
+    description: "模型自带的 MTP 头。教程的调优表格使用三个候选 token，而其单节点启动命令并未开启投机解码。"
+    args: ["--speculative-config", '{"method":"qwen3_next_mtp","num_speculative_tokens":3}']
+  prefix_caching:
+    label: "前缀缓存"
+    description: "复用共享前缀请求的 KV 块；教程的长上下文场景分别给出了 128k 开启与关闭前缀缓存的配置。"
+    args: ["--enable-prefix-caching"]
+    flag_when_false: "--no-enable-prefix-caching"
+  long_context:
+    label: "长上下文（YaRN）"
+    description: "通过 YaRN RoPE 扩展到模型卡验证的 1M token 窗口（相对原生 262,144 使用 4.0 倍缩放）。该配置继承自上游 vLLM recipe；昇腾教程本身只覆盖 32k 与 128k 窗口。"
+    args:
+      - "--hf-overrides"
+      - '{"rope_parameters":{"rope_type":"yarn","rope_theta":10000000,"partial_rotary_factor":0.25,"factor":4.0,"original_max_position_embeddings":262144}}'
+      - "--max-model-len"
+      - "1010000"
+    env:
+      VLLM_ALLOW_LONG_MAX_MODEL_LEN: "1"
+
+opt_in_features: [spec_decoding, long_context]
+
+variants:
+  default:
+    precision: BF16
+    vram_minimum_gb: 192
+    description: "教程所有场景使用的 BF16 权重；TP4 可放在单台 8 卡 Atlas 800 A3 或 Atlas 800 A2 节点上。"
+
+compatible_strategies: [single_node_A3, single_node_A2]
+hardware_overrides: {}
+strategy_overrides: {}
+guide: ""
+
+config_params:
+  max_model_len:
+    default: 32768
+    type: number
+    description: "单条请求输入与输出的最大 token 数。"
+  max_num_batched_tokens:
+    default: 4096
+    type: number
+    description: "单个调度步骤处理的最大 token 数。"
+  gpu_memory_utilization:
+    default: 0.8
+    type: number
+    description: "模型执行与 KV 缓存可使用的 NPU 显存比例。"
+
+overview: |-
+  Qwen3-Next-80B-A3B-Instruct 是 Qwen3-Next 系列中的高稀疏 MoE 模型，总参数量 80B，每 token 激活 3B 参数。相比 Qwen3 的 MoE 架构，它改进了混合注意力机制并引入多 token 预测头；教程称这些改动提升了长上下文和大总参数量下的训练与推理效率。vLLM-Ascend 通过 Triton Ascend 运行该模型，教程明确标注其为实验特性：不同版本之间的稳定性、精度和性能都可能变化。
+
+  **已废弃。** vLLM-Ascend 在 v0.30.0 中停止支持该模型，main 上的教程现在只是一个指向 v0.23.0 文档的废弃提示。本 recipe 的全部命令都复制自该 v0.23.0 教程，并对应 v0.23.0 镜像（vLLM-Ascend `v0.23.0`）。请把它当作历史配置与已发布实测数据的记录，而不是当前版本上仍受支持的部署方案。
+
+  教程只记录了一种单节点部署：在一台 Atlas 800 A3 节点（64G × 16）上使用 BF16 权重、张量并行 4 和全量 Decode ACLGraph；其前置条件也接受一台 Atlas 800 A2 节点（64G × 8）。已发布的性能数字是在两节点 A3-752T 集群上测得的，因此单节点启动命令与基准测试所用的拓扑并不相同。
+
+weight_download:
+  - weight_version: BF16
+    sources:
+      - source: ModelScope
+        url: https://www.modelscope.cn/models/Qwen/Qwen3-Next-80B-A3B-Instruct
+        command: |-
+          ```bash
+          pip install modelscope
+          modelscope download --model Qwen/Qwen3-Next-80B-A3B-Instruct
+          ```
+
+prerequisites:
+  - title: 模型权重
+    content: |-
+      `Qwen3-Next-80B-A3B-Instruct` 需要一台 Atlas 800 A3（64G × 16）节点内的 8 张卡，或一台 Atlas 800 A2（64G × 8）节点内的 8 张卡。教程没有为昇腾发布量化权重，下面所有场景都使用 BF16 权重：参数量约 160 GB，最小可运行显存预算为 192 GB（不含 KV 缓存）。
+  - title: 运行时版本
+    content: |-
+      vLLM-Ascend 从 `v0.10.2rc1` 开始支持该模型，教程称其可从 `v0.16.0` 起稳定运行。本 recipe 对应 v0.23.0 的文档与镜像；由于该模型在 v0.30.0 已停止支持，之后的版本没有教程覆盖。
+
+env_setup:
+  container:
+    A3:
+      content: |-
+        在 Atlas 800 A3 节点上启动该镜像。教程把镜像 tag 写成版本占位符；在 v0.23.0 文档中它解析为 v0.23.0 的 A3 镜像，端口映射与下文 `vllm serve` 的默认端口一致。
+
+        ```bash
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0-a3
+        docker run --rm \
+        --shm-size=1g \
+        --name vllm-ascend-qwen3 \
+        --device /dev/davinci0 \
+        --device /dev/davinci1 \
+        --device /dev/davinci2 \
+        --device /dev/davinci3 \
+        --device /dev/davinci4 \
+        --device /dev/davinci5 \
+        --device /dev/davinci6 \
+        --device /dev/davinci7 \
+        --device /dev/davinci8 \
+        --device /dev/davinci9 \
+        --device /dev/davinci10 \
+        --device /dev/davinci11 \
+        --device /dev/davinci12 \
+        --device /dev/davinci13 \
+        --device /dev/davinci14 \
+        --device /dev/davinci15 \
+        --device /dev/davinci_manager \
+        --device /dev/devmm_svm \
+        --device /dev/hisi_hdc \
+        -v /usr/local/dcmi:/usr/local/dcmi \
+        -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+        -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \
+        -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
+        -v /etc/ascend_install.info:/etc/ascend_install.info \
+        -v /root/.cache:/root/.cache \
+        -p 8000:8000 \
+        -it $IMAGE bash
+        ```
+    A2:
+      content: |-
+        教程把 A2 镜像作为注释与 A3 镜像并列给出：同一个 tag，去掉 `-a3` 后缀。上面的 `docker run` 除设备数量外不变，A2 节点使用 8 张卡（`/dev/davinci0` 到 `/dev/davinci7`）。
+
+        ```bash
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0
+        ```
+  pip:
+    content: |-
+      教程也给出了不使用 Docker 镜像时的源码安装方式：先安装 vLLM 源码，再安装 vLLM-Ascend，并用 `pip show` 确认两者版本。多节点部署时需要在每个节点上都完成环境准备。
+
+      ```bash
+      git clone https://github.com/vllm-project/vllm.git
+      cd vllm
+      pip install -e .
+
+      git clone https://github.com/vllm-project/vllm-ascend.git
+      cd vllm-ascend
+      pip install -e .
+
+      pip show vllm vllm-ascend
+      ```
+
+scenarios:
+  - npu: Atlas 800 A3
+    precision: BF16
+    deployment: 单节点
+    case: TP4 32k 上下文（A3）
+    tags: [a3-single]
+    strategy: single_node_A3
+    steps:
+      - title: 启动服务
+        content: |-
+          教程的单节点部署：一台 Atlas 800 A3 节点（64G × 16），张量并行 4（即使用该节点 16 张 NPU 中的 4 张），32k 窗口、全量 Decode ACLGraph。`vllm serve` 默认监听 `0.0.0.0:8000`，也正是镜像映射的端口。
+
+          ```bash
+          vllm serve Qwen/Qwen3-Next-80B-A3B-Instruct \
+            --served-model-name qwen3_next \
+            --tensor-parallel-size 4 \
+            --max-model-len {{max_model_len}} \
+            --gpu-memory-utilization {{gpu_memory_utilization}} \
+            --max-num-batched-tokens {{max_num_batched_tokens}} \
+            --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY"}'
+          ```
+      - title: 推理验证
+        content: |-
+          教程的功能验证是一条 chat completion 请求；服务正常时返回 HTTP 200，响应 JSON 中带有 `choices` 字段。
+
+          ```bash
+          curl http://<server_ip>:<port>/v1/chat/completions -H "Content-Type: application/json" -d '{
+            "model": "qwen3_next",
+            "messages": [
+              {"role": "user", "content": "Who are you?"}
+            ],
+            "temperature": 0.6,
+            "top_p": 0.95,
+            "top_k": 20,
+            "max_completion_tokens": 32
+          }'
+          ```
+  - npu: Atlas 800 A2
+    precision: BF16
+    deployment: 单节点
+    case: TP4 32k 上下文（A2）
+    tags: [a2-single]
+    strategy: single_node_A2
+    steps:
+      - title: 启动服务
+        content: |-
+          教程把 8 卡 Atlas 800 A2 节点列为受支持的前置条件，但没有单独给出 A2 命令；只有镜像 tag 不同（没有 `-a3` 后缀），因此单节点命令保持不变。教程没有发布 A2 的实测数据，这也是该硬件标记为 experimental 的原因。
+
+          ```bash
+          vllm serve Qwen/Qwen3-Next-80B-A3B-Instruct \
+            --served-model-name qwen3_next \
+            --tensor-parallel-size 4 \
+            --max-model-len {{max_model_len}} \
+            --gpu-memory-utilization {{gpu_memory_utilization}} \
+            --max-num-batched-tokens {{max_num_batched_tokens}} \
+            --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY"}'
+          ```
+      - title: 推理验证
+        content: |-
+          对 A2 服务发送同一条 chat completion 请求。
+
+          ```bash
+          curl http://<server_ip>:<port>/v1/chat/completions -H "Content-Type: application/json" -d '{
+            "model": "qwen3_next",
+            "messages": [
+              {"role": "user", "content": "Who are you?"}
+            ],
+            "temperature": 0.6,
+            "top_p": 0.95,
+            "top_k": 20,
+            "max_completion_tokens": 32
+          }'
+          ```
+
+verification: |-
+  本 recipe 在迁移过程中没有重新实机运行：所有命令都复制自 v0.23.0 教程，这是最后一个记录该模型的版本（vLLM-Ascend 在 v0.30.0 停止支持，main 上只剩废弃提示）。教程声明的预期结果是：服务依次打印 `Started server process`、`Waiting for application startup.` 和 `Application startup complete.`，chat completion 请求返回 HTTP 200，响应 JSON 中包含 `choices` 字段。教程针对 `Who are you?` 的示例响应带有关于 Qwen 由通义实验室研发的助手文本、`reasoning` 字段，以及因 32 个补全 token 上限而产生的 `finish_reason: length`。
+
+  请把 `<server_ip>` 和 `<port>` 替换为实际运行 API 服务的节点地址与端口。本 recipe 中没有任何精度或时延数字是在迁移过程中测得的，全部引用自教程。
+
+performance:
+  accuracy: |-
+    教程只给出一条 AISBench `vllm-api-general-chat` 生成模式的结果，并注明仅供参考：在 `vllm-ascend:0.13.0rc1` 上 gsm8k 准确率为 95.53。教程没有为该模型给出其他数据集。评测流程参见[使用 AISBench](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/evaluation/using_ais_bench.html)。
+  benchmark: |-
+    教程只发布了一条实测结果，本 recipe 原样引用：
+
+    ```text
+    Hardware: A3-752T, 2 node
+    Deployment: TP4 + Full Decode Only
+    Input/Output: 2k/2k
+    Concurrency: 32
+    Performance: 580tps, TPOT 54ms
+    ```
+
+    教程本身带来两点需要注意。它没有说明该数字对应的 vLLM-Ascend 构建版本，而且测量使用的是两节点部署，而教程给出的唯一启动命令是单节点。它的复现命令也比 2k/2k、并发 32 的实测负载轻得多：
+
+    ```bash
+    export VLLM_USE_MODELSCOPE=True
+    vllm bench serve --model Qwen/Qwen3-Next-80B-A3B-Instruct  --dataset-name random --random-input 200 --num-prompts 200 --request-rate 1 --save-result --result-dir ./
+    ```
+
+tuning: |-
+  教程给出的硬性约束优先：`Qwen3-Next` 当前不支持 TP >= 16。该模型有 16 个 query head，但只有 2 个 key/value head，因此 TP >= 16 时 GQA 会退化为 MHA，而 FIA 算子目前在 head dimension 为 256 的 MHA 场景下无法工作 —— 这正是该模型的 head dimension。除非你重新实测过其他切分方式，否则请保持教程记录的张量并行 4。
+
+  除此之外，教程把调优交给公共文档，没有逐项列出参数建议：[公共性能调优文档](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/performance_and_debug/optimization_and_tuning.html) 与 [特性矩阵](https://docs.vllm.ai/projects/ascend/en/latest/user_guide/support_matrix/feature_matrix.html)。
+
+  教程的场景表格本身存在矛盾，阅读时需要注意。表 1 把高吞吐 16k 场景，以及两个 128k 长上下文场景（分别开启、关闭前缀缓存）列为单节点 A3 负载，表 2 对所有这些场景都标注 MTP 投机 3 —— 但两张表都写着 2 NPU、TP 1、DP 1，这与教程发布的 `--tensor-parallel-size 4` 命令和 8 卡节点要求相冲突。表 1 第四行的 "Multimodal (1080p)" 是视觉模型遗留内容：Qwen3-Next 是纯文本模型。请以上面场景中的启动命令为准，16k/128k 两行只作为"探索过哪些窗口"的参考。
+
+  需要更长窗口时，先调大 `--max-model-len`；若显存不足，优先降低 `--max-num-batched-tokens` 或 `--gpu-memory-utilization`。1M token 的 `long_context` 特性继承自上游 vLLM recipe，昇腾教程并未验证它，教程最多只覆盖到 128k。
+
+references:
+  - title: "官方 vLLM-Ascend 教程（v0.23.0）"
+    url: https://github.com/vllm-project/vllm-ascend/blob/v0.23.0/docs/source/tutorials/models/Qwen3-Next.md
+  - title: "BF16 权重（ModelScope）"
+    url: https://www.modelscope.cn/models/Qwen/Qwen3-Next-80B-A3B-Instruct
+  - title: "模型卡（HuggingFace）"
+    url: https://huggingface.co/Qwen/Qwen3-Next-80B-A3B-Instruct
+  - title: "Qwen3-Next 博客"
+    url: https://qwen.ai/blog?id=4074cca80393150c248e508aa62983f9cb7d27cd
+  - title: "vLLM-Ascend Docker 安装"
+    url: https://docs.vllm.ai/projects/ascend/en/latest/installation.html
