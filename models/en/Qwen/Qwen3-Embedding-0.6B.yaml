@@ -4,6 +4,7 @@ meta:
   provider: 'Qwen'
   description: 'The smallest member of the Qwen3 Embedding series, a 0.6B dense model built on the Qwen3 foundation for text embedding and retrieval tasks, supporting efficient single-card deployment on Ascend NPUs.'
   date_added: 2026-10-14
+  date_updated: 2026-11-11
   difficulty: beginner
   performance_headline: 'Single-node single-card pooling deployment on Atlas 800I A2 / Atlas 300I DUO with vLLM-Ascend'
   hardware:

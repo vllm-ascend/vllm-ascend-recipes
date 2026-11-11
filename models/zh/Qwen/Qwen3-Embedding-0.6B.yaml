@@ -4,6 +4,7 @@ meta:
   provider: 'Qwen'
   description: 'Qwen3 Embedding 系列最小成员，基于 Qwen3 稠密基座的 0.6B 文本嵌入模型，面向嵌入与检索任务，支持昇腾 NPU 单卡高效部署。'
   date_added: 2026-10-14
+  date_updated: 2026-11-11
   difficulty: beginner
   performance_headline: 'Atlas 800I A2 / Atlas 300I DUO 单节点单卡 pooling 部署'
   hardware:
