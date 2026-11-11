@@ -132,6 +132,16 @@ def test_build_combo_url_encodes_fmode():
     assert url.endswith("&nodes=1")
 
 
+def test_build_combo_url_passes_frontend():
+    # frontend=python drops VLLM_USE_RUST_FRONTEND from the rendered env;
+    # combos opt in via the map so images without the vllm-rs binary can serve.
+    combo = {"hardware": "ascend_910c", "variant": "ascend_w8a8", "frontend": "python"}
+    url = gen.build_combo_url("https://s", "org/model", combo)
+    assert "frontend=python&" in url
+    combo.pop("frontend")
+    assert "frontend=" not in gen.build_combo_url("https://s", "org/model", combo)
+
+
 # --- env value quoting (template 5.1 rule 4) --------------------------------
 
 

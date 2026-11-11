@@ -113,6 +113,8 @@ def build_combo_url(site: str, hf_id: str, combo: dict) -> str:
         ("hardware", str(combo["hardware"])),
         ("variant", str(combo["variant"])),
     ]
+    if combo.get("frontend"):
+        params.append(("frontend", str(combo["frontend"])))
     features = combo.get("features") or {}
     if features:
         params.append(("features", ",".join(features)))
