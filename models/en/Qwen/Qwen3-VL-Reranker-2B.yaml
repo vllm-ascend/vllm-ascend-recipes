@@ -4,7 +4,7 @@ meta:
   provider: 'Qwen'
   description: 'A 2B vision-language reranker in the Qwen3 series, producing relevance scores for query-document pairs across text and multimodal inputs, with single-card deployment on Ascend NPUs.'
   date_added: 2026-10-14
-  date_updated: 2026-11-02
+  date_updated: 2026-11-11
   difficulty: beginner
   performance_headline: 'Single-node single-card pooling deployment on Atlas 800I A3 / Atlas 800I A2 / Atlas 300I DUO with vLLM-Ascend'
   hardware:

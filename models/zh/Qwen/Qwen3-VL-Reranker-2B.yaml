@@ -4,7 +4,7 @@ meta:
   provider: 'Qwen'
   description: 'Qwen3 系列 2B 视觉-语言重排序模型，为查询-文档对输出相关性分数，支持文本与多模态输入，可在单张昇腾 NPU 上部署。'
   date_added: 2026-10-14
-  date_updated: 2026-11-02
+  date_updated: 2026-11-11
   difficulty: beginner
   performance_headline: 'Atlas 800I A3 / Atlas 800I A2 / Atlas 300I DUO 单节点单卡 pooling 部署'
   hardware:
