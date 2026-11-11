@@ -172,22 +172,50 @@ def tail_lines(path: Path, count: int) -> list[str]:
 
 
 def wait_ready(proc: subprocess.Popen, base_url: str, timeout_s: int, log_path: Path) -> list[dict]:
-    """Poll /v1/models until the engine is ready (template 7, rule 3)."""
+    """Poll /v1/models until the engine is ready (template 7, rule 3).
+
+    New serve.log lines are mirrored to stdout so the engine progress streams
+    into the job log (mirrors verify-recipe.sh's foreground serve), plus a
+    progress line every 30s.
+    """
     deadline = time.monotonic() + timeout_s
+    started = time.monotonic()
     last_error: Exception | None = None
+    last_pos = 0
+    last_progress_at = started
     while time.monotonic() < deadline:
         if proc.poll() is not None:
             raise ComboFailure(
                 f"engine exited early with code {proc.returncode}; last {LOG_TAIL_LINES} lines of {log_path.name}:\n"
                 + "\n".join(tail_lines(log_path, LOG_TAIL_LINES))
             )
+        # Mirror new serve.log lines into the job log.
+        try:
+            with open(log_path, "rb") as fh:
+                fh.seek(last_pos)
+                chunk = fh.read()
+                last_pos += len(chunk)
+        except OSError:
+            chunk = b""
+        if chunk:
+            for line in chunk.decode("utf-8", errors="replace").splitlines():
+                print(f"[serve] {line}", flush=True)
+            last_progress_at = time.monotonic()
+        elif time.monotonic() - last_progress_at >= 30:
+            print(f"[wait_ready] still waiting for {base_url} ... "
+                  f"({int(time.monotonic() - started)}s elapsed, timeout {timeout_s}s)", flush=True)
+            last_progress_at = time.monotonic()
         try:
             payload = http_get_json(base_url + "/v1/models")
             return list(payload.get("data") or [])
         except (urllib.error.URLError, OSError, json.JSONDecodeError) as e:
             last_error = e
         time.sleep(POLL_INTERVAL_S)
-    raise ComboFailure(f"readiness timeout after {timeout_s}s (last error: {last_error})")
+    raise ComboFailure(
+        f"readiness timeout after {timeout_s}s (last error: {last_error}); "
+        f"last {LOG_TAIL_LINES} lines of {log_path.name}:\n"
+        + "\n".join(tail_lines(log_path, LOG_TAIL_LINES))
+    )
 
 
 def wait_tcp(port: int, timeout_s: int, proc: subprocess.Popen | None = None) -> None:
