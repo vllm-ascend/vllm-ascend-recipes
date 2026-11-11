@@ -171,13 +171,16 @@ def tail_lines(path: Path, count: int) -> list[str]:
         return []
 
 
-def wait_ready(proc: subprocess.Popen, base_url: str, timeout_s: int) -> list[dict]:
+def wait_ready(proc: subprocess.Popen, base_url: str, timeout_s: int, log_path: Path) -> list[dict]:
     """Poll /v1/models until the engine is ready (template 7, rule 3)."""
     deadline = time.monotonic() + timeout_s
     last_error: Exception | None = None
     while time.monotonic() < deadline:
         if proc.poll() is not None:
-            raise ComboFailure(f"engine exited early with code {proc.returncode}; see serve.log")
+            raise ComboFailure(
+                f"engine exited early with code {proc.returncode}; last {LOG_TAIL_LINES} lines of {log_path.name}:\n"
+                + "\n".join(tail_lines(log_path, LOG_TAIL_LINES))
+            )
         try:
             payload = http_get_json(base_url + "/v1/models")
             return list(payload.get("data") or [])
@@ -291,7 +294,7 @@ def run_combo(combo_dir: Path, results_dir: Path) -> int:
         try:
             engine = start_bg(["bash", str(combo_dir / "run.sh")], out_dir / "serve.log")
             base_url = f"http://127.0.0.1:{meta['port']}"
-            models = wait_ready(engine, base_url, int(meta["readiness_timeout_s"]))
+            models = wait_ready(engine, base_url, int(meta["readiness_timeout_s"]), out_dir / "serve.log")
             result["readiness_seconds"] = round(time.monotonic() - started, 1)
             for comp in meta.get("companions") or []:
                 if not comp.get("after"):
