@@ -8,8 +8,8 @@ meta:
   difficulty: beginner
   performance_headline: 'Atlas 800I A3 / Atlas 800I A2 / Atlas 300I DUO 单节点单卡 pooling 部署'
   hardware:
-    atlas_800_a3: experimental
-    atlas_800_a2: experimental
+    atlas_800_a3: verified
+    atlas_800_a2: verified
 
 model:
   model_id: 'Qwen/Qwen3-VL-Reranker-2B'
