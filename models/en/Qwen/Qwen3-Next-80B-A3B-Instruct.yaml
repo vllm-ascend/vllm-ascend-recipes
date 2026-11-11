@@ -212,18 +212,18 @@ scenarios:
   - npu: Atlas 800 A2
     precision: BF16
     deployment: Single-Node
-    case: TP4 32k Context (A2)
+    case: TP8 32k Context (A2)
     tags: [a2-single]
     strategy: single_node_A2
     steps:
       - title: Start the server
         content: |-
-          The tutorial lists the 8-card Atlas 800 A2 node as a supported prerequisite but publishes no separate A2 command; only the image tag differs (no `-a3` suffix), so the single-node command is unchanged. No A2 measurement is published, which is why this hardware is marked experimental.
+          The tutorial lists the 8-card Atlas 800 A2 node as a supported prerequisite but publishes no separate A2 command. A2 nodes in this catalog run 910B4 parts with about 32 GB per die, so the A3 TP4 layout does not fit: TP4 needs roughly 40 GB of BF16 weights per die and aborts with NPU out of memory during engine init. This scenario therefore uses TP8, which spreads the ~160 GB checkpoint to ~20 GB per die. No A2 measurement is published, which is why this hardware is marked experimental.
 
           ```bash
           vllm serve Qwen/Qwen3-Next-80B-A3B-Instruct \
             --served-model-name qwen3_next \
-            --tensor-parallel-size 4 \
+            --tensor-parallel-size 8 \
             --max-model-len {{max_model_len}} \
             --gpu-memory-utilization {{gpu_memory_utilization}} \
             --max-num-batched-tokens {{max_num_batched_tokens}} \

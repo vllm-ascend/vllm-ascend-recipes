@@ -211,18 +211,18 @@ scenarios:
   - npu: Atlas 800 A2
     precision: BF16
     deployment: 单节点
-    case: TP4 32k 上下文（A2）
+    case: TP8 32k 上下文（A2）
     tags: [a2-single]
     strategy: single_node_A2
     steps:
       - title: 启动服务
         content: |-
-          教程把 8 卡 Atlas 800 A2 节点列为受支持的前置条件，但没有单独给出 A2 命令；只有镜像 tag 不同（没有 `-a3` 后缀），因此单节点命令保持不变。教程没有发布 A2 的实测数据，这也是该硬件标记为 experimental 的原因。
+          教程把 8 卡 Atlas 800 A2 节点列为受支持的前置条件，但没有单独给出 A2 命令。本目录中的 A2 机器为 910B4，单 die 约 32 GB，因此无法沿用 A3 的 TP4 布局：TP4 时 BF16 权重每 die 约 40 GB，引擎初始化阶段会直接 NPU OOM。该场景改用 TP8，把约 160 GB 的权重摊到每 die 约 20 GB。教程没有发布 A2 的实测数据，这也是该硬件标记为 experimental 的原因。
 
           ```bash
           vllm serve Qwen/Qwen3-Next-80B-A3B-Instruct \
             --served-model-name qwen3_next \
-            --tensor-parallel-size 4 \
+            --tensor-parallel-size 8 \
             --max-model-len {{max_model_len}} \
             --gpu-memory-utilization {{gpu_memory_utilization}} \
             --max-num-batched-tokens {{max_num_batched_tokens}} \
