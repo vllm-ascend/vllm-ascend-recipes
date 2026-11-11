@@ -1,0 +1,26 @@
+{
+  "recipe_path": "models/en/Qwen/Qwen3-VL-235B-A22B-Instruct.yaml",
+  "hw_key": "mixed",
+  "image": "mixed; see hardware_runs",
+  "scenarios": [],
+  "missing_reason": "selected hardware job did not provide results",
+  "hardware_runs": [
+    {
+      "recipe_path": "models/en/Qwen/Qwen3-VL-235B-A22B-Instruct.yaml",
+      "hw_key": "atlas_800_a3",
+      "image": "quay.nju.edu.cn/ascend/vllm-ascend:v0.23.0.post1-a3",
+      "scenarios": [],
+      "missing_reason": "selected hardware job did not provide results",
+      "status": "unknown"
+    },
+    {
+      "recipe_path": "models/en/Qwen/Qwen3-VL-235B-A22B-Instruct.yaml",
+      "hw_key": "ascend_950dt",
+      "image": "quay.nju.edu.cn/ascend/vllm-ascend:v0.23.0.post1-a5",
+      "scenarios": [],
+      "missing_reason": "selected hardware job did not provide results",
+      "status": "unknown"
+    }
+  ],
+  "head_sha": "fd1f0ea5bc906ae932578a2ef03783b6f28ad32c"
+}
