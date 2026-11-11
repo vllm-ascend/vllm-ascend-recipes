@@ -26,11 +26,11 @@ model:
   base_env:
     VLLM_USE_MODELSCOPE: "True"
   docker_image:
-    atlas_800_a3: "quay.io/ascend/vllm-ascend:v0.23.0-a3"
-    atlas_800_a2: "quay.io/ascend/vllm-ascend:v0.23.0"
+    atlas_800_a3: "quay.io/ascend/vllm-ascend:v0.23.0.post1-a3"
+    atlas_800_a2: "quay.io/ascend/vllm-ascend:v0.23.0.post1"
   nightly_required: false
   # vLLM-Ascend 自 v0.30.0 起已停止支持该模型，main 上的教程只剩 295 字节的废弃提示。
-  # 本 recipe 的所有命令均取自 v0.23.0 教程 tag，并对应 v0.23.0 镜像；
+  # 本 recipe 的所有命令均取自 v0.23.0.post1 教程 tag，并对应 v0.23.0.post1 镜像；
   # 若没有新的教程可引用，不要把这些 tag 换成更新的版本。
   install:
     pip: false
@@ -86,7 +86,7 @@ config_params:
 overview: |-
   Qwen3-Next-80B-A3B-Instruct 是 Qwen3-Next 系列中的高稀疏 MoE 模型，总参数量 80B，每 token 激活 3B 参数。相比 Qwen3 的 MoE 架构，它改进了混合注意力机制并引入多 token 预测头；教程称这些改动提升了长上下文和大总参数量下的训练与推理效率。vLLM-Ascend 通过 Triton Ascend 运行该模型，教程明确标注其为实验特性：不同版本之间的稳定性、精度和性能都可能变化。
 
-  **已废弃。** vLLM-Ascend 在 v0.30.0 中停止支持该模型，main 上的教程现在只是一个指向 v0.23.0 文档的废弃提示。本 recipe 的全部命令都复制自该 v0.23.0 教程，并对应 v0.23.0 镜像（vLLM-Ascend `v0.23.0`）。请把它当作历史配置与已发布实测数据的记录，而不是当前版本上仍受支持的部署方案。
+  **已废弃。** vLLM-Ascend 在 v0.30.0 中停止支持该模型，main 上的教程现在只是一个指向 v0.23.0.post1 文档的废弃提示。本 recipe 的全部命令都复制自该 v0.23.0.post1 教程，并对应 v0.23.0.post1 镜像（vLLM-Ascend `v0.23.0.post1`）。请把它当作历史配置与已发布实测数据的记录，而不是当前版本上仍受支持的部署方案。
 
   教程只记录了一种单节点部署：在一台 Atlas 800 A3 节点（64G × 16）上使用 BF16 权重、张量并行 4 和全量 Decode ACLGraph；其前置条件也接受一台 Atlas 800 A2 节点（64G × 8）。已发布的性能数字是在两节点 A3-752T 集群上测得的，因此单节点启动命令与基准测试所用的拓扑并不相同。
 
@@ -107,16 +107,16 @@ prerequisites:
       `Qwen3-Next-80B-A3B-Instruct` 需要一台 Atlas 800 A3（64G × 16）节点内的 8 张卡，或一台 Atlas 800 A2（64G × 8）节点内的 8 张卡。教程没有为昇腾发布量化权重，下面所有场景都使用 BF16 权重：参数量约 160 GB，最小可运行显存预算为 192 GB（不含 KV 缓存）。
   - title: 运行时版本
     content: |-
-      vLLM-Ascend 从 `v0.10.2rc1` 开始支持该模型，教程称其可从 `v0.16.0` 起稳定运行。本 recipe 对应 v0.23.0 的文档与镜像；由于该模型在 v0.30.0 已停止支持，之后的版本没有教程覆盖。
+      vLLM-Ascend 从 `v0.10.2rc1` 开始支持该模型，教程称其可从 `v0.16.0` 起稳定运行。本 recipe 对应 v0.23.0.post1 的文档与镜像；由于该模型在 v0.30.0 已停止支持，之后的版本没有教程覆盖。
 
 env_setup:
   container:
     A3:
       content: |-
-        在 Atlas 800 A3 节点上启动该镜像。教程把镜像 tag 写成版本占位符；在 v0.23.0 文档中它解析为 v0.23.0 的 A3 镜像，端口映射与下文 `vllm serve` 的默认端口一致。
+        在 Atlas 800 A3 节点上启动该镜像。教程把镜像 tag 写成版本占位符；在 v0.23.0.post1 文档中它解析为 v0.23.0.post1 的 A3 镜像，端口映射与下文 `vllm serve` 的默认端口一致。
 
         ```bash
-        export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0-a3
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0.post1-a3
         docker run --rm \
         --shm-size=1g \
         --name vllm-ascend-qwen3 \
@@ -153,7 +153,7 @@ env_setup:
         教程把 A2 镜像作为注释与 A3 镜像并列给出：同一个 tag，去掉 `-a3` 后缀。上面的 `docker run` 除设备数量外不变，A2 节点使用 8 张卡（`/dev/davinci0` 到 `/dev/davinci7`）。
 
         ```bash
-        export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0.post1
         ```
   pip:
     content: |-
@@ -246,7 +246,7 @@ scenarios:
           ```
 
 verification: |-
-  本 recipe 在迁移过程中没有重新实机运行：所有命令都复制自 v0.23.0 教程，这是最后一个记录该模型的版本（vLLM-Ascend 在 v0.30.0 停止支持，main 上只剩废弃提示）。教程声明的预期结果是：服务依次打印 `Started server process`、`Waiting for application startup.` 和 `Application startup complete.`，chat completion 请求返回 HTTP 200，响应 JSON 中包含 `choices` 字段。教程针对 `Who are you?` 的示例响应带有关于 Qwen 由通义实验室研发的助手文本、`reasoning` 字段，以及因 32 个补全 token 上限而产生的 `finish_reason: length`。
+  本 recipe 在迁移过程中没有重新实机运行：所有命令都复制自 v0.23.0.post1 教程，这是最后一个记录该模型的版本（vLLM-Ascend 在 v0.30.0 停止支持，main 上只剩废弃提示）。教程声明的预期结果是：服务依次打印 `Started server process`、`Waiting for application startup.` 和 `Application startup complete.`，chat completion 请求返回 HTTP 200，响应 JSON 中包含 `choices` 字段。教程针对 `Who are you?` 的示例响应带有关于 Qwen 由通义实验室研发的助手文本、`reasoning` 字段，以及因 32 个补全 token 上限而产生的 `finish_reason: length`。
 
   请把 `<server_ip>` 和 `<port>` 替换为实际运行 API 服务的节点地址与端口。本 recipe 中没有任何精度或时延数字是在迁移过程中测得的，全部引用自教程。
 
@@ -281,8 +281,8 @@ tuning: |-
   需要更长窗口时，先调大 `--max-model-len`；若显存不足，优先降低 `--max-num-batched-tokens` 或 `--gpu-memory-utilization`。1M token 的 `long_context` 特性继承自上游 vLLM recipe，昇腾教程并未验证它，教程最多只覆盖到 128k。
 
 references:
-  - title: "官方 vLLM-Ascend 教程（v0.23.0）"
-    url: https://github.com/vllm-project/vllm-ascend/blob/v0.23.0/docs/source/tutorials/models/Qwen3-Next.md
+  - title: "官方 vLLM-Ascend 教程（v0.23.0.post1）"
+    url: https://github.com/vllm-project/vllm-ascend/blob/v0.23.0.post1/docs/source/tutorials/models/Qwen3-Next.md
   - title: "BF16 权重（ModelScope）"
     url: https://www.modelscope.cn/models/Qwen/Qwen3-Next-80B-A3B-Instruct
   - title: "模型卡（HuggingFace）"
