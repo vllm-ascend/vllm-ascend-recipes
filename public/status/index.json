@@ -37,6 +37,9 @@
       "slug": "Qwen3-Embedding-0.6B"
     },
     {
+      "slug": "Qwen3-Next-80B-A3B-Instruct"
+    },
+    {
       "slug": "Qwen3-Reranker"
     },
     {
