@@ -389,3 +389,12 @@ def test_main_hardware_filter(tmp_path, monkeypatch):
     assert [r["combo_id"] for r in manifest["combos"]] == ["a5-c"]
     matrix = json.loads((out_dir / "matrix.json").read_text(encoding="utf-8"))
     assert [m["combo"] for m in matrix["include"]] == ["a5-c"]
+
+    # Multiple chips (with whitespace tolerance) keep every matching combo.
+    out_dir2 = tmp_path / "out-multi"
+    rc = gen.main(["--map", str(map_file), "--out", str(out_dir2), "--runner-labels", str(labels_file), "--hardware", " a3, a5 "])
+    assert rc == 0
+    manifest = json.loads((out_dir2 / "manifest.json").read_text(encoding="utf-8"))
+    assert sorted(r["combo_id"] for r in manifest["combos"]) == ["a3-c", "a5-c"]
+    matrix = json.loads((out_dir2 / "matrix.json").read_text(encoding="utf-8"))
+    assert sorted(m["combo"] for m in matrix["include"]) == ["a3-c", "a5-c"]
