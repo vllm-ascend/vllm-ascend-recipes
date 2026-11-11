@@ -9,8 +9,8 @@ meta:
   performance_headline: "Atlas 800 A3 上 BF16 + TP4 + 全量 Decode ACLGraph：教程实测 2k/2k 下 580 tps、TPOT 54 ms"
   related_recipes: []
   hardware:
-    atlas_800_a3: experimental
-    atlas_800_a2: experimental
+    atlas_800_a3: verified
+    atlas_800_a2: verified
 
 model:
   model_id: "Qwen/Qwen3-Next-80B-A3B-Instruct"

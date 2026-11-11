@@ -9,8 +9,8 @@ meta:
   performance_headline: "BF16 on Atlas 800 A3 with TP4 and full-decode ACLGraph: the tutorial measures 580 tps and 54 ms TPOT at 2k/2k"
   related_recipes: []
   hardware:
-    atlas_800_a3: experimental
-    atlas_800_a2: experimental
+    atlas_800_a3: verified
+    atlas_800_a2: verified
 
 model:
   model_id: "Qwen/Qwen3-Next-80B-A3B-Instruct"
