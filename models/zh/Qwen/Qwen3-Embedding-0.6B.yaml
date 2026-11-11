@@ -7,7 +7,7 @@ meta:
   difficulty: beginner
   performance_headline: 'Atlas 800I A2 / Atlas 300I DUO 单节点单卡 pooling 部署'
   hardware:
-    atlas_800_a2: verified
+    atlas_800_a2: experimental
 
 model:
   model_id: 'Qwen/Qwen3-Embedding-0.6B'
@@ -21,16 +21,16 @@ model:
     - '--runner'
     - 'pooling'
   docker_image:
-    atlas_800_a2: 'quay.io/ascend/vllm-ascend:v0.30.0rc2'
-    atlas_800_a3: 'quay.io/ascend/vllm-ascend:v0.30.0rc2-a3'
-    ascend_950dt: 'quay.io/ascend/vllm-ascend:v0.30.0rc2-a5'
-    atlas_300i_duo: 'quay.io/ascend/vllm-ascend:v0.30.0rc2-310p'
+    atlas_800_a2: 'quay.io/ascend/vllm-ascend:v0.23.0.post1'
+    atlas_800_a3: 'quay.io/ascend/vllm-ascend:v0.23.0.post1-a3'
+    ascend_950dt: 'quay.io/ascend/vllm-ascend:v0.23.0.post1-a5'
+    atlas_300i_duo: 'quay.io/ascend/vllm-ascend:v0.23.0.post1-310p'
   nightly_required: false
   install:
     # Ascend 推荐使用 Docker；pip 需要源码编译（无官方 wheel），因此隐藏 pip 页签。
     pip: false
     docker:
-      command: 'docker run --rm --name vllm-ascend --shm-size=1g --net=host --device /dev/davinci0 --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc -v /root/.cache:/root/.cache -it quay.io/ascend/vllm-ascend:v0.30.0rc2 bash'
+      command: 'docker run --rm --name vllm-ascend --shm-size=1g --net=host --device /dev/davinci0 --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc -v /root/.cache:/root/.cache -it quay.io/ascend/vllm-ascend:v0.23.0.post1 bash'
       note: '官方昇腾镜像；完整设备/驱动挂载见环境准备中的容器配置。'
 
 compatible_strategies:
@@ -137,13 +137,13 @@ env_setup:
         **拉取镜像：**
 
         ```bash
-        docker pull quay.io/ascend/vllm-ascend:v0.30.0rc2
+        docker pull quay.io/ascend/vllm-ascend:v0.23.0.post1
         ```
 
         **启动容器：**
 
         ```bash
-        export IMAGE=quay.io/ascend/vllm-ascend:v0.30.0rc2
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0.post1
 
         docker run --rm \
             --name vllm-ascend \
@@ -170,7 +170,7 @@ env_setup:
         可以使用官方一体化 Docker 镜像直接运行 `Qwen3-Embedding`。
 
         ```bash
-        export IMAGE=quay.io/ascend/vllm-ascend:v0.30.0rc2-a3
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0.post1-a3
 
         docker run --rm \
             --name vllm-ascend \
@@ -195,7 +195,7 @@ env_setup:
         以下命令使用面向 Ascend 950DT&950PR 产品的 Ubuntu 镜像启动容器。
 
         ```bash
-        export IMAGE=quay.io/ascend/vllm-ascend:v0.30.0rc2-a5
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0.post1-a5
 
         docker run --rm \
             --name vllm-ascend \
@@ -219,7 +219,7 @@ env_setup:
         Atlas 300I DUO 请使用 `-310p` 镜像：
 
         ```bash
-        export IMAGE=quay.io/ascend/vllm-ascend:v0.30.0rc2-310p
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0.post1-310p
 
         docker run --rm \
             --name vllm-ascend \
