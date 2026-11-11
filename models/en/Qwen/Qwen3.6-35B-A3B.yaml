@@ -105,6 +105,9 @@ overview: |-
   Qwen3.6-35B-A3B is a multimodal sparse MoE model with 35B total parameters and about 3B active parameters per token. Its hybrid attention architecture supports long-context serving, W8A8 quantization, expert parallelism, and MTP.
 
 weight_download:
+  # Mirrors the tutorial 3.1 weight table (five weight versions).
+  # The tutorial links ModelScope only for every version, so no other
+  # download host is listed here.
   - weight_version: BF16
     sources:
       - source: ModelScope
@@ -123,7 +126,7 @@ weight_download:
           pip install modelscope
           modelscope download --model Eco-Tech/Qwen3.6-35B-A3B-w8a8
           ```
-  - weight_version: W8A8 MXFP8 (Ascend 950DT)
+  - weight_version: W8A8 MXFP8
     sources:
       - source: ModelScope
         url: https://www.modelscope.cn/models/Eco-Tech/Qwen3.6-35B-A3B-w8a8-mxfp8
@@ -132,18 +135,49 @@ weight_download:
           pip install modelscope
           modelscope download --model Eco-Tech/Qwen3.6-35B-A3B-w8a8-mxfp8
           ```
+  - weight_version: W8A8C8 MXFP8
+    sources:
+      - source: ModelScope
+        url: https://www.modelscope.cn/models/Eco-Tech/Qwen3.6-35B-A3B-w8a8c8-mxfp8
+        command: |-
+          ```bash
+          pip install modelscope
+          modelscope download --model Eco-Tech/Qwen3.6-35B-A3B-w8a8c8-mxfp8
+          ```
+  - weight_version: W4A8 MXFP
+    sources:
+      - source: ModelScope
+        url: https://www.modelscope.cn/models/Eco-Tech/Qwen3.6-35B-A3B-w4a8-mxfp
+        command: |-
+          ```bash
+          pip install modelscope
+          modelscope download --model Eco-Tech/Qwen3.6-35B-A3B-w4a8-mxfp
+          ```
 
 prerequisites:
-  - title: Model weight and runtime
+  - title: Model weight
     content: |-
-      A2/A3 and Atlas 300I DUO use Eco-Tech/Qwen3.6-35B-A3B-w8a8. Ascend 950DT uses Eco-Tech/Qwen3.6-35B-A3B-w8a8-mxfp8. Use the latest nightly image matching the target hardware and record the main tutorial commit and image digest during verification.
+      The tutorial ships five weight versions. Pick the one that matches your hardware and fetch it with the weight tab above; this table records which versions exist and where each one is published.
+
+      | Weight version | Hardware requirement | Published on |
+      | -------------- | -------------------- | ------------ |
+      | BF16 (`Qwen/Qwen3.6-35B-A3B`) | 1 Ascend 950DT (96GB x 8) node, 1 Atlas 800 A3 (64GB x 16) node, 1 Atlas 800 A2 (64GB x 8) node, or Atlas 300I DUO | ModelScope |
+      | W8A8 (`Eco-Tech/Qwen3.6-35B-A3B-w8a8`) | 1 Atlas 800 A3 (64GB x 16) node, 1 Atlas 800 A2 (64GB x 8) node, or Atlas 300I DUO | ModelScope |
+      | W8A8 MXFP8 (`Eco-Tech/Qwen3.6-35B-A3B-w8a8-mxfp8`) | 1 Ascend 950DT (96GB x 8) node | ModelScope |
+      | W8A8C8 MXFP8 (`Eco-Tech/Qwen3.6-35B-A3B-w8a8c8-mxfp8`) | 1 Ascend 950DT (96GB x 8) node | ModelScope |
+      | W4A8 MXFP (`Eco-Tech/Qwen3.6-35B-A3B-w4a8-mxfp`) | 1 Ascend 950DT (96GB x 8) node | ModelScope |
+
+      The tutorial publishes every version on ModelScope, so ModelScope is the only download host listed. Download the weight to a shared directory such as `/root/.cache/` and record the path, because the deployment commands resolve the model from it.
+  - title: Container image and runtime
+    content: |-
+      Every command below uses `quay.io/ascend/vllm-ascend:v0.30.0` and its per-product tags (`-a3`, `-a5`, `-310p`), the same pins as `model.docker_image` and the tutorial 4.1 image commands. Nightly images are not used: the tutorial configuration fails on `nightly-main-a3` (vLLM Ascend 0.19.1rc2.dev3230+g469c6c260) with a TransData error, as recorded in the verification section. Record the main tutorial commit and the exact image digest when you reproduce a scenario.
 
 env_setup:
   container:
     A3:
       content: |-
         ```bash
-        export IMAGE=quay.io/ascend/vllm-ascend:nightly-main-a3
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.30.0-a3
         DEVS=""
         for i in $(seq 0 15); do DEVS="$DEVS --device /dev/davinci$i"; done
         docker run --rm --name vllm-ascend --net=host --shm-size=1g $DEVS \
@@ -160,7 +194,7 @@ env_setup:
     A2:
       content: |-
         ```bash
-        export IMAGE=quay.io/ascend/vllm-ascend:nightly-main
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.30.0
         DEVS=""
         for i in $(seq 0 7); do DEVS="$DEVS --device /dev/davinci$i"; done
         docker run --rm --name vllm-ascend --net=host --shm-size=1g $DEVS \
@@ -177,7 +211,7 @@ env_setup:
     Ascend 950DT:
       content: |-
         ```bash
-        export IMAGE=quay.io/ascend/vllm-ascend:nightly-main-a5
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.30.0-a5
         DEVS=""
         for i in $(seq 0 7); do DEVS="$DEVS --device /dev/davinci$i"; done
         docker run --rm --name vllm-ascend --net=host --shm-size=500g $DEVS \
@@ -194,7 +228,7 @@ env_setup:
     Atlas 300I DUO:
       content: |-
         ```bash
-        export IMAGE=quay.io/ascend/vllm-ascend:nightly-main-310p
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.30.0-310p
         docker run --rm --name vllm-ascend --shm-size=10g --net=host \
           --device /dev/davinci0 --device /dev/davinci1 \
           --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc \
@@ -369,3 +403,7 @@ references:
     url: https://www.modelscope.cn/models/Eco-Tech/Qwen3.6-35B-A3B-w8a8
   - title: "W8A8 MXFP8 checkpoint"
     url: https://www.modelscope.cn/models/Eco-Tech/Qwen3.6-35B-A3B-w8a8-mxfp8
+  - title: "W8A8C8 MXFP8 checkpoint"
+    url: https://www.modelscope.cn/models/Eco-Tech/Qwen3.6-35B-A3B-w8a8c8-mxfp8
+  - title: "W4A8 MXFP checkpoint"
+    url: https://www.modelscope.cn/models/Eco-Tech/Qwen3.6-35B-A3B-w4a8-mxfp

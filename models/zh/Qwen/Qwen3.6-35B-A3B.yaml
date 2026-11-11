@@ -105,6 +105,8 @@ overview: |-
   Qwen3.6-35B-A3B 是多模态稀疏 MoE 模型，总参数量为 35B，每 token 激活约 3B 参数。其混合注意力架构支持长上下文推理、W8A8 量化、专家并行和 MTP。
 
 weight_download:
+  # 与教程 3.1 权重表保持一致（共五个权重版本）。
+  # 教程中每个版本的下载链接均为 ModelScope，因此这里不列出其他下载站点。
   - weight_version: BF16
     sources:
       - source: ModelScope
@@ -123,7 +125,7 @@ weight_download:
           pip install modelscope
           modelscope download --model Eco-Tech/Qwen3.6-35B-A3B-w8a8
           ```
-  - weight_version: W8A8 MXFP8（Ascend 950DT）
+  - weight_version: W8A8 MXFP8
     sources:
       - source: ModelScope
         url: https://www.modelscope.cn/models/Eco-Tech/Qwen3.6-35B-A3B-w8a8-mxfp8
@@ -132,18 +134,49 @@ weight_download:
           pip install modelscope
           modelscope download --model Eco-Tech/Qwen3.6-35B-A3B-w8a8-mxfp8
           ```
+  - weight_version: W8A8C8 MXFP8
+    sources:
+      - source: ModelScope
+        url: https://www.modelscope.cn/models/Eco-Tech/Qwen3.6-35B-A3B-w8a8c8-mxfp8
+        command: |-
+          ```bash
+          pip install modelscope
+          modelscope download --model Eco-Tech/Qwen3.6-35B-A3B-w8a8c8-mxfp8
+          ```
+  - weight_version: W4A8 MXFP
+    sources:
+      - source: ModelScope
+        url: https://www.modelscope.cn/models/Eco-Tech/Qwen3.6-35B-A3B-w4a8-mxfp
+        command: |-
+          ```bash
+          pip install modelscope
+          modelscope download --model Eco-Tech/Qwen3.6-35B-A3B-w4a8-mxfp
+          ```
 
 prerequisites:
-  - title: 模型权重与运行环境
+  - title: 模型权重
     content: |-
-      A2/A3 和 Atlas 300I DUO 使用 Eco-Tech/Qwen3.6-35B-A3B-w8a8，Ascend 950DT 使用 Eco-Tech/Qwen3.6-35B-A3B-w8a8-mxfp8。请使用与目标硬件匹配的最新 nightly 镜像，并在验证时记录 main 教程提交与准确的镜像摘要。
+      教程提供五个权重版本。请选择与您的硬件匹配的版本，并在上方权重页签中下载；下表记录各版本的存在情况和发布渠道。
+
+      | 权重版本 | 硬件要求 | 发布渠道 |
+      | -------- | -------- | -------- |
+      | BF16（`Qwen/Qwen3.6-35B-A3B`） | 1 个 Ascend 950DT（96GB x 8）节点、1 个 Atlas 800 A3（64GB x 16）节点、1 个 Atlas 800 A2（64GB x 8）节点，或 Atlas 300I DUO | ModelScope |
+      | W8A8（`Eco-Tech/Qwen3.6-35B-A3B-w8a8`） | 1 个 Atlas 800 A3（64GB x 16）节点、1 个 Atlas 800 A2（64GB x 8）节点，或 Atlas 300I DUO | ModelScope |
+      | W8A8 MXFP8（`Eco-Tech/Qwen3.6-35B-A3B-w8a8-mxfp8`） | 1 个 Ascend 950DT（96GB x 8）节点 | ModelScope |
+      | W8A8C8 MXFP8（`Eco-Tech/Qwen3.6-35B-A3B-w8a8c8-mxfp8`） | 1 个 Ascend 950DT（96GB x 8）节点 | ModelScope |
+      | W4A8 MXFP（`Eco-Tech/Qwen3.6-35B-A3B-w4a8-mxfp`） | 1 个 Ascend 950DT（96GB x 8）节点 | ModelScope |
+
+      教程中每个权重版本都发布在 ModelScope，因此这里只列出 ModelScope。请将权重下载到多节点共享目录（例如 `/root/.cache/`）并记录路径，部署命令会从该路径加载模型。
+  - title: 容器镜像与运行环境
+    content: |-
+      下文所有命令使用 `quay.io/ascend/vllm-ascend:v0.30.0` 及其分产品标签（`-a3`、`-a5`、`-310p`），与 `model.docker_image` 及教程 4.1 的镜像命令保持一致。这里不使用 nightly 镜像：在 `nightly-main-a3`（vLLM Ascend 0.19.1rc2.dev3230+g469c6c260）上教程配置会因 TransData 报错而失败，详见下文“功能验证”部分。复现场景时请记录 main 教程提交与准确的镜像摘要。
 
 env_setup:
   container:
     A3:
       content: |-
         ```bash
-        export IMAGE=quay.io/ascend/vllm-ascend:nightly-main-a3
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.30.0-a3
         DEVS=""
         for i in $(seq 0 15); do DEVS="$DEVS --device /dev/davinci$i"; done
         docker run --rm --name vllm-ascend --net=host --shm-size=1g $DEVS \
@@ -160,7 +193,7 @@ env_setup:
     A2:
       content: |-
         ```bash
-        export IMAGE=quay.io/ascend/vllm-ascend:nightly-main
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.30.0
         DEVS=""
         for i in $(seq 0 7); do DEVS="$DEVS --device /dev/davinci$i"; done
         docker run --rm --name vllm-ascend --net=host --shm-size=1g $DEVS \
@@ -177,7 +210,7 @@ env_setup:
     Ascend 950DT:
       content: |-
         ```bash
-        export IMAGE=quay.io/ascend/vllm-ascend:nightly-main-a5
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.30.0-a5
         DEVS=""
         for i in $(seq 0 7); do DEVS="$DEVS --device /dev/davinci$i"; done
         docker run --rm --name vllm-ascend --net=host --shm-size=500g $DEVS \
@@ -194,7 +227,7 @@ env_setup:
     Atlas 300I DUO:
       content: |-
         ```bash
-        export IMAGE=quay.io/ascend/vllm-ascend:nightly-main-310p
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.30.0-310p
         docker run --rm --name vllm-ascend --shm-size=10g --net=host \
           --device /dev/davinci0 --device /dev/davinci1 \
           --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc \
@@ -367,3 +400,7 @@ references:
     url: https://www.modelscope.cn/models/Eco-Tech/Qwen3.6-35B-A3B-w8a8
   - title: "W8A8 MXFP8 权重"
     url: https://www.modelscope.cn/models/Eco-Tech/Qwen3.6-35B-A3B-w8a8-mxfp8
+  - title: "W8A8C8 MXFP8 权重"
+    url: https://www.modelscope.cn/models/Eco-Tech/Qwen3.6-35B-A3B-w8a8c8-mxfp8
+  - title: "W4A8 MXFP 权重"
+    url: https://www.modelscope.cn/models/Eco-Tech/Qwen3.6-35B-A3B-w4a8-mxfp
