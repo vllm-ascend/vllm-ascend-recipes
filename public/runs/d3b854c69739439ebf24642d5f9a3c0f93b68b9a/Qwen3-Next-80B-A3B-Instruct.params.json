@@ -1,0 +1,83 @@
+{
+  "verification_scope": "single-node API smoke; not accuracy or full feature coverage",
+  "recipe_path": "models/en/Qwen/Qwen3-Next-80B-A3B-Instruct.yaml",
+  "model_id": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+  "hw_key": "mixed",
+  "head_sha": "d3b854c69739439ebf24642d5f9a3c0f93b68b9a",
+  "workflow_run_id": "43017549558",
+  "trigger_type": "pr",
+  "image": "mixed; see hardware_runs",
+  "started_at": "2026-11-11T12:06:51Z",
+  "scenarios": [
+    {
+      "index": 0,
+      "npu": "Atlas 800 A2",
+      "precision": "BF16",
+      "deployment": "Single-Node",
+      "case": "TP8 32k Context (A2)",
+      "serve_cmd": "vllm serve /root/.cache/modelscope/hub/models/Qwen/Qwen3-Next-80B-A3B-Instruct \\\n  --served-model-name qwen3_next \\\n  --tensor-parallel-size 8 \\\n  --max-model-len 32768 \\\n  --gpu-memory-utilization 0.8 \\\n  --max-num-batched-tokens 4096 \\\n  --compilation-config '{\"cudagraph_mode\":\"FULL_DECODE_ONLY\"}'",
+      "verification_status": "pass",
+      "verification_reason": "Task API response validated"
+    },
+    {
+      "index": 0,
+      "npu": "Atlas 800 A3",
+      "precision": "BF16",
+      "deployment": "Single-Node",
+      "case": "TP4 32k Context (A3)",
+      "serve_cmd": "vllm serve /root/.cache/modelscope/hub/models/Qwen/Qwen3-Next-80B-A3B-Instruct \\\n  --served-model-name qwen3_next \\\n  --tensor-parallel-size 4 \\\n  --max-model-len 32768 \\\n  --gpu-memory-utilization 0.8 \\\n  --max-num-batched-tokens 4096 \\\n  --compilation-config '{\"cudagraph_mode\":\"FULL_DECODE_ONLY\"}'",
+      "verification_status": "pass",
+      "verification_reason": "Task API response validated"
+    }
+  ],
+  "hardware_runs": [
+    {
+      "verification_scope": "single-node API smoke; not accuracy or full feature coverage",
+      "recipe_path": "models/en/Qwen/Qwen3-Next-80B-A3B-Instruct.yaml",
+      "model_id": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+      "hw_key": "atlas_800_a2",
+      "head_sha": "d3b854c69739439ebf24642d5f9a3c0f93b68b9a",
+      "workflow_run_id": "43017549558",
+      "trigger_type": "pr",
+      "image": "quay.nju.edu.cn/ascend/vllm-ascend:v0.23.0.post1",
+      "started_at": "2026-11-11T12:06:51Z",
+      "scenarios": [
+        {
+          "index": 0,
+          "npu": "Atlas 800 A2",
+          "precision": "BF16",
+          "deployment": "Single-Node",
+          "case": "TP8 32k Context (A2)",
+          "serve_cmd": "vllm serve /root/.cache/modelscope/hub/models/Qwen/Qwen3-Next-80B-A3B-Instruct \\\n  --served-model-name qwen3_next \\\n  --tensor-parallel-size 8 \\\n  --max-model-len 32768 \\\n  --gpu-memory-utilization 0.8 \\\n  --max-num-batched-tokens 4096 \\\n  --compilation-config '{\"cudagraph_mode\":\"FULL_DECODE_ONLY\"}'",
+          "verification_status": "pass",
+          "verification_reason": "Task API response validated"
+        }
+      ],
+      "status": "pass"
+    },
+    {
+      "verification_scope": "single-node API smoke; not accuracy or full feature coverage",
+      "recipe_path": "models/en/Qwen/Qwen3-Next-80B-A3B-Instruct.yaml",
+      "model_id": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+      "hw_key": "atlas_800_a3",
+      "head_sha": "d3b854c69739439ebf24642d5f9a3c0f93b68b9a",
+      "workflow_run_id": "43017549558",
+      "trigger_type": "pr",
+      "image": "quay.nju.edu.cn/ascend/vllm-ascend:v0.23.0.post1-a3",
+      "started_at": "2026-11-11T12:06:51Z",
+      "scenarios": [
+        {
+          "index": 0,
+          "npu": "Atlas 800 A3",
+          "precision": "BF16",
+          "deployment": "Single-Node",
+          "case": "TP4 32k Context (A3)",
+          "serve_cmd": "vllm serve /root/.cache/modelscope/hub/models/Qwen/Qwen3-Next-80B-A3B-Instruct \\\n  --served-model-name qwen3_next \\\n  --tensor-parallel-size 4 \\\n  --max-model-len 32768 \\\n  --gpu-memory-utilization 0.8 \\\n  --max-num-batched-tokens 4096 \\\n  --compilation-config '{\"cudagraph_mode\":\"FULL_DECODE_ONLY\"}'",
+          "verification_status": "pass",
+          "verification_reason": "Task API response validated"
+        }
+      ],
+      "status": "pass"
+    }
+  ]
+}
