@@ -23,6 +23,7 @@ CI workflow itself.
 """
 
 import importlib.util
+import json
 import shlex
 from pathlib import Path
 
@@ -164,7 +165,6 @@ def test_plan_combo_happy_path():
     assert meta["draft_model"] is None
     assert meta["features_resolved"] == {"spec_decoding": "dspark"}
     assert meta["runner"] == "linux-aarch64-a5-4"
-    assert meta["npu_list"] == "0,1,2,3"
     assert meta["image"] == "quay.io/ascend/vllm-ascend:v0.23.0-a5"
     assert meta["runner_image"] == ("swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/vllm-ascend:v0.23.0-a5")
     assert meta["readiness_timeout_s"] == 1800
@@ -214,7 +214,6 @@ def test_plan_combo_modelscope_and_draft_model():
     # No ASCEND_RT_VISIBLE_DEVICES in env: required_npu = tp*dp = 16.
     assert meta["required_npu"] == 16
     assert meta["runner"] == "linux-aarch64-a3-800t-16"
-    assert meta["npu_list"] == ",".join(str(i) for i in range(16))
     assert meta["port"] == 8000  # no --port in argv
 
 
@@ -310,7 +309,7 @@ def test_derive_timeouts_execute_timeout_env_widens_limits():
 # --- run.sh rendering (template 5.1 / 7) -------------------------------------
 
 
-def test_render_run_sh_overrides_visibility_and_quotes_argv():
+def test_render_run_sh_keeps_recipe_visibility_and_quotes_argv():
     meta = _plan(A5_RENDER)
     meta["env"]["LD_PRELOAD"] = "/usr/lib/aarch64-linux-gnu/libjemalloc.so.2:$LD_PRELOAD"
     script = gen.render_run_sh(meta)
@@ -321,9 +320,10 @@ def test_render_run_sh_overrides_visibility_and_quotes_argv():
     assert "export HCCL_BUFFSIZE=1024" in lines
     assert "export VLLM_USE_RUST_FRONTEND=1" in lines
     assert "export LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libjemalloc.so.2:${LD_PRELOAD:-}" in lines
-    # ...but ASCEND_RT_VISIBLE_DEVICES comes from CI_NPU_LIST, never from the recipe env.
-    assert 'export ASCEND_RT_VISIBLE_DEVICES="${CI_NPU_LIST:?CI_NPU_LIST must be set by the CI job}"' in lines
-    assert "export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3" not in lines
+    # ...and ASCEND_RT_VISIBLE_DEVICES ships exactly as the recipe render
+    # provides it; no synthetic CI_NPU_LIST override (runner scheduling trusted).
+    assert "export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3" in lines
+    assert "CI_NPU_LIST" not in script
     # argv is quoted per token, including the spec-config JSON blob.
     exec_lines = [ln for ln in lines if ln.startswith("exec ")]
     assert len(exec_lines) == 1
@@ -348,3 +348,53 @@ def test_pick_runner_prefers_smallest_fitting():
 def test_pick_runner_unknown_hardware_fails():
     with pytest.raises(gen.ComboFailure, match="unknown hardware"):
         gen.pick_runner(RUNNER_LABELS, "ascend_960c", 4, None)
+
+
+# --- --hardware chip filter (manual dispatch) ---------------------------------
+
+
+def test_main_hardware_filter(tmp_path, monkeypatch):
+    # map with one A5 combo and one A3 combo; --hardware a5 must plan only the A5 one.
+    map_file = tmp_path / "map.json"
+    map_file.write_text(
+        json.dumps(
+            {
+                "schema_version": gen.SCHEMA_VERSION,
+                "entries": [
+                    {
+                        "name": "M",
+                        "yaml": "recipes/overlays/org/M.yaml",
+                        "hf_id": "org/M",
+                        "combos": [
+                            {"id": "a5-c", "hardware": "ascend_950dt_8x", "variant": "default", "nodes": 1},
+                            {"id": "a3-c", "hardware": "ascend_910c", "variant": "default", "nodes": 1},
+                        ],
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    labels_file = tmp_path / "runner_label.json"
+    labels_file.write_text(
+        json.dumps({"linux-aarch64-a5-4": {"chip": "a5", "npu_num": 4}, "linux-aarch64-a3-4": {"chip": "a3", "npu_num": 4}}),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(gen, "fetch_render", lambda *a, **k: (dict(A5_RENDER), "https://s/x.json"))
+
+    out_dir = tmp_path / "out"
+    rc = gen.main(["--map", str(map_file), "--out", str(out_dir), "--runner-labels", str(labels_file), "--hardware", "a5"])
+    assert rc == 0
+    manifest = json.loads((out_dir / "manifest.json").read_text(encoding="utf-8"))
+    assert [r["combo_id"] for r in manifest["combos"]] == ["a5-c"]
+    matrix = json.loads((out_dir / "matrix.json").read_text(encoding="utf-8"))
+    assert [m["combo"] for m in matrix["include"]] == ["a5-c"]
+
+    # Multiple chips (with whitespace tolerance) keep every matching combo.
+    out_dir2 = tmp_path / "out-multi"
+    rc = gen.main(["--map", str(map_file), "--out", str(out_dir2), "--runner-labels", str(labels_file), "--hardware", " a3, a5 "])
+    assert rc == 0
+    manifest = json.loads((out_dir2 / "manifest.json").read_text(encoding="utf-8"))
+    assert sorted(r["combo_id"] for r in manifest["combos"]) == ["a3-c", "a5-c"]
+    matrix = json.loads((out_dir2 / "matrix.json").read_text(encoding="utf-8"))
+    assert sorted(m["combo"] for m in matrix["include"]) == ["a3-c", "a5-c"]

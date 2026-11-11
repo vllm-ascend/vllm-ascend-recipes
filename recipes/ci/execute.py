@@ -91,6 +91,8 @@ def npu_visible_count() -> int | None:
             proc = subprocess.run(args, capture_output=True, text=True, timeout=60)
         except (OSError, subprocess.TimeoutExpired):
             return None
+        print(f"[precheck] $ {' '.join(args)} -> rc={proc.returncode}\n"
+              f"{proc.stdout or proc.stderr}", flush=True)
         if proc.returncode == 0:
             matches = re.findall(pattern, proc.stdout, flags=re.MULTILINE)
             if matches:
@@ -111,10 +113,19 @@ def weights_cached(model_id: str, hub: str) -> bool:
 
 
 def precheck(meta: dict) -> str | None:
-    """Return a skip reason, or None when the combo may run."""
+    """Return a skip reason, or None when the combo may run.
+
+    NPU visibility is informational only: the runner assignment is trusted,
+    so a low npu-smi count is logged but never blocks the run.
+    """
     visible = npu_visible_count()
-    if visible is not None and visible < int(meta["required_npu"]):
-        return f"insufficient NPU: {visible} visible < {meta['required_npu']} required"
+    required = int(meta["required_npu"])
+    if visible is not None:
+        if visible < required:
+            print(f"[precheck] WARNING: {visible} visible NPU(s) < {required} required; "
+                  "trusting runner assignment and continuing", flush=True)
+        else:
+            print(f"[precheck] NPU check ok: {visible} visible >= {required} required", flush=True)
 
     job_image = os.environ.get("VLLM_ASCEND_IMAGE", "")
     if job_image and image_tag(job_image) != image_tag(str(meta["image"])):

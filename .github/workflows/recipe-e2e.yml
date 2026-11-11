@@ -33,6 +33,11 @@ on:
     paths:
       - '.github/workflows/recipe-e2e.yml'
   workflow_dispatch:
+    inputs:
+      hardware:
+        description: 'chips to run (a2/a3/a5, comma-separated; empty = all)'
+        required: false
+        default: ''
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -58,7 +63,8 @@ jobs:
           python3 recipes/ci/generate.py \
             --map recipes/ci/map.json \
             --out dist \
-            --runner-labels .github/workflows/scripts/runner_label.json
+            --runner-labels .github/workflows/scripts/runner_label.json \
+            --hardware "${{ inputs.hardware || github.event.inputs.hardware }}"
 
       - name: Generate summary
         run: cat dist/summary.md
@@ -109,7 +115,6 @@ jobs:
 
       - name: Run combo
         env:
-          CI_NPU_LIST: ${{ matrix.npu_list }}
           VLLM_ASCEND_IMAGE: ${{ matrix.image }}
         run: |
           python3 recipes/ci/execute.py \
