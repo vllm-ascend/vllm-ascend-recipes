@@ -10,7 +10,7 @@ meta:
   related_recipes:
     - "Qwen/Qwen3-VL-30B-A3B-Instruct"
   hardware:
-    atlas_800_a3: experimental
+    atlas_800_a3: verified
     atlas_800_a2: experimental
     ascend_950dt: experimental
 
