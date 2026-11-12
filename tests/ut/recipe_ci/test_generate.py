@@ -237,6 +237,29 @@ def test_plan_combo_max_with_visible_devices():
     assert meta["runner"] == "linux-aarch64-a3-800t-16"
 
 
+def test_plan_combo_uses_declared_device_mounts():
+    # A3 card carries two dies: the recipe declares 16 /dev/davinci mounts (8
+    # cards) while argv/env only say 4. The wider declaration must win, and the
+    # runner pools are sized in the same units (verification_plan.py parity).
+    render = dict(A5_RENDER)
+    render["docker_argv"] = ["docker", "run"] + [
+        token for i in range(16) for token in ("--device", f"/dev/davinci{i}")
+    ] + ["--device", "/dev/davinci_manager", "--device", "/dev/hisi_hdc"]
+    meta = _plan(render, dict(A5_COMBO, hardware="ascend_910c"))
+    assert meta["required_npu"] == 16  # from the 16 declared device mounts
+    assert meta["runner"] == "linux-aarch64-a3-800t-16"
+
+
+def test_declared_device_count_falls_back_to_command():
+    # No docker_argv: count the mounts in the docker command string instead.
+    render = {
+        "docker_command": "docker run --device /dev/davinci0 --device /dev/davinci1 "
+        "--device=/dev/davinci2 --device /dev/davinci_manager",
+    }
+    assert gen.declared_device_count(render) == 3
+    assert gen.declared_device_count({}) == 0
+
+
 # --- assertion failures (template 4.2) --------------------------------------
 
 
