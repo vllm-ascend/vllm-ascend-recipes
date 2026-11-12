@@ -112,6 +112,52 @@ def weights_cached(model_id: str, hub: str) -> bool:
     return path.is_dir() and (path / "snapshots").is_dir() and any((path / "snapshots").iterdir())
 
 
+def local_model_dir(model_id: str, hub: str) -> Path | None:
+    """Resolve a hub model id to its local cache directory, when usable.
+
+    Usable means the directory exists and holds a config.json, so vllm can
+    load the model straight from disk. Serving from a local path short-circuits
+    the hub file-list API entirely (vllm v0.23.0's modelscope listing breaks
+    on the current API response with KeyError 'Type'), which matches the
+    offline runner setup: weights are host-mounted, nothing to download.
+    """
+    path: Path | None = None
+    if hub == "modelscope":
+        base = Path(os.environ.get("MODELSCOPE_CACHE") or os.path.expanduser("~/.cache/modelscope"))
+        path = base / "hub" / "models" / model_id
+    else:
+        base = Path(os.environ.get("HF_HOME") or os.path.expanduser("~/.cache/huggingface"))
+        snapshots = base / "hub" / ("models--" + model_id.replace("/", "--")) / "snapshots"
+        if snapshots.is_dir():
+            dirs = sorted(d for d in snapshots.iterdir() if d.is_dir())
+            path = dirs[-1] if dirs else None
+    if path is not None and path.is_dir() and (path / "config.json").is_file():
+        return path
+    return None
+
+
+def localized_run_sh(combo_dir: Path, out_dir: Path, meta: dict) -> Path:
+    """Copy run.sh with hub model ids rewritten to local cache paths.
+
+    The rewritten copy lands in out_dir; the generated artifact stays intact.
+    Cache paths contain no shell metacharacters, so plain textual replacement
+    is safe both for the serve argument and for ids nested inside
+    --speculative-config JSON.
+    """
+    script = (combo_dir / "run.sh").read_text(encoding="utf-8")
+    for key in ("model_id", "draft_model"):
+        model_id = meta.get(key)
+        if not model_id:
+            continue
+        local = local_model_dir(str(model_id), str(meta["hub"]))
+        if local is not None:
+            script = script.replace(str(model_id), str(local))
+            print(f"[combo] {key}: {model_id} -> {local}", flush=True)
+    target = out_dir / "run.sh"
+    target.write_text(script, encoding="utf-8")
+    return target
+
+
 def precheck(meta: dict) -> str | None:
     """Return a skip reason, or None when the combo may run.
 
@@ -320,7 +366,8 @@ def run_combo(combo_dir: Path, results_dir: Path) -> int:
         companions: list[subprocess.Popen] = []
         started = time.monotonic()
         try:
-            engine = start_bg(["bash", str(combo_dir / "run.sh")], out_dir / "serve.log")
+            run_sh = localized_run_sh(combo_dir, out_dir, meta)
+            engine = start_bg(["bash", str(run_sh)], out_dir / "serve.log")
             base_url = f"http://127.0.0.1:{meta['port']}"
             models = wait_ready(engine, base_url, int(meta["readiness_timeout_s"]), out_dir / "serve.log")
             result["readiness_seconds"] = round(time.monotonic() - started, 1)
