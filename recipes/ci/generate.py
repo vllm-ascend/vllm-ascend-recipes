@@ -302,6 +302,27 @@ def rewrite_image(image: str, rewrites: list[dict]) -> str:
     return image
 
 
+_DAVINCI_DEVICE_RE = re.compile(r"^/dev/davinci\d+$")
+
+
+def declared_device_count(render: dict) -> int:
+    """Count the NPU device mounts the recipe declares.
+
+    Parity with ``.github/_scripts/verification_plan.py:required_cards``: the
+    recipe's own docker invocation lists one ``--device /dev/davinciN`` per
+    usable device. On A3 a card carries two dies, so an 8-card deployment
+    declares 16 entries - and the runner pools (runner_label.json) are sized in
+    those same units. ``tp*dp`` alone understates A3 (e.g. dp=4 on an 8-card
+    recipe), so the declared mounts are what the runner must fit.
+    """
+    argv = render.get("docker_argv") or []
+    count = sum(1 for token in argv if _DAVINCI_DEVICE_RE.match(str(token)))
+    if count:
+        return count
+    command = str(render.get("docker_command") or "")
+    return len(re.findall(r"--device[\s=]+/dev/davinci\d+", command))
+
+
 def pick_runner(runner_labels: dict, hardware: str, required_npu: int, override: str | None) -> str:
     """Pick a runner label from runner_label.json: same chip, smallest card
     count that fits (template section 9). Raises ComboSkip when none fits."""
@@ -345,7 +366,7 @@ def plan_combo(
     env = dict(render.get("env") or {})
     visible = env.get(NPU_VISIBILITY_ENV)
     visible_count = len(str(visible).split(",")) if visible else 0
-    required_npu = max(tp * dp * pp, visible_count)
+    required_npu = max(tp * dp * pp, visible_count, declared_device_count(render))
 
     image = str(render.get("docker_image") or "")
     if not image:
