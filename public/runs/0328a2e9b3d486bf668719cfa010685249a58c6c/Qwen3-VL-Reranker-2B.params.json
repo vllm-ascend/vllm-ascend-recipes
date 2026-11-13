@@ -4,10 +4,10 @@
   "model_id": "Qwen/Qwen3-VL-Reranker-2B",
   "hw_key": "mixed",
   "head_sha": "0328a2e9b3d486bf668719cfa010685249a58c6c",
-  "workflow_run_id": "43053454173",
+  "workflow_run_id": "43424199609",
   "trigger_type": "pr",
   "image": "mixed; see hardware_runs",
-  "started_at": "2026-11-11T15:57:13Z",
+  "started_at": "2026-11-13T12:19:33Z",
   "scenarios": [
     {
       "index": 0,
@@ -37,10 +37,10 @@
       "model_id": "Qwen/Qwen3-VL-Reranker-2B",
       "hw_key": "atlas_800_a2",
       "head_sha": "0328a2e9b3d486bf668719cfa010685249a58c6c",
-      "workflow_run_id": "43053454173",
+      "workflow_run_id": "43424199609",
       "trigger_type": "pr",
       "image": "quay.nju.edu.cn/ascend/vllm-ascend:v0.23.0.post1",
-      "started_at": "2026-11-11T15:57:13Z",
+      "started_at": "2026-11-13T12:19:33Z",
       "scenarios": [
         {
           "index": 0,
@@ -61,10 +61,10 @@
       "model_id": "Qwen/Qwen3-VL-Reranker-2B",
       "hw_key": "atlas_800_a3",
       "head_sha": "0328a2e9b3d486bf668719cfa010685249a58c6c",
-      "workflow_run_id": "43053454173",
+      "workflow_run_id": "43424199609",
       "trigger_type": "pr",
       "image": "quay.nju.edu.cn/ascend/vllm-ascend:v0.23.0.post1-a3",
-      "started_at": "2026-11-11T15:57:13Z",
+      "started_at": "2026-11-13T12:19:33Z",
       "scenarios": [
         {
           "index": 0,
