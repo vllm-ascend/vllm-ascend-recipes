@@ -4,10 +4,10 @@
   "model_id": "Eco-Tech/Qwen3.6-35B-A3B-w8a8",
   "hw_key": "mixed",
   "head_sha": "698939d35a0f05862fd5805cec09f5f01219444d",
-  "workflow_run_id": "43058723482",
+  "workflow_run_id": "43428798161",
   "trigger_type": "pr",
   "image": "mixed; see hardware_runs",
-  "started_at": "2026-11-11T16:28:41Z",
+  "started_at": "2026-11-13T12:52:02Z",
   "scenarios": [
     {
       "index": 0,
@@ -37,10 +37,10 @@
       "model_id": "Eco-Tech/Qwen3.6-35B-A3B-w8a8",
       "hw_key": "atlas_800_a2",
       "head_sha": "698939d35a0f05862fd5805cec09f5f01219444d",
-      "workflow_run_id": "43058723482",
+      "workflow_run_id": "43428798161",
       "trigger_type": "pr",
       "image": "quay.nju.edu.cn/ascend/vllm-ascend:v0.30.0",
-      "started_at": "2026-11-11T16:28:41Z",
+      "started_at": "2026-11-13T12:52:02Z",
       "scenarios": [
         {
           "index": 0,
@@ -61,10 +61,10 @@
       "model_id": "Eco-Tech/Qwen3.6-35B-A3B-w8a8",
       "hw_key": "atlas_800_a3",
       "head_sha": "698939d35a0f05862fd5805cec09f5f01219444d",
-      "workflow_run_id": "43058723482",
+      "workflow_run_id": "43428798161",
       "trigger_type": "pr",
       "image": "quay.nju.edu.cn/ascend/vllm-ascend:v0.30.0-a3",
-      "started_at": "2026-11-11T16:28:41Z",
+      "started_at": "2026-11-13T12:52:02Z",
       "scenarios": [
         {
           "index": 0,
@@ -81,11 +81,15 @@
     },
     {
       "recipe_path": "models/en/Qwen/Qwen3.6-35B-A3B.yaml",
+      "model_id": "",
       "hw_key": "ascend_950dt",
+      "head_sha": "698939d35a0f05862fd5805cec09f5f01219444d",
+      "trigger_type": "pr",
       "image": "quay.nju.edu.cn/ascend/vllm-ascend:v0.30.0-a5",
+      "started_at": "2026-11-13T12:52:02Z",
       "scenarios": [],
-      "missing_reason": "selected hardware job did not provide results",
-      "status": "unknown"
+      "skip_reason": "镜像未预装该权重 (model_id=Eco-Tech/Qwen3.6-35B-A3B-w8a8, 目录=Eco-Tech/Qwen3.6-35B-A3B-w8a8, 已尝试 ['', 'Eco-Tech', 'vllm-ascend', 'models', '/root/.cache/'])",
+      "status": "skip"
     }
   ]
 }
