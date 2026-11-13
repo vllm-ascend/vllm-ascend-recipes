@@ -21,7 +21,8 @@ Consumes the artifacts produced by ``recipes/ci/generate.py`` on the NPU job:
 
 1. prechecks: visible NPU count, container image tag vs the recipe image,
    weights cache (main model + speculative draft model),
-2. run ``run.sh`` (engine) and capture ``serve.log``,
+2. log the resolved serve command, run ``run.sh`` (engine) and capture
+   ``serve.log``,
 3. poll ``/v1/models`` until ready, start companions (vllm-router etc.),
 4. smoke test ``POST /v1/chat/completions``,
 5. teardown and write ``result.json`` (pass / fail / skip).
@@ -136,26 +137,70 @@ def local_model_dir(model_id: str, hub: str) -> Path | None:
     return None
 
 
-def localized_run_sh(combo_dir: Path, out_dir: Path, meta: dict) -> Path:
-    """Copy run.sh with hub model ids rewritten to local cache paths.
+def localized_model_paths(meta: dict) -> dict[str, str]:
+    """Map ``model_id``/``draft_model`` to their local cache dir when usable.
 
-    The rewritten copy lands in out_dir; the generated artifact stays intact.
     Cache paths contain no shell metacharacters, so plain textual replacement
     is safe both for the serve argument and for ids nested inside
     --speculative-config JSON.
     """
-    script = (combo_dir / "run.sh").read_text(encoding="utf-8")
+    paths: dict[str, str] = {}
     for key in ("model_id", "draft_model"):
         model_id = meta.get(key)
         if not model_id:
             continue
         local = local_model_dir(str(model_id), str(meta["hub"]))
         if local is not None:
-            script = script.replace(str(model_id), str(local))
-            print(f"[combo] {key}: {model_id} -> {local}", flush=True)
+            paths[key] = str(local)
+    return paths
+
+
+def localized_run_sh(combo_dir: Path, out_dir: Path, meta: dict) -> Path:
+    """Copy run.sh with hub model ids rewritten to local cache paths.
+
+    The rewritten copy lands in out_dir; the generated artifact stays intact.
+    """
+    script = (combo_dir / "run.sh").read_text(encoding="utf-8")
+    for key, local in localized_model_paths(meta).items():
+        model_id = str(meta[key])
+        script = script.replace(model_id, local)
+        print(f"[combo] {key}: {model_id} -> {local}", flush=True)
     target = out_dir / "run.sh"
     target.write_text(script, encoding="utf-8")
     return target
+
+
+def format_serve_command(meta: dict) -> str:
+    """Render the resolved serve command for the job log.
+
+    Mirrors the recipe docs' presentation: the env exports followed by
+    ``vllm serve ... \\`` with one flag per continuation line. Model ids are
+    rewritten to their local cache paths (as in the localized run.sh), so the
+    log shows the command that actually runs.
+    """
+    argv = [str(token) for token in (meta.get("argv") or [])]
+    for key, local in localized_model_paths(meta).items():
+        model_id = str(meta[key])
+        argv = [token.replace(model_id, local) for token in argv]
+
+    env = meta.get("env") or {}
+    lines = [f"export {key}={env[key]}" for key in sorted(env)]
+    head = " ".join(shlex.quote(token) for token in argv[:3])
+    flags: list[str] = []
+    i = 3
+    while i < len(argv):
+        # A flag and its value stay on one line; bare flags stand alone.
+        if argv[i].startswith("--") and i + 1 < len(argv) and not argv[i + 1].startswith("--"):
+            flags.append(f"{argv[i]} {shlex.quote(argv[i + 1])}")
+            i += 2
+        else:
+            flags.append(shlex.quote(argv[i]))
+            i += 1
+    cont = " \\"
+    lines.append(head + (cont if flags else ""))
+    for n, flag in enumerate(flags):
+        lines.append(f"    {flag}{cont if n < len(flags) - 1 else ''}")
+    return "\n".join(lines)
 
 
 def precheck(meta: dict) -> str | None:
@@ -367,6 +412,7 @@ def run_combo(combo_dir: Path, results_dir: Path) -> int:
         started = time.monotonic()
         try:
             run_sh = localized_run_sh(combo_dir, out_dir, meta)
+            print("[combo] resolved serve command:\n" + format_serve_command(meta), flush=True)
             engine = start_bg(["bash", str(run_sh)], out_dir / "serve.log")
             base_url = f"http://127.0.0.1:{meta['port']}"
             models = wait_ready(engine, base_url, int(meta["readiness_timeout_s"]), out_dir / "serve.log")

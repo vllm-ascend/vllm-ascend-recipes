@@ -19,6 +19,7 @@
 
 import importlib.util
 import json
+import shlex
 from pathlib import Path
 
 import pytest
@@ -117,3 +118,68 @@ def test_localized_run_sh_keeps_unknown_ids(tmp_path, monkeypatch):
     # No cached copy exists: the id is left exactly as rendered.
     script = target.read_text(encoding="utf-8")
     assert "org/not-cached-anywhere" in script
+
+
+# --- resolved serve command log ----------------------------------------------
+
+
+def test_format_serve_command_env_prefix_and_continuations(tmp_path, monkeypatch):
+    model = tmp_path / "cache" / "hub" / "models" / "Eco-Tech" / "model-w8a8"
+    model.mkdir(parents=True)
+    (model / "config.json").write_text("{}", encoding="utf-8")
+    monkeypatch.setenv("MODELSCOPE_CACHE", str(tmp_path / "cache"))
+    meta = {
+        "model_id": "Eco-Tech/model-w8a8",
+        "draft_model": None,
+        "hub": "modelscope",
+        "env": {"HCCL_BUFFSIZE": "1024", "ASCEND_RT_VISIBLE_DEVICES": "0,1"},
+        "argv": [
+            "vllm",
+            "serve",
+            "Eco-Tech/model-w8a8",
+            "--trust-remote-code",
+            "--data-parallel-size",
+            "4",
+            "--compilation-config",
+            '{"cudagraph_mode":"FULL_DECODE_ONLY"}',
+            "--tensor-parallel-size",
+            "4",
+        ],
+    }
+    lines = exe.format_serve_command(meta).splitlines()
+    assert lines[0] == "export ASCEND_RT_VISIBLE_DEVICES=0,1"  # env sorted, prefixed
+    assert lines[1] == "export HCCL_BUFFSIZE=1024"
+    # Local weights path, not the hub id; bare flags stand on their own line.
+    assert lines[2] == f"vllm serve {shlex.quote(str(model))} \\"
+    assert lines[3] == "    --trust-remote-code \\"
+    assert lines[4] == "    --data-parallel-size 4 \\"
+    assert lines[5] == '    --compilation-config \'{"cudagraph_mode":"FULL_DECODE_ONLY"}\' \\'
+    assert lines[6] == "    --tensor-parallel-size 4"  # last line: no continuation
+
+
+def test_format_serve_command_rewrites_nested_draft_model_id(tmp_path, monkeypatch):
+    for name in ("draft", "main"):
+        d = tmp_path / "cache" / "hub" / "models" / "org" / name
+        d.mkdir(parents=True)
+        (d / "config.json").write_text("{}", encoding="utf-8")
+    monkeypatch.setenv("MODELSCOPE_CACHE", str(tmp_path / "cache"))
+    meta = {
+        "model_id": "org/main",
+        "draft_model": "org/draft",
+        "hub": "modelscope",
+        "env": {},
+        "argv": [
+            "vllm",
+            "serve",
+            "org/main",
+            "--speculative-config",
+            '{"method":"eagle3","model":"org/draft"}',
+        ],
+    }
+    main_local = tmp_path / "cache" / "hub" / "models" / "org" / "main"
+    draft_local = tmp_path / "cache" / "hub" / "models" / "org" / "draft"
+    block = exe.format_serve_command(meta)
+    assert "org/main" not in block and "org/draft" not in block
+    assert str(main_local) in block
+    # The draft id nested inside the --speculative-config JSON is rewritten too.
+    assert f'"model":"{draft_local}"' in block
