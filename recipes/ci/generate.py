@@ -341,6 +341,50 @@ def pick_runner(runner_labels: dict, hardware: str, required_npu: int, override:
     return candidates[0][1]
 
 
+def override_flag(argv: list[str], flag: str, value: str) -> list[str]:
+    """Set ``flag value`` in argv (last-wins): replace the first occurrence,
+    drop any later duplicates, append when the flag is absent."""
+    result: list[str] = []
+    seen = False
+    i = 0
+    while i < len(argv):
+        if argv[i] == flag:
+            if not seen:
+                result += [flag, value]
+                seen = True
+            i += 2  # skip the flag's own value
+            continue
+        result.append(argv[i])
+        i += 1
+    if not seen:
+        result += [flag, value]
+    return result
+
+
+def apply_override(combo: dict, argv: list[str], env: dict) -> tuple[list[str], dict]:
+    """Apply the combo's optional local ``override`` on top of the site render.
+
+    The site renders Ascend combos through the strategy layer, which only
+    exposes DP+EP (``single_node_dep``); a ``tp`` query param is ignored, so a
+    deployment needing a wider world size (e.g. tp added to dp to fit A3's
+    per-die memory) cannot be requested upstream. The map may therefore carry::
+
+        "override": {
+            "extra_args": {"--tensor-parallel-size": "4"},
+            "extra_env": {"ASCEND_RT_VISIBLE_DEVICES": "0,1,...,15"}
+        }
+
+    ``extra_args`` overrides/append argv flags by name, ``extra_env`` overrides
+    or adds env entries; both are last-wins, so the map beats the render.
+    """
+    override = combo.get("override") or {}
+    for flag, value in (override.get("extra_args") or {}).items():
+        argv = override_flag(argv, str(flag), str(value))
+    env = dict(env)
+    env.update({str(k): str(v) for k, v in (override.get("extra_env") or {}).items()})
+    return argv, env
+
+
 def plan_combo(
     entry: dict,
     combo: dict,
@@ -351,6 +395,9 @@ def plan_combo(
 ) -> dict:
     """Validate one render and derive the execution plan (template 5/6).
 
+    The combo's local ``override`` is applied before the assertions, so
+    ``expect`` reflects the command that will actually run.
+
     Raises ComboFailure (fallback mismatch / bad shape) or ComboSkip
     (multi-node, no runner). Pure function: no I/O.
     """
@@ -360,10 +407,11 @@ def plan_combo(
 
     assert_not_adjusted(render)
     assert_single_node(render)
+    env = dict(render.get("env") or {})
+    argv, env = apply_override(combo, argv, env)
     features_resolved = resolve_spec_mode(combo, argv)
     tp, dp, pp = assert_parallel_sizes(combo, argv)
 
-    env = dict(render.get("env") or {})
     visible = env.get(NPU_VISIBILITY_ENV)
     visible_count = len(str(visible).split(",")) if visible else 0
     required_npu = max(tp * dp * pp, visible_count, declared_device_count(render))
@@ -386,6 +434,7 @@ def plan_combo(
         "variant": combo["variant"],
         "features_requested": combo.get("features") or {},
         "features_resolved": features_resolved,
+        "override": combo.get("override") or {},
         "image": image,
         "runner_image": runner_image,
         "runner": runner,
@@ -412,8 +461,9 @@ def render_run_sh(meta: dict) -> str:
     """Render ``run.sh`` from the plan (template 5.1 / 7).
 
     - env dict -> ``export K=V`` (``$VAR`` values become ``${VAR:-}``),
-    - the recipe env ships as-is (``ASCEND_RT_VISIBLE_DEVICES`` included when
-      the render has it; runner scheduling is trusted for device selection),
+    - the env ships as planned: the render's values plus any combo ``override``
+      (``ASCEND_RT_VISIBLE_DEVICES`` included when set; runner scheduling is
+      trusted for device selection),
     - the argv is re-assembled with per-token shell quoting.
     """
     lines = [
@@ -426,8 +476,9 @@ def render_run_sh(meta: dict) -> str:
         "# --- env from the recipe render ---",
     ]
     for key in sorted(meta["env"]):
-        # Keep ASCEND_RT_VISIBLE_DEVICES exactly as the recipe render ships it
-        # (runner scheduling is trusted); do not force a synthetic device list.
+        # ASCEND_RT_VISIBLE_DEVICES ships as planned (render value, or the
+        # combo override when the map widens the device list); runner
+        # scheduling is trusted, no synthetic CI_NPU_LIST override is added.
         lines.append(f"export {key}={quote_env_value(str(meta['env'][key]))}")
     lines += [
         "",

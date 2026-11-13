@@ -102,6 +102,39 @@ SOURCE_URL = (
     "https://recipes.vllm.ai/deepseek-ai/DeepSeek-V4-Flash.json?hardware=ascend_950dt_8x&variant=default&nodes=1"
 )
 
+# Shape of the DeepSeek-V4-Flash A3 W8A8+mtp render (live site, 2026-11):
+# the strategy layer only exposes DP+EP, so the site ignores a tp query param
+# and renders dp=4 with ASCEND_RT_VISIBLE_DEVICES=0,1,2,3.
+A3_RENDER = {
+    "argv": [
+        "vllm",
+        "serve",
+        "Eco-Tech/DeepSeek-V4-Flash-w8a8-mtp",
+        "--trust-remote-code",
+        "--quantization",
+        "ascend",
+        "--enable-expert-parallel",
+        "--port",
+        "8100",
+        "--data-parallel-size",
+        "4",
+        "--max-num-seqs",
+        "64",
+        "--speculative-config",
+        '{"method":"mtp","num_speculative_tokens":1,"enforce_eager":true}',
+    ],
+    "env": {
+        "ASCEND_RT_VISIBLE_DEVICES": "0,1,2,3",
+        "HCCL_BUFFSIZE": "1024",
+        "VLLM_USE_MODELSCOPE": "True",
+    },
+    "docker_image": "quay.io/ascend/vllm-ascend:v0.23.0-a3",
+    "strategy": "single_node_dep",
+    "deploy_type": "single_node",
+    "node_count": 1,
+    "selection": {"hardware": "ascend_910c", "adjusted": [], "pd": None},
+}
+
 
 def _plan(render: dict, combo: dict | None = None, entry: dict | None = None) -> dict:
     return gen.plan_combo(
@@ -258,6 +291,89 @@ def test_declared_device_count_falls_back_to_command():
     }
     assert gen.declared_device_count(render) == 3
     assert gen.declared_device_count({}) == 0
+
+
+# --- combo override (map-side command rewrite) -------------------------------
+
+
+def test_override_flag_replaces_dedupes_and_appends():
+    # Replaces the value in place...
+    assert gen.override_flag(["--data-parallel-size", "4"], "--data-parallel-size", "8") == [
+        "--data-parallel-size",
+        "8",
+    ]
+    # ...drops later duplicates...
+    assert gen.override_flag(["--a", "1", "--b", "2", "--a", "3"], "--a", "9") == ["--a", "9", "--b", "2"]
+    # ...and appends when the flag is absent.
+    assert gen.override_flag(["vllm", "serve"], "--tensor-parallel-size", "4") == [
+        "vllm",
+        "serve",
+        "--tensor-parallel-size",
+        "4",
+    ]
+
+
+def test_apply_override_last_wins_on_args_and_env():
+    argv, env = gen.apply_override(
+        {
+            "override": {
+                "extra_args": {"--data-parallel-size": "8"},
+                "extra_env": {"ASCEND_RT_VISIBLE_DEVICES": "0,1"},
+            }
+        },
+        ["vllm", "serve", "m", "--data-parallel-size", "4"],
+        {"ASCEND_RT_VISIBLE_DEVICES": "0,1,2,3", "HCCL_BUFFSIZE": "1024"},
+    )
+    assert argv.count("--data-parallel-size") == 1
+    assert gen.argv_int(argv, "--data-parallel-size") == 8
+    assert env["ASCEND_RT_VISIBLE_DEVICES"] == "0,1"
+    assert env["HCCL_BUFFSIZE"] == "1024"  # untouched env keys survive
+
+
+def test_apply_override_without_override_is_a_noop():
+    argv = ["vllm", "serve", "m"]
+    env = {"HCCL_BUFFSIZE": "1024"}
+    assert gen.apply_override({}, argv, env) == (argv, env)
+
+
+def test_plan_combo_applies_override():
+    # The site renders A3 as DP+EP (tp params are ignored); the map injects
+    # tp=4 and widens the device list so the 16-die runner is used (dp4*tp4=16).
+    combo = {
+        "id": "a3-910c-w8a8-mtp",
+        "hardware": "ascend_910c",
+        "variant": "ascend_w8a8",
+        "features": {"spec_decoding": "mtp"},
+        "expect": {"dp": 4, "tp": 4},
+        "override": {
+            "extra_args": {"--tensor-parallel-size": "4"},
+            "extra_env": {"ASCEND_RT_VISIBLE_DEVICES": ",".join(map(str, range(16)))},
+        },
+    }
+    meta = _plan(A3_RENDER, combo)
+    assert meta["tp"] == 4 and meta["dp"] == 4
+    assert meta["required_npu"] == 16
+    assert meta["runner"] == "linux-aarch64-a3-800t-16"
+    assert meta["override"] == combo["override"]
+    assert meta["argv"].count("--tensor-parallel-size") == 1
+    # run.sh carries the overridden command and env.
+    script = gen.render_run_sh(meta)
+    assert "--tensor-parallel-size 4" in script
+    assert f"export ASCEND_RT_VISIBLE_DEVICES={','.join(map(str, range(16)))}" in script
+
+
+def test_plan_combo_override_drives_expectation_mismatch():
+    # With no override the site render stays dp=4/tp=1, so expect.tp=4 fails:
+    # the map must actually inject tp, expecting it alone is not enough.
+    combo = dict(
+        id="a3-910c-w8a8-mtp",
+        hardware="ascend_910c",
+        variant="ascend_w8a8",
+        features={"spec_decoding": "mtp"},
+        expect={"dp": 4, "tp": 4},
+    )
+    with pytest.raises(gen.ComboFailure, match="tp=1 != expected 4"):
+        _plan(A3_RENDER, combo)
 
 
 # --- assertion failures (template 4.2) --------------------------------------
