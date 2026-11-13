@@ -4,10 +4,10 @@
   "model_id": "Eco-Tech/Qwen3-VL-235B-A22B-Instruct-w8a8-QuaRot",
   "hw_key": "mixed",
   "head_sha": "a6051f865a2e8a0a95353aa89881480b72940b11",
-  "workflow_run_id": "43059815648",
+  "workflow_run_id": "43426021697",
   "trigger_type": "pr",
   "image": "mixed; see hardware_runs",
-  "started_at": "2026-11-11T16:35:17Z",
+  "started_at": "2026-11-13T12:32:23Z",
   "scenarios": [
     {
       "index": 0,
@@ -16,8 +16,8 @@
       "deployment": "Single-Node",
       "case": "Image-Only Online Serving (A3)",
       "serve_cmd": "export VLLM_USE_MODELSCOPE=True\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\nexport HCCL_OP_EXPANSION_MODE=\"AIV\"\nexport HCCL_BUFFSIZE=1536\nexport OMP_NUM_THREADS=1\nexport OMP_PROC_BIND=false\nexport TASK_QUEUE_ENABLE=1\nexport VLLM_ASCEND_ENABLE_FLASHCOMM1=1\nexport VLLM_ASCEND_ENABLE_FUSED_MC2=1\nexport VLLM_ASCEND_BALANCE_SCHEDULING=1\n\nvllm serve /root/.cache/modelscope/hub/models/Eco-Tech/Qwen3-VL-235B-A22B-Instruct-w8a8-QuaRot \\\n  --host 0.0.0.0 \\\n  --port 8000 \\\n  --served-model-name qwen3-vl-235b \\\n  --quantization ascend \\\n  --data-parallel-size 4 \\\n  --tensor-parallel-size 4 \\\n  --enable-expert-parallel \\\n  --seed 1024 \\\n  --max-num-seqs 32 \\\n  --max-model-len 32768 \\\n  --max-num-batched-tokens 16384 \\\n  --trust-remote-code \\\n  --gpu-memory-utilization 0.92 \\\n  --no-enable-prefix-caching \\\n  --mm-processor-cache-gb 0 \\\n  --limit-mm-per-prompt.image 1 \\\n  --limit-mm-per-prompt.video 0 \\\n  --compilation-config '{\"cudagraph_mode\":\"FULL_DECODE_ONLY\",\"cudagraph_capture_sizes\":[1,2,4,8,16,24,32]}'",
-      "verification_status": "fail",
-      "verification_reason": "Model server did not become ready"
+      "verification_status": "pass",
+      "verification_reason": "Task API response validated"
     }
   ],
   "hardware_runs": [
@@ -27,10 +27,10 @@
       "model_id": "Eco-Tech/Qwen3-VL-235B-A22B-Instruct-w8a8-QuaRot",
       "hw_key": "atlas_800_a3",
       "head_sha": "a6051f865a2e8a0a95353aa89881480b72940b11",
-      "workflow_run_id": "43059815648",
+      "workflow_run_id": "43426021697",
       "trigger_type": "pr",
       "image": "quay.nju.edu.cn/ascend/vllm-ascend:v0.23.0.post1-a3",
-      "started_at": "2026-11-11T16:35:17Z",
+      "started_at": "2026-11-13T12:32:23Z",
       "scenarios": [
         {
           "index": 0,
@@ -39,19 +39,23 @@
           "deployment": "Single-Node",
           "case": "Image-Only Online Serving (A3)",
           "serve_cmd": "export VLLM_USE_MODELSCOPE=True\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\nexport HCCL_OP_EXPANSION_MODE=\"AIV\"\nexport HCCL_BUFFSIZE=1536\nexport OMP_NUM_THREADS=1\nexport OMP_PROC_BIND=false\nexport TASK_QUEUE_ENABLE=1\nexport VLLM_ASCEND_ENABLE_FLASHCOMM1=1\nexport VLLM_ASCEND_ENABLE_FUSED_MC2=1\nexport VLLM_ASCEND_BALANCE_SCHEDULING=1\n\nvllm serve /root/.cache/modelscope/hub/models/Eco-Tech/Qwen3-VL-235B-A22B-Instruct-w8a8-QuaRot \\\n  --host 0.0.0.0 \\\n  --port 8000 \\\n  --served-model-name qwen3-vl-235b \\\n  --quantization ascend \\\n  --data-parallel-size 4 \\\n  --tensor-parallel-size 4 \\\n  --enable-expert-parallel \\\n  --seed 1024 \\\n  --max-num-seqs 32 \\\n  --max-model-len 32768 \\\n  --max-num-batched-tokens 16384 \\\n  --trust-remote-code \\\n  --gpu-memory-utilization 0.92 \\\n  --no-enable-prefix-caching \\\n  --mm-processor-cache-gb 0 \\\n  --limit-mm-per-prompt.image 1 \\\n  --limit-mm-per-prompt.video 0 \\\n  --compilation-config '{\"cudagraph_mode\":\"FULL_DECODE_ONLY\",\"cudagraph_capture_sizes\":[1,2,4,8,16,24,32]}'",
-          "verification_status": "fail",
-          "verification_reason": "Model server did not become ready"
+          "verification_status": "pass",
+          "verification_reason": "Task API response validated"
         }
       ],
-      "status": "fail"
+      "status": "pass"
     },
     {
       "recipe_path": "models/en/Qwen/Qwen3-VL-235B-A22B-Instruct.yaml",
+      "model_id": "",
       "hw_key": "ascend_950dt",
+      "head_sha": "a6051f865a2e8a0a95353aa89881480b72940b11",
+      "trigger_type": "pr",
       "image": "quay.nju.edu.cn/ascend/vllm-ascend:v0.23.0.post1-a5",
+      "started_at": "2026-11-13T12:32:23Z",
       "scenarios": [],
-      "missing_reason": "selected hardware job did not provide results",
-      "status": "unknown"
+      "skip_reason": "镜像未预装该权重 (model_id=Eco-Tech/Qwen3-VL-235B-A22B-Instruct-w8a8-QuaRot, 目录=Eco-Tech/Qwen3-VL-235B-A22B-Instruct-w8a8-QuaRot, 已尝试 ['', 'Eco-Tech', 'vllm-ascend', 'models', '/root/.cache/'])",
+      "status": "skip"
     }
   ]
 }
