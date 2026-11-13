@@ -4,10 +4,10 @@
   "model_id": "Qwen/Qwen3-Embedding-0.6B",
   "hw_key": "atlas_800_a2",
   "head_sha": "d03d84f1ef47937e56309f3bc38a3d75ce884195",
-  "workflow_run_id": "43053046348",
+  "workflow_run_id": "43423116766",
   "trigger_type": "pr",
   "image": "quay.nju.edu.cn/ascend/vllm-ascend:v0.23.0.post1",
-  "started_at": "2026-11-11T15:54:39Z",
+  "started_at": "2026-11-13T12:11:45Z",
   "scenarios": [
     {
       "index": 0,
