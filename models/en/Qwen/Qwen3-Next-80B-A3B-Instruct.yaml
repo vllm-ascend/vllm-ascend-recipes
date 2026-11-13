@@ -1,0 +1,294 @@
+meta:
+  title: "Qwen3-Next-80B-A3B-Instruct"
+  slug: "qwen3-next-80b-a3b-instruct"
+  provider: "Qwen"
+  description: "Qwen3-Next hybrid-attention sparse MoE model with 80B total and 3B active parameters, served from BF16 weights on one 8-card Atlas 800 A3 or Atlas 800 A2 node through Triton Ascend."
+  date_added: 2026-11-10
+  difficulty: intermediate
+  tasks: [text]
+  performance_headline: "BF16 on Atlas 800 A3 with TP4 and full-decode ACLGraph: the tutorial measures 580 tps and 54 ms TPOT at 2k/2k"
+  related_recipes: []
+  hardware:
+    atlas_800_a3: verified
+    atlas_800_a2: verified
+
+model:
+  model_id: "Qwen/Qwen3-Next-80B-A3B-Instruct"
+  min_vllm_version: "0.16.0"
+  architecture: moe
+  parameter_count: "80B"
+  active_parameters: "3B"
+  context_length: 1048576
+  modality: text
+  base_args:
+    - "--served-model-name"
+    - "qwen3_next"
+  base_env:
+    VLLM_USE_MODELSCOPE: "True"
+  docker_image:
+    atlas_800_a3: "quay.io/ascend/vllm-ascend:v0.23.0.post1-a3"
+    atlas_800_a2: "quay.io/ascend/vllm-ascend:v0.23.0.post1"
+  nightly_required: false
+  # vLLM-Ascend discontinued this model in v0.30.0, and the tutorial on main is
+  # a 295-byte deprecation stub. Every command in this recipe is reproduced from
+  # the v0.23.0.post1 tutorial tag and targets the v0.23.0.post1 images; do not move these
+  # tags to a newer release without a new tutorial to cite.
+  install:
+    pip: false
+
+features:
+  spec_decoding:
+    label: "MTP Spec Decoding"
+    description: "Native multi-token prediction head. The tutorial's tuning tables run three speculative tokens, while its single-node serve command runs without speculative decoding."
+    args: ["--speculative-config", '{"method":"qwen3_next_mtp","num_speculative_tokens":3}']
+  prefix_caching:
+    label: "Prefix Caching"
+    description: "Reuse KV blocks for requests that share a prefix; the tutorial's long-context rows compare 128k with and without prefix caching."
+    args: ["--enable-prefix-caching"]
+    flag_when_false: "--no-enable-prefix-caching"
+  long_context:
+    label: "Long Context (YaRN)"
+    description: "YaRN RoPE scaling to the 1M-token window the model card validates (factor 4.0 over the native 262,144). Inherited from the upstream vLLM recipe; the Ascend tutorial itself only documents 32k and 128k windows."
+    args:
+      - "--hf-overrides"
+      - '{"rope_parameters":{"rope_type":"yarn","rope_theta":10000000,"partial_rotary_factor":0.25,"factor":4.0,"original_max_position_embeddings":262144}}'
+      - "--max-model-len"
+      - "1010000"
+    env:
+      VLLM_ALLOW_LONG_MAX_MODEL_LEN: "1"
+
+opt_in_features: [spec_decoding, long_context]
+
+variants:
+  default:
+    precision: BF16
+    vram_minimum_gb: 192
+    description: "BF16 checkpoint used by every tutorial scenario; TP4 over one 8-card Atlas 800 A3 or Atlas 800 A2 node."
+
+compatible_strategies: [single_node_A3, single_node_A2]
+hardware_overrides: {}
+strategy_overrides: {}
+guide: ""
+
+config_params:
+  max_model_len:
+    default: 32768
+    type: number
+    description: "Maximum input plus output length of a single request."
+  max_num_batched_tokens:
+    default: 4096
+    type: number
+    description: "Maximum tokens processed in one scheduler step."
+  gpu_memory_utilization:
+    default: 0.8
+    type: number
+    description: "Fraction of NPU memory available for model execution and KV cache."
+
+overview: |-
+  Qwen3-Next-80B-A3B-Instruct is a highly sparse MoE model in the Qwen3-Next family with 80B total and 3B active parameters per token. Compared with the Qwen3 MoE architecture it changes the hybrid attention mechanism and adds a multi-token prediction head, which the tutorial describes as improving training and inference efficiency under long contexts and large total parameter counts. vLLM-Ascend runs it on Triton Ascend, which the tutorial labels experimental: stability, accuracy, and performance may change between releases.
+
+  **Deprecated.** vLLM-Ascend discontinued this model in v0.30.0 and the tutorial on `main` is now a deprecation stub that points at the v0.23.0.post1 documentation. Every command in this recipe is reproduced from that v0.23.0.post1 tutorial and targets the v0.23.0.post1 images (vLLM-Ascend `v0.23.0.post1`). Treat the recipe as a record of the historical configuration and the published measurements, not as a supported deployment on current releases.
+
+  The tutorial documents one single-node deployment of the BF16 checkpoint with tensor parallelism 4 and full-decode ACLGraph on one Atlas 800 A3 node (64G x 16), and its prerequisites also accept one Atlas 800 A2 node (64G x 8). The published performance number was measured on a two-node A3-752T cluster, so the single-node command and the benchmark topology are not the same.
+
+weight_download:
+  - weight_version: BF16
+    sources:
+      - source: ModelScope
+        url: https://www.modelscope.cn/models/Qwen/Qwen3-Next-80B-A3B-Instruct
+        command: |-
+          ```bash
+          pip install modelscope
+          modelscope download --model Qwen/Qwen3-Next-80B-A3B-Instruct
+          ```
+
+prerequisites:
+  - title: Model weight
+    content: |-
+      `Qwen3-Next-80B-A3B-Instruct` needs 8 cards in one Atlas 800 A3 (64G x 16) node or 8 cards in one Atlas 800 A2 (64G x 8) node. The tutorial publishes no quantized checkpoint for Ascend — every scenario below serves the BF16 weights, roughly 160 GB of parameters and a 192 GB minimum fit budget before KV cache.
+  - title: Runtime version
+    content: |-
+      vLLM-Ascend first supported the model in `v0.10.2rc1`, and the tutorial states that it runs stably from `v0.16.0`. This recipe targets the v0.23.0.post1 documentation and images; because the model was discontinued in v0.30.0, no later release is covered by a tutorial.
+
+env_setup:
+  container:
+    A3:
+      content: |-
+        Start this image on the Atlas 800 A3 node. The tutorial writes the image tag as a version placeholder; on the v0.23.0.post1 documentation it resolves to the v0.23.0.post1 A3 image, and the port publish matches the default `vllm serve` port used below.
+
+        ```bash
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0.post1-a3
+        docker run --rm \
+        --shm-size=1g \
+        --name vllm-ascend-qwen3 \
+        --device /dev/davinci0 \
+        --device /dev/davinci1 \
+        --device /dev/davinci2 \
+        --device /dev/davinci3 \
+        --device /dev/davinci4 \
+        --device /dev/davinci5 \
+        --device /dev/davinci6 \
+        --device /dev/davinci7 \
+        --device /dev/davinci8 \
+        --device /dev/davinci9 \
+        --device /dev/davinci10 \
+        --device /dev/davinci11 \
+        --device /dev/davinci12 \
+        --device /dev/davinci13 \
+        --device /dev/davinci14 \
+        --device /dev/davinci15 \
+        --device /dev/davinci_manager \
+        --device /dev/devmm_svm \
+        --device /dev/hisi_hdc \
+        -v /usr/local/dcmi:/usr/local/dcmi \
+        -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+        -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \
+        -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
+        -v /etc/ascend_install.info:/etc/ascend_install.info \
+        -v /root/.cache:/root/.cache \
+        -p 8000:8000 \
+        -it $IMAGE bash
+        ```
+    A2:
+      content: |-
+        The tutorial keeps the A2 image as a comment beside the A3 one: the same tag without the `-a3` suffix. The `docker run` above is unchanged apart from the 8 davinci devices of an A2 node (`/dev/davinci0` through `/dev/davinci7`).
+
+        ```bash
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0.post1
+        ```
+  pip:
+    content: |-
+      The tutorial also documents a source installation when the Docker image is not used: install vLLM from source first, then vLLM-Ascend, and verify both with `pip show`. On a multi-node deployment the environment has to be set up on every node.
+
+      ```bash
+      git clone https://github.com/vllm-project/vllm.git
+      cd vllm
+      pip install -e .
+
+      git clone https://github.com/vllm-project/vllm-ascend.git
+      cd vllm-ascend
+      pip install -e .
+
+      pip show vllm vllm-ascend
+      ```
+
+scenarios:
+  - npu: Atlas 800 A3
+    precision: BF16
+    deployment: Single-Node
+    case: TP4 32k Context (A3)
+    tags: [a3-single]
+    strategy: single_node_A3
+    steps:
+      - title: Start the server
+        content: |-
+          The tutorial's single-node deployment: one Atlas 800 A3 node (64G x 16) at tensor parallelism 4, so 4 of the node's 16 NPUs are used, with a 32k window and full-decode ACLGraph. `vllm serve` binds `0.0.0.0:8000` by default, which is the port the image publishes.
+
+          ```bash
+          vllm serve Qwen/Qwen3-Next-80B-A3B-Instruct \
+            --served-model-name qwen3_next \
+            --tensor-parallel-size 4 \
+            --max-model-len {{max_model_len}} \
+            --gpu-memory-utilization {{gpu_memory_utilization}} \
+            --max-num-batched-tokens {{max_num_batched_tokens}} \
+            --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY"}'
+          ```
+      - title: Verify inference
+        content: |-
+          The tutorial's functional check is a chat completion request; a successful service answers with HTTP 200 and a JSON body carrying `choices`.
+
+          ```bash
+          curl http://<server_ip>:<port>/v1/chat/completions -H "Content-Type: application/json" -d '{
+            "model": "qwen3_next",
+            "messages": [
+              {"role": "user", "content": "Who are you?"}
+            ],
+            "temperature": 0.6,
+            "top_p": 0.95,
+            "top_k": 20,
+            "max_completion_tokens": 32
+          }'
+          ```
+  - npu: Atlas 800 A2
+    precision: BF16
+    deployment: Single-Node
+    case: TP8 32k Context (A2)
+    tags: [a2-single]
+    strategy: single_node_A2
+    steps:
+      - title: Start the server
+        content: |-
+          The tutorial lists the 8-card Atlas 800 A2 node as a supported prerequisite but publishes no separate A2 command. A2 nodes in this catalog run 910B4 parts with about 32 GB per die, so the A3 TP4 layout does not fit: TP4 needs roughly 40 GB of BF16 weights per die and aborts with NPU out of memory during engine init. This scenario therefore uses TP8, which spreads the ~160 GB checkpoint to ~20 GB per die. No A2 measurement is published, which is why this hardware is marked experimental.
+
+          ```bash
+          vllm serve Qwen/Qwen3-Next-80B-A3B-Instruct \
+            --served-model-name qwen3_next \
+            --tensor-parallel-size 8 \
+            --max-model-len {{max_model_len}} \
+            --gpu-memory-utilization {{gpu_memory_utilization}} \
+            --max-num-batched-tokens {{max_num_batched_tokens}} \
+            --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY"}'
+          ```
+      - title: Verify inference
+        content: |-
+          Send the same chat completion request against the A2 service.
+
+          ```bash
+          curl http://<server_ip>:<port>/v1/chat/completions -H "Content-Type: application/json" -d '{
+            "model": "qwen3_next",
+            "messages": [
+              {"role": "user", "content": "Who are you?"}
+            ],
+            "temperature": 0.6,
+            "top_p": 0.95,
+            "top_k": 20,
+            "max_completion_tokens": 32
+          }'
+          ```
+
+verification: |-
+  This recipe was not re-run during migration: every command is reproduced from the v0.23.0.post1 tutorial, which is the last version documenting the model (vLLM-Ascend discontinued it in v0.30.0, and `main` carries only a deprecation stub). The tutorial's stated expected results are: the service prints `Started server process`, `Waiting for application startup.` and `Application startup complete.`, and a chat completion request returns HTTP 200 with a JSON body containing `choices`. The tutorial's example response for the prompt `Who are you?` carries the assistant text about Qwen being developed by the Tongyi Lab, a `reasoning` field, and `finish_reason: length` truncated at 32 completion tokens.
+
+  Replace `<server_ip>` and `<port>` with the address and port of the node running the API server. No accuracy or latency figure in this recipe was measured during migration; all numbers are quoted from the tutorial.
+
+performance:
+  accuracy: |-
+    The tutorial reports one AISBench `vllm-api-general-chat` result in generation mode and marks it as reference only: gsm8k accuracy 95.53 on `vllm-ascend:0.13.0rc1`. The tutorial names no other dataset for this model. See [Using AISBench](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/evaluation/using_ais_bench.html) for the evaluation workflow.
+  benchmark: |-
+    The tutorial publishes one measurement, which this recipe quotes verbatim:
+
+    ```text
+    Hardware: A3-752T, 2 node
+    Deployment: TP4 + Full Decode Only
+    Input/Output: 2k/2k
+    Concurrency: 32
+    Performance: 580tps, TPOT 54ms
+    ```
+
+    Two caveats come from the tutorial itself. It does not name the vLLM-Ascend build behind the number, and the measurement is a two-node deployment while the only serve command the tutorial publishes is single-node. Its reproduction command is also a much lighter workload than the reported 2k/2k at concurrency 32:
+
+    ```bash
+    export VLLM_USE_MODELSCOPE=True
+    vllm bench serve --model Qwen/Qwen3-Next-80B-A3B-Instruct  --dataset-name random --random-input 200 --num-prompts 200 --request-rate 1 --save-result --result-dir ./
+    ```
+
+tuning: |-
+  The tutorial's hard constraint comes first: `Qwen3-Next` does not support TP >= 16 today. The model has 16 query heads but only 2 key and value heads, so GQA degenerates into MHA at TP >= 16, and the FIA operator does not work in MHA scenarios with a head dimension of 256 — which is this model's head dimension. Keep tensor parallelism at the documented value of 4 unless you have re-measured a different split.
+
+  Beyond that, the tutorial defers to the public tuning guide rather than listing per-knob advice: [Public Performance Tuning Documentation](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/performance_and_debug/optimization_and_tuning.html) and the [Feature Matrix](https://docs.vllm.ai/projects/ascend/en/latest/user_guide/support_matrix/feature_matrix.html).
+
+  The tutorial's scenario table is internally inconsistent, so read it with care. Table 1 lists a high-throughput 16k row and two long-context 128k rows (one with prefix caching, one without) as single-node A3 workloads, and Table 2 lists MTP speculation 3 for all of them — but both tables claim 2 NPUs, TP 1 and DP 1, which contradicts the published `--tensor-parallel-size 4` command and the 8-card node requirement. Table 1's fourth row, "Multimodal (1080p)", is a leftover from a vision model: Qwen3-Next is text-only. Treat the serve command in the scenario above as authoritative and use the 16k/128k rows only as indications of which windows were exercised.
+
+  For a longer window, raise `--max-model-len` and lower `--max-num-batched-tokens` or `--gpu-memory-utilization` first if HBM runs out. The 1M-token `long_context` feature is inherited from the upstream vLLM recipe and was not validated by the Ascend tutorial, which stops at 128k.
+
+references:
+  - title: "Official vLLM-Ascend tutorial (v0.23.0.post1)"
+    url: https://github.com/vllm-project/vllm-ascend/blob/v0.23.0.post1/docs/source/tutorials/models/Qwen3-Next.md
+  - title: "BF16 checkpoint (ModelScope)"
+    url: https://www.modelscope.cn/models/Qwen/Qwen3-Next-80B-A3B-Instruct
+  - title: "Model card (HuggingFace)"
+    url: https://huggingface.co/Qwen/Qwen3-Next-80B-A3B-Instruct
+  - title: "Qwen3-Next blog"
+    url: https://qwen.ai/blog?id=4074cca80393150c248e508aa62983f9cb7d27cd
+  - title: "vLLM-Ascend Docker installation"
+    url: https://docs.vllm.ai/projects/ascend/en/latest/installation.html
