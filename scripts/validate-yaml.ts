@@ -1,6 +1,7 @@
 import { parse } from 'yaml';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { modelSchema } from '../src/lib/schema';
 
 type AnyRecord = Record<string, unknown>;
@@ -206,7 +207,7 @@ let hasErrors = false;
 const seenTestIds = new Map<string, string>();
 
 for (const lang of ['en', 'zh']) {
-  const langDir = new URL(`../models/${lang}/`, import.meta.url).pathname;
+  const langDir = fileURLToPath(new URL(`../models/${lang}/`, import.meta.url));
   try {
     const files = findYamlFiles(langDir);
     if (files.length === 0) {
