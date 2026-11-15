@@ -1,0 +1,8 @@
+{
+  "recipe_path": "models/en/THUDM/GLM-5.yaml",
+  "hw_key": "ascend_950dt",
+  "image": "quay.nju.edu.cn/ascend/vllm-ascend:v0.30.0rc2-a5",
+  "scenarios": [],
+  "missing_reason": "selected hardware job did not provide results",
+  "head_sha": "0355aedba1d1a99e5b3b93edb461cd7a6c61458a"
+}

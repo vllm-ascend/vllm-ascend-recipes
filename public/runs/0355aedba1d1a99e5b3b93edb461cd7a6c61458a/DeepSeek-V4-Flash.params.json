@@ -1,0 +1,8 @@
+{
+  "recipe_path": "models/en/DeepSeek/DeepSeek-V4-Flash.yaml",
+  "hw_key": "ascend_950dt",
+  "image": "swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/vllm-ascend:v0.23.0-a5",
+  "scenarios": [],
+  "missing_reason": "selected hardware job did not provide results",
+  "head_sha": "0355aedba1d1a99e5b3b93edb461cd7a6c61458a"
+}
