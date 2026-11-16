@@ -45,6 +45,25 @@
           "nodes": 1
         }
       ]
+    },
+    {
+      "name": "Qwen3-VL-Reranker-2B",
+      "yaml": "recipes/models/Qwen/Qwen3-VL-Reranker-2B.yaml",
+      "hf_id": "Qwen/Qwen3-VL-Reranker-2B",
+      "combos": [
+        {
+          "id": "a3-qwen3-vl-reranker-2b",
+          "hardware": "ascend_910c",
+          "variant": "default",
+          "frontend": "python",
+          "features": {},
+          "expect": { "tp": 1, "dp": 1, "pp": 1 },
+          "override": { "extra_env": { "VLLM_USE_MODELSCOPE": "True" } },
+          "smoke_test": "rerank",
+          "required": true,
+          "nodes": 1
+        }
+      ]
     }
   ]
 }

@@ -24,10 +24,10 @@ Consumes the artifacts produced by ``recipes/ci/generate.py`` on the NPU job:
 2. log the resolved serve command, run ``run.sh`` (engine) and capture
    ``serve.log``,
 3. poll ``/v1/models`` until ready, start companions (vllm-router etc.),
-4. smoke test ``POST /v1/chat/completions``,
+4. smoke test ``POST /v1/chat/completions`` or ``POST /v1/rerank``,
 5. teardown and write ``result.json`` (pass / fail / skip).
 
-Exit code: 0 for pass/skip, 1 for fail. Stdlib only - runs inside the recipe
+Exit code: 0 for pass or optional skip, 1 for fail or required skip. Stdlib only - runs inside the recipe
 container image without extra pip installs.
 """
 
@@ -36,6 +36,7 @@ from __future__ import annotations
 import argparse
 import contextlib
 import json
+import math
 import os
 import re
 import shlex
@@ -155,15 +156,24 @@ def localized_model_paths(meta: dict) -> dict[str, str]:
     return paths
 
 
+def replace_model_ids(text: str, replacements: dict[str, str]) -> str:
+    """Replace original IDs in one pass, without rewriting inserted paths."""
+    if not replacements:
+        return text
+    pattern = "|".join(re.escape(key) for key in sorted(replacements, key=len, reverse=True))
+    return re.sub(pattern, lambda match: replacements[match.group(0)], text)
+
+
 def localized_run_sh(combo_dir: Path, out_dir: Path, meta: dict) -> Path:
     """Copy run.sh with hub model ids rewritten to local cache paths.
 
     The rewritten copy lands in out_dir; the generated artifact stays intact.
     """
     script = (combo_dir / "run.sh").read_text(encoding="utf-8")
-    for key, local in localized_model_paths(meta).items():
+    paths = localized_model_paths(meta)
+    script = replace_model_ids(script, {str(meta[key]): local for key, local in paths.items()})
+    for key, local in paths.items():
         model_id = str(meta[key])
-        script = script.replace(model_id, local)
         print(f"[combo] {key}: {model_id} -> {local}", flush=True)
     target = out_dir / "run.sh"
     target.write_text(script, encoding="utf-8")
@@ -179,9 +189,8 @@ def format_serve_command(meta: dict) -> str:
     log shows the command that actually runs.
     """
     argv = [str(token) for token in (meta.get("argv") or [])]
-    for key, local in localized_model_paths(meta).items():
-        model_id = str(meta[key])
-        argv = [token.replace(model_id, local) for token in argv]
+    replacements = {str(meta[key]): local for key, local in localized_model_paths(meta).items()}
+    argv = [replace_model_ids(token, replacements) for token in argv]
 
     env = meta.get("env") or {}
     lines = [f"export {key}={env[key]}" for key in sorted(env)]
@@ -341,8 +350,39 @@ def ensure_companion(comp: dict, log_path: Path) -> tuple[subprocess.Popen | Non
     return start_bg(["bash", "-lc", str(comp["command"])], log_path), comp.get("port")
 
 
-def smoke(base_url: str, model: str) -> None:
-    """Smoke test: one chat completion with non-empty content (template 7, rule 4)."""
+def smoke(base_url: str, model: str, kind: str = "chat") -> None:
+    """Check chat content or the historical Qwen VL reranker tutorial pair."""
+    if kind == "rerank":
+        payload = {
+            "model": model,
+            "query": "What is the capital of China?",
+            "documents": [
+                "The capital of China is Beijing.",
+                "Gravity is a force that attracts two bodies towards each other. It gives weight to physical objects "
+                "and is responsible for the movement of planets around the sun.",
+            ],
+        }
+        try:
+            resp = http_post_json(base_url + "/v1/rerank", payload)
+        except (urllib.error.URLError, OSError, json.JSONDecodeError) as e:
+            raise ComboFailure(f"rerank smoke request failed: {e}") from e
+        results = resp.get("results") if isinstance(resp, dict) else None
+        if not isinstance(results, list) or len(results) != 2:
+            raise ComboFailure("rerank smoke: expected scores for both documents")
+        scores = {}
+        for item in results:
+            if not isinstance(item, dict):
+                raise ComboFailure("rerank smoke: invalid result item")
+            index, score = item.get("index"), item.get("relevance_score")
+            if type(index) is not int or index not in (0, 1) or index in scores:
+                raise ComboFailure("rerank smoke: invalid or duplicate document index")
+            if isinstance(score, bool) or not isinstance(score, (int, float)) or not math.isfinite(score):
+                raise ComboFailure("rerank smoke: invalid relevance_score")
+            scores[index] = score
+        if scores[0] <= scores[1]:
+            raise ComboFailure("rerank smoke: the relevant document did not score higher")
+        print(f"[smoke] rerank passed: relevant={scores[0]}, unrelated={scores[1]}", flush=True)
+        return
     payload = {
         "model": model,
         "messages": [{"role": "user", "content": "Say 'ok'."}],
@@ -397,6 +437,8 @@ def run_combo(combo_dir: Path, results_dir: Path) -> int:
         "required_npu": meta["required_npu"],
         "port": meta["port"],
         "source_url": meta["source_url"],
+        "smoke_test": meta.get("smoke_test", "chat"),
+        "required": bool(meta.get("required", False)),
         "status": "fail",
         "skip_reason": None,
         "readiness_seconds": None,
@@ -426,7 +468,7 @@ def run_combo(combo_dir: Path, results_dir: Path) -> int:
                     if port:
                         wait_tcp(int(port), COMPANION_READY_TIMEOUT_S, companion)
             served = str(models[0]["id"]) if models else str(meta["model_id"])
-            smoke(base_url, served)
+            smoke(base_url, served, meta.get("smoke_test", "chat"))
             result["smoke_seconds"] = round(time.monotonic() - started, 1)
             result["status"] = "pass"
         except (ComboFailure, ComboSkip) as e:
@@ -442,7 +484,7 @@ def run_combo(combo_dir: Path, results_dir: Path) -> int:
     (out_dir / "result.json").write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     reason = f": {result['skip_reason']}" if result["skip_reason"] else ""
     print(f"[{combo_id}] {result['status']}{reason}")
-    return 0 if result["status"] in ("pass", "skip") else 1
+    return 0 if result["status"] == "pass" or (result["status"] == "skip" and not meta.get("required")) else 1
 
 
 def summarize(results_dir: Path) -> int:

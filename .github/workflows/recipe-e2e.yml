@@ -20,22 +20,30 @@ name: Recipe E2E
 # Serve-recipe E2E validation driven by recipes/ci/map.json
 # (design: recipes/ci/recipe-ci-template.md).
 #
-# - "generate" renders every MAP combo on ubuntu-latest: fetch from the
+# - "generate" renders changed MAP combos on PRs, or the requested manual
+#   selection on ubuntu-latest: fetch from the
 #   recipes site, run the content assertions (fallback / single-node gate /
 #   speculative method), and emit run.sh + meta.json artifacts.
 # - "execute" runs the generated scripts on NPU runners inside the recipe's
 #   container image. It is gated on the `recipe-e2e` label (PRs) or a manual
 #   workflow_dispatch to protect the NPU pool; the generate stage always runs
-#   on workflow changes.
+#   on workflow, map, helper and unit-test changes.
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, labeled]
     paths:
       - '.github/workflows/recipe-e2e.yml'
+      - 'recipes/ci/**'
+      - 'tests/ut/recipe_ci/**'
   workflow_dispatch:
     inputs:
       hardware:
         description: 'chips to run (a2/a3/a5, comma-separated; empty = all)'
+        required: false
+        default: ''
+      combos:
+        description: 'combo IDs to run (comma-separated; empty = all)'
         required: false
         default: ''
 
@@ -57,14 +65,36 @@ jobs:
     steps:
       - name: Checkout vllm-ascend repo
         uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Test recipe E2E helpers
+        run: |
+          python3 -m pip install pytest
+          python3 -m pytest tests/ut/recipe_ci -q
 
       - name: Generate run.sh from recipes site
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HARDWARE: ${{ inputs.hardware }}
+          COMBOS: ${{ inputs.combos }}
         run: |
+          selection=()
+          if [ -n "$BASE_SHA" ]; then
+            git show "$BASE_SHA:recipes/ci/map.json" > "$RUNNER_TEMP/recipe-e2e-baseline.json"
+            selection+=(--baseline-map "$RUNNER_TEMP/recipe-e2e-baseline.json")
+          fi
           python3 recipes/ci/generate.py \
             --map recipes/ci/map.json \
             --out dist \
             --runner-labels .github/workflows/scripts/runner_label.json \
-            --hardware "${{ inputs.hardware || github.event.inputs.hardware }}"
+            --hardware "$HARDWARE" \
+            --combos "$COMBOS" \
+            "${selection[@]}"
 
       - name: Generate summary
         run: cat dist/summary.md

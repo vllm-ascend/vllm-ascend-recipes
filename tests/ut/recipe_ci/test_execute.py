@@ -102,7 +102,7 @@ def test_localized_run_sh_rewrites_hub_ids(tmp_path, monkeypatch, capsys):
     # The serve argument and the id inside --speculative-config are rewritten.
     assert f"vllm serve {local}" in script
     assert f'"model":"{local}"' in script
-    assert "Eco-Tech/model-w8a8" not in script
+    assert shlex.split(script.splitlines()[1])[3] == local
     # The generated artifact is untouched.
     assert "Eco-Tech/model-w8a8" in (combo_dir / "run.sh").read_text(encoding="utf-8")
     # The rewrite is logged.
@@ -179,7 +179,85 @@ def test_format_serve_command_rewrites_nested_draft_model_id(tmp_path, monkeypat
     main_local = tmp_path / "cache" / "hub" / "models" / "org" / "main"
     draft_local = tmp_path / "cache" / "hub" / "models" / "org" / "draft"
     block = exe.format_serve_command(meta)
-    assert "org/main" not in block and "org/draft" not in block
+    assert shlex.split(block.splitlines()[0].removesuffix(" \\")) == ["vllm", "serve", str(main_local)]
     assert str(main_local) in block
     # The draft id nested inside the --speculative-config JSON is rewritten too.
     assert f'"model":"{draft_local}"' in block
+
+
+def test_same_model_ids_are_localized_once_on_linux_paths(tmp_path, monkeypatch):
+    combo_dir, meta = _make_combo(tmp_path, monkeypatch)
+    paths = {"model_id": "/cache/Eco-Tech/model-w8a8", "draft_model": "/cache/Eco-Tech/model-w8a8"}
+    monkeypatch.setattr(exe, "localized_model_paths", lambda meta: paths)
+    out = tmp_path / "out"
+    out.mkdir()
+    script = exe.localized_run_sh(combo_dir, out, meta).read_text(encoding="utf-8")
+    assert "exec vllm serve /cache/Eco-Tech/model-w8a8 --tensor-parallel-size" in script
+    assert '"model":"/cache/Eco-Tech/model-w8a8"' in script
+    assert "/cache//cache/" not in script
+
+
+def test_overlapping_model_ids_do_not_rewrite_local_paths(monkeypatch):
+    paths = {"model_id": "/cache/org/model", "draft_model": "/cache/org/model-draft"}
+    monkeypatch.setattr(exe, "localized_model_paths", lambda meta: paths)
+    meta = {"model_id": "org/model", "draft_model": "org/model-draft", "env": {},
+            "argv": ["vllm", "serve", "org/model", "--speculative-config", '{"model":"org/model-draft"}']}
+    block = exe.format_serve_command(meta)
+    assert shlex.split(block.splitlines()[0].removesuffix(" \\")) == ["vllm", "serve", "/cache/org/model"]
+    config = json.loads(shlex.split(block.splitlines()[-1])[1])
+    assert config["model"] == "/cache/org/model-draft"
+
+
+def test_rerank_smoke_uses_tutorial_request(monkeypatch):
+    requests = []
+
+    def post(url, payload):
+        requests.append((url, payload))
+        return {"results": [{"index": 0, "relevance_score": 0.99}, {"index": 1, "relevance_score": 0.1}]}
+
+    monkeypatch.setattr(exe, "http_post_json", post)
+    exe.smoke("http://127.0.0.1:8000", "Qwen/Qwen3-VL-Reranker-2B", "rerank")
+    url, payload = requests[0]
+    assert url == "http://127.0.0.1:8000/v1/rerank"
+    assert payload["model"] == "Qwen/Qwen3-VL-Reranker-2B"
+    assert payload["query"] == "What is the capital of China?"
+    assert len(payload["documents"]) == 2
+    assert "messages" not in payload
+
+
+@pytest.mark.parametrize("results", [
+    [],
+    [{"index": 0, "relevance_score": 0.9}],
+    [{"index": 0, "relevance_score": 0.9}, {"index": 0, "relevance_score": 0.1}],
+    [{"index": 0, "relevance_score": float("nan")}, {"index": 1, "relevance_score": 0.1}],
+    [{"index": 0, "relevance_score": float("inf")}, {"index": 1, "relevance_score": 0.1}],
+    [{"index": 0, "relevance_score": "high"}, {"index": 1, "relevance_score": 0.1}],
+    [{"index": 0, "relevance_score": 0.1}, {"index": 1, "relevance_score": 0.9}],
+    [{"index": 0, "relevance_score": 0.9}, {"index": 2, "relevance_score": 0.1}],
+])
+def test_rerank_smoke_rejects_invalid_or_reversed_scores(monkeypatch, results):
+    monkeypatch.setattr(exe, "http_post_json", lambda *args: {"results": results})
+    with pytest.raises(exe.ComboFailure):
+        exe.smoke("http://127.0.0.1:8000", "model", "rerank")
+
+
+def test_default_smoke_still_checks_chat_content(monkeypatch):
+    requests = []
+    monkeypatch.setattr(exe, "http_post_json", lambda url, payload: requests.append(url) or {"choices": [{"message": {"content": "ok"}}]})
+    exe.smoke("http://127.0.0.1:8000", "model")
+    assert requests == ["http://127.0.0.1:8000/v1/chat/completions"]
+
+
+@pytest.mark.parametrize("required,expected", [(True, 1), (False, 0)])
+def test_required_combo_skip_is_not_a_passing_check(tmp_path, monkeypatch, required, expected):
+    meta = {"combo_id": "reranker", "hf_id": "Qwen/Qwen3-VL-Reranker-2B", "hardware": "ascend_910c",
+            "variant": "default", "features_resolved": {}, "image": "registry/image:1", "strategy": "single_node_tp",
+            "deploy_type": "single_node", "required_npu": 1, "port": 8000, "source_url": "https://recipes.vllm.ai",
+            "required": required, "smoke_test": "rerank"}
+    combo_dir = tmp_path / "combo"
+    combo_dir.mkdir()
+    (combo_dir / "meta.json").write_text(json.dumps(meta), encoding="utf-8")
+    monkeypatch.setattr(exe, "precheck", lambda meta: "weights not cached")
+    assert exe.run_combo(combo_dir, tmp_path / "results") == expected
+    result = json.loads((tmp_path / "results/reranker/result.json").read_text(encoding="utf-8"))
+    assert result["status"] == "skip"
