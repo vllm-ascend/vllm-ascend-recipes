@@ -217,7 +217,7 @@ scenarios:
     steps:
       - title: 启动服务
         content: |-
-          教程把 8 卡 Atlas 800 A2 节点列为受支持的前置条件，但没有单独给出 A2 命令。本目录中的 A2 机器为 910B4，单 die 约 32 GB，因此无法沿用 A3 的 TP4 布局：TP4 时 BF16 权重每 die 约 40 GB，引擎初始化阶段会直接 NPU OOM。该场景改用 TP8，把约 160 GB 的权重摊到每 die 约 20 GB。教程没有发布 A2 的实测数据，这也是该硬件标记为 experimental 的原因。
+          教程把 8 卡 Atlas 800 A2 节点列为受支持的前置条件，但没有单独给出 A2 命令。本目录中的 A2 机器为 910B4，单 die 约 32 GB，因此无法沿用 A3 的 TP4 布局：TP4 时 BF16 权重每 die 约 40 GB，引擎初始化阶段会直接 NPU OOM。该场景改用 TP8，把约 160 GB 的权重摊到每 die 约 20 GB。教程没有给出 A2 命令或实测数据，TP8 是本 recipe 针对 32 GB 单卡的适配；`atlas_800_a2` 仅在启动与基础服务层面标记为 `verified`（run 43058336697），不声明任何精度或吞吐数据。
 
           ```bash
           vllm serve Qwen/Qwen3-Next-80B-A3B-Instruct \
@@ -246,9 +246,19 @@ scenarios:
           ```
 
 verification: |-
-  本 recipe 在迁移过程中没有重新实机运行：所有命令都复制自 v0.23.0.post1 教程，这是最后一个记录该模型的版本（vLLM-Ascend 在 v0.30.0 停止支持，main 上只剩废弃提示）。教程声明的预期结果是：服务依次打印 `Started server process`、`Waiting for application startup.` 和 `Application startup complete.`，chat completion 请求返回 HTTP 200，响应 JSON 中包含 `choices` 字段。教程针对 `Who are you?` 的示例响应带有关于 Qwen 由通义实验室研发的助手文本、`reasoning` 字段，以及因 32 个补全 token 上限而产生的 `finish_reason: length`。
+  `meta.hardware.atlas_800_a3` 与 `atlas_800_a2` 在 v0.23.0.post1 镜像上标记为 `verified`，依据仅为启动与基础服务：
 
-  请把 `<server_ip>` 和 `<port>` 替换为实际运行 API 服务的节点地址与端口。本 recipe 中没有任何精度或时延数字是在迁移过程中测得的，全部引用自教程。
+  - **A3**（BF16、TP4、`FULL_DECODE_ONLY`、`quay.io/ascend/vllm-ascend:v0.23.0.post1-a3`）：Recipe E2E 流水线渲染上游
+    overlay（[vllm-project/vllm-ascend#21552](https://github.com/vllm-project/vllm-ascend/pull/21552)），41 个分片全部加载，
+    服务就绪耗时 **310.1 s**，`GET /v1/models` 与 `POST /v1/chat/completions` 均返回 HTTP 200（run
+    [43824490069](https://github.com/vllm-ascend/vllm-ascend-recipes/actions/runs/43824490069)，`status: pass`，见 #159）。
+  - **A2**（BF16、TP8、32k 上下文、`quay.io/ascend/vllm-ascend:v0.23.0.post1`）：A2 单节点 recipe job 在 A2 runner
+    上验证了渲染出的命令（run [43058336697](https://github.com/vllm-ascend/vllm-ascend-recipes/actions/runs/43058336697)）。
+
+  所有命令仍复制自 v0.23.0.post1 教程，这是最后一个记录该模型的版本（vLLM-Ascend 在 v0.30.0 停止支持，
+  main 上只剩废弃提示）。教程声明的预期结果是：服务依次打印 `Started server process`、`Waiting for application startup.` 和 `Application startup complete.`，chat completion 请求返回 HTTP 200，响应 JSON 中包含 `choices` 字段。教程针对 `Who are you?` 的示例响应带有关于 Qwen 由通义实验室研发的助手文本、`reasoning` 字段，以及因 32 个补全 token 上限而产生的 `finish_reason: length`。
+
+  请把 `<server_ip>` 和 `<port>` 替换为实际运行 API 服务的节点地址与端口。本 recipe 没有测量精度或时延数字，performance 段的所有数字均引用自教程。
 
 performance:
   accuracy: |-

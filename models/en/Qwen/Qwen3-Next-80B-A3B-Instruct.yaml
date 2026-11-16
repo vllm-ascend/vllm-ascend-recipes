@@ -218,7 +218,7 @@ scenarios:
     steps:
       - title: Start the server
         content: |-
-          The tutorial lists the 8-card Atlas 800 A2 node as a supported prerequisite but publishes no separate A2 command. A2 nodes in this catalog run 910B4 parts with about 32 GB per die, so the A3 TP4 layout does not fit: TP4 needs roughly 40 GB of BF16 weights per die and aborts with NPU out of memory during engine init. This scenario therefore uses TP8, which spreads the ~160 GB checkpoint to ~20 GB per die. No A2 measurement is published, which is why this hardware is marked experimental.
+          The tutorial lists the 8-card Atlas 800 A2 node as a supported prerequisite but publishes no separate A2 command. A2 nodes in this catalog run 910B4 parts with about 32 GB per die, so the A3 TP4 layout does not fit: TP4 needs roughly 40 GB of BF16 weights per die and aborts with NPU out of memory during engine init. This scenario therefore uses TP8, which spreads the ~160 GB checkpoint to ~20 GB per die. The tutorial publishes no A2 command or measurement, so TP8 is this recipe's adaptation for 32 GB dies; `atlas_800_a2` is `verified` on startup and basic serving only (run 43058336697), and no accuracy or throughput figure is claimed for A2.
 
           ```bash
           vllm serve Qwen/Qwen3-Next-80B-A3B-Instruct \
@@ -247,9 +247,21 @@ scenarios:
           ```
 
 verification: |-
-  This recipe was not re-run during migration: every command is reproduced from the v0.23.0.post1 tutorial, which is the last version documenting the model (vLLM-Ascend discontinued it in v0.30.0, and `main` carries only a deprecation stub). The tutorial's stated expected results are: the service prints `Started server process`, `Waiting for application startup.` and `Application startup complete.`, and a chat completion request returns HTTP 200 with a JSON body containing `choices`. The tutorial's example response for the prompt `Who are you?` carries the assistant text about Qwen being developed by the Tongyi Lab, a `reasoning` field, and `finish_reason: length` truncated at 32 completion tokens.
+  `meta.hardware.atlas_800_a3` and `atlas_800_a2` are `verified` on the v0.23.0.post1 images, on startup and basic serving only:
 
-  Replace `<server_ip>` and `<port>` with the address and port of the node running the API server. No accuracy or latency figure in this recipe was measured during migration; all numbers are quoted from the tutorial.
+  - **A3** (BF16, TP4, `FULL_DECODE_ONLY`, `quay.io/ascend/vllm-ascend:v0.23.0.post1-a3`): the Recipe E2E
+    pipeline rendered the upstream overlay ([vllm-project/vllm-ascend#21552](https://github.com/vllm-project/vllm-ascend/pull/21552)),
+    loaded all 41 shards, became ready in **310.1 s**, and answered `GET /v1/models` and
+    `POST /v1/chat/completions` with HTTP 200 (run
+    [43824490069](https://github.com/vllm-ascend/vllm-ascend-recipes/actions/runs/43824490069), `status: pass`, tracked in #159).
+  - **A2** (BF16, TP8, 32k context, `quay.io/ascend/vllm-ascend:v0.23.0.post1`): the A2 single-node recipe job
+    verified the rendered command on an A2 runner (run
+    [43058336697](https://github.com/vllm-ascend/vllm-ascend-recipes/actions/runs/43058336697)).
+
+  Every command is still reproduced from the v0.23.0.post1 tutorial, which is the last version documenting
+  the model (vLLM-Ascend discontinued it in v0.30.0, and `main` carries only a deprecation stub). The tutorial's stated expected results are: the service prints `Started server process`, `Waiting for application startup.` and `Application startup complete.`, and a chat completion request returns HTTP 200 with a JSON body containing `choices`. The tutorial's example response for the prompt `Who are you?` carries the assistant text about Qwen being developed by the Tongyi Lab, a `reasoning` field, and `finish_reason: length` truncated at 32 completion tokens.
+
+  Replace `<server_ip>` and `<port>` with the address and port of the node running the API server. No accuracy or latency figure was measured; every number in the performance section is quoted from the tutorial.
 
 performance:
   accuracy: |-
