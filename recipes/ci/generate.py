@@ -411,10 +411,16 @@ def plan_combo(
     argv, env = apply_override(combo, argv, env)
     features_resolved = resolve_spec_mode(combo, argv)
     tp, dp, pp = assert_parallel_sizes(combo, argv)
+    smoke_test = combo.get("smoke_test", "chat")
+    if smoke_test not in ("chat", "rerank"):
+        raise ComboFailure(f"unknown smoke_test {smoke_test!r}")
 
     visible = env.get(NPU_VISIBILITY_ENV)
     visible_count = len(str(visible).split(",")) if visible else 0
-    required_npu = max(tp * dp * pp, visible_count, declared_device_count(render))
+    # Pooling executes the structured serve argv, not the renderer's generic
+    # full-node Docker example. Keep declared-mount sizing for legacy MoE cases.
+    mounts = 0 if argv_value(argv, "--runner") == "pooling" else declared_device_count(render)
+    required_npu = max(tp * dp * pp, visible_count, mounts)
 
     image = str(render.get("docker_image") or "")
     if not image:
@@ -434,6 +440,8 @@ def plan_combo(
         "variant": combo["variant"],
         "features_requested": combo.get("features") or {},
         "features_resolved": features_resolved,
+        "smoke_test": smoke_test,
+        "required": bool(combo.get("required", False)),
         "override": combo.get("override") or {},
         "image": image,
         "runner_image": runner_image,
@@ -505,6 +513,7 @@ def process_combo(
         "runner": None,
         "image": None,
         "timeout_minutes": None,
+        "required": bool(combo.get("required", False)),
     }
     try:
         if (combo.get("nodes") or 1) != 1:
@@ -559,13 +568,29 @@ def write_outputs(out_dir: Path, rows: list[dict]) -> int:
             f"| {r['combo_id']} | {r['status']} | {r['reason'] or ''} | {r['runner'] or ''} | {r['image'] or ''} |"
         )
     (out_dir / "summary.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
-    return 1 if any(r["status"] == "failed" for r in rows) else 0
+    return 1 if any(r["status"] == "failed" or (r.get("required") and r["status"] == "skipped") for r in rows) else 0
+
+
+def changed_combo_ids(current: dict, baseline: dict) -> set[str]:
+    """Select map additions/changes without fetching unrelated large models."""
+    def indexed(data):
+        return {
+            combo["id"]: (dict((k, v) for k, v in entry.items() if k != "combos"), combo)
+            for entry in data.get("entries", []) for combo in entry.get("combos", [])
+        }
+
+    candidates, previous = indexed(current), indexed(baseline)
+    if {k: v for k, v in current.items() if k != "entries"} != {k: v for k, v in baseline.items() if k != "entries"}:
+        return set(candidates)
+    return {key for key, value in candidates.items() if previous.get(key) != value}
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--map", required=True, type=Path, help="MAP json (recipes/ci/map.json)")
     parser.add_argument("--out", required=True, type=Path, help="output directory for artifacts")
+    parser.add_argument("--combos", default="", help="comma-separated combo IDs; empty = all")
+    parser.add_argument("--baseline-map", type=Path, help="only generate added/changed map combos (PRs)")
     parser.add_argument(
         "--runner-labels",
         required=True,
@@ -587,10 +612,22 @@ def main(argv: list[str] | None = None) -> int:
     site = str(map_data.get("site") or DEFAULT_SITE)
     rewrites = list(map_data.get("runner_image_rewrites") or [])
     wanted = {h.strip() for h in args.hardware.split(",") if h.strip()}
+    known = [c["id"] for e in map_data.get("entries", []) for c in e.get("combos", [])]
+    if len(known) != len(set(known)):
+        parser.error("combo IDs must be unique")
+    selected = {c.strip() for c in args.combos.split(",") if c.strip()} or None
+    if selected and selected - set(known):
+        parser.error("unknown combo IDs: " + ", ".join(sorted(selected - set(known))))
+    if args.baseline_map:
+        baseline = json.loads(args.baseline_map.read_text(encoding="utf-8"))
+        changed = changed_combo_ids(map_data, baseline)
+        selected = changed if selected is None else selected & changed
 
     rows = []
     for entry in map_data.get("entries", []):
         for combo in entry.get("combos", []):
+            if selected is not None and combo["id"] not in selected:
+                continue
             if wanted and HARDWARE_CHIP.get(str(combo.get("hardware"))) not in wanted:
                 print(f"[{combo.get('id')}] filtered out by --hardware {','.join(sorted(wanted))}")
                 continue

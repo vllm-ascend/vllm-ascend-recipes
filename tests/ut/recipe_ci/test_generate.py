@@ -547,3 +547,75 @@ def test_main_hardware_filter(tmp_path, monkeypatch):
     assert sorted(r["combo_id"] for r in manifest["combos"]) == ["a3-c", "a5-c"]
     matrix = json.loads((out_dir2 / "matrix.json").read_text(encoding="utf-8"))
     assert sorted(m["combo"] for m in matrix["include"]) == ["a3-c", "a5-c"]
+
+
+def test_changed_combo_ids_preserves_unchanged_models():
+    baseline = {"site": "https://recipes.vllm.ai", "entries": [dict(A5_ENTRY, combos=[A5_COMBO])]}
+    current = json.loads(json.dumps(baseline))
+    assert gen.changed_combo_ids(current, baseline) == set()
+    current["entries"].append({"hf_id": "Qwen/Qwen3-VL-Reranker-2B", "combos": [{"id": "reranker"}]})
+    assert gen.changed_combo_ids(current, baseline) == {"reranker"}
+    current["entries"][0]["combos"][0]["expect"]["dp"] = 2
+    assert gen.changed_combo_ids(current, baseline) == {"reranker", A5_COMBO["id"]}
+
+
+def test_changed_combo_ids_includes_entry_and_global_changes():
+    baseline = {"site": "https://recipes.vllm.ai", "entries": [dict(A5_ENTRY, combos=[A5_COMBO])]}
+    current = json.loads(json.dumps(baseline))
+    current["entries"][0]["hf_id"] = "other/model"
+    assert gen.changed_combo_ids(current, baseline) == {A5_COMBO["id"]}
+    current = json.loads(json.dumps(baseline))
+    current["site"] = "https://preview.example"
+    assert gen.changed_combo_ids(current, baseline) == {A5_COMBO["id"]}
+
+
+def test_main_selects_changed_or_explicit_combos(tmp_path, monkeypatch):
+    baseline = {"schema_version": 1, "entries": [dict(A5_ENTRY, combos=[A5_COMBO])]}
+    current = json.loads(json.dumps(baseline))
+    current["entries"][0]["combos"].append(dict(A5_COMBO, id="new-combo"))
+    source, base, labels = (tmp_path / name for name in ("map.json", "base.json", "labels.json"))
+    source.write_text(json.dumps(current), encoding="utf-8")
+    base.write_text(json.dumps(baseline), encoding="utf-8")
+    labels.write_text(json.dumps(RUNNER_LABELS), encoding="utf-8")
+    fetched = []
+
+    def fetch(site, hf_id, combo):
+        fetched.append(combo["id"])
+        return dict(A5_RENDER), SOURCE_URL
+
+    monkeypatch.setattr(gen, "fetch_render", fetch)
+    common = ["--map", str(source), "--runner-labels", str(labels)]
+    assert gen.main(common + ["--out", str(tmp_path / "changed"), "--baseline-map", str(base)]) == 0
+    assert fetched == ["new-combo"]
+    fetched.clear()
+    assert gen.main(common + ["--out", str(tmp_path / "explicit"), "--combos", A5_COMBO["id"]]) == 0
+    assert fetched == [A5_COMBO["id"]]
+    with pytest.raises(SystemExit):
+        gen.main(common + ["--out", str(tmp_path / "invalid"), "--combos", "typo"])
+    assert fetched == [A5_COMBO["id"]]
+
+
+def test_plan_combo_carries_rerank_smoke_and_required_policy():
+    meta = _plan(A5_RENDER, dict(A5_COMBO, smoke_test="rerank", required=True))
+    assert meta["smoke_test"] == "rerank"
+    assert meta["required"] is True
+    with pytest.raises(gen.ComboFailure, match="smoke_test"):
+        _plan(A5_RENDER, dict(A5_COMBO, smoke_test="typo"))
+
+
+def test_required_combo_without_runner_fails_generation(tmp_path, monkeypatch):
+    monkeypatch.setattr(gen, "fetch_render", lambda *args: (dict(A5_RENDER), SOURCE_URL))
+    combo = dict(A5_COMBO, required=True)
+    row = gen.process_combo(A5_ENTRY, combo, "https://recipes.vllm.ai", {}, REWRITES, tmp_path)
+    assert row["status"] == "skipped"
+    assert gen.write_outputs(tmp_path, [row]) == 1
+
+
+def test_pooling_uses_serving_parallelism_instead_of_full_node_docker_mounts():
+    render = dict(A3_RENDER)
+    render["argv"] = ["vllm", "serve", "Qwen/Qwen3-VL-Reranker-2B", "--runner", "pooling", "--tensor-parallel-size", "1"]
+    render["env"] = {}
+    render["docker_argv"] = ["docker", "run"] + [f"/dev/davinci{i}" for i in range(16)]
+    meta = _plan(render, dict(A5_COMBO, hardware="ascend_910c", expect={"tp": 1, "dp": 1}))
+    assert meta["required_npu"] == 1
+    assert meta["runner"] == "linux-aarch64-a3-2"
