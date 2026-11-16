@@ -156,15 +156,24 @@ def localized_model_paths(meta: dict) -> dict[str, str]:
     return paths
 
 
+def replace_model_ids(text: str, replacements: dict[str, str]) -> str:
+    """Replace original IDs in one pass, without rewriting inserted paths."""
+    if not replacements:
+        return text
+    pattern = "|".join(re.escape(key) for key in sorted(replacements, key=len, reverse=True))
+    return re.sub(pattern, lambda match: replacements[match.group(0)], text)
+
+
 def localized_run_sh(combo_dir: Path, out_dir: Path, meta: dict) -> Path:
     """Copy run.sh with hub model ids rewritten to local cache paths.
 
     The rewritten copy lands in out_dir; the generated artifact stays intact.
     """
     script = (combo_dir / "run.sh").read_text(encoding="utf-8")
-    for key, local in localized_model_paths(meta).items():
+    paths = localized_model_paths(meta)
+    script = replace_model_ids(script, {str(meta[key]): local for key, local in paths.items()})
+    for key, local in paths.items():
         model_id = str(meta[key])
-        script = script.replace(model_id, local)
         print(f"[combo] {key}: {model_id} -> {local}", flush=True)
     target = out_dir / "run.sh"
     target.write_text(script, encoding="utf-8")
@@ -180,9 +189,8 @@ def format_serve_command(meta: dict) -> str:
     log shows the command that actually runs.
     """
     argv = [str(token) for token in (meta.get("argv") or [])]
-    for key, local in localized_model_paths(meta).items():
-        model_id = str(meta[key])
-        argv = [token.replace(model_id, local) for token in argv]
+    replacements = {str(meta[key]): local for key, local in localized_model_paths(meta).items()}
+    argv = [replace_model_ids(token, replacements) for token in argv]
 
     env = meta.get("env") or {}
     lines = [f"export {key}={env[key]}" for key in sorted(env)]
