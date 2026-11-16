@@ -4,10 +4,10 @@
   "model_id": "Qwen/Qwen3-Next-80B-A3B-Instruct",
   "hw_key": "mixed",
   "head_sha": "ef098b06cf56993d0e22a08df7c56bd97a3cbfb6",
-  "workflow_run_id": "43882550443",
+  "workflow_run_id": "43893313479",
   "trigger_type": "pr",
   "image": "mixed; see hardware_runs",
-  "started_at": "2026-11-16T14:07:50Z",
+  "started_at": "2026-11-16T15:09:14Z",
   "scenarios": [
     {
       "index": 0,
@@ -37,10 +37,10 @@
       "model_id": "Qwen/Qwen3-Next-80B-A3B-Instruct",
       "hw_key": "atlas_800_a2",
       "head_sha": "ef098b06cf56993d0e22a08df7c56bd97a3cbfb6",
-      "workflow_run_id": "43882550443",
+      "workflow_run_id": "43893313479",
       "trigger_type": "pr",
       "image": "quay.nju.edu.cn/ascend/vllm-ascend:v0.23.0.post1",
-      "started_at": "2026-11-16T14:07:50Z",
+      "started_at": "2026-11-16T15:09:14Z",
       "scenarios": [
         {
           "index": 0,
@@ -61,10 +61,10 @@
       "model_id": "Qwen/Qwen3-Next-80B-A3B-Instruct",
       "hw_key": "atlas_800_a3",
       "head_sha": "ef098b06cf56993d0e22a08df7c56bd97a3cbfb6",
-      "workflow_run_id": "43882550443",
+      "workflow_run_id": "43893313479",
       "trigger_type": "pr",
       "image": "quay.nju.edu.cn/ascend/vllm-ascend:v0.23.0.post1-a3",
-      "started_at": "2026-11-16T14:07:50Z",
+      "started_at": "2026-11-16T15:09:14Z",
       "scenarios": [
         {
           "index": 0,
