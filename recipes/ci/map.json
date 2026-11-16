@@ -58,6 +58,29 @@
           "nodes": 1
         }
       ]
+    },
+    {
+      "name": "Qwen3.6-35B-A3B",
+      "yaml": "recipes/overlays/Qwen/Qwen3.6-35B-A3B.yaml",
+      "hf_id": "Qwen/Qwen3.6-35B-A3B",
+      "combos": [
+        {
+          "id": "a3-910c-w8a8-a3-mtp",
+          "hardware": "ascend_910c",
+          "variant": "ascend_w8a8_a3",
+          "features": { "spec_decoding": "mtp" },
+          "expect": { "spec_decoding": "qwen3_5_mtp", "tp": 2 },
+          "nodes": 1
+        },
+        {
+          "id": "a5-950dt-w8a8-mxfp8-mtp",
+          "hardware": "ascend_950dt",
+          "variant": "ascend_w8a8_mxfp8_a5",
+          "features": { "spec_decoding": "mtp" },
+          "expect": { "spec_decoding": "qwen3_5_mtp", "tp": 1 },
+          "nodes": 1
+        }
+      ]
     }
   ]
 }
