@@ -62,6 +62,11 @@ PD_STRATEGY = "pd_cluster"
 # recipes hardware profile id -> runner chip id (runner_label.json "chip")
 HARDWARE_CHIP = {
     "ascend_910c": "a3",
+    # The plain A5 profile is a separate id from ascend_950dt_8x: variants
+    # that only declare it (Qwen3.6-35B-A3B W8A8 MXFP8) render nowhere else,
+    # and asking for ascend_950dt_8x makes the site fall back
+    # (selection.adjusted) and trip the fallback assertion.
+    "ascend_950dt": "a5",
     "ascend_950dt_8x": "a5",
     "ascend_950pr_8x": "a5",
 }
