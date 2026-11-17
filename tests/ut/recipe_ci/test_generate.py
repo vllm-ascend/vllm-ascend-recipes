@@ -206,6 +206,7 @@ def test_plan_combo_happy_path():
     assert meta["port"] == 8100
     assert meta["hub"] == "huggingface"
     assert meta["draft_model"] is None
+    assert meta["bench"] is True  # chat combos benchmark by default
     assert meta["features_resolved"] == {"spec_decoding": "dspark"}
     assert meta["runner"] == "linux-aarch64-a5-4"
     assert meta["image"] == "quay.io/ascend/vllm-ascend:v0.23.0-a5"
@@ -218,6 +219,14 @@ def test_plan_combo_happy_path():
     assert companion["port"] == 8000
     assert companion["after"] is True
     assert companion["install_hint"] == "uv pip install vllm-router"
+
+
+def test_plan_combo_bench_follows_smoke_test_and_override():
+    # Rerank combos have no page "Bench" snippet, so benchmarking stays off
+    # unless the map turns it on; chat combos can opt out explicitly.
+    assert _plan(A5_RENDER, dict(A5_COMBO, smoke_test="rerank"))["bench"] is False
+    assert _plan(A5_RENDER, dict(A5_COMBO, smoke_test="rerank", bench=True))["bench"] is True
+    assert _plan(A5_RENDER, dict(A5_COMBO, bench=False))["bench"] is False
 
 
 def test_plan_combo_modelscope_and_draft_model():

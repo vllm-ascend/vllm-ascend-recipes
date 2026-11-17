@@ -24,8 +24,10 @@ Consumes the artifacts produced by ``recipes/ci/generate.py`` on the NPU job:
 2. log the resolved serve command, run ``run.sh`` (engine) and capture
    ``serve.log``,
 3. poll ``/v1/models`` until ready, start companions (vllm-router etc.),
-4. smoke test ``POST /v1/chat/completions`` or ``POST /v1/rerank``,
-5. teardown and write ``result.json`` (pass / fail / skip).
+4. run the recipes page's cURL service verification, then the smoke test
+   (``POST /v1/chat/completions`` or ``POST /v1/rerank``),
+5. benchmark chat combos with the page's ``vllm bench serve`` snippet,
+6. teardown and write ``result.json`` (pass / fail / skip).
 
 Exit code: 0 for pass or optional skip, 1 for fail or required skip. Stdlib only - runs inside the recipe
 container image without extra pip installs.
@@ -57,6 +59,18 @@ SMOKE_MAX_TOKENS = 8
 COMPANION_READY_TIMEOUT_S = 600
 TEARDOWN_WAIT_S = 30
 LOG_TAIL_LINES = 100
+BENCH_TIMEOUT_S = 3600
+
+# The recipes page's install card carries a "cURL" and a "Bench" popover whose
+# commands are fixed templates (only model / host / port vary). These mirror
+# those snippets verbatim; the page uses the same 32 max_tokens for cURL.
+CURL_MAX_TOKENS = 32
+BENCH_NUM_PROMPTS = 100
+BENCH_INPUT_LEN = 1024
+BENCH_OUTPUT_LEN = 1024
+BENCH_MAX_CONCURRENCY = 32
+
+_BENCH_METRIC_RE = re.compile(r"^([A-Za-z][^:]*?):\s+(-?[\d.]+)\s*$")
 
 # Escape hatches for ops / dry-runs (documented in template section 7).
 NPU_COUNT_OVERRIDE_ENV = "RECIPE_CI_FORCE_NPU_COUNT"
@@ -398,6 +412,124 @@ def smoke(base_url: str, model: str, kind: str = "chat") -> None:
         raise ComboFailure("smoke: empty message content (resp=" + json.dumps(resp)[:400] + ")")
 
 
+def curl_command(base_url: str, model: str) -> str:
+    """Rebuild the recipes site's cURL snippet (install card > cURL popover).
+
+    Only host / port / model vary on the page; the body is fixed.
+    """
+    return (
+        f"curl {base_url}/v1/chat/completions \\\n"
+        '  -H "Content-Type: application/json" \\\n'
+        "  -d '{\n"
+        f'    "model": "{model}",\n'
+        '    "messages": [{"role": "user", "content": "Hello"}],\n'
+        f'    "max_tokens": {CURL_MAX_TOKENS}\n'
+        "  }'"
+    )
+
+
+def verify_service(base_url: str, model: str) -> None:
+    """Service verification: run the page's cURL snippet against the server.
+
+    The command is logged verbatim so the CI log shows exactly what users copy
+    from the page; the request itself is the same body (Hello / max_tokens 32).
+    ``model`` must be the id the engine actually serves (the localized run.sh
+    replaced the hub id with its local cache path).
+    """
+    print("[verify] " + curl_command(base_url, model), flush=True)
+    payload = {
+        "model": model,
+        "messages": [{"role": "user", "content": "Hello"}],
+        "max_tokens": CURL_MAX_TOKENS,
+    }
+    try:
+        resp = http_post_json(base_url + "/v1/chat/completions", payload)
+    except (urllib.error.URLError, OSError, json.JSONDecodeError) as e:
+        raise ComboFailure(f"cURL verification failed: {e}") from e
+    choices = resp.get("choices") or []
+    content = (choices[0].get("message") or {}).get("content") if choices else None
+    if not content:
+        raise ComboFailure("cURL verification: empty message content (resp=" + json.dumps(resp)[:400] + ")")
+
+
+def bench_command(base_url: str, model: str) -> list[str]:
+    """Rebuild the recipes site's Bench snippet (install card > Bench popover).
+
+    Every flag except model / host / port is the site's fixed default, so the CI
+    benchmark matches what the page tells users to run.
+    """
+    host, _, port = base_url.removeprefix("http://").partition(":")
+    return [
+        "vllm",
+        "bench",
+        "serve",
+        "--model",
+        model,
+        "--host",
+        host or "127.0.0.1",
+        "--port",
+        port or "8000",
+        "--dataset-name",
+        "random",
+        "--random-input-len",
+        str(BENCH_INPUT_LEN),
+        "--random-output-len",
+        str(BENCH_OUTPUT_LEN),
+        "--num-prompts",
+        str(BENCH_NUM_PROMPTS),
+        "--max-concurrency",
+        str(BENCH_MAX_CONCURRENCY),
+    ]
+
+
+def parse_bench_metrics(text: str) -> dict[str, float]:
+    """Parse the ``key: value`` lines of the ``vllm bench serve`` result table.
+
+    All numeric metrics are kept, so a rename in a future vllm release degrades
+    to a lookup miss in the summary instead of dropping the whole benchmark.
+    """
+    metrics: dict[str, float] = {}
+    for line in text.splitlines():
+        match = _BENCH_METRIC_RE.match(line.strip())
+        if not match:
+            continue
+        try:
+            metrics[match.group(1).strip()] = float(match.group(2))
+        except ValueError:
+            continue
+    return metrics
+
+
+def run_bench(base_url: str, model: str, out_dir: Path) -> dict:
+    """Benchmark the served model with the page's ``vllm bench serve`` snippet.
+
+    The raw output is kept as ``bench.log`` (uploaded with the results) and the
+    parsed metrics feed ``result.json``. Any failure marks the combo red: the
+    benchmark is part of the recipe verification, not a best-effort extra.
+    """
+    argv = bench_command(base_url, model)
+    print("[bench] " + " ".join(shlex.quote(token) for token in argv), flush=True)
+    started = time.monotonic()
+    try:
+        proc = subprocess.run(argv, capture_output=True, text=True, timeout=BENCH_TIMEOUT_S)
+    except FileNotFoundError as e:
+        raise ComboFailure("vllm CLI not found; cannot run 'vllm bench serve'") from e
+    except subprocess.TimeoutExpired as e:
+        raise ComboFailure(f"'vllm bench serve' timed out after {BENCH_TIMEOUT_S}s") from e
+    output = (proc.stdout or "") + (proc.stderr or "")
+    (out_dir / "bench.log").write_text(output, encoding="utf-8")
+    if proc.returncode != 0:
+        raise ComboFailure(
+            f"'vllm bench serve' exited with code {proc.returncode}; see bench.log:\n"
+            + "\n".join(output.splitlines()[-LOG_TAIL_LINES:])
+        )
+    metrics = parse_bench_metrics(output)
+    if not metrics:
+        raise ComboFailure("'vllm bench serve' produced no metrics; see bench.log")
+    print("[bench] " + ", ".join(f"{key}={value}" for key, value in metrics.items()), flush=True)
+    return {"seconds": round(time.monotonic() - started, 1), "metrics": metrics}
+
+
 def teardown(procs: list[subprocess.Popen], out_dir: Path) -> None:
     """Terminate process groups, then collect an npu-smi snapshot."""
     for proc in procs:
@@ -442,7 +574,9 @@ def run_combo(combo_dir: Path, results_dir: Path) -> int:
         "status": "fail",
         "skip_reason": None,
         "readiness_seconds": None,
+        "verify_seconds": None,
         "smoke_seconds": None,
+        "bench": None,
     }
 
     skip_reason = precheck(meta)
@@ -467,9 +601,17 @@ def run_combo(combo_dir: Path, results_dir: Path) -> int:
                     companions.append(companion)
                     if port:
                         wait_tcp(int(port), COMPANION_READY_TIMEOUT_S, companion)
+            # Requests must name the model the engine actually serves: the
+            # localized run.sh replaced the hub id with its local cache path.
             served = str(models[0]["id"]) if models else str(meta["model_id"])
-            smoke(base_url, served, meta.get("smoke_test", "chat"))
+            smoke_test = meta.get("smoke_test", "chat")
+            if smoke_test == "chat":
+                verify_service(base_url, served)
+                result["verify_seconds"] = round(time.monotonic() - started, 1)
+            smoke(base_url, served, smoke_test)
             result["smoke_seconds"] = round(time.monotonic() - started, 1)
+            if meta.get("bench"):
+                result["bench"] = run_bench(base_url, served, out_dir)
             result["status"] = "pass"
         except (ComboFailure, ComboSkip) as e:
             result.update(
@@ -489,13 +631,16 @@ def run_combo(combo_dir: Path, results_dir: Path) -> int:
 
 def summarize(results_dir: Path) -> int:
     """Print a markdown table of all result.json files for GITHUB_STEP_SUMMARY."""
-    print("| combo | status | reason | readiness (s) | total (s) |")
-    print("| --- | --- | --- | --- | --- |")
+    print("| combo | status | reason | readiness (s) | smoke (s) | bench (s) | output tok/s |")
+    print("| --- | --- | --- | --- | --- | --- | --- |")
     for path in sorted(results_dir.glob("*/result.json")):
         r = json.loads(path.read_text(encoding="utf-8"))
+        bench = r.get("bench") or {}
+        metrics = bench.get("metrics") or {}
         print(
             f"| {r.get('combo_id')} | {r.get('status')} | {r.get('skip_reason') or ''} "
-            f"| {r.get('readiness_seconds') or ''} | {r.get('smoke_seconds') or ''} |"
+            f"| {r.get('readiness_seconds') or ''} | {r.get('smoke_seconds') or ''} "
+            f"| {bench.get('seconds') or ''} | {metrics.get('Output token throughput (tok/s)') or ''} |"
         )
     return 0
 

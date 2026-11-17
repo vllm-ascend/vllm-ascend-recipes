@@ -446,6 +446,9 @@ def plan_combo(
         "features_requested": combo.get("features") or {},
         "features_resolved": features_resolved,
         "smoke_test": smoke_test,
+        # Benchmarking follows the recipes page's "Bench" snippet, which only
+        # exists for chat models; rerank combos opt out by default.
+        "bench": bool(combo.get("bench", smoke_test == "chat")),
         "required": bool(combo.get("required", False)),
         "override": combo.get("override") or {},
         "image": image,
