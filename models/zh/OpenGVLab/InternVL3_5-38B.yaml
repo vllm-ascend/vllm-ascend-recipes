@@ -117,7 +117,7 @@ scenarios:
         --max-num-seqs 32 \
         --gpu-memory-utilization 0.9 \
         --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY","cudagraph_capture_sizes":[4,32,64,128,192,256,512]}' \
-        --additional-config '{"enable_weight_nz_layout":true,"enable_cpu_binding":true,"enable_fused_mc2":1}'  \
+        --additional-config '{"weight_nz_mode":1,"enable_cpu_binding":true,"enable_fused_mc2":1}'  \
         --mm-processor-cache-gb 0 \
         --enable-chunked-prefill \
         --safetensors-load-strategy prefetch \
