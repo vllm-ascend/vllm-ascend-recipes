@@ -226,7 +226,7 @@ https://docs.vllm.ai/projects/ascend/en/latest/installation.html
 - `models/en/Qwen/Qwen3-Dense.yaml`
 - `models/zh/Qwen/Qwen3-Dense.yaml`
 
-**建议**: 为每个 dense 子模型创建单独的 YAML，或将它们作为一个合集处理。推荐用合集方式，在 description 中列出所有变体。
+**建议**: 已按模型拆分为两个独立 YAML（`Qwen3.5-27B.yaml` / `Qwen3.6-27B.yaml`），不再使用合集文件，避免 variants 跨模型混用与 slug 语义歧义。
 
 ---
 
@@ -239,17 +239,17 @@ https://docs.vllm.ai/projects/ascend/en/latest/installation.html
 | architecture | dense |
 | parameters | 27B |
 | active_parameters | null |
-| context_length | 131072 |
-| modality | text |
-| NPU | Atlas 800I A3, Atlas 800I A2 |
-| Precisions | BF16, W8A8 |
-| Deployments | Single Node, Multi Node |
+| context_length | 262144 |
+| modality | multimodal |
+| NPU | Atlas 800I A3, Atlas 800I A2, Ascend 950DT (仅 3.6), Atlas 300I DUO |
+| Precisions | BF16, W8A8, W8A8 MXFP8 / W8A8C8 MXFP8 (仅 3.6), W8A8-310P (仅 3.6) |
+| Deployments | Single Node |
 | 源文件 | `Qwen3.5-27B-Qwen3.6-27B.md` (10 sections) |
 | 难度 | ⭐⭐ (两个模型共享一个教程) |
 
-文件路径:
-- `models/en/Qwen/Qwen3.5-27B-Qwen3.6-27B.yaml`
-- `models/zh/Qwen/Qwen3.5-27B-Qwen3.6-27B.yaml`
+文件路径（按模型拆分为两个文件，slug 不再合并）:
+- `models/en/Qwen/Qwen3.5-27B.yaml` + `models/zh/Qwen/Qwen3.5-27B.yaml`
+- `models/en/Qwen/Qwen3.6-27B.yaml` + `models/zh/Qwen/Qwen3.6-27B.yaml`
 
 ---
 

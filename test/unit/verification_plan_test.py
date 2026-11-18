@@ -358,7 +358,7 @@ class RecipeParserTests(unittest.TestCase):
         self.assertEqual(len(result["scenarios"][0]["verify_cmds"]), 2)
 
     def test_qwen_a5_requests_target_served_name_and_keep_chat_benchmark(self):
-        recipe = yaml.safe_load((ROOT / "models/en/Qwen/Qwen3.5-27B-Qwen3.6-27B.yaml").read_text(encoding="utf-8"))
+        recipe = yaml.safe_load((ROOT / "models/en/Qwen/Qwen3.6-27B.yaml").read_text(encoding="utf-8"))
         selected = [item for item in recipe["scenarios"] if item["npu"] == "Ascend 950DT"]
         result = self.parse(selected, verification=recipe["verification"])
         checks = result["scenarios"][0]["verify_cmds"]

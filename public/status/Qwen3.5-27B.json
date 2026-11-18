@@ -1,0 +1,52 @@
+{
+  "model": "Qwen3.5-27B",
+  "last_pr_run": {
+    "kind": "pr",
+    "status": "pass",
+    "conclusion": "success",
+    "head_sha": "2b2470ef60fa8a4d31ecd4121898d0371fbcc0d3",
+    "head_sha_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/commit/2b2470ef60fa8a4d31ecd4121898d0371fbcc0d3",
+    "workflow_run_id": 40259303801,
+    "workflow_run_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/actions/runs/40259303801",
+    "started_at": "2026-10-26T02:28:53Z",
+    "finished_at": "2026-10-26T03:53:21Z",
+    "pr_number": null,
+    "pr_url": null,
+    "pr_title": null,
+    "pr_author": null
+  },
+  "last_nightly_run": null,
+  "last_manual_run": null,
+  "targets": {
+    "qwen35-27b-a2-w8a8-single-node-multi-card": {
+      "test_id": null,
+      "selector": {
+        "npu": "Atlas 800I A2",
+        "precision": "W8A8",
+        "deployment": "Single-Node",
+        "case": "Multi Card"
+      },
+      "runner": "linux-aarch64-a2b4-8",
+      "mode": "single-node",
+      "last_pr_run": {
+        "kind": "pr",
+        "status": "pass",
+        "conclusion": "success",
+        "head_sha": "2b2470ef60fa8a4d31ecd4121898d0371fbcc0d3",
+        "head_sha_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/commit/2b2470ef60fa8a4d31ecd4121898d0371fbcc0d3",
+        "workflow_run_id": 40259303801,
+        "workflow_run_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/actions/runs/40259303801",
+        "started_at": "2026-10-26T02:28:53Z",
+        "finished_at": "2026-10-26T03:53:21Z",
+        "pr_number": null,
+        "pr_url": null,
+        "pr_title": null,
+        "pr_author": null,
+        "verification_note": "Task API response validated"
+      },
+      "last_nightly_run": null,
+      "history": [],
+      "last_manual_run": null
+    }
+  }
+}
