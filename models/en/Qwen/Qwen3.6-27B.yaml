@@ -475,6 +475,56 @@ scenarios:
     content: |-
       See the `verification` section below.
 
+# ===== Atlas 800 A3, W8A8, TP=2 + DP=8, Low Latency (128k) =====
+- npu: Atlas 800I A3
+  precision: W8A8
+  deployment: Single-Node
+  case: Low Latency (128k)
+  tags: [a3-single, low-latency]
+  strategy: single_node_A3
+  steps:
+  - title: Start the server
+    content: |-
+      **Status: experimental — awaiting a real-device run.** This is the tutorial's Low Latency row for Atlas 800 A3: the same TP=2 + DP=8 topology as the throughput case, but `--max-num-seqs 4` and `--max-num-batched-tokens 4096` to cut batch latency. The badge stays `experimental` until the rendered command is executed end-to-end on an A3 node.
+
+      ```bash
+      #!/bin/sh
+      export MODEL_PATH=Eco-Tech/Qwen3.6-27B-w8a8
+      export VLLM_USE_MODELSCOPE=True
+      export HCCL_BUFFSIZE=512
+      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+      export OMP_PROC_BIND=false
+      export OMP_NUM_THREADS=1
+      export TASK_QUEUE_ENABLE=1
+
+      vllm serve $MODEL_PATH \
+          --host 0.0.0.0 \
+          --port 8000 \
+          --data-parallel-size 8 \
+          --tensor-parallel-size 2 \
+          --quantization ascend \
+          --served-model-name qwen3.6 \
+          --max-num-seqs 4 \
+          --max-model-len 133000 \
+          --max-num-batched-tokens 4096 \
+          --trust-remote-code \
+          --allowed-local-media-path / \
+          --dtype bfloat16 \
+          --reasoning-parser qwen3 \
+          --mm-processor-cache-gb 0 \
+          --mm-encoder-tp-mode data \
+          --mm-processor-cache-type shm \
+          --gpu-memory-utilization {{gpu_memory_utilization}} \
+          {{prefix_caching}} \
+          {{spec_decoding}} \
+          {{compilation_config}} \
+          {{cpu_binding}} \
+          {{async_scheduling}}
+      ```
+  - title: Service verification
+    content: |-
+      See the `verification` section below.
+
 # ===== Atlas 800 A3, BF16, TP=2 =====
 - npu: Atlas 800I A3
   precision: BF16
