@@ -2350,7 +2350,7 @@
         "deployment": "Single-Node",
         "case": "Single Node Multi Card"
       },
-      "runner": "linux-aarch64-a3-800i-16-cn12-001",
+      "runner": "linux-aarch64-a3-800i-recipes-fed-16",
       "mode": "single-node",
       "last_pr_run": null,
       "last_nightly_run": {
