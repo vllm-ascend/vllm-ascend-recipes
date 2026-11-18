@@ -1,0 +1,667 @@
+meta:
+  title: Qwen3.5-Dense (2B / 4B / 9B)
+  slug: qwen3.5-dense
+  provider: Qwen
+  description: Qwen3.5 Dense FP16 deployment on Atlas 300I DUO and Atlas 200I Pro, migrated from the official tutorial.
+  date_added: '2026-11-18'
+  difficulty: intermediate
+  tasks:
+    - text
+    - multimodal
+  hardware:
+    atlas_300i_duo: experimental
+    atlas_200i_pro: experimental
+model:
+  model_id: Qwen/Qwen3.5-2B
+  architecture: dense
+  parameter_count: 2B
+  active_parameters: null
+  context_length: 262144
+  modality: text, image, video
+  base_args:
+    - --host
+    - 127.0.0.1
+    - --port
+    - '8080'
+    - --tensor-parallel-size
+    - '1'
+    - --served-model-name
+    - qwen3.5
+    - --max-num-seqs
+    - '32'
+    - --max-model-len
+    - '16384'
+    - --trust-remote-code
+    - --gpu-memory-utilization
+    - '0.90'
+    - --mamba-ssm-cache-dtype
+    - float16
+    - --dtype
+    - float16
+    - --compilation-config
+    - '{"cudagraph_mode": "FULL_DECODE_ONLY", "cudagraph_capture_sizes": [2,16]}'
+    - --additional-config
+    - '{"ascend_compilation_config": {"enable_npugraph_ex": false}}'
+  base_env:
+    VLLM_USE_MODELSCOPE: 'True'
+  docker_image:
+    atlas_300i_duo: quay.io/ascend/vllm-ascend:main-310p
+    atlas_200i_pro: quay.io/ascend/vllm-ascend:main-310p
+  install:
+    pip: false
+features:
+  spec_decoding:
+    label: MTP speculative decoding
+    description: 'Tutorial baseline: one speculative token using qwen3_5_mtp.'
+    args:
+      - --speculative-config
+      - '{"method": "qwen3_5_mtp","num_speculative_tokens":1}'
+variants:
+  default:
+    precision: fp16
+    vram_minimum_gb: 5
+  4b:
+    model_id: Qwen/Qwen3.5-4B
+    precision: fp16
+    vram_minimum_gb: 10
+  9b:
+    model_id: Qwen/Qwen3.5-9B
+    precision: fp16
+    vram_minimum_gb: 22
+compatible_strategies:
+  - single_node_310p
+config_params:
+  max_model_len:
+    default: 16384
+    type: number
+    description: Input plus output context length; lower if memory is insufficient.
+  max_num_seqs:
+    default: 32
+    type: number
+    description: Maximum concurrent requests; lower if memory is insufficient.
+  gpu_memory_utilization:
+    default: 0.9
+    type: number
+    description: Fraction of device memory allocated to vLLM.
+overview:
+  Qwen3.5-2B, 4B and 9B are dense multimodal models with gated delta networks and full attention. This recipe
+  preserves the official single-node TP deployment on Atlas 300I DUO and Atlas 200I Pro. The checkpoint context
+  is 262144 tokens; the tutorial deployment uses only 16384. Target-hardware inference, MTP, accuracy and performance
+  have not been independently verified for this contribution. Both hardware entries remain experimental.
+weight_download:
+  - weight_version: FP16 (Qwen3.5-2B)
+    sources:
+      - source: ModelScope
+        url: https://modelscope.cn/models/Qwen/Qwen3.5-2B
+        command: |-
+          ```bash
+          pip install modelscope
+          modelscope download --model Qwen/Qwen3.5-2B
+          ```
+      - source: HuggingFace
+        url: https://huggingface.co/Qwen/Qwen3.5-2B
+        command: |-
+          ```bash
+          pip install -U huggingface_hub
+          hf download Qwen/Qwen3.5-2B
+          ```
+  - weight_version: W8A8 (Qwen3.5-2B, download reference)
+    sources:
+      - source: ModelScope
+        url: https://modelscope.cn/models/Eco-Tech/Qwen3.5-2B-W8A8-310P
+        command: |-
+          ```bash
+          pip install modelscope
+          modelscope download --model Eco-Tech/Qwen3.5-2B-W8A8-310P
+          ```
+  - weight_version: FP16 (Qwen3.5-4B)
+    sources:
+      - source: ModelScope
+        url: https://modelscope.cn/models/Qwen/Qwen3.5-4B
+        command: |-
+          ```bash
+          pip install modelscope
+          modelscope download --model Qwen/Qwen3.5-4B
+          ```
+      - source: HuggingFace
+        url: https://huggingface.co/Qwen/Qwen3.5-4B
+        command: |-
+          ```bash
+          pip install -U huggingface_hub
+          hf download Qwen/Qwen3.5-4B
+          ```
+  - weight_version: W8A8 (Qwen3.5-4B, download reference)
+    sources:
+      - source: ModelScope
+        url: https://modelscope.cn/models/Eco-Tech/Qwen3.5-4B-W8A8-310P
+        command: |-
+          ```bash
+          pip install modelscope
+          modelscope download --model Eco-Tech/Qwen3.5-4B-W8A8-310P
+          ```
+  - weight_version: FP16 (Qwen3.5-9B)
+    sources:
+      - source: ModelScope
+        url: https://modelscope.cn/models/Qwen/Qwen3.5-9B
+        command: |-
+          ```bash
+          pip install modelscope
+          modelscope download --model Qwen/Qwen3.5-9B
+          ```
+      - source: HuggingFace
+        url: https://huggingface.co/Qwen/Qwen3.5-9B
+        command: |-
+          ```bash
+          pip install -U huggingface_hub
+          hf download Qwen/Qwen3.5-9B
+          ```
+  - weight_version: W8A8 (Qwen3.5-9B, download reference)
+    sources:
+      - source: ModelScope
+        url: https://modelscope.cn/models/Eco-Tech/Qwen3.5-9B-W8A8-310P
+        command: |-
+          ```bash
+          pip install modelscope
+          modelscope download --model Eco-Tech/Qwen3.5-9B-W8A8-310P
+          ```
+prerequisites:
+  - title: Hardware and software
+    content:
+      Use Atlas 300I DUO (TP=1 or TP=2) or Atlas 200I Pro (TP=1). Check device memory before using the tutorial
+      defaults, especially 9B FP16. Use current main-310p images to test main; the tutorial support floor is v0.23.0rc1-310p.
+      On openEuler use main-310p-openeuler. Record the pulled image digest and source commits with results. These
+      images and launch commands do not target 910B.
+env_setup:
+  container:
+    Atlas 300I DUO:
+      content: |-
+        Adjust device IDs to the available devices and keep the listed platform-specific driver mounts. Downloaded weights persist only in the mounted cache. Record the resolved image digest.
+
+        ```bash
+        export IMAGE=m.daocloud.io/quay.io/ascend/vllm-ascend:main-310p
+        docker run --rm \
+            --name vllm-ascend \
+            --shm-size=10g \
+            --device /dev/davinci0 \
+            --device /dev/davinci1 \
+            --device /dev/davinci2 \
+            --device /dev/davinci3 \
+            --device /dev/davinci4 \
+            --device /dev/davinci5 \
+            --device /dev/davinci6 \
+            --device /dev/davinci7 \
+            --device /dev/davinci_manager \
+            --device /dev/devmm_svm \
+            --device /dev/hisi_hdc \
+            -v /usr/local/dcmi:/usr/local/dcmi \
+            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+            -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \
+            -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
+            -v /etc/ascend_install.info:/etc/ascend_install.info \
+            -v /root/.cache:/root/.cache \
+            -p 8080:8080 \
+            -it $IMAGE bash
+        ```
+
+        ```bash
+        docker ps
+        ```
+    Atlas 200I Pro (Ubuntu 24.04):
+      content: |-
+        Adjust device IDs to the available devices and keep the listed platform-specific driver mounts. Downloaded weights persist only in the mounted cache. Record the resolved image digest.
+
+        ```bash
+        export IMAGE=quay.io/ascend/vllm-ascend:main-310p
+
+        docker run --rm \
+        --privileged \
+        --name vllm-ascend \
+        --shm-size=10g \
+        --device=/dev/davinci0:/dev/davinci0 \
+        --device=/dev/davinci_manager \
+        --device=/dev/ascend_manager \
+        --device=/dev/user_config \
+        -v /etc/sys_version.conf:/etc/sys_version.conf \
+        -v /etc/ld.so.conf.d/mind_so.conf:/etc/ld.so.conf.d/mind_so.conf \
+        -v /etc/hdcBasic.cfg:/etc/hdcBasic.cfg \
+        -v /var/dmp_daemon:/var/dmp_daemon \
+        -v /usr/lib64/libmmpa.so:/usr/lib64/libmmpa.so \
+        -v /usr/lib64/libcrypto.so.1.1:/usr/lib64/libcrypto.so.1.1 \
+        -v /usr/local/sbin/npu-smi:/usr/local/sbin/npu-smi \
+        -v /usr/lib64/libstackcore.so:/usr/lib64/libstackcore.so \
+        -v /usr/lib/aarch64-linux-gnu/libyaml-0.so.2:/usr/lib64/libyaml-0.so.2 \
+        -v /etc/slog.conf:/etc/slog.conf \
+        -v /var/slogd:/var/slogd \
+        -v /usr/local/Ascend/driver/lib64:/usr/local/Ascend/driver/lib64 \
+        -v /usr/lib64/libtensorflow.so:/usr/lib64/libtensorflow.so \
+        -v /root/.cache:/root/.cache \
+        -p 8080:8080 \
+        -it $IMAGE bash
+        ```
+
+        ```bash
+        docker ps
+        ```
+    Atlas 200I Pro (openEuler 24.03):
+      content: |-
+        Adjust device IDs to the available devices and keep the listed platform-specific driver mounts. Downloaded weights persist only in the mounted cache. Record the resolved image digest.
+
+        ```bash
+        export IMAGE=quay.io/ascend/vllm-ascend:main-310p-openeuler
+
+        docker run --rm \
+        --privileged \
+        --name vllm-ascend \
+        --shm-size=10g \
+        --device=/dev/davinci0:/dev/davinci0 \
+        --device=/dev/davinci_manager \
+        --device=/dev/ascend_manager \
+        --device=/dev/user_config \
+        -v /etc/sys_version.conf:/etc/sys_version.conf \
+        -v /etc/ld.so.conf.d/mind_so.conf:/etc/ld.so.conf.d/mind_so.conf \
+        -v /etc/hdcBasic.cfg:/etc/hdcBasic.cfg \
+        -v /var/dmp_daemon:/var/dmp_daemon \
+        -v /usr/lib64/libsemanage.so.2:/usr/lib64/libsemanage.so.2 \
+        -v /usr/lib64/libmmpa.so:/usr/lib64/libmmpa.so \
+        -v /usr/lib64/libcrypto.so.1.1:/usr/lib64/libcrypto.so.1.1 \
+        -v /usr/lib64/libyaml-0.so.2.0.9:/usr/lib64/libyaml-0.so.2 \
+        -v /usr/local/sbin/npu-smi:/usr/local/sbin/npu-smi \
+        -v /usr/lib64/libstackcore.so:/usr/lib64/libstackcore.so \
+        -v /etc/slog.conf:/etc/slog.conf \
+        -v /var/slogd:/var/slogd \
+        -v /usr/local/Ascend/driver/lib64:/usr/local/Ascend/driver/lib64 \
+        -v /usr/lib64/libtensorflow.so:/usr/lib64/libtensorflow.so \
+        -v /root/.cache:/root/.cache \
+        -p 8080:8080 \
+        -it $IMAGE bash
+        ```
+
+        ```bash
+        docker ps
+        ```
+  pip:
+    content:
+      For source builds follow the [installation guide](https://docs.vllm.ai/projects/ascend/en/latest/getting_started/installation.html).
+      Clone main and install with `pip install -e .` only after satisfying that guide. The tutorial notes that `triton-ascend`
+      and `triton` may need removal to avoid conflicts on these platforms. Check `pip show vllm-ascend` afterwards.
+scenarios:
+  - npu: Atlas 300I DUO
+    precision: FP16 (Qwen3.5-2B)
+    deployment: Single-Node
+    case: TP=1
+    tags:
+      - 310p-single
+    strategy: single_node_310p
+    steps:
+      - title: Start the server
+        content: |-
+          Set `your_model_path` to `Qwen/Qwen3.5-2B` or the corresponding local download. Run inside the container.
+
+          ```bash
+          export VLLM_USE_MODELSCOPE=True
+          vllm serve your_model_path \
+          --host 127.0.0.1 \
+          --port 8080 \
+          --tensor-parallel-size 1 \
+          --served-model-name qwen3.5 \
+          --max-num-seqs {{max_num_seqs}} \
+          --max-model-len {{max_model_len}} \
+          --trust-remote-code \
+          --gpu-memory-utilization {{gpu_memory_utilization}} \
+          --mamba-ssm-cache-dtype float16 \
+          --dtype float16 \
+          {{spec_decoding}} \
+          --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY", "cudagraph_capture_sizes": [2,16]}' \
+          --additional-config '{"ascend_compilation_config": {"enable_npugraph_ex": false}}'
+          ```
+      - title: Verify inference
+        content:
+          Follow the Verification section below. Keep the logs and both inference responses; startup alone is
+          not sufficient.
+  - npu: Atlas 300I DUO
+    precision: FP16 (Qwen3.5-2B)
+    deployment: Single-Node
+    case: TP=2
+    tags:
+      - 310p-single
+    strategy: single_node_310p
+    steps:
+      - title: Start the server
+        content: |-
+          Set `your_model_path` to `Qwen/Qwen3.5-2B` or the corresponding local download. Run inside the container.
+
+          ```bash
+          export VLLM_USE_MODELSCOPE=True
+          vllm serve your_model_path \
+          --host 127.0.0.1 \
+          --port 8080 \
+          --tensor-parallel-size 2 \
+          --served-model-name qwen3.5 \
+          --max-num-seqs {{max_num_seqs}} \
+          --max-model-len {{max_model_len}} \
+          --trust-remote-code \
+          --gpu-memory-utilization {{gpu_memory_utilization}} \
+          --mamba-ssm-cache-dtype float16 \
+          --dtype float16 \
+          {{spec_decoding}} \
+          --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY", "cudagraph_capture_sizes": [2,16]}' \
+          --additional-config '{"ascend_compilation_config": {"enable_npugraph_ex": false}}'
+          ```
+      - title: Verify inference
+        content:
+          Follow the Verification section below. Keep the logs and both inference responses; startup alone is
+          not sufficient.
+  - npu: Atlas 200I Pro
+    precision: FP16 (Qwen3.5-2B)
+    deployment: Single-Node
+    case: TP=1
+    tags:
+      - 310p-single
+    strategy: single_node_310p
+    steps:
+      - title: Start the server
+        content: |-
+          Set `your_model_path` to `Qwen/Qwen3.5-2B` or the corresponding local download. Run inside the container.
+
+          ```bash
+          export VLLM_USE_MODELSCOPE=True
+          vllm serve your_model_path \
+          --host 127.0.0.1 \
+          --port 8080 \
+          --tensor-parallel-size 1 \
+          --served-model-name qwen3.5 \
+          --max-num-seqs {{max_num_seqs}} \
+          --max-model-len {{max_model_len}} \
+          --trust-remote-code \
+          --gpu-memory-utilization {{gpu_memory_utilization}} \
+          --mamba-ssm-cache-dtype float16 \
+          --dtype float16 \
+          {{spec_decoding}} \
+          --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY", "cudagraph_capture_sizes": [2,16]}' \
+          --additional-config '{"ascend_compilation_config": {"enable_npugraph_ex": false}}'
+          ```
+      - title: Verify inference
+        content:
+          Follow the Verification section below. Keep the logs and both inference responses; startup alone is
+          not sufficient.
+  - npu: Atlas 300I DUO
+    precision: FP16 (Qwen3.5-4B)
+    deployment: Single-Node
+    case: TP=1
+    tags:
+      - 310p-single
+    strategy: single_node_310p
+    steps:
+      - title: Start the server
+        content: |-
+          Set `your_model_path` to `Qwen/Qwen3.5-4B` or the corresponding local download. Run inside the container.
+
+          ```bash
+          export VLLM_USE_MODELSCOPE=True
+          vllm serve your_model_path \
+          --host 127.0.0.1 \
+          --port 8080 \
+          --tensor-parallel-size 1 \
+          --served-model-name qwen3.5 \
+          --max-num-seqs {{max_num_seqs}} \
+          --max-model-len {{max_model_len}} \
+          --trust-remote-code \
+          --gpu-memory-utilization {{gpu_memory_utilization}} \
+          --mamba-ssm-cache-dtype float16 \
+          --dtype float16 \
+          {{spec_decoding}} \
+          --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY", "cudagraph_capture_sizes": [2,16]}' \
+          --additional-config '{"ascend_compilation_config": {"enable_npugraph_ex": false}}'
+          ```
+      - title: Verify inference
+        content:
+          Follow the Verification section below. Keep the logs and both inference responses; startup alone is
+          not sufficient.
+  - npu: Atlas 300I DUO
+    precision: FP16 (Qwen3.5-4B)
+    deployment: Single-Node
+    case: TP=2
+    tags:
+      - 310p-single
+    strategy: single_node_310p
+    steps:
+      - title: Start the server
+        content: |-
+          Set `your_model_path` to `Qwen/Qwen3.5-4B` or the corresponding local download. Run inside the container.
+
+          ```bash
+          export VLLM_USE_MODELSCOPE=True
+          vllm serve your_model_path \
+          --host 127.0.0.1 \
+          --port 8080 \
+          --tensor-parallel-size 2 \
+          --served-model-name qwen3.5 \
+          --max-num-seqs {{max_num_seqs}} \
+          --max-model-len {{max_model_len}} \
+          --trust-remote-code \
+          --gpu-memory-utilization {{gpu_memory_utilization}} \
+          --mamba-ssm-cache-dtype float16 \
+          --dtype float16 \
+          {{spec_decoding}} \
+          --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY", "cudagraph_capture_sizes": [2,16]}' \
+          --additional-config '{"ascend_compilation_config": {"enable_npugraph_ex": false}}'
+          ```
+      - title: Verify inference
+        content:
+          Follow the Verification section below. Keep the logs and both inference responses; startup alone is
+          not sufficient.
+  - npu: Atlas 200I Pro
+    precision: FP16 (Qwen3.5-4B)
+    deployment: Single-Node
+    case: TP=1
+    tags:
+      - 310p-single
+    strategy: single_node_310p
+    steps:
+      - title: Start the server
+        content: |-
+          Set `your_model_path` to `Qwen/Qwen3.5-4B` or the corresponding local download. Run inside the container.
+
+          ```bash
+          export VLLM_USE_MODELSCOPE=True
+          vllm serve your_model_path \
+          --host 127.0.0.1 \
+          --port 8080 \
+          --tensor-parallel-size 1 \
+          --served-model-name qwen3.5 \
+          --max-num-seqs {{max_num_seqs}} \
+          --max-model-len {{max_model_len}} \
+          --trust-remote-code \
+          --gpu-memory-utilization {{gpu_memory_utilization}} \
+          --mamba-ssm-cache-dtype float16 \
+          --dtype float16 \
+          {{spec_decoding}} \
+          --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY", "cudagraph_capture_sizes": [2,16]}' \
+          --additional-config '{"ascend_compilation_config": {"enable_npugraph_ex": false}}'
+          ```
+      - title: Verify inference
+        content:
+          Follow the Verification section below. Keep the logs and both inference responses; startup alone is
+          not sufficient.
+  - npu: Atlas 300I DUO
+    precision: FP16 (Qwen3.5-9B)
+    deployment: Single-Node
+    case: TP=1
+    tags:
+      - 310p-single
+    strategy: single_node_310p
+    steps:
+      - title: Start the server
+        content: |-
+          Set `your_model_path` to `Qwen/Qwen3.5-9B` or the corresponding local download. Run inside the container.
+
+          ```bash
+          export VLLM_USE_MODELSCOPE=True
+          vllm serve your_model_path \
+          --host 127.0.0.1 \
+          --port 8080 \
+          --tensor-parallel-size 1 \
+          --served-model-name qwen3.5 \
+          --max-num-seqs {{max_num_seqs}} \
+          --max-model-len {{max_model_len}} \
+          --trust-remote-code \
+          --gpu-memory-utilization {{gpu_memory_utilization}} \
+          --mamba-ssm-cache-dtype float16 \
+          --dtype float16 \
+          {{spec_decoding}} \
+          --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY", "cudagraph_capture_sizes": [2,16]}' \
+          --additional-config '{"ascend_compilation_config": {"enable_npugraph_ex": false}}'
+          ```
+      - title: Verify inference
+        content:
+          Follow the Verification section below. Keep the logs and both inference responses; startup alone is
+          not sufficient.
+  - npu: Atlas 300I DUO
+    precision: FP16 (Qwen3.5-9B)
+    deployment: Single-Node
+    case: TP=2
+    tags:
+      - 310p-single
+    strategy: single_node_310p
+    steps:
+      - title: Start the server
+        content: |-
+          Set `your_model_path` to `Qwen/Qwen3.5-9B` or the corresponding local download. Run inside the container.
+
+          ```bash
+          export VLLM_USE_MODELSCOPE=True
+          vllm serve your_model_path \
+          --host 127.0.0.1 \
+          --port 8080 \
+          --tensor-parallel-size 2 \
+          --served-model-name qwen3.5 \
+          --max-num-seqs {{max_num_seqs}} \
+          --max-model-len {{max_model_len}} \
+          --trust-remote-code \
+          --gpu-memory-utilization {{gpu_memory_utilization}} \
+          --mamba-ssm-cache-dtype float16 \
+          --dtype float16 \
+          {{spec_decoding}} \
+          --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY", "cudagraph_capture_sizes": [2,16]}' \
+          --additional-config '{"ascend_compilation_config": {"enable_npugraph_ex": false}}'
+          ```
+      - title: Verify inference
+        content:
+          Follow the Verification section below. Keep the logs and both inference responses; startup alone is
+          not sufficient.
+  - npu: Atlas 200I Pro
+    precision: FP16 (Qwen3.5-9B)
+    deployment: Single-Node
+    case: TP=1
+    tags:
+      - 310p-single
+    strategy: single_node_310p
+    steps:
+      - title: Start the server
+        content: |-
+          Set `your_model_path` to `Qwen/Qwen3.5-9B` or the corresponding local download. Run inside the container.
+
+          ```bash
+          export VLLM_USE_MODELSCOPE=True
+          vllm serve your_model_path \
+          --host 127.0.0.1 \
+          --port 8080 \
+          --tensor-parallel-size 1 \
+          --served-model-name qwen3.5 \
+          --max-num-seqs {{max_num_seqs}} \
+          --max-model-len {{max_model_len}} \
+          --trust-remote-code \
+          --gpu-memory-utilization {{gpu_memory_utilization}} \
+          --mamba-ssm-cache-dtype float16 \
+          --dtype float16 \
+          {{spec_decoding}} \
+          --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY", "cudagraph_capture_sizes": [2,16]}' \
+          --additional-config '{"ascend_compilation_config": {"enable_npugraph_ex": false}}'
+          ```
+      - title: Verify inference
+        content:
+          Follow the Verification section below. Keep the logs and both inference responses; startup alone is
+          not sufficient.
+verification: |-
+  Startup must reach `Application startup complete`. Run the checks below in the serving container, replacing `<server_ip>` with `127.0.0.1` and `<port>` with `8080`. Readiness alone does not prove inference: both requests must return HTTP 200 and generated text in `choices`. The tutorial binds loopback; for host clients explicitly choose a reachable bind address. Completions uses its `max_tokens` field; Chat Completions uses `max_completion_tokens`.
+
+  ```bash
+  curl --fail-with-body --silent --show-error http://<server_ip>:<port>/health
+  curl --fail-with-body --silent --show-error http://<server_ip>:<port>/v1/models
+  curl --fail-with-body --silent --show-error http://<server_ip>:<port>/v1/completions \
+    -H 'Content-Type: application/json' \
+    -d '{"model":"qwen3.5","prompt":"The future of AI is","max_tokens":50,"temperature":0}'
+  curl --fail-with-body --silent --show-error http://<server_ip>:<port>/v1/chat/completions \
+    -H 'Content-Type: application/json' \
+    -d '{"model":"qwen3.5","messages":[{"role":"user","content":"The future of AI is"}],"max_completion_tokens":1024,"temperature":0.7,"top_p":0.95}'
+  ```
+evaluation:
+  accuracy:
+    content: |-
+      The following numbers are copied from the official tutorial on Atlas 300I DUO, not measured in this contribution. Do not use them to mark this recipe verified. Replace `your_model_path` in the AISBench configuration with the checkpoint used by the server. Follow the [AISBench guide](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/evaluation/using_ais_bench.html) to prepare gsm8k and textvqa and run each model separately. TextVQA requires the visual dataset and multimodal requests; a text chat smoke does not verify it.
+
+      ```python
+      # Example configuration: benchmarks/ais_bench/benchmark/configs/models/vllm_api/vllm_api_general_chat.py
+      from ais_bench.benchmark.models import VLLMCustomAPIChat
+      from ais_bench.benchmark.utils.model_postprocessors import extract_non_reasoning_content
+
+      models = [
+          dict(
+              attr="service",
+              type=VLLMCustomAPIChat,
+              abbr="vllm-api-general-chat",
+              path="your_model_path",
+              model="qwen3.5",
+              request_rate=0,
+              retry=2,
+              host_ip="127.0.0.1",
+              host_port=8080,
+              max_out_len=4096,
+              batch_size=16,
+              trust_remote_code=False,
+              generation_kwargs=dict(
+                  temperature=0.0,
+                  ignore_eos=False,
+                  chat_template_kwargs = {"enable_thinking": False},
+              ),
+              pred_postprocessor=dict(type=extract_non_reasoning_content)
+          )
+      ]
+      ```
+
+      | Model | dataset | version | metric | mode | vllm-api-general-chat |
+      |-------|---------|---------|--------|------|------------------------|
+      | Qwen3.5-2B | gsm8k | - | accuracy | gen | 77.71 |
+      | Qwen3.5-2B | textvqa | - | accuracy | gen | 76.09 |
+      | Qwen3.5-4B | gsm8k | - | accuracy | gen | 93.18 |
+      | Qwen3.5-4B | textvqa | - | accuracy | gen | 79.08 |
+      | Qwen3.5-9B | gsm8k | - | accuracy | gen | 95.30 |
+      | Qwen3.5-9B | textvqa | - | accuracy | gen | 82.33 |
+  performance:
+    content:
+      Use the [AISBench performance guide](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/evaluation/using_ais_bench.html#execute-performance-evaluation).
+      Record checkpoint/revision, hardware, image digest, launch arguments, input/output lengths, concurrency, request
+      count, failures, throughput and latency. The source tutorial publishes no numerical performance baseline for
+      these models. No measured throughput or latency is claimed here.
+tuning:
+  'Only TP is covered: use TP=1 on a single visible Atlas 200I Pro NPU; Atlas 300I DUO may use TP=1 or TP=2.
+  Keep dtype and Mamba SSM cache float16, disable enable_npugraph_ex, and use FULL_DECODE_ONLY. With TP, hardware
+  event IDs permit at most two capture sizes; [2,16] is the tutorial MTP baseline. For one speculative token each
+  capture size is twice its non-MTP value. Lower context, concurrent sequences and memory utilization if startup
+  runs out of memory. No DP or PD scenario is claimed. See the [tuning guide](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/performance_and_debug/optimization_and_tuning.html).'
+faq:
+  'See the [Public FAQ](https://docs.vllm.ai/projects/ascend/en/latest/faqs.html). A successful 910B run cannot
+  establish 310P / Atlas 200I Pro compatibility. Quantized checkpoints listed below are download references only:
+  the tutorial provides FP16 launch commands and no W8A8 serving baseline.'
+references:
+  - title: Official source tutorial (pinned main)
+    url: https://github.com/vllm-project/vllm-ascend/blob/80a705e62778bee2d49ffa72becf557961f7c181/docs/source/tutorials/models/Qwen3.5-Dense.md
+  - title: AISBench
+    url: https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/evaluation/using_ais_bench.html
+  - title: Qwen3.5-2B
+    url: https://huggingface.co/Qwen/Qwen3.5-2B
+  - title: Qwen3.5-4B
+    url: https://huggingface.co/Qwen/Qwen3.5-4B
+  - title: Qwen3.5-9B
+    url: https://huggingface.co/Qwen/Qwen3.5-9B
+guide: ''
