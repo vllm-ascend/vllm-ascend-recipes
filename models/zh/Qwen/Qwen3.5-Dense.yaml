@@ -561,7 +561,7 @@ scenarios:
       - title: 验证推理
         content: 执行下方“验证”部分的检查，保存日志及两次推理响应；仅启动成功不够。
 verification: |-
-  启动日志需出现 `Application startup complete`。在服务容器内执行下列检查，将 `<server_ip>` 替换为 `127.0.0.1`、`<port>` 替换为 `8080`。就绪不等于推理成功：两次推理请求均需返回 HTTP 200，且 `choices` 含生成文本。教程监听回环地址；宿主机访问时需显式设置可达的监听地址。Completions 使用 `max_tokens`，Chat Completions 使用 `max_completion_tokens`。
+  启动日志需出现 `Application startup complete`。在服务容器内执行下列检查，使用服务 IP `127.0.0.1` 和端口 `8080`。就绪不等于推理成功：两次推理请求均需返回 HTTP 200，且 `choices` 含生成文本。教程监听回环地址；宿主机访问时需显式设置可达的监听地址。Completions 使用 `max_tokens`，Chat Completions 使用 `max_completion_tokens`。
 
   ```bash
   curl --fail-with-body --silent --show-error http://<server_ip>:<port>/health

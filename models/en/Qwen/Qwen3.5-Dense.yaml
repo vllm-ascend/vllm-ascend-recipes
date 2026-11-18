@@ -583,7 +583,7 @@ scenarios:
           Follow the Verification section below. Keep the logs and both inference responses; startup alone is
           not sufficient.
 verification: |-
-  Startup must reach `Application startup complete`. Run the checks below in the serving container, replacing `<server_ip>` with `127.0.0.1` and `<port>` with `8080`. Readiness alone does not prove inference: both requests must return HTTP 200 and generated text in `choices`. The tutorial binds loopback; for host clients explicitly choose a reachable bind address. Completions uses its `max_tokens` field; Chat Completions uses `max_completion_tokens`.
+  Startup must reach `Application startup complete`. Run the checks below in the serving container, using server IP `127.0.0.1` and port `8080`. Readiness alone does not prove inference: both requests must return HTTP 200 and generated text in `choices`. The tutorial binds loopback; for host clients explicitly choose a reachable bind address. Completions uses its `max_tokens` field; Chat Completions uses `max_completion_tokens`.
 
   ```bash
   curl --fail-with-body --silent --show-error http://<server_ip>:<port>/health
