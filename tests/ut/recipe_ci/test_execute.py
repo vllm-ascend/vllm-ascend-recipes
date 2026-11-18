@@ -248,6 +248,110 @@ def test_default_smoke_still_checks_chat_content(monkeypatch):
     assert requests == ["http://127.0.0.1:8000/v1/chat/completions"]
 
 
+# --- cURL verification / vllm bench serve (recipes site snippets) ------------
+
+
+def test_curl_command_matches_site_snippet():
+    assert exe.curl_command("http://127.0.0.1:8100", "Eco-Tech/model-w8a8") == (
+        "curl http://127.0.0.1:8100/v1/chat/completions \\\n"
+        '  -H "Content-Type: application/json" \\\n'
+        "  -d '{\n"
+        '    "model": "Eco-Tech/model-w8a8",\n'
+        '    "messages": [{"role": "user", "content": "Hello"}],\n'
+        '    "max_tokens": 32\n'
+        "  }'"
+    )
+
+
+def test_verify_service_posts_the_page_payload_and_logs_the_command(monkeypatch, capsys):
+    requests = []
+
+    def post(url, payload):
+        requests.append((url, payload))
+        return {"choices": [{"message": {"content": "Hello!"}}]}
+
+    monkeypatch.setattr(exe, "http_post_json", post)
+    exe.verify_service("http://127.0.0.1:8100", "Eco-Tech/model-w8a8")
+    url, payload = requests[0]
+    assert url == "http://127.0.0.1:8100/v1/chat/completions"
+    assert payload == {
+        "model": "Eco-Tech/model-w8a8",
+        "messages": [{"role": "user", "content": "Hello"}],
+        "max_tokens": 32,
+    }
+    assert "curl http://127.0.0.1:8100/v1/chat/completions \\" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("resp", [{}, {"choices": []}, {"choices": [{"message": {"content": ""}}]}])
+def test_verify_service_rejects_empty_content(monkeypatch, resp):
+    monkeypatch.setattr(exe, "http_post_json", lambda *args: resp)
+    with pytest.raises(exe.ComboFailure):
+        exe.verify_service("http://127.0.0.1:8100", "model")
+
+
+def test_bench_command_matches_site_snippet():
+    assert exe.bench_command("http://127.0.0.1:8100", "Eco-Tech/model-w8a8") == [
+        "vllm", "bench", "serve",
+        "--model", "Eco-Tech/model-w8a8",
+        "--host", "127.0.0.1",
+        "--port", "8100",
+        "--dataset-name", "random",
+        "--random-input-len", "1024",
+        "--random-output-len", "1024",
+        "--num-prompts", "100",
+        "--max-concurrency", "32",
+    ]
+
+
+def test_parse_bench_metrics_reads_the_result_table():
+    text = (
+        "============ Serving Benchmark Result ============\n"
+        "Successful requests:                     100\n"
+        "Benchmark duration (s):                  22.35\n"
+        "Request throughput (req/s):              4.47\n"
+        "Output token throughput (tok/s):         4578.75\n"
+        "---------------Time to First Token----------------\n"
+        "Mean TTFT (ms):                          71.23\n"
+        "Device: NPU\n"
+    )
+    metrics = exe.parse_bench_metrics(text)
+    assert metrics["Successful requests"] == 100.0
+    assert metrics["Output token throughput (tok/s)"] == 4578.75
+    assert metrics["Mean TTFT (ms)"] == 71.23
+    assert "Device" not in metrics
+
+
+def _fake_bench(monkeypatch, returncode=0, stdout="", stderr=""):
+    class Proc:
+        pass
+
+    proc = Proc()
+    proc.returncode = returncode
+    proc.stdout = stdout
+    proc.stderr = stderr
+    monkeypatch.setattr(exe.subprocess, "run", lambda *args, **kwargs: proc)
+
+
+def test_run_bench_writes_log_and_returns_metrics(tmp_path, monkeypatch, capsys):
+    _fake_bench(monkeypatch, stdout="Output token throughput (tok/s):         4578.75\n")
+    result = exe.run_bench("http://127.0.0.1:8100", "model", tmp_path)
+    assert result["metrics"]["Output token throughput (tok/s)"] == 4578.75
+    assert "Output token throughput" in (tmp_path / "bench.log").read_text(encoding="utf-8")
+    assert "--max-concurrency 32" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize(
+    "returncode,stdout",
+    [(1, "Output token throughput (tok/s): 1\n"), (0, "no table here\n")],
+)
+def test_run_bench_failures_mark_the_combo_red(tmp_path, monkeypatch, returncode, stdout):
+    _fake_bench(monkeypatch, returncode=returncode, stdout=stdout, stderr="boom")
+    with pytest.raises(exe.ComboFailure):
+        exe.run_bench("http://127.0.0.1:8100", "model", tmp_path)
+    # The raw output is kept for the artifacts even on failure.
+    assert (tmp_path / "bench.log").exists()
+
+
 @pytest.mark.parametrize("required,expected", [(True, 1), (False, 0)])
 def test_required_combo_skip_is_not_a_passing_check(tmp_path, monkeypatch, required, expected):
     meta = {"combo_id": "reranker", "hf_id": "Qwen/Qwen3-VL-Reranker-2B", "hardware": "ascend_910c",
@@ -261,3 +365,75 @@ def test_required_combo_skip_is_not_a_passing_check(tmp_path, monkeypatch, requi
     assert exe.run_combo(combo_dir, tmp_path / "results") == expected
     result = json.loads((tmp_path / "results/reranker/result.json").read_text(encoding="utf-8"))
     assert result["status"] == "skip"
+
+
+# --- run_combo wiring (verify -> smoke -> bench -> teardown) ----------------
+
+
+class _FakeProc:
+    pid = 4242
+
+    def poll(self):
+        return None
+
+
+def _combo_meta(tmp_path, **over):
+    meta = {
+        "combo_id": "a3-chat", "hf_id": "org/model", "hardware": "ascend_910c",
+        "variant": "default", "features_resolved": {}, "image": "registry/image:1",
+        "strategy": "single_node_tp", "deploy_type": "single_node", "required_npu": 1,
+        "port": 8100, "source_url": "https://recipes.vllm.ai", "required": False,
+        "smoke_test": "chat", "bench": True, "model_id": "org/model",
+        "draft_model": None, "hub": "modelscope", "env": {},
+        "argv": ["vllm", "serve", "org/model"], "readiness_timeout_s": 60, "companions": [],
+    }
+    meta.update(over)
+    combo_dir = tmp_path / "combo"
+    combo_dir.mkdir(parents=True, exist_ok=True)
+    (combo_dir / "meta.json").write_text(json.dumps(meta), encoding="utf-8")
+    (combo_dir / "run.sh").write_text("exec vllm serve org/model\n", encoding="utf-8")
+    return combo_dir, meta
+
+
+def _stub_run_combo(monkeypatch, calls):
+    monkeypatch.setattr(exe, "precheck", lambda meta: None)
+    monkeypatch.setattr(exe, "start_bg", lambda *args, **kwargs: _FakeProc())
+    monkeypatch.setattr(exe, "wait_ready", lambda *args, **kwargs: [{"id": "served-id"}])
+    monkeypatch.setattr(exe, "verify_service", lambda url, model: calls.append(("verify", url, model)))
+    monkeypatch.setattr(exe, "smoke", lambda url, model, kind: calls.append(("smoke", model, kind)))
+    monkeypatch.setattr(
+        exe, "run_bench",
+        lambda url, model, out: calls.append(("bench", model)) or {"seconds": 1.0, "metrics": {}},
+    )
+    monkeypatch.setattr(exe, "teardown", lambda procs, out: calls.append(("teardown", len(procs))))
+
+
+def test_run_combo_runs_verify_smoke_and_bench(tmp_path, monkeypatch):
+    combo_dir, _ = _combo_meta(tmp_path)
+    calls = []
+    _stub_run_combo(monkeypatch, calls)
+
+    assert exe.run_combo(combo_dir, tmp_path / "results") == 0
+    # The id /v1/models reports feeds every request: the localized run.sh served
+    # the on-disk path, so the hub id must not leak into the checks.
+    assert calls == [
+        ("verify", "http://127.0.0.1:8100", "served-id"),
+        ("smoke", "served-id", "chat"),
+        ("bench", "served-id"),
+        ("teardown", 1),
+    ]
+    result = json.loads((tmp_path / "results/a3-chat/result.json").read_text(encoding="utf-8"))
+    assert result["status"] == "pass"
+    assert result["verify_seconds"] is not None
+    assert result["bench"] == {"seconds": 1.0, "metrics": {}}
+
+
+def test_run_combo_skips_bench_and_curl_for_rerank(tmp_path, monkeypatch):
+    combo_dir, _ = _combo_meta(tmp_path, smoke_test="rerank", bench=False)
+    calls = []
+    _stub_run_combo(monkeypatch, calls)
+
+    assert exe.run_combo(combo_dir, tmp_path / "results") == 0
+    assert calls == [("smoke", "served-id", "rerank"), ("teardown", 1)]
+    result = json.loads((tmp_path / "results/a3-chat/result.json").read_text(encoding="utf-8"))
+    assert result["bench"] is None
