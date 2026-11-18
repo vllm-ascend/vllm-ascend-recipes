@@ -43,6 +43,9 @@
       "slug": "Qwen3-Next-80B-A3B-Instruct"
     },
     {
+      "slug": "Qwen3-Omni-30B-A3B-Thinking"
+    },
+    {
       "slug": "Qwen3-Reranker"
     },
     {
