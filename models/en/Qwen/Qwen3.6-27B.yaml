@@ -696,7 +696,7 @@ verification: |-
       -d '{
           "model": "qwen3.6",
           "messages": [{"role": "user", "content": "The future of AI is"}],
-          "max_completion_tokens": 1024,
+          "max_completion_tokens": 4096,
           "temperature": 0.7,
           "top_p": 0.95
       }'
