@@ -459,10 +459,10 @@ scenarios:
           --max-num-batched-tokens 16384 \
           --tensor-parallel-size 4 \
           --enable-expert-parallel \
-        --quantization ascend \
+          --quantization ascend \
           --distributed-executor-backend "mp" \
           {{prefix_caching}} \
-          {{compilation_config}} \
+            {{compilation_config}} \
           {{flashcomm1}} \
           --gpu-memory-utilization {{gpu_memory_utilization}} \
           {{spec_decoding}} \
@@ -521,10 +521,10 @@ scenarios:
           --max-num-batched-tokens 16384 \
           --tensor-parallel-size 4 \
           --enable-expert-parallel \
-        --quantization ascend \
+          --quantization ascend \
           --distributed-executor-backend "mp" \
           {{prefix_caching}} \
-          {{compilation_config}} \
+            {{compilation_config}} \
           {{flashcomm1}} \
           --gpu-memory-utilization {{gpu_memory_utilization}} \
           {{spec_decoding}} \
@@ -667,7 +667,7 @@ scenarios:
           --max-num-seqs 32 \
           --served-model-name qwen3 \
           --dtype float16 \
-        --quantization ascend \
+          --quantization ascend \
           --max-model-len 16384 \
           --additional-config '{"ascend_compilation_config": {"fuse_norm_quant": false,"enable_npugraph_ex":false}}' \
           --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY", "cudagraph_capture_sizes": [1,32]}' \
@@ -692,7 +692,7 @@ scenarios:
 - npu: Atlas 800I A3
   precision: bf16
   deployment: 单节点-多卡
-  case: BF16 Multi Card
+  case: BF16 多卡
   tags:
   - a3-single
   strategy: single_node_A3
@@ -719,7 +719,7 @@ scenarios:
           --enable-expert-parallel \
           --distributed-executor-backend "mp" \
           {{prefix_caching}} \
-          {{compilation_config}} \
+            {{compilation_config}} \
           {{flashcomm1}} \
           --gpu-memory-utilization {{gpu_memory_utilization}} \
           {{spec_decoding}} \
@@ -739,7 +739,7 @@ scenarios:
 - npu: Atlas 800I A3
   precision: W8A8
   deployment: 单节点-多卡
-  case: Low Latency
+  case: 低延迟
   tags:
   - a3-single
   strategy: single_node_A3
@@ -766,8 +766,8 @@ scenarios:
           --enable-expert-parallel \
           --distributed-executor-backend "mp" \
           {{prefix_caching}} \
-          --quantization ascend \
-        {{compilation_config}} \
+            --quantization ascend \
+          {{compilation_config}} \
           {{flashcomm1}} \
           --gpu-memory-utilization 0.95 \
           {{spec_decoding}} \
@@ -787,7 +787,7 @@ scenarios:
 - npu: Atlas 800I A3
   precision: W8A8
   deployment: 单节点-多卡
-  case: High Throughput
+  case: 高吞吐
   tags:
   - a3-single
   strategy: single_node_A3
@@ -813,8 +813,8 @@ scenarios:
           --tensor-parallel-size 1 \
           --distributed-executor-backend "mp" \
           {{prefix_caching}} \
-          --quantization ascend \
-        {{compilation_config}} \
+            --quantization ascend \
+          {{compilation_config}} \
           {{flashcomm1}} \
           --gpu-memory-utilization 0.95 \
           {{spec_decoding}} \
@@ -834,7 +834,7 @@ scenarios:
 - npu: Atlas 800I A3
   precision: W8A8
   deployment: 单节点-多卡
-  case: Long Context
+  case: 长上下文
   tags:
   - a3-single
   strategy: single_node_A3
@@ -861,8 +861,8 @@ scenarios:
           --enable-expert-parallel \
           --distributed-executor-backend "mp" \
           {{prefix_caching}} \
-          --quantization ascend \
-        {{compilation_config}} \
+            --quantization ascend \
+          {{compilation_config}} \
           {{flashcomm1}} \
           --gpu-memory-utilization 0.95 \
           --port 8000 \
