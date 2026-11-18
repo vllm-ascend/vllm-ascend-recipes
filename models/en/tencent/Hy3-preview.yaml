@@ -41,18 +41,12 @@ model:
   base_env:
     HCCL_OP_EXPANSION_MODE: AIV
   docker_image:
-    atlas_800_a3: quay.io/ascend/vllm-ascend:nightly-main-a3
-  nightly_required: true
+    atlas_800_a3: quay.io/ascend/vllm-ascend:v0.30.0-a3-openeuler
   install:
     pip: false
     docker:
-      command: docker pull quay.io/ascend/vllm-ascend:nightly-main-a3
-      note: All listed hardware configurations are experimental here. No startup, inference, accuracy or performance
-        result has been measured for this migration. The mutable nightly image is a current validation candidate,
-        not a compatibility guarantee. Record its repository digest and package versions before running. Upstream
-        discontinued this model starting with vLLM Ascend v0.30.0 and no longer provides support or fixes. Commands
-        below preserve the v0.23.0 historical tutorial; they may fail on current nightly. A successful local CPU
-        check does not establish runtime support.
+      command: docker pull quay.io/ascend/vllm-ascend:v0.30.0-a3-openeuler
+      note: The vLLM Ascend v0.30.0 release is used for manual validation. Model startup, inference, accuracy and performance validation are pending. The official v0.30.0 documentation marks the model as no longer supported. The commands preserve the historical v0.23.0 tutorial baseline.
 variants:
   default:
     precision: bf16
@@ -76,19 +70,10 @@ weight_download:
       modelscope download --model Tencent-Hunyuan/Hy3-preview --local_dir /models/tencent/Hy3-preview
       ```
 prerequisites:
-- title: Validation boundary and provenance
-  content: All listed hardware configurations are experimental here. No startup, inference, accuracy or performance
-    result has been measured for this migration. The mutable nightly image is a current validation candidate, not
-    a compatibility guarantee. Record its repository digest and package versions before running. Upstream discontinued
-    this model starting with vLLM Ascend v0.30.0 and no longer provides support or fixes. Commands below preserve
-    the v0.23.0 historical tutorial; they may fail on current nightly. A successful local CPU check does not establish
-    runtime support.
-- title: Dated image provenance
-  content: 'Registry observed on 2026-10-20: `nightly-main-a3` manifest digest `sha256:c32749b08b289227e1aea7b99caf669cae63deb60d57ecac23d098b3e169d839`;
-    Linux arm64 platform manifest `sha256:e80e4a75f03562853a503546d3d8ea1e96193fa532b5e30c5ba7f0680f73f1c9`, image
-    created 2026-10-20T00:33:33Z. This is registry provenance only; no layers were downloaded or runtime verified.
-    To freeze the candidate, replace the IMAGE value below with `quay.io/ascend/vllm-ascend@sha256:c32749b08b289227e1aea7b99caf669cae63deb60d57ecac23d098b3e169d839`
-    before starting the container. Record the digest actually pulled because the nightly tag can change.'
+- title: Runtime validation status
+  content: The vLLM Ascend v0.30.0 release is used for manual validation. Model startup, inference, accuracy and performance validation are pending. The official v0.30.0 documentation marks the model as no longer supported. The commands preserve the historical v0.23.0 tutorial baseline.
+- title: Image evidence
+  content: Record the image repository digest from docker image inspect and the installed package versions on each test node.
 - title: Host preparation
   content: Use an Atlas 800I A3 node with 16 visible 64 GB logical devices (8 dual-die NPUs). Confirm driver, CANN,
     HCCL and container compatibility using the [installation guide](https://docs.vllm.ai/projects/ascend/en/latest/installation.html).
@@ -101,7 +86,7 @@ env_setup:
         Run on the Linux Ascend host after downloading weights to `/models`. Map the devices reserved for this deployment. For PD, repeat on every node; the same relative checkpoint paths must exist on all nodes.
 
         ```bash
-        export IMAGE=quay.io/ascend/vllm-ascend:nightly-main-a3
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.30.0-a3-openeuler
         devices=()
         for i in {0..15}; do devices+=(--device "/dev/davinci$i"); done
         docker run --rm -it --name ascend-recipe --net=host --ipc=host \

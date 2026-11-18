@@ -30,13 +30,12 @@ model:
     VLLM_TORCH_PROFILER_WITH_STACK: '0'
     HCCL_BUFFSIZE: '1536'
   docker_image:
-    atlas_800_a3: quay.io/ascend/vllm-ascend:nightly-main-a3
-  nightly_required: true
+    atlas_800_a3: quay.io/ascend/vllm-ascend:v0.30.0-a3-openeuler
   install:
     pip: false
     docker:
-      command: docker pull quay.io/ascend/vllm-ascend:nightly-main-a3
-      note: 本迁移列出的硬件配置均为实验状态，尚未实测启动、推理、精度或性能。可变 nightly 镜像仅作为当前验证候选，不代表兼容性保证；运行前请记录仓库摘要和软件包版本。
+      command: docker pull quay.io/ascend/vllm-ascend:v0.30.0-a3-openeuler
+      note: 手工验证使用 vLLM Ascend v0.30.0 正式版。模型启动、推理、精度和性能均待实机验证。v0.30.0 官方文档已标明停止支持该模型。
 variants:
   default:
     precision: W8A8
@@ -60,13 +59,10 @@ weight_download:
       modelscope download --model Eco-Tech/InternVL3_5-38B-w8a8 --local_dir /models/Eco-Tech/InternVL3_5-38B-w8a8
       ```
 prerequisites:
-- title: 验证边界与来源
-  content: 本迁移列出的硬件配置均为实验状态，尚未实测启动、推理、精度或性能。可变 nightly 镜像仅作为当前验证候选，不代表兼容性保证；运行前请记录仓库摘要和软件包版本。
-- title: 带日期的镜像来源
-  content: 2026-10-20 查询镜像仓库：`nightly-main-a3` 清单摘要为 `sha256:c32749b08b289227e1aea7b99caf669cae63deb60d57ecac23d098b3e169d839`；Linux
-    arm64 平台清单为 `sha256:e80e4a75f03562853a503546d3d8ea1e96193fa532b5e30c5ba7f0680f73f1c9`，镜像创建于 2026-10-20T00:33:33Z。这仅属于仓库来源证据，未下载镜像层或验证运行时。需要固定候选镜像时，请在启动容器前，将下方
-    IMAGE 值改为 `quay.io/ascend/vllm-ascend@sha256:c32749b08b289227e1aea7b99caf669cae63deb60d57ecac23d098b3e169d839`。nightly
-    标签会变化，请记录实际拉取的摘要。
+- title: 运行时验证状态
+  content: 手工验证使用 vLLM Ascend v0.30.0 正式版。模型启动、推理、精度和性能均待实机验证。v0.30.0 官方文档已标明停止支持该模型。
+- title: 镜像验证记录
+  content: 在每台测试节点上记录 docker image inspect 显示的镜像仓库摘要和已安装的软件包版本。
 - title: 主机准备
   content: 使用具有 16 个可见 64 GB 逻辑设备（8 个双芯片 NPU）的 Atlas 800I A3 节点。按照[安装指南](https://docs.vllm.ai/projects/ascend/en/latest/installation.html)确认驱动、CANN、HCCL
     与容器兼容性。源文档中的 CPU 调频与 sysctl 调优属于可选管理员操作，以下命令不会自动执行。
@@ -77,7 +73,7 @@ env_setup:
         在 Linux 昇腾主机上执行，先将权重下载到 `/models`。映射本次部署预留的设备。PD 场景在每个节点执行，各节点必须具有相同的权重相对路径。
 
         ```bash
-        export IMAGE=quay.io/ascend/vllm-ascend:nightly-main-a3
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.30.0-a3-openeuler
         devices=()
         for i in {0..15}; do devices+=(--device "/dev/davinci$i"); done
         docker run --rm -it --name ascend-recipe --net=host --ipc=host \
@@ -137,7 +133,7 @@ scenarios:
       response=$(curl --fail --silent --show-error http://127.0.0.1:2002/v1/chat/completions \
         -H 'Content-Type: application/json' \
         -d '{"model":"internvl3_5","max_tokens":64,"temperature":0,"messages":[{"role":"user","content":[{"type":"image_url","image_url":{"url":"https://modelscope.oss-cn-beijing.aliyuncs.com/resource/tiger.jpeg"}},{"type":"text","text":"What is the text in the illustration?"}]}]}')
-      python3 -c 'import json,sys; r=json.load(sys.stdin); assert r["choices"]; m=r["choices"][0]["message"]; assert m.get("content") or m.get("tool_calls")' <<<"$response"
+      python3 -c 'import json,sys; r=json.load(sys.stdin); assert r["choices"]; m=r["choices"][0]["message"]; assert m.get("content") or m.get("tool_calls"); print(json.dumps(r, ensure_ascii=False, indent=2))' <<<"$response"
       ```
 performance:
   accuracy: 尚未测量。按照 [AISBench 精度评估](https://docs.vllm.ai/projects/ascend/en/v0.23.0/developer_guide/evaluation/using_ais_bench.html)记录数据集版本、生成参数及权重版本。冒烟响应不能作为精度证据。
