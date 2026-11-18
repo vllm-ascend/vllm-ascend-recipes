@@ -51,8 +51,14 @@ features:
     args: ["--enable-prefix-caching"]
     flag_when_false: "--no-enable-prefix-caching"
 
+  spec_decoding:
+    label: "Eagle3 投机解码"
+    description: "可选的 Eagle3 投机解码；请将 your_eagle3_model_path 替换为已下载的草稿模型路径"
+    args: ["--speculative-config", '{"method": "eagle3", "model": "your_eagle3_model_path", "num_speculative_tokens": 3}']
+
 opt_in_features:
   - prefix_caching
+  - spec_decoding
 
 variants:
   default:
@@ -70,6 +76,11 @@ compatible_strategies:
 
 hardware_overrides: {}
 strategy_overrides: {}
+
+dependencies:
+  - note: "可选的 Eagle3 投机解码草稿模型（请替换 your_eagle3_model_path）"
+    command: "pip install modelscope && modelscope download --model AngelSlim/Qwen3-a3B_eagle3"
+    optional: true
 
 guide: ""
 
@@ -131,6 +142,28 @@ weight_download:
   - source: GitCode
     url: ''
     command: ''
+- weight_version: Eagle3 草稿模型（可选）
+  sources:
+  - source: ModelScope
+    url: https://www.modelscope.cn/models/AngelSlim/Qwen3-a3B_eagle3
+    command: |-
+      ```bash
+      pip install modelscope
+      modelscope download --model AngelSlim/Qwen3-a3B_eagle3
+      ```
+  - source: HuggingFace
+    url: https://huggingface.co/AngelSlim/Qwen3-a3B_eagle3
+    command: |-
+      ```bash
+      pip install -U huggingface_hub
+      huggingface-cli download AngelSlim/Qwen3-a3B_eagle3
+      ```
+  - source: Modelers
+    url: ''
+    command: ''
+  - source: GitCode
+    url: ''
+    command: ''
 
 quantization:
   content: |-
@@ -151,6 +184,7 @@ prerequisites:
     | --- | --- | --- |
     | Qwen3-Coder-30B-A3B-Instruct（BF16） | Atlas 800I A3（64GB，1~2 卡） | [下载](https://www.modelscope.cn/models/Qwen/Qwen3-Coder-30B-A3B-Instruct) |
     | Qwen3-Coder-30B-A3B-Instruct-W8A8 | Atlas 800I A3（64GB，1~2 卡） | [下载](https://www.modelscope.cn/models/Eco-Tech/Qwen3-Coder-30B-A3B-Instruct-w8a8) |
+    | Eagle3 草稿模型（可选） | Atlas 800I A3 | [下载](https://www.modelscope.cn/models/AngelSlim/Qwen3-a3B_eagle3) |
 
     卡数为推荐值，可按实际情况调整。请将权重放在容器可访问的共享目录。
 - title: 驱动与固件
@@ -230,7 +264,8 @@ scenarios:
           {{compilation_config}} \
           --additional-config '{"weight_nz_mode": 2}' \
           --gpu-memory-utilization {{gpu_memory_utilization}} \
-          --port 8000
+          --port 8000 \
+          {{spec_decoding}}
       ```
 
       > - W8A8 权重必须保留 `--quantization ascend`。
@@ -306,7 +341,8 @@ scenarios:
           {{compilation_config}} \
           --additional-config '{"enable_flashcomm1": true, "weight_nz_mode": 2}' \
           --gpu-memory-utilization {{gpu_memory_utilization}} \
-          --port 8000
+          --port 8000 \
+          {{spec_decoding}}
       ```
 
       > - `ASCEND_RT_VISIBLE_DEVICES` 需指定 4 个芯片，TP4 会为每个芯片分配一个 rank。
@@ -381,7 +417,8 @@ scenarios:
           {{compilation_config}} \
           --additional-config '{"enable_flashcomm1": true, "weight_nz_mode": 2}' \
           --gpu-memory-utilization {{gpu_memory_utilization}} \
-          --port 8000
+          --port 8000 \
+          {{spec_decoding}}
       ```
 
       > - 超过 262144 tokens 时需追加 `--hf-overrides '{"rope_parameters": {"rope_type": "yarn", "factor": 4, "original_max_position_embeddings": 262144}}'`。
@@ -512,7 +549,7 @@ tuning: |-
 faq: |-
   **为什么必须加 `--quantization ascend`？** 本 recipe 验证的是 W8A8 权重；仅在服务 BF16 权重时移除。
 
-  **是否支持 Eagle3 投机推理？** 上游教程列出了可选的 Eagle3 草稿模型。本 recipe 未验证，因为测试环境没有对应权重；请在自有硬件验证后再添加 `--speculative-config`。
+  **是否支持 Eagle3 投机推理？** 支持。可选的草稿模型通过默认关闭的 `spec_decoding` 特性提供，已在 Atlas 800I A3 的 TP1 上完成功能验证（3/3 HTTP 200，日志无 ERROR/Traceback）。启用前请将 `your_eagle3_model_path` 替换为本地草稿模型目录。上方性能表仍为非 Eagle3 基线。
 
   **长上下文为什么只验证到 131072 tokens？** 模型原生支持 262144 tokens，131072 是本 recipe 的验证值。提高前请检查 KV Cache 显存；超过 262144 时需追加 YaRN 配置。
 
@@ -525,5 +562,8 @@ references:
   url: https://www.modelscope.cn/models/Eco-Tech/Qwen3-Coder-30B-A3B-Instruct-w8a8
 - title: vLLM-Ascend 附加配置
   url: https://docs.vllm.ai/projects/ascend/en/latest/user_guide/configuration/additional_config.html
+- title: Eagle3 草稿模型
+  url: https://www.modelscope.cn/models/AngelSlim/Qwen3-a3B_eagle3
+
 - title: vLLM-Ascend GitHub
   url: https://github.com/vllm-project/vllm-ascend

@@ -51,8 +51,14 @@ features:
     args: ["--enable-prefix-caching"]
     flag_when_false: "--no-enable-prefix-caching"
 
+  spec_decoding:
+    label: "Eagle3 Spec Decoding"
+    description: "Optional Eagle3 speculative decoding; replace your_eagle3_model_path with the downloaded draft model path"
+    args: ["--speculative-config", '{"method": "eagle3", "model": "your_eagle3_model_path", "num_speculative_tokens": 3}']
+
 opt_in_features:
   - prefix_caching
+  - spec_decoding
 
 variants:
   default:
@@ -70,6 +76,11 @@ compatible_strategies:
 
 hardware_overrides: {}
 strategy_overrides: {}
+
+dependencies:
+  - note: "Optional Eagle3 draft model for speculative decoding (replace your_eagle3_model_path)"
+    command: "pip install modelscope && modelscope download --model AngelSlim/Qwen3-a3B_eagle3"
+    optional: true
 
 guide: ""
 
@@ -131,6 +142,28 @@ weight_download:
   - source: GitCode
     url: ''
     command: ''
+- weight_version: Eagle3 Draft Model (optional)
+  sources:
+  - source: ModelScope
+    url: https://www.modelscope.cn/models/AngelSlim/Qwen3-a3B_eagle3
+    command: |-
+      ```bash
+      pip install modelscope
+      modelscope download --model AngelSlim/Qwen3-a3B_eagle3
+      ```
+  - source: HuggingFace
+    url: https://huggingface.co/AngelSlim/Qwen3-a3B_eagle3
+    command: |-
+      ```bash
+      pip install -U huggingface_hub
+      huggingface-cli download AngelSlim/Qwen3-a3B_eagle3
+      ```
+  - source: Modelers
+    url: ''
+    command: ''
+  - source: GitCode
+    url: ''
+    command: ''
 
 quantization:
   content: |-
@@ -151,6 +184,7 @@ prerequisites:
     | --- | --- | --- |
     | Qwen3-Coder-30B-A3B-Instruct (BF16) | Atlas 800I A3 (64GB, 1~2 cards) | [Download](https://www.modelscope.cn/models/Qwen/Qwen3-Coder-30B-A3B-Instruct) |
     | Qwen3-Coder-30B-A3B-Instruct-W8A8 | Atlas 800I A3 (64GB, 1~2 cards) | [Download](https://www.modelscope.cn/models/Eco-Tech/Qwen3-Coder-30B-A3B-Instruct-w8a8) |
+    | Eagle3 Draft Model (optional) | Atlas 800I A3 | [Download](https://www.modelscope.cn/models/AngelSlim/Qwen3-a3B_eagle3) |
 
     The card counts are recommendations and can be adjusted. Keep the weights in a shared directory visible to the container.
 - title: Driver and Firmware
@@ -230,7 +264,8 @@ scenarios:
           {{compilation_config}} \
           --additional-config '{"weight_nz_mode": 2}' \
           --gpu-memory-utilization {{gpu_memory_utilization}} \
-          --port 8000
+          --port 8000 \
+          {{spec_decoding}}
       ```
 
       > - `--quantization ascend` is required for the W8A8 checkpoint.
@@ -306,7 +341,8 @@ scenarios:
           {{compilation_config}} \
           --additional-config '{"enable_flashcomm1": true, "weight_nz_mode": 2}' \
           --gpu-memory-utilization {{gpu_memory_utilization}} \
-          --port 8000
+          --port 8000 \
+          {{spec_decoding}}
       ```
 
       > - Assign four chips to `ASCEND_RT_VISIBLE_DEVICES`; TP4 maps one rank to each chip.
@@ -381,7 +417,8 @@ scenarios:
           {{compilation_config}} \
           --additional-config '{"enable_flashcomm1": true, "weight_nz_mode": 2}' \
           --gpu-memory-utilization {{gpu_memory_utilization}} \
-          --port 8000
+          --port 8000 \
+          {{spec_decoding}}
       ```
 
       > - For contexts above 262144 tokens, add `--hf-overrides '{"rope_parameters": {"rope_type": "yarn", "factor": 4, "original_max_position_embeddings": 262144}}'`.
@@ -512,7 +549,7 @@ tuning: |-
 faq: |-
   **Why is `--quantization ascend` required?** The validated checkpoint is W8A8. Remove the flag only when serving the BF16 checkpoint.
 
-  **Is Eagle3 speculative decoding supported?** The upstream tutorial lists an optional Eagle3 draft model. It was not validated in this recipe because the draft weights were not available in the test environment; add `--speculative-config` only after validating the draft model on your hardware.
+  **Is Eagle3 speculative decoding supported?** Yes. The optional draft model is exposed as an off-by-default `spec_decoding` feature and was functionally validated on Atlas 800I A3 at TP1 (3/3 HTTP 200 responses, no ERROR/Traceback in the logs). Replace `your_eagle3_model_path` with the local draft-model directory before enabling it. The performance tables above remain the non-Eagle3 baseline.
 
   **Why does the long-context scenario stop at 131072 tokens?** The model supports 262144 tokens natively, but 131072 is the value validated in this recipe. Raise it after checking KV-cache memory, and add YaRN overrides above 262144.
 
@@ -525,5 +562,8 @@ references:
   url: https://www.modelscope.cn/models/Eco-Tech/Qwen3-Coder-30B-A3B-Instruct-w8a8
 - title: vLLM-Ascend Additional Configuration
   url: https://docs.vllm.ai/projects/ascend/en/latest/user_guide/configuration/additional_config.html
+- title: Eagle3 Draft Model
+  url: https://www.modelscope.cn/models/AngelSlim/Qwen3-a3B_eagle3
+
 - title: vLLM-Ascend GitHub
   url: https://github.com/vllm-project/vllm-ascend
