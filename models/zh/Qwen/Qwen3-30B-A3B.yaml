@@ -5,7 +5,7 @@ meta:
   description: "Qwen3 系列中的 MoE（混合专家）模型，总参数量 30.5B，每 token 激活 3.3B 参数。稀疏 MoE 架构实现高效训练与推理，在推理、指令遵循和智能体能力方面表现优异，同时相比同等能力的稠密模型具有更低的计算成本。"
   date_added: 2026-07-07
   performance_headline: "Atlas 800 A2/A3 单节点部署，支持 BF16 与 W8A8 精度"
-  date_updated: 2026-08-17
+  date_updated: 2026-11-18
   difficulty: intermediate
   related_recipes:
     - "Qwen/Qwen3.6-27B"
@@ -24,13 +24,10 @@ model:
   modality: text
   base_args:
     - "--trust-remote-code"
-    - "--enable-expert-parallel"
-    - "--quantization"
-    - "ascend"
-    - "--distributed_executor_backend"
+    - "--distributed-executor-backend"
     - "mp"
   base_env:
-    HCCL_BUFFSIZE: "512"
+    HCCL_BUFFSIZE: "1024"
     OMP_PROC_BIND: "false"
     OMP_NUM_THREADS: "1"
     PYTORCH_NPU_ALLOC_CONF: "expandable_segments:True"
@@ -54,7 +51,7 @@ features:
   spec_decoding:
     label: "Eagle3 Spec Decoding"
     description: "Eagle3 投机解码 — 将 your_eagle3_model_path 替换为草稿模型路径"
-    args: ["--speculative-config", '{"method": "eagle3", "model": "your_eagle3_model_path", "draft_tensor_parallel_size": 1, "num_speculative_tokens": 3}']
+    args: ["--speculative-config", '{"method": "eagle3", "model": "your_eagle3_model_path", "num_speculative_tokens": 3}']
   compilation_config:
     label: "Compilation Config"
     description: "decode 阶段全 ACL 图执行(--compilation-config cudagraph_mode=FULL_DECODE_ONLY)"
@@ -72,12 +69,17 @@ features:
     label: "FlashComm1"
     description: "FlashComm 通信优化(通过 --additional-config)"
     args: ["--additional-config", '{"enable_flashcomm1": true, "weight_nz_mode": 2}']
+    flag_when_false: "--additional-config '{\"weight_nz_mode\": 2}'"
 
 opt_in_features:
   - prefix_caching
+  - spec_decoding
+  - async_scheduling
+  - flashcomm1
 
 variants:
   default:
+    model_id: "Eco-Tech/Qwen3-30B-A3B-w8a8"
     precision: W8A8
     vram_minimum_gb: 37
     description: "W8A8 量化权重,适用于 Atlas 800 A2/A3"
@@ -108,7 +110,7 @@ strategy_overrides: {}
 
 dependencies:
   - note: "Eagle3 投机解码草稿模型(替换 your_eagle3_model_path)"
-    command: "pip install modelscope && modelscope download --model AngelSlim/Qwen3-a3B_eagle3"
+    command: "pip install -U huggingface_hub && hf download AngelSlim/Qwen3-a3B_eagle3 --local-dir your_eagle3_model_path"
 
 guide: ""
 performance_model_names:
@@ -130,6 +132,8 @@ config_params:
     description: "KV cache 可用的显存比例"
 
 overview: |-
+  > 主分支验证应使用当前 nightly-main 镜像（A3 使用 nightly-main-a3），并记录镜像 digest、vLLM 与 vLLM-Ascend commit。下方 v0.23.0rc1 命令保留为历史版本示例，不代表已完成当前 main 分支实测。
+
   Qwen3-30B-A3B 是 Qwen3 系列中的混合专家（MoE）模型，总参数量 30.5B，每 token 激活 3.3B 参数。稀疏 MoE 架构实现了高效的训练和推理，在推理、指令遵循和智能体能力方面表现出色，同时相比同等能力的稠密模型保持了更低的计算成本。
 weight_download:
 - weight_version: BF16
@@ -146,7 +150,7 @@ weight_download:
     command: |-
       ```bash
       pip install -U huggingface_hub
-      huggingface-cli download Qwen/Qwen3-30B-A3B
+      hf download Qwen/Qwen3-30B-A3B
       ```
   - source: 魔乐社区
     url: ''
@@ -203,7 +207,7 @@ weight_download:
     url: https://huggingface.co/AngelSlim/Qwen3-a3B_eagle3
     command: |-
       ```bash
-      huggingface-cli download AngelSlim/Qwen3-a3B_eagle3
+      hf download AngelSlim/Qwen3-a3B_eagle3
       ```
   - source: ModelScope
     url: ''
@@ -255,7 +259,7 @@ env_setup:
         **拉取 Docker 镜像：**
 
         ```bash
-        docker pull quay.io/ascend/vllm-ascend:v0.23.0rc1
+        docker pull quay.io/ascend/vllm-ascend:v0.23.0rc1-a3
         ```
 
         **启动 Docker 容器：**
@@ -421,13 +425,14 @@ env_setup:
 
       > **说明**：如果部署多节点环境，需在每个节点上完成环境配置。
 
-      更多详情请参考[安装指南](https://docs.vllm.ai/projects/ascend/zh-cn/latest/installation.html)。
+      更多详情请参考[安装指南](https://docs.vllm.ai/projects/ascend/zh-cn/latest/getting_started/installation.html)。
 scenarios:
 - npu: Atlas 800I A3
   precision: W8A8
   deployment: 单节点-多卡
   case: 多卡
-  tags: [a3-single]
+  tags:
+  - a3-single
   strategy: single_node_A3
   steps:
   - title: 启动服务
@@ -454,15 +459,14 @@ scenarios:
           --max-num-batched-tokens 16384 \
           --tensor-parallel-size 4 \
           --enable-expert-parallel \
-          --quantization ascend \
-          --distributed_executor_backend "mp" \
+        --quantization ascend \
+          --distributed-executor-backend "mp" \
           {{prefix_caching}} \
-          {{async_scheduling}} \
           {{compilation_config}} \
           {{flashcomm1}} \
           --gpu-memory-utilization {{gpu_memory_utilization}} \
-          --port 8000 \
-          {{spec_decoding}}
+          {{spec_decoding}} \
+          --port 8000
       ```
 
       > - `ASCEND_RT_VISIBLE_DEVICES`：必须设置为分配给您环境的 NPU 芯片 ID（例如，4 芯片为 `0,1,2,3`）。
@@ -477,12 +481,21 @@ scenarios:
       - [额外配置](https://docs.vllm.ai/projects/ascend/zh-cn/latest/user_guide/configuration/additional_config.html) — `--additional-config` 格式和选项
   - title: 服务验证
     content: |-
-      服务启动后，通过发送 prompt 验证其运行状态。使用示例请参考下方的验证部分。
+      检查服务健康状态并发送真实推理请求；模型列表就绪不能替代推理成功。
+
+      ```bash
+      curl --fail --silent --show-error http://<server_ip>:<port>/health
+      curl --fail --silent --show-error http://<server_ip>:<port>/v1/models
+      curl --fail --silent --show-error http://<server_ip>:<port>/v1/chat/completions \
+          -H 'Content-Type: application/json' \
+          -d '{"model":"qwen3","messages":[{"role":"user","content":"Explain tensor parallelism briefly."}],"temperature":0,"max_completion_tokens":256,"chat_template_kwargs":{"enable_thinking":false}}'
+      ```
 - npu: Atlas 800I A2
   precision: W8A8
   deployment: 单节点-多卡
   case: 多卡（A2）
-  tags: [a2-single]
+  tags:
+  - a2-single
   strategy: single_node_A2
   steps:
   - title: 启动服务
@@ -508,15 +521,14 @@ scenarios:
           --max-num-batched-tokens 16384 \
           --tensor-parallel-size 4 \
           --enable-expert-parallel \
-          --quantization ascend \
-          --distributed_executor_backend "mp" \
+        --quantization ascend \
+          --distributed-executor-backend "mp" \
           {{prefix_caching}} \
-          {{async_scheduling}} \
           {{compilation_config}} \
           {{flashcomm1}} \
           --gpu-memory-utilization {{gpu_memory_utilization}} \
-          --port 8000 \
-          {{spec_decoding}}
+          {{spec_decoding}} \
+          --port 8000
       ```
 
       > - `ASCEND_RT_VISIBLE_DEVICES`：必须设置为分配给您环境的 NPU 芯片 ID（例如，4 芯片为 `0,1,2,3`）。
@@ -531,16 +543,27 @@ scenarios:
       - [额外配置](https://docs.vllm.ai/projects/ascend/zh-cn/latest/user_guide/configuration/additional_config.html) — `--additional-config` 格式和选项
   - title: 服务验证
     content: |-
-      服务启动后，通过发送 prompt 验证其运行状态。使用示例请参考下方的验证部分。
+      检查服务健康状态并发送真实推理请求；模型列表就绪不能替代推理成功。
+
+      ```bash
+      curl --fail --silent --show-error http://<server_ip>:<port>/health
+      curl --fail --silent --show-error http://<server_ip>:<port>/v1/models
+      curl --fail --silent --show-error http://<server_ip>:<port>/v1/chat/completions \
+          -H 'Content-Type: application/json' \
+          -d '{"model":"qwen3","messages":[{"role":"user","content":"Explain tensor parallelism briefly."}],"temperature":0,"max_completion_tokens":256,"chat_template_kwargs":{"enable_thinking":false}}'
+      ```
 - npu: Atlas 800I A2
   precision: bf16
   deployment: 多节点
   case: 2-node
-  tags: [multi-node-dp]
+  tags:
+  - multi-node-dp
   strategy: multi_node_dp
   test_id: qwen30b-dp-2n2c
   npu_per_node: 2
-  aisbench: [accuracy, performance]
+  aisbench:
+  - accuracy
+  - performance
   scripts:
     api-0:
       language: bash
@@ -616,20 +639,17 @@ scenarios:
       export ASCEND_RT_VISIBLE_DEVICES="${ASCEND_RT_VISIBLE_DEVICES:-0,1}"
       ```
   - title: 启动 API 节点 0
-    content: |-
-      {{script:api-0}}
+    content: '{{script:api-0}}'
   - title: 启动 Headless 节点 0
-    content: |-
-      {{script:headless-0}}
+    content: '{{script:headless-0}}'
   - title: 验证服务
-    content: |-
-      {{script:service-check}}
-
+    content: '{{script:service-check}}'
 - npu: Atlas 300I DUO
   precision: W8A8
   deployment: 单节点-多卡
   case: 300I DUO(TP2)
-  tags: [310p-single]
+  tags:
+  - 310p-single
   strategy: single_node_310p
   steps:
   - title: 启动服务
@@ -645,12 +665,12 @@ scenarios:
           --port 8000 \
           --tensor-parallel-size 2 \
           --max-num-seqs 32 \
-          --served_model_name qwen3 \
+          --served-model-name qwen3 \
           --dtype float16 \
-          --quantization ascend \
+        --quantization ascend \
           --max-model-len 16384 \
-          --additional-config '{"ascend_compilation_config": {"fuse_norm_quant": false,"enable_npu_graph_ex":false}}' \
-          {{compilation_config}} \
+          --additional-config '{"ascend_compilation_config": {"fuse_norm_quant": false,"enable_npugraph_ex":false}}' \
+          --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY", "cudagraph_capture_sizes": [1,32]}' \
           {{prefix_caching}}
       ```
 
@@ -660,14 +680,213 @@ scenarios:
       > - `--max-num-seqs` 限制并发请求数,以降低 KV cache 和图捕获压力。
   - title: 服务验证
     content: |-
-      服务启动后，通过发送 prompt 验证其运行状态。使用示例请参考下方的验证部分。
+      检查服务健康状态并发送真实推理请求；模型列表就绪不能替代推理成功。
+
+      ```bash
+      curl --fail --silent --show-error http://<server_ip>:<port>/health
+      curl --fail --silent --show-error http://<server_ip>:<port>/v1/models
+      curl --fail --silent --show-error http://<server_ip>:<port>/v1/chat/completions \
+          -H 'Content-Type: application/json' \
+          -d '{"model":"qwen3","messages":[{"role":"user","content":"Explain tensor parallelism briefly."}],"temperature":0,"max_completion_tokens":256,"chat_template_kwargs":{"enable_thinking":false}}'
+      ```
+- npu: Atlas 800I A3
+  precision: bf16
+  deployment: 单节点-多卡
+  case: BF16 Multi Card
+  tags:
+  - a3-single
+  strategy: single_node_A3
+  steps:
+  - title: 启动服务
+    content: |-
+      使用 Qwen/Qwen3-30B-A3B BF16 权重；不传入量化参数。
+
+      ```bash
+      export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3
+      export HCCL_OP_EXPANSION_MODE="AIV"  # not needed on A2
+      export HCCL_BUFFSIZE=1024
+      export OMP_PROC_BIND=false
+      export OMP_NUM_THREADS=1
+      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+
+      vllm serve your_model_path \
+          --served-model-name qwen3 \
+          --trust-remote-code \
+          --max-num-seqs {{max_num_seqs}} \
+          --max-model-len {{max_model_len}} \
+          --max-num-batched-tokens 16384 \
+          --tensor-parallel-size 4 \
+          --enable-expert-parallel \
+          --distributed-executor-backend "mp" \
+          {{prefix_caching}} \
+          {{compilation_config}} \
+          {{flashcomm1}} \
+          --gpu-memory-utilization {{gpu_memory_utilization}} \
+          {{spec_decoding}} \
+          --port 8000
+      ```
+  - title: 服务验证
+    content: |-
+      检查服务健康状态并发送真实推理请求；模型列表就绪不能替代推理成功。
+
+      ```bash
+      curl --fail --silent --show-error http://<server_ip>:<port>/health
+      curl --fail --silent --show-error http://<server_ip>:<port>/v1/models
+      curl --fail --silent --show-error http://<server_ip>:<port>/v1/chat/completions \
+          -H 'Content-Type: application/json' \
+          -d '{"model":"qwen3","messages":[{"role":"user","content":"Explain tensor parallelism briefly."}],"temperature":0,"max_completion_tokens":256,"chat_template_kwargs":{"enable_thinking":false}}'
+      ```
+- npu: Atlas 800I A3
+  precision: W8A8
+  deployment: 单节点-多卡
+  case: Low Latency
+  tags:
+  - a3-single
+  strategy: single_node_A3
+  steps:
+  - title: 启动服务
+    content: |-
+      迁移自官方 tutorial 的调优配置。Eagle3 为可选项，启用前下载草稿模型并替换路径。
+
+      ```bash
+      export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3
+      export HCCL_OP_EXPANSION_MODE="AIV"
+      export HCCL_BUFFSIZE=1024
+      export OMP_PROC_BIND=false
+      export OMP_NUM_THREADS=1
+      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+
+      vllm serve your_model_path \
+          --served-model-name qwen3 \
+          --trust-remote-code \
+          --max-num-seqs 100 \
+          --max-model-len 37364 \
+          --max-num-batched-tokens 16384 \
+          --tensor-parallel-size 4 \
+          --enable-expert-parallel \
+          --distributed-executor-backend "mp" \
+          {{prefix_caching}} \
+          --quantization ascend \
+        {{compilation_config}} \
+          {{flashcomm1}} \
+          --gpu-memory-utilization 0.95 \
+          {{spec_decoding}} \
+          --port 8000
+      ```
+  - title: 服务验证
+    content: |-
+      检查服务健康状态并发送真实推理请求；模型列表就绪不能替代推理成功。
+
+      ```bash
+      curl --fail --silent --show-error http://<server_ip>:<port>/health
+      curl --fail --silent --show-error http://<server_ip>:<port>/v1/models
+      curl --fail --silent --show-error http://<server_ip>:<port>/v1/chat/completions \
+          -H 'Content-Type: application/json' \
+          -d '{"model":"qwen3","messages":[{"role":"user","content":"Explain tensor parallelism briefly."}],"temperature":0,"max_completion_tokens":256,"chat_template_kwargs":{"enable_thinking":false}}'
+      ```
+- npu: Atlas 800I A3
+  precision: W8A8
+  deployment: 单节点-多卡
+  case: High Throughput
+  tags:
+  - a3-single
+  strategy: single_node_A3
+  steps:
+  - title: 启动服务
+    content: |-
+      迁移自官方 tutorial 的调优配置。Eagle3 为可选项，启用前下载草稿模型并替换路径。
+
+      ```bash
+      export ASCEND_RT_VISIBLE_DEVICES=0
+      export HCCL_OP_EXPANSION_MODE="AIV"
+      export HCCL_BUFFSIZE=1024
+      export OMP_PROC_BIND=false
+      export OMP_NUM_THREADS=1
+      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+
+      vllm serve your_model_path \
+          --served-model-name qwen3 \
+          --trust-remote-code \
+          --max-num-seqs 100 \
+          --max-model-len 37364 \
+          --max-num-batched-tokens 16384 \
+          --tensor-parallel-size 1 \
+          --distributed-executor-backend "mp" \
+          {{prefix_caching}} \
+          --quantization ascend \
+        {{compilation_config}} \
+          {{flashcomm1}} \
+          --gpu-memory-utilization 0.95 \
+          {{spec_decoding}} \
+          --port 8000
+      ```
+  - title: 服务验证
+    content: |-
+      检查服务健康状态并发送真实推理请求；模型列表就绪不能替代推理成功。
+
+      ```bash
+      curl --fail --silent --show-error http://<server_ip>:<port>/health
+      curl --fail --silent --show-error http://<server_ip>:<port>/v1/models
+      curl --fail --silent --show-error http://<server_ip>:<port>/v1/chat/completions \
+          -H 'Content-Type: application/json' \
+          -d '{"model":"qwen3","messages":[{"role":"user","content":"Explain tensor parallelism briefly."}],"temperature":0,"max_completion_tokens":256,"chat_template_kwargs":{"enable_thinking":false}}'
+      ```
+- npu: Atlas 800I A3
+  precision: W8A8
+  deployment: 单节点-多卡
+  case: Long Context
+  tags:
+  - a3-single
+  strategy: single_node_A3
+  steps:
+  - title: 启动服务
+    content: |-
+      迁移自官方 tutorial 的调优配置。Eagle3 为可选项，启用前下载草稿模型并替换路径。
+
+      ```bash
+      export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3
+      export HCCL_OP_EXPANSION_MODE="AIV"
+      export HCCL_BUFFSIZE=1024
+      export OMP_PROC_BIND=false
+      export OMP_NUM_THREADS=1
+      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+
+      vllm serve your_model_path \
+          --served-model-name qwen3 \
+          --trust-remote-code \
+          --max-num-seqs 14 \
+          --max-model-len 131072 \
+          --max-num-batched-tokens 16384 \
+          --tensor-parallel-size 4 \
+          --enable-expert-parallel \
+          --distributed-executor-backend "mp" \
+          {{prefix_caching}} \
+          --quantization ascend \
+        {{compilation_config}} \
+          {{flashcomm1}} \
+          --gpu-memory-utilization 0.95 \
+          --port 8000 \
+          {{spec_decoding}} \
+          --hf-overrides '{"rope_parameters": {"rope_type":"yarn","factor":4,"original_max_position_embeddings":32768}}'
+      ```
+  - title: 服务验证
+    content: |-
+      检查服务健康状态并发送真实推理请求；模型列表就绪不能替代推理成功。
+
+      ```bash
+      curl --fail --silent --show-error http://<server_ip>:<port>/health
+      curl --fail --silent --show-error http://<server_ip>:<port>/v1/models
+      curl --fail --silent --show-error http://<server_ip>:<port>/v1/chat/completions \
+          -H 'Content-Type: application/json' \
+          -d '{"model":"qwen3","messages":[{"role":"user","content":"Explain tensor parallelism briefly."}],"temperature":0,"max_completion_tokens":256,"chat_template_kwargs":{"enable_thinking":false}}'
+      ```
 verification: |-
   服务启动后，可以通过发送 prompt 调用模型。
 
   **Chat Completions API：**
 
   ```shell
-  curl http://localhost:8000/v1/chat/completions \
+  curl http://<server_ip>:<port>/v1/chat/completions \
       -H "Content-Type: application/json" \
       -d '{
           "model": "qwen3",
@@ -681,7 +900,7 @@ verification: |-
       }'
   ```
 
-  > - **URL** (`http://localhost:8000`)：请将 `localhost` 和 `8000` 替换为您的服务器 IP 和 `vllm serve` 命令中的 `--port` 值。
+  > - **URL** (`http://<server_ip>:<port>`)：请将 `localhost` 和 `8000` 替换为您的服务器 IP 和 `vllm serve` 命令中的 `--port` 值。
   > - **`model`**：必须与 `vllm serve` 命令中的 `--served-model-name` 值匹配（例如 `qwen3`）。
 
   预期结果：HTTP 200，JSON 响应中包含 `choices` 字段及生成的文本。
@@ -850,9 +1069,14 @@ performance:
     | ------------- | ----------------------- | ------ |
     | GSM8K         | accuracy (4-shot CoT)   | 92.87% |
     | GPQA-Diamond  | accuracy (0-shot CoT)   | 60.10% |
+    | LiveCodeBench | pass@1 (0-shot)       | 60.05% |
     | AIME 2024     | accuracy (0-shot)       | 76.67% |
+
+    > 以上为官方 tutorial 在 v0.22.1rc 上的历史参考结果，并非本次 main 分支实测结果。
   benchmark: |-
     ### 推荐配置
+
+    请在上方选择对应场景生成启动命令。Eagle3 为可选功能，启用时需要下载草稿模型。
 
     > **注意**：以下配置在特定测试环境中验证，仅供参考。最优配置取决于最大输入/输出长度、前缀缓存命中率、精度要求以及部署机器配比等因素。建议参考第 9.2 节根据实际情况进行调优。
 
@@ -878,32 +1102,6 @@ performance:
 
     **低延迟配置：**
 
-    ```shell
-    export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3
-    export HCCL_OP_EXPANSION_MODE="AIV"
-    export HCCL_BUFFSIZE=1024
-    export OMP_PROC_BIND=false
-    export OMP_NUM_THREADS=1
-    export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
-
-    vllm serve your_model_path \
-        --served-model-name qwen3 \
-        --trust-remote-code \
-        --max-num-seqs {{max_num_seqs}} \
-        --max-model-len 37364 \
-        --max-num-batched-tokens 16384 \
-        --tensor-parallel-size 4 \
-        --enable-expert-parallel \
-        --distributed_executor_backend "mp" \
-        {{prefix_caching}} \
-        {{async_scheduling}} \
-        --quantization ascend \
-        {{compilation_config}} \
-        {{flashcomm1}} \
-        --gpu-memory-utilization {{gpu_memory_utilization}} \
-        --port 8000 \
-        --speculative-config '{"method": "eagle3","model": "your_eagle3_model_path", "num_speculative_tokens": 3}'
-    ```
 
     该配置的 AISBench 示例设置：
 
@@ -913,31 +1111,6 @@ performance:
 
     **高吞吐配置：**
 
-    ```shell
-    export ASCEND_RT_VISIBLE_DEVICES=0
-    export HCCL_OP_EXPANSION_MODE="AIV"
-    export HCCL_BUFFSIZE=1024
-    export OMP_PROC_BIND=false
-    export OMP_NUM_THREADS=1
-    export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
-
-    vllm serve your_model_path \
-        --served-model-name qwen3 \
-        --trust-remote-code \
-        --max-num-seqs {{max_num_seqs}} \
-        --max-model-len 37364 \
-        --max-num-batched-tokens 16384 \
-        --tensor-parallel-size 1 \
-        --distributed_executor_backend "mp" \
-        {{prefix_caching}} \
-        {{async_scheduling}} \
-        --quantization ascend \
-        {{compilation_config}} \
-        --additional-config '{"weight_nz_mode": 2}' \
-        --gpu-memory-utilization {{gpu_memory_utilization}} \
-        --port 8000 \
-        --speculative-config '{"method": "eagle3","model": "your_eagle3_model_path", "num_speculative_tokens": 3}'
-    ```
 
     该配置的 AISBench 示例设置：
 
@@ -947,33 +1120,6 @@ performance:
 
     **长上下文配置：**
 
-    ```shell
-    export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3
-    export HCCL_OP_EXPANSION_MODE="AIV"
-    export HCCL_BUFFSIZE=1024
-    export OMP_PROC_BIND=false
-    export OMP_NUM_THREADS=1
-    export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
-
-    vllm serve your_model_path \
-        --served-model-name qwen3 \
-        --trust-remote-code \
-        --max-num-seqs 14 \
-        --max-model-len 131072 \
-        --max-num-batched-tokens 16384 \
-        --tensor-parallel-size 4 \
-        --enable-expert-parallel \
-        --distributed_executor_backend "mp" \
-        {{prefix_caching}} \
-        {{async_scheduling}} \
-        --quantization ascend \
-        {{compilation_config}} \
-        {{flashcomm1}} \
-        --gpu-memory-utilization {{gpu_memory_utilization}} \
-        --port 8000 \
-        --speculative-config '{"method": "eagle3","model": "your_eagle3_model_path", "num_speculative_tokens": 3}' \
-        --hf-overrides '{"rope_parameters": {"rope_type":"yarn","factor":4,"original_max_position_embeddings":32768}}'
-    ```
 
     该配置的 AISBench 示例设置：
 
