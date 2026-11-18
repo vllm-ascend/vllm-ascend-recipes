@@ -558,6 +558,107 @@ def test_main_hardware_filter(tmp_path, monkeypatch):
     assert sorted(m["combo"] for m in matrix["include"]) == ["a3-c", "a5-c"]
 
 
+# --- --models filter (manual dispatch) ----------------------------------------
+
+
+def _two_model_map(tmp_path):
+    map_file = tmp_path / "map.json"
+    map_file.write_text(
+        json.dumps(
+            {
+                "schema_version": gen.SCHEMA_VERSION,
+                "entries": [
+                    {
+                        "name": "Model-A",
+                        "yaml": "recipes/overlays/org/A.yaml",
+                        "hf_id": "org/A",
+                        "combos": [{"id": "a5-c", "hardware": "ascend_950dt_8x", "variant": "default", "nodes": 1}],
+                    },
+                    {
+                        "name": "Model-B",
+                        "yaml": "recipes/overlays/org/B.yaml",
+                        "hf_id": "org/B",
+                        "combos": [{"id": "a3-c", "hardware": "ascend_910c", "variant": "default", "nodes": 1}],
+                    },
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    labels_file = tmp_path / "runner_label.json"
+    labels_file.write_text(
+        json.dumps(
+            {
+                "linux-aarch64-a5-4": {"chip": "a5", "npu_num": 4},
+                "linux-aarch64-a3-4": {"chip": "a3", "npu_num": 4},
+            }
+        ),
+        encoding="utf-8",
+    )
+    return ["--map", str(map_file), "--runner-labels", str(labels_file)]
+
+
+def _fetch_by_hardware(site, hf_id, combo):
+    render = A3_RENDER if combo["hardware"] == "ascend_910c" else A5_RENDER
+    return dict(render), SOURCE_URL
+
+
+def _combos_of(out_dir: Path) -> list[str]:
+    manifest = json.loads((out_dir / "manifest.json").read_text(encoding="utf-8"))
+    return sorted(r["combo_id"] for r in manifest["combos"])
+
+
+def test_main_models_filter_matches_name_and_hf_id(tmp_path, monkeypatch):
+    # --models exists so a manual dispatch can select a model without knowing
+    # which entry a bare combo ID such as a3-c belongs to.
+    common = _two_model_map(tmp_path)
+    monkeypatch.setattr(gen, "fetch_render", _fetch_by_hardware)
+
+    assert gen.main(common + ["--out", str(tmp_path / "name"), "--models", "Model-A"]) == 0
+    assert _combos_of(tmp_path / "name") == ["a5-c"]
+
+    # hf_id works too, and matching is case-insensitive.
+    assert gen.main(common + ["--out", str(tmp_path / "hf"), "--models", "ORG/B"]) == 0
+    assert _combos_of(tmp_path / "hf") == ["a3-c"]
+
+    assert gen.main(common + ["--out", str(tmp_path / "both"), "--models", "Model-A, org/B"]) == 0
+    assert _combos_of(tmp_path / "both") == ["a3-c", "a5-c"]
+
+
+def test_main_models_combines_with_hardware_as_and(tmp_path, monkeypatch):
+    # Model-B only declares an A3 combo, so A5 + Model-B matches nothing: the
+    # filters are an intersection, and a green run of zero combos would hide it.
+    common = _two_model_map(tmp_path)
+    monkeypatch.setattr(gen, "fetch_render", _fetch_by_hardware)
+    out_dir = tmp_path / "conflict"
+    with pytest.raises(SystemExit):
+        gen.main(common + ["--out", str(out_dir), "--hardware", "a5", "--models", "Model-B"])
+    assert not (out_dir / "manifest.json").exists()
+
+
+def test_main_unknown_model_is_rejected(tmp_path, monkeypatch):
+    common = _two_model_map(tmp_path)
+    monkeypatch.setattr(gen, "fetch_render", _fetch_by_hardware)
+    with pytest.raises(SystemExit):
+        gen.main(common + ["--out", str(tmp_path / "typo"), "--models", "Model-Typo"])
+
+
+def test_main_empty_change_set_without_filters_stays_green(tmp_path, monkeypatch):
+    # PRs pass the three filters as empty strings; an empty change set is a
+    # normal no-op and must not trip the filter mismatch guard.
+    common = _two_model_map(tmp_path)
+    monkeypatch.setattr(gen, "fetch_render", _fetch_by_hardware)
+    baseline = tmp_path / "base.json"
+    baseline.write_text((tmp_path / "map.json").read_text(encoding="utf-8"), encoding="utf-8")
+    out_dir = tmp_path / "unchanged"
+    rc = gen.main(
+        common
+        + ["--out", str(out_dir), "--hardware", "", "--combos", "", "--models", "", "--baseline-map", str(baseline)]
+    )
+    assert rc == 0
+    assert _combos_of(out_dir) == []
+
+
 def test_changed_combo_ids_preserves_unchanged_models():
     baseline = {"site": "https://recipes.vllm.ai", "entries": [dict(A5_ENTRY, combos=[A5_COMBO])]}
     current = json.loads(json.dumps(baseline))
