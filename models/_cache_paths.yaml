@@ -53,3 +53,6 @@ aliases:
     cache_dir: PaddlePaddle/PaddleOCR-VL
   - model_id: moonshotai/Kimi-K2.6
     cache_dir: Kimi-K2.6-W4A8
+
+  - model_id: Qwen/Qwen3-Coder-30B-A3B-Instruct
+    cache_dir: Qwen3-Coder-30B-A3B-Instruct-w8a8

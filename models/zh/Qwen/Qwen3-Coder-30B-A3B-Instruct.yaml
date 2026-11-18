@@ -1,0 +1,529 @@
+﻿meta:
+  title: "Qwen3-Coder-30B-A3B-Instruct"
+  slug: "qwen3-coder-30b-a3b-instruct"
+  provider: "Qwen"
+  description: "30.5B 总参、3.3B 激活的 MoE 代码模型，支持智能体编码、函数调用，原生上下文长度 262144 tokens。"
+  date_added: 2026-11-19
+  performance_headline: "Atlas 800I A3 单节点 W8A8 部署，覆盖高吞吐、低时延与 128K 长上下文场景"
+  difficulty: intermediate
+  hardware:
+    atlas_800_a3: verified
+
+model:
+  model_id: "Qwen/Qwen3-Coder-30B-A3B-Instruct"
+  min_vllm_version: "0.30.0"
+  architecture: moe
+  parameter_count: "30.5B"
+  active_parameters: "3.3B"
+  context_length: 262144
+  modality: text
+  base_args:
+    - "--trust-remote-code"
+  base_env:
+    HCCL_BUFFSIZE: "1024"
+    OMP_PROC_BIND: "false"
+    OMP_NUM_THREADS: "1"
+    PYTORCH_NPU_ALLOC_CONF: "expandable_segments:True"
+  docker_image:
+    atlas_800_a3: "quay.io/ascend/vllm-ascend:v0.30.0-a3-openeuler"
+  nightly_required: false
+  install:
+    pip: false
+    docker:
+      command: "docker run --rm --net=host --shm-size=128g -v /models:/models --device /dev/davinci0 --device /dev/davinci1 --device /dev/davinci2 --device /dev/davinci3 -it quay.io/ascend/vllm-ascend:v0.30.0-a3-openeuler bash"
+      note: "昇腾官方镜像；完整设备与驱动挂载见 env_setup.container。"
+
+features:
+  expert_parallel:
+    description: "MoE 专家并行，适用于 TP4 场景"
+    args: ["--enable-expert-parallel"]
+  compilation_config:
+    label: "Compilation Config"
+    description: "Decode 阶段使用完整 ACL 图（--compilation-config cudagraph_mode=FULL_DECODE_ONLY）"
+    args: ["--compilation-config", '{"cudagraph_mode": "FULL_DECODE_ONLY"}']
+  async_scheduling:
+    label: "Async Scheduling"
+    description: "异步调度，重叠 CPU 调度与 NPU 计算"
+    args: ["--async-scheduling"]
+  prefix_caching:
+    label: "Prefix Caching"
+    description: "KV Cache 前缀缓存（验证场景默认关闭）"
+    args: ["--enable-prefix-caching"]
+    flag_when_false: "--no-enable-prefix-caching"
+
+opt_in_features:
+  - prefix_caching
+
+variants:
+  default:
+    precision: W8A8
+    vram_minimum_gb: 32
+    description: "Atlas 800I A3 上的 W8A8 量化权重"
+  bf16:
+    model_id: "Qwen/Qwen3-Coder-30B-A3B-Instruct"
+    precision: bf16
+    vram_minimum_gb: 60
+    description: "Atlas 800I A3 上的 BF16 权重"
+
+compatible_strategies:
+  - single_node_A3
+
+hardware_overrides: {}
+strategy_overrides: {}
+
+guide: ""
+
+config_params:
+  max_model_len:
+    default: 37364
+    type: number
+    description: "最大上下文长度（输入与输出 token 之和）"
+  max_num_seqs:
+    default: 100
+    type: number
+    description: "最大并发序列数"
+  gpu_memory_utilization:
+    default: 0.95
+    type: number
+    description: "可用于 KV Cache 的 NPU 显存比例"
+
+overview: |-
+  Qwen3-Coder-30B-A3B-Instruct 是 30.5B 总参、3.3B 激活的 MoE 代码模型，面向智能体编码、仓库级代码生成与工具调用，原生支持 262144 tokens 上下文。本 recipe 覆盖上游教程的三个单节点场景：高吞吐（TP1）、低时延（TP4 + 专家并行）与 131072 tokens 长上下文（TP4）。
+
+weight_download:
+- weight_version: BF16
+  sources:
+  - source: ModelScope
+    url: https://www.modelscope.cn/models/Qwen/Qwen3-Coder-30B-A3B-Instruct
+    command: |-
+      ```bash
+      pip install modelscope
+      modelscope download --model Qwen/Qwen3-Coder-30B-A3B-Instruct
+      ```
+  - source: HuggingFace
+    url: https://huggingface.co/Qwen/Qwen3-Coder-30B-A3B-Instruct
+    command: |-
+      ```bash
+      pip install -U huggingface_hub
+      huggingface-cli download Qwen/Qwen3-Coder-30B-A3B-Instruct
+      ```
+  - source: Modelers
+    url: ''
+    command: ''
+  - source: GitCode
+    url: ''
+    command: ''
+- weight_version: W8A8（预量化）
+  sources:
+  - source: ModelScope
+    url: https://www.modelscope.cn/models/Eco-Tech/Qwen3-Coder-30B-A3B-Instruct-w8a8
+    command: |-
+      ```bash
+      pip install modelscope
+      modelscope download --model Eco-Tech/Qwen3-Coder-30B-A3B-Instruct-w8a8
+      ```
+  - source: HuggingFace
+    url: ''
+    command: ''
+  - source: Modelers
+    url: ''
+    command: ''
+  - source: GitCode
+    url: ''
+    command: ''
+
+quantization:
+  content: |-
+    W8A8 权重采用混合量化策略：
+
+    - **Embedding 层**：BF16，不量化
+    - **Q/K 归一化**（`q_norm`、`k_norm`）：BF16
+    - **Attention 投影**（`q/k/v/o_proj`）：静态 W8A8，per-tensor scale，bias 保持 BF16
+    - **MoE 路由 gate**（`mlp.gate`）：BF16
+    - **MoE 专家投影**（`gate/up/down_proj`）：动态 W8A8，推理时计算输入 scale
+
+    若无法获取预量化权重，可使用 **msmodelslim** 按[量化指南](https://docs.vllm.ai/projects/ascend/en/latest/user_guide/feature_guide/quantization.html)对 BF16 模型量化。
+
+prerequisites:
+- title: 模型权重
+  content: |-
+    | 模型 | 硬件要求 | 下载 |
+    | --- | --- | --- |
+    | Qwen3-Coder-30B-A3B-Instruct（BF16） | Atlas 800I A3（64GB，1~2 卡） | [下载](https://www.modelscope.cn/models/Qwen/Qwen3-Coder-30B-A3B-Instruct) |
+    | Qwen3-Coder-30B-A3B-Instruct-W8A8 | Atlas 800I A3（64GB，1~2 卡） | [下载](https://www.modelscope.cn/models/Eco-Tech/Qwen3-Coder-30B-A3B-Instruct-w8a8) |
+
+    卡数为推荐值，可按实际情况调整。请将权重放在容器可访问的共享目录。
+- title: 驱动与固件
+  content: |-
+    启动容器前需在宿主机安装昇腾驱动与固件，版本请参考 [Ascend HDK 安装文档](https://www.hiascend.com/document)。
+
+env_setup:
+  container:
+    A3:
+      content: |-
+        使用本 recipe 验证过的 vLLM-Ascend 官方一体化镜像。
+
+        **拉取镜像：**
+
+        ```bash
+        docker pull quay.io/ascend/vllm-ascend:v0.30.0-a3-openeuler
+        ```
+
+        **启动容器：**
+
+        ```bash
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.30.0-a3-openeuler
+
+        docker run \
+            --name vllm-ascend-env \
+            --shm-size=128g \
+            --net=host \
+            --privileged=true \
+            --device /dev/davinci0 \
+            --device /dev/davinci1 \
+            --device /dev/davinci2 \
+            --device /dev/davinci3 \
+            --device /dev/davinci_manager \
+            --device /dev/devmm_svm \
+            --device /dev/hisi_hdc \
+            -v /usr/local/Ascend/driver:/usr/local/Ascend/driver \
+            -v /usr/local/dcmi:/usr/local/dcmi \
+            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+            -v /etc/ascend_install.info:/etc/ascend_install.info \
+            -v /models:/models \
+            -it -d $IMAGE bash
+        ```
+
+        > **说明**：Atlas 800I A3 有 8 个 NPU、双 die 设计，共 16 个芯片。本 recipe 最多使用 4 个芯片（`/dev/davinci0` 至 `/dev/davinci3`），如需暴露其余芯片可继续添加 `--device`。
+
+scenarios:
+- npu: Atlas 800I A3
+  precision: W8A8
+  deployment: Single-Node
+  case: High Throughput
+  tags: [a3-single]
+  strategy: single_node_A3
+  steps:
+  - title: 启动服务
+    content: |-
+      单芯片（TP1）部署可最大化并发请求的聚合吞吐，下面使用 0 号芯片与 37364 tokens 上下文。
+
+      ```bash
+      export ASCEND_RT_VISIBLE_DEVICES=0
+      export HCCL_OP_EXPANSION_MODE="AIV"
+      export HCCL_BUFFSIZE=1024
+      export OMP_PROC_BIND=false
+      export OMP_NUM_THREADS=1
+      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+
+      vllm serve your_model_path \
+          --served-model-name qwen3-coder \
+          --trust-remote-code \
+          --max-num-seqs {{max_num_seqs}} \
+          --max-model-len {{max_model_len}} \
+          --max-num-batched-tokens 16384 \
+          --tensor-parallel-size 1 \
+          --distributed_executor_backend "mp" \
+          {{prefix_caching}} \
+          {{async_scheduling}} \
+          --quantization ascend \
+          {{compilation_config}} \
+          --additional-config '{"weight_nz_mode": 2}' \
+          --gpu-memory-utilization {{gpu_memory_utilization}} \
+          --port 8000
+      ```
+
+      > - W8A8 权重必须保留 `--quantization ascend`。
+      > - 默认关闭前缀缓存；如需开启请先评估实际命中率。
+      > - NPU 显存被其他服务占用时，可适当降低 `--max-num-seqs` 与 `--max-model-len`。
+  - title: 验证服务
+    content: |-
+      ```bash
+      curl http://localhost:<port>/v1/chat/completions \
+          -H "Content-Type: application/json" \
+          -d '{
+              "model": "qwen3-coder",
+              "messages": [
+                  {"role": "user", "content": "Write a Python function named fib that returns the n-th Fibonacci number. Output only code."}
+              ],
+              "temperature": 0,
+              "max_tokens": 512
+          }'
+      ```
+
+      预期结果：HTTP 200，`choices` 中的内容包含 `def fib` 定义。
+  - title: 性能基准
+    content: |-
+      ```bash
+      vllm bench serve \
+          --model your_model_path \
+          --served-model-name qwen3-coder \
+          --host 127.0.0.1 \
+          --port 8000 \
+          --dataset-name random \
+          --random-input-len 2048 \
+          --random-output-len 2048 \
+          --num-prompts 100 \
+          --max-concurrency 32 \
+          --seed 1234 \
+          --ignore-eos \
+          --save-result \
+          --result-dir ./
+      ```
+
+      Atlas 800I A3 + v0.30.0 镜像实测：100/100 成功，输出吞吐 756.42 tok/s，平均 TTFT 1205.82 ms，平均 TPOT 36.56 ms。
+- npu: Atlas 800I A3
+  precision: W8A8
+  deployment: Single-Node
+  case: Low Latency
+  tags: [a3-single]
+  strategy: single_node_A3
+  steps:
+  - title: 启动服务
+    content: |-
+      四芯片张量并行并开启专家并行，可降低单 token 时延。该场景开启 FlashComm1。
+
+      ```bash
+      export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3
+      export HCCL_OP_EXPANSION_MODE="AIV"
+      export HCCL_BUFFSIZE=1024
+      export OMP_PROC_BIND=false
+      export OMP_NUM_THREADS=1
+      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+
+      vllm serve your_model_path \
+          --served-model-name qwen3-coder \
+          --trust-remote-code \
+          --max-num-seqs {{max_num_seqs}} \
+          --max-model-len {{max_model_len}} \
+          --max-num-batched-tokens 16384 \
+          --tensor-parallel-size 4 \
+          --enable-expert-parallel \
+          --distributed_executor_backend "mp" \
+          {{prefix_caching}} \
+          {{async_scheduling}} \
+          --quantization ascend \
+          {{compilation_config}} \
+          --additional-config '{"enable_flashcomm1": true, "weight_nz_mode": 2}' \
+          --gpu-memory-utilization {{gpu_memory_utilization}} \
+          --port 8000
+      ```
+
+      > - `ASCEND_RT_VISIBLE_DEVICES` 需指定 4 个芯片，TP4 会为每个芯片分配一个 rank。
+      > - `--enable-expert-parallel` 将 128 个 MoE 专家分布到 4 个 rank。
+  - title: 验证服务
+    content: |-
+      ```bash
+      curl http://localhost:<port>/v1/chat/completions \
+          -H "Content-Type: application/json" \
+          -d '{
+              "model": "qwen3-coder",
+              "messages": [
+                  {"role": "user", "content": "Reply with exactly one word: OK"}
+              ],
+              "temperature": 0,
+              "max_tokens": 64
+          }'
+      ```
+
+      预期结果：HTTP 200，`choices` 非空。
+  - title: 性能基准
+    content: |-
+      ```bash
+      vllm bench serve \
+          --model your_model_path \
+          --served-model-name qwen3-coder \
+          --host 127.0.0.1 \
+          --port 8000 \
+          --dataset-name random \
+          --random-input-len 2048 \
+          --random-output-len 2048 \
+          --num-prompts 100 \
+          --max-concurrency 32 \
+          --seed 1234 \
+          --ignore-eos \
+          --save-result \
+          --result-dir ./
+      ```
+
+      Atlas 800I A3 + v0.30.0 镜像实测：100/100 成功，输出吞吐 1219.29 tok/s，平均 TTFT 1007.98 ms，平均 TPOT 21.35 ms。
+- npu: Atlas 800I A3
+  precision: W8A8
+  deployment: Single-Node
+  case: Long Context
+  tags: [a3-single]
+  strategy: single_node_A3
+  steps:
+  - title: 启动服务
+    content: |-
+      长上下文场景保持 TP4 与专家并行，将上下文提升到 131072 tokens，并把 `--max-num-seqs` 降到 14 以留出 KV Cache 空间。Qwen3-Coder 原生支持 262144 tokens，因此 131072 无需 RoPE 扩展。
+
+      ```bash
+      export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3
+      export HCCL_OP_EXPANSION_MODE="AIV"
+      export HCCL_BUFFSIZE=1024
+      export OMP_PROC_BIND=false
+      export OMP_NUM_THREADS=1
+      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+
+      vllm serve your_model_path \
+          --served-model-name qwen3-coder \
+          --trust-remote-code \
+          --max-num-seqs 14 \
+          --max-model-len 131072 \
+          --max-num-batched-tokens 16384 \
+          --tensor-parallel-size 4 \
+          --enable-expert-parallel \
+          --distributed_executor_backend "mp" \
+          {{prefix_caching}} \
+          {{async_scheduling}} \
+          --quantization ascend \
+          {{compilation_config}} \
+          --additional-config '{"enable_flashcomm1": true, "weight_nz_mode": 2}' \
+          --gpu-memory-utilization {{gpu_memory_utilization}} \
+          --port 8000
+      ```
+
+      > - 超过 262144 tokens 时需追加 `--hf-overrides '{"rope_parameters": {"rope_type": "yarn", "factor": 4, "original_max_position_embeddings": 262144}}'`。
+      > - 若 KV Cache 接近 NPU 显存上限，可继续降低 `--max-num-seqs`。
+  - title: 验证服务
+    content: |-
+      发送超过 32768 tokens 的请求，确认返回内容正常、无超时。
+
+      ```bash
+      curl http://localhost:<port>/v1/chat/completions \
+          -H "Content-Type: application/json" \
+          -d '{
+              "model": "qwen3-coder",
+              "messages": [
+                  {"role": "user", "content": "Summarize the key risks of a large-scale software migration in three bullet points."}
+              ],
+              "temperature": 0,
+              "max_tokens": 256
+          }'
+      ```
+
+      预期结果：HTTP 200，`choices` 非空且无超时。
+  - title: 性能基准
+    content: |-
+      ```bash
+      vllm bench serve \
+          --model your_model_path \
+          --served-model-name qwen3-coder \
+          --host 127.0.0.1 \
+          --port 8000 \
+          --dataset-name random \
+          --random-input-len 8192 \
+          --random-output-len 512 \
+          --num-prompts 20 \
+          --max-concurrency 4 \
+          --seed 1234 \
+          --ignore-eos \
+          --save-result \
+          --result-dir ./
+      ```
+
+      Atlas 800I A3 + v0.30.0 镜像实测：20/20 成功，输出吞吐 221.63 tok/s，平均 TTFT 735.66 ms，平均 TPOT 16.64 ms。另以 60025 tokens 单请求验证，3.58 s 返回正确答案。
+
+verification: |-
+  服务启动后发送对话请求，`<port>` 替换为 `vllm serve` 中使用的端口。
+
+  ```bash
+  curl http://localhost:<port>/v1/chat/completions \
+      -H "Content-Type: application/json" \
+      -d '{
+          "model": "qwen3-coder",
+          "messages": [
+              {"role": "user", "content": "Give me a short introduction to large language models."}
+          ],
+          "temperature": 0.6,
+          "top_p": 0.95,
+          "max_tokens": 512
+      }'
+  ```
+
+  预期结果：HTTP 200，返回 JSON 中的 `choices` 非空。
+
+evaluation:
+  accuracy:
+    content: |-
+      ### 使用 EvalScope
+
+      在独立虚拟环境中安装 EvalScope，并连接已启动的 OpenAI 兼容服务：
+
+      ```bash
+      python3 -m venv /root/eval-venv
+      /root/eval-venv/bin/pip install -U "numpy>=2.0" evalscope
+      /root/eval-venv/bin/evalscope eval \
+          --model qwen3-coder \
+          --api-url http://127.0.0.1:8000/v1 \
+          --api-key EMPTY \
+          --eval-type openai_api \
+          --datasets gsm8k \
+          --limit 100 \
+          --eval-batch-size 8
+      ```
+
+      **精度结果（Atlas 800I A3，vLLM-Ascend v0.30.0，W8A8，100 题）：**
+
+      | 数据集 | 指标 | 分数 |
+      | --- | --- | --- |
+      | GSM8K | accuracy | 98.00% |
+
+      上游教程使用 AISBench 报告 GSM8K 90.14%，100 题子集的采样差异会导致波动。
+
+performance:
+  accuracy: |-
+    ### 使用 EvalScope
+
+    命令见评测章节。精度基于高吞吐 TP1 服务与 W8A8 权重测得。
+
+  benchmark: |-
+    ### 实测结果
+
+    以下数据均在单台 Atlas 800I A3（共 16 芯片，最多使用 4 芯片）与 `quay.io/ascend/vllm-ascend:v0.30.0-a3-openeuler` 镜像上采集。
+
+    | 场景 | TP | 请求数 | 并发 | 输出吞吐（tok/s） | 平均 TTFT（ms） | 平均 TPOT（ms） |
+    | --- | --- | --- | --- | --- | --- | --- |
+    | 高吞吐 | 1 | 100/100 | 32 | 756.42 | 1205.82 | 36.56 |
+    | 低时延 | 4 | 100/100 | 32 | 1219.29 | 1007.98 | 21.35 |
+    | 长上下文 | 4 | 20/20 | 4 | 221.63 | 735.66 | 16.64 |
+
+    基准输入输出：高吞吐与低时延为 2048/2048 tokens；长上下文为 8192/512 tokens。
+
+    #### 场景概览
+
+    | 场景 | 部署方式 | NPU 总数 | 权重版本 | 关键考量 |
+    | --- | --- | --- | --- | --- |
+    | 高吞吐 | 单节点（TP1） | 1（A3） | W8A8 | 单芯片部署最大化并发请求处理能力 |
+    | 低时延 | 单节点（TP4） | 2（A3） | W8A8 | 多芯片 TP + 专家并行降低单 token 时延 |
+    | 长上下文 | 单节点（TP4） | 2（A3） | W8A8 | 降低并发序列数为 131072 tokens 上下文预留空间 |
+
+    > Atlas 800I A3 每个 NPU 包含两个 die（芯片），因此 TP4 使用 4 个芯片，即 2 个 NPU。
+
+tuning: |-
+  ### 调优建议
+
+  - 逐步提高 `--max-num-seqs` 直到 NPU 显存或调度成为瓶颈。
+  - 长请求超时时，降低 `--max-num-seqs` 与 `--max-model-len`。
+  - 验证场景关闭前缀缓存，因为随机基准输入不会命中缓存；共享前缀业务可开启并先评估命中率。
+  - 更多选项见[性能调优文档](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/performance_and_debug/optimization_and_tuning.html)。
+
+faq: |-
+  **为什么必须加 `--quantization ascend`？** 本 recipe 验证的是 W8A8 权重；仅在服务 BF16 权重时移除。
+
+  **是否支持 Eagle3 投机推理？** 上游教程列出了可选的 Eagle3 草稿模型。本 recipe 未验证，因为测试环境没有对应权重；请在自有硬件验证后再添加 `--speculative-config`。
+
+  **长上下文为什么只验证到 131072 tokens？** 模型原生支持 262144 tokens，131072 是本 recipe 的验证值。提高前请检查 KV Cache 显存；超过 262144 时需追加 YaRN 配置。
+
+references:
+- title: vLLM-Ascend 教程（v0.23.0 历史版本）
+  url: https://docs.vllm.ai/projects/ascend/en/v0.23.0/tutorials/models/Qwen3-Coder-30B-A3B.html
+- title: ModelScope 模型下载（BF16）
+  url: https://www.modelscope.cn/models/Qwen/Qwen3-Coder-30B-A3B-Instruct
+- title: ModelScope 模型下载（W8A8）
+  url: https://www.modelscope.cn/models/Eco-Tech/Qwen3-Coder-30B-A3B-Instruct-w8a8
+- title: vLLM-Ascend 附加配置
+  url: https://docs.vllm.ai/projects/ascend/en/latest/user_guide/configuration/additional_config.html
+- title: vLLM-Ascend GitHub
+  url: https://github.com/vllm-project/vllm-ascend
