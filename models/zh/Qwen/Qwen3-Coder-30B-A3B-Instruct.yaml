@@ -62,7 +62,7 @@ variants:
   bf16:
     model_id: "Qwen/Qwen3-Coder-30B-A3B-Instruct"
     precision: bf16
-    vram_minimum_gb: 60
+    vram_minimum_gb: 64
     description: "Atlas 800I A3 上的 BF16 权重"
 
 compatible_strategies:
