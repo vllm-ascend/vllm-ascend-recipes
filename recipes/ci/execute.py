@@ -469,7 +469,7 @@ def verify_service(base_url: str, model: str) -> None:
         raise ComboFailure(
             f"cURL verification failed (curl exit {proc.returncode}): {(proc.stderr or '').strip()[:400]}"
         )
-    print("[verify] response: " + (proc.stdout or "").strip()[:400], flush=True)
+    print("[verify] response: " + (proc.stdout or "").strip(), flush=True)
     try:
         resp = json.loads(proc.stdout)
     except json.JSONDecodeError as e:
@@ -546,6 +546,7 @@ def run_bench(base_url: str, model: str, out_dir: Path) -> dict:
         raise ComboFailure(f"'vllm bench serve' timed out after {BENCH_TIMEOUT_S}s") from e
     output = (proc.stdout or "") + (proc.stderr or "")
     (out_dir / "bench.log").write_text(output, encoding="utf-8")
+    print("[bench] raw output:\n" + output.rstrip(), flush=True)
     if proc.returncode != 0:
         raise ComboFailure(
             f"'vllm bench serve' exited with code {proc.returncode}; see bench.log:\n"

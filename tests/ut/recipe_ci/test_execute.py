@@ -304,6 +304,14 @@ def test_verify_service_rejects_empty_content(monkeypatch, resp):
         exe.verify_service("http://127.0.0.1:8100", "model")
 
 
+def test_verify_service_prints_the_full_response(monkeypatch, capsys):
+    # The whole body reaches the job log; it used to be cut at 400 characters.
+    body = json.dumps({"pad": "x" * 1000, "choices": [{"message": {"content": "Hello!"}}]})
+    _curl_run(monkeypatch, [], stdout=body)
+    exe.verify_service("http://127.0.0.1:8100", "model")
+    assert body in capsys.readouterr().out
+
+
 def test_verify_service_fails_on_non_zero_curl_exit(monkeypatch):
     _curl_run(monkeypatch, [], stderr="curl: (7) Failed to connect", returncode=7)
     with pytest.raises(exe.ComboFailure, match="exit 7"):
@@ -358,7 +366,11 @@ def test_run_bench_writes_log_and_returns_metrics(tmp_path, monkeypatch, capsys)
     result = exe.run_bench("http://127.0.0.1:8100", "model", tmp_path)
     assert result["metrics"]["Output token throughput (tok/s)"] == 4578.75
     assert "Output token throughput" in (tmp_path / "bench.log").read_text(encoding="utf-8")
-    assert "--max-concurrency 32" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "--max-concurrency 32" in out
+    # The full raw output is echoed to the job log, not just the parsed metrics.
+    assert "[bench] raw output:" in out
+    assert "Output token throughput (tok/s):         4578.75" in out
 
 
 @pytest.mark.parametrize(
