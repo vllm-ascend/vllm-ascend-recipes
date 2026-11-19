@@ -385,7 +385,7 @@ def _combo_meta(tmp_path, **over):
         "port": 8100, "source_url": "https://recipes.vllm.ai", "required": False,
         "smoke_test": "chat", "bench": True, "model_id": "org/model",
         "draft_model": None, "hub": "modelscope", "env": {},
-        "argv": ["vllm", "serve", "org/model"], "readiness_timeout_s": 60, "companions": [],
+        "argv": ["vllm", "serve", "org/model"], "readiness_timeout_s": 60,
     }
     meta.update(over)
     combo_dir = tmp_path / "combo"
