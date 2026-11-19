@@ -4,11 +4,11 @@ meta:
   provider: "Tencent"
   description: "腾讯混元 A13B Instruct MoE（总参 80B / 激活 13B）在昇腾上的部署。教程路径为单机 4 卡 TP=4 BF16。"
   date_added: "2026-10-29"
-  date_updated: "2026-11-18"
+  date_updated: "2026-11-19"
   difficulty: intermediate
   tasks:
     - text-generation
-  performance_headline: "Atlas A3 4 卡 TP=4 BF16（教程）；Atlas A3 4 卡 TP=4 BF16 已验证；静态权重 37.4562 GB/NPU"
+  performance_headline: "Atlas A3 4 卡 TP=4 BF16 已验证；静态权重 37.4562 GB/NPU"
   related_recipes: []
   hardware:
     atlas_800_a3: verified
@@ -46,16 +46,16 @@ model:
     pip: false
     docker:
       command: "docker run --rm --name vllm-ascend --shm-size=1g --device /dev/davinci0 --device /dev/davinci1 --device /dev/davinci2 --device /dev/davinci3 --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc -v /root/.cache:/root/.cache -it quay.io/ascend/vllm-ascend:v0.23.0-a3 bash"
-      note: "容器内需要 4 个 Ascend die；完整挂载见 env_setup.container。"
+      note: "Needs four Ascend dies in the container; full mounts follow env_setup.container."
 
 features: {}
 opt_in_features: []
 
 variants:
-  bf16:
+  default:
     precision: bf16
     vram_minimum_gb: 160
-    description: "BF16 权重。教程静态权重约 37.5 GiB/NPU（TP=4）。"
+    description: "BF16 checkpoint. Tutorial static weight ~37.5 GiB/NPU at TP=4."
 
 compatible_strategies:
   - single_node_A3
@@ -69,14 +69,18 @@ config_params:
   max_model_len:
     default: 32768
     type: number
-    description: "教程默认 32768；显存足够时可扩到 256k。"
+    description: "Tutorial default 32768; model supports up to 256k with enough KV headroom."
   gpu_memory_utilization:
     default: 0.90
     type: number
-    description: "教程在 4×64 GiB HBM 上默认 0.90。"
+    description: "Tutorial default 0.90 on 4×64 GiB HBM."
 
 overview: |-
-  Hunyuan-A13B-Instruct 是腾讯细粒度 MoE（总参 80B / 激活 13B），带原生思维链。本 recipe 迁移官方 vLLM Ascend 教程的单机 4 卡路径。真机验证需要至少 4 个 Ascend910 die 的 Atlas A3（当前可达实验室多为 2 die）。
+  Hunyuan-A13B-Instruct is Tencent's fine-grained MoE (80B total / 13B active) with native CoT.
+  This Ascend recipe migrates the official vLLM Ascend tutorial single-node 4-NPU path.
+  Verified on Atlas A3 (VIS=0,1,2,3 TP=4, max-model-len=32768, image v0.23.0-a3):
+  tutorial curl PASS; docker log `Loading model weights took 37.4562 GB` matches tutorial static-weight KPI 37.46 GB/NPU;
+  AISBench PERF gsm8k MaxConc=16 PASS.
 
 weight_download:
   - weight_version: BF16
@@ -99,13 +103,13 @@ weight_download:
         command: ""
 
 prerequisites:
-  - title: 模型权重
+  - title: Model Weight
     content: |-
-      | 权重版本 | 硬件要求 | 下载 |
-      |----------|----------|------|
-      | BF16 | Atlas 800 A3，≥4 Ascend910 die（TP=4） | [ModelScope](https://www.modelscope.cn/models/Tencent-Hunyuan/Hunyuan-A13B-Instruct) |
+      | Weight Version | Hardware Requirements | Download Links |
+      |----------------|------------------------|----------------|
+      | BF16 | Atlas 800 A3 with ≥4 Ascend910 dies (TP=4) | [ModelScope](https://www.modelscope.cn/models/Tencent-Hunyuan/Hunyuan-A13B-Instruct) |
 
-      > **路径说明**：记录本地下载目录，并在 `vllm serve` 中使用同一路径。
+      > **Path description**: Record the local path and pass it to `vllm serve`.
 
 env_setup:
   container:
@@ -137,52 +141,75 @@ env_setup:
         ```
   pip:
     content: |-
-      安装匹配的 Ascend torch / torch_npu 2.10、`vllm==0.23.0`，以及 A3 变体 `vllm-ascend==0.23.0`（`…-a3.whl`；plain pip 需改名）。
+      Install matching Ascend torch / torch_npu 2.10, `vllm==0.23.0`, and the A3 variant `vllm-ascend==0.23.0` wheel.
 
 scenarios:
   - npu: Atlas A3
-    title: 单机 4 卡 TP=4
+    precision: bf16
+    deployment: Single-Node
+    case: Single Node TP4 (A3)
+    tags: [a3-tp4]
+    strategy: single_node_A3
+    steps:
+      - title: Start the server
+        content: |-
+          ```bash
+          export HCCL_INTRA_ROCE_ENABLE=1
+          export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3
+          export MODEL_PATH=Tencent-Hunyuan/Hunyuan-A13B-Instruct
+
+          vllm serve ${MODEL_PATH} \
+              --trust-remote-code \
+              --host 0.0.0.0 \
+              --port 8000 \
+              --served-model-name Hunyuan \
+              --tensor-parallel-size 4 \
+              --max-model-len {{max_model_len}} \
+              --gpu-memory-utilization {{gpu_memory_utilization}}
+          ```
+      - title: Service Verification
+        content: |-
+          ```bash
+          curl http://127.0.0.1:8000/v1/chat/completions \
+            -H "Content-Type: application/json" \
+            -d '{
+              "model": "Hunyuan",
+              "messages": [{"role":"user","content":"Give me a short introduction to large language models."}],
+              "max_tokens": 100,
+              "temperature": 0.7
+            }'
+          ```
+
+verification: |-
+  Expect tutorial chat curl PASS and serve log `Loading model weights took 37.4562 GB` per NPU.
+
+evaluation:
+  - title: AISBench
     content: |-
-      ```bash
-      export HCCL_INTRA_ROCE_ENABLE=1
-      export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3
-      export MODEL_PATH=Tencent-Hunyuan/Hunyuan-A13B-Instruct
+      PERF gsm8k MaxConc=16 PASS (TTFT≈247.7ms, TPOT≈44.8ms).
+      Historical GSM8K ACC ≈93.93 (tutorial target 94.77; not force-rerun this cycle).
 
-      vllm serve ${MODEL_PATH} \
-          --trust-remote-code \
-          --host 0.0.0.0 \
-          --port 8000 \
-          --served-model-name Hunyuan \
-          --tensor-parallel-size 4 \
-          --max-model-len 32768 \
-          --gpu-memory-utilization 0.90
-      ```
-
-  - npu: Atlas A3
-    title: 冒烟对话
+performance:
+  - title: Static weight KPI
     content: |-
-      ```bash
-      curl http://127.0.0.1:8000/v1/chat/completions \
-        -H "Content-Type: application/json" \
-        -d '{
-          "model": "Hunyuan",
-          "messages": [{"role":"user","content":"请用一段话简要介绍大语言模型。"}],
-          "max_tokens": 100,
-          "temperature": 0.7
-        }'
-      ```
+      Lab A3 (v0.23.0-a3): weights **37.4562 GB/NPU** (MATCH tutorial ~37.46).
 
-accuracy_and_performance: |-
-  教程（CANN 8.5.1）：静态权重约 37.46 GiB/NPU；ACLGraph PIECEWISE 捕获约 18 s；KV 容量约 529k tokens；AISBench GSM8K 精度 94.77%。0.23.0 A3 真机冒烟待空闲 ≥4 die 主机。
+tuning: |-
+  Keep TP=4 for the official single-node tutorial path. Two-die hosts cannot satisfy that configuration.
 
-faq:
-  - q: 为什么必须 TP=4？
-    a: 官方昇腾教程单机路径按 4 die 验证。双 die 主机无法满足该配置。
-  - q: ModelScope 与 HuggingFace 模型 ID？
-    a: 教程使用本地路径；ModelScope 为 `Tencent-Hunyuan/Hunyuan-A13B-Instruct`，HF 为 `tencent/Hunyuan-A13B-Instruct`。
+faq: |-
+  For common environment and installation issues, see the [Public FAQs](https://docs.vllm.ai/projects/ascend/en/latest/faqs.html).
+
+  ### Why TP=4?
+
+  **Answer:** The official Ascend tutorial single-node path uses four dies. Two-die hosts cannot satisfy that configuration.
+
+  ### ModelScope vs HuggingFace id?
+
+  **Answer:** Tutorial uses a local `Hunyuan-A13B-Instruct` path; ModelScope id is `Tencent-Hunyuan/Hunyuan-A13B-Instruct`, HF id `tencent/Hunyuan-A13B-Instruct`.
 
 references:
-  - title: vLLM Ascend 教程 Hunyuan-A13B-Instruct
+  - title: vLLM Ascend tutorial Hunyuan-A13B-Instruct
     url: https://docs.vllm.ai/projects/ascend/en/latest/tutorials/models/Hunyuan-A13B-Instruct.html
-  - title: ModelScope 权重
+  - title: ModelScope weights
     url: https://www.modelscope.cn/models/Tencent-Hunyuan/Hunyuan-A13B-Instruct
