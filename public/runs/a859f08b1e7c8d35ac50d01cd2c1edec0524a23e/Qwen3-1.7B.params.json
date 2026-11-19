@@ -1,0 +1,37 @@
+{
+  "recipe_path": "models/en/Qwen/Qwen3-1.7B.yaml",
+  "model_id": "",
+  "hw_key": "mixed",
+  "head_sha": "a859f08b1e7c8d35ac50d01cd2c1edec0524a23e",
+  "trigger_type": "pr",
+  "image": "mixed; see hardware_runs",
+  "started_at": "2026-11-19T11:39:14Z",
+  "scenarios": [],
+  "skip_reason": "镜像未预装该权重 (model_id=Qwen/Qwen3-1.7B, 目录=Qwen/Qwen3-1.7B, 已尝试 ['', 'Eco-Tech', 'vllm-ascend', 'models', '/root/.cache/'])",
+  "hardware_runs": [
+    {
+      "recipe_path": "models/en/Qwen/Qwen3-1.7B.yaml",
+      "model_id": "",
+      "hw_key": "atlas_800_a2",
+      "head_sha": "a859f08b1e7c8d35ac50d01cd2c1edec0524a23e",
+      "trigger_type": "pr",
+      "image": "quay.nju.edu.cn/ascend/vllm-ascend:nightly-main",
+      "started_at": "2026-11-19T11:39:14Z",
+      "scenarios": [],
+      "skip_reason": "镜像未预装该权重 (model_id=Qwen/Qwen3-1.7B, 目录=Qwen/Qwen3-1.7B, 已尝试 ['', 'Eco-Tech', 'vllm-ascend', 'models', '/root/.cache/'])",
+      "status": "skip"
+    },
+    {
+      "recipe_path": "models/en/Qwen/Qwen3-1.7B.yaml",
+      "model_id": "",
+      "hw_key": "atlas_800_a3",
+      "head_sha": "a859f08b1e7c8d35ac50d01cd2c1edec0524a23e",
+      "trigger_type": "pr",
+      "image": "quay.nju.edu.cn/ascend/vllm-ascend:nightly-main-a3",
+      "started_at": "2026-11-19T11:39:14Z",
+      "scenarios": [],
+      "skip_reason": "镜像未预装该权重 (model_id=Qwen/Qwen3-1.7B, 目录=Qwen/Qwen3-1.7B, 已尝试 ['', 'Eco-Tech', 'vllm-ascend', 'models', '/root/.cache/'])",
+      "status": "skip"
+    }
+  ]
+}
