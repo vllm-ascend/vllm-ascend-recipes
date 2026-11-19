@@ -496,7 +496,7 @@ scenarios:
                       "content": "Who are you?"
                   }
               ],
-              "max_tokens": 256,
+              "max_tokens": 2048,
               "temperature": 0
           }'
       ```
