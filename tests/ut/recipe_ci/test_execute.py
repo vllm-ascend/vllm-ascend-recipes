@@ -437,3 +437,51 @@ def test_run_combo_skips_bench_and_curl_for_rerank(tmp_path, monkeypatch):
     assert calls == [("smoke", "served-id", "rerank"), ("teardown", 1)]
     result = json.loads((tmp_path / "results/a3-chat/result.json").read_text(encoding="utf-8"))
     assert result["bench"] is None
+
+
+def test_run_combo_continues_when_a_companion_is_unavailable(tmp_path, monkeypatch, capsys):
+    # vllm-router arrives with an `uv pip install` hint; when that cannot run here
+    # the combo must still verify the engine, not skip with nothing checked.
+    companion = {"feature": "strategy:single_node_dep", "after": True, "install_hint": "uv pip install vllm-router"}
+    combo_dir, _ = _combo_meta(tmp_path, companions=[companion])
+    calls = []
+    _stub_run_combo(monkeypatch, calls)
+
+    def _unavailable(comp, log_path, install_log):
+        raise exe.CompanionUnavailable("companion install failed (exit 127): uv pip install vllm-router")
+
+    monkeypatch.setattr(exe, "ensure_companion", _unavailable)
+
+    assert exe.run_combo(combo_dir, tmp_path / "results") == 0
+    assert calls == [
+        ("verify", "http://127.0.0.1:8100", "served-id"),
+        ("smoke", "served-id", "chat"),
+        ("bench", "served-id"),
+        ("teardown", 1),
+    ]
+    result = json.loads((tmp_path / "results/a3-chat/result.json").read_text(encoding="utf-8"))
+    assert result["status"] == "pass"
+    assert result["companion_skipped"] == ["companion install failed (exit 127): uv pip install vllm-router"]
+    assert "companion skipped" in capsys.readouterr().out
+
+
+def test_ensure_companion_records_the_installer_output_on_failure(tmp_path, monkeypatch):
+    # The install used to be run with check=True and re-raised `from None`, so the
+    # reason a companion was unavailable never reached the artifacts.
+    class _Installer:
+        returncode = 127
+        stdout = ""
+        stderr = "bash: line 1: uv: command not found\n"
+
+    monkeypatch.setattr(exe.shutil, "which", lambda name: None)
+    monkeypatch.setattr(exe.subprocess, "run", lambda *args, **kwargs: _Installer())
+
+    with pytest.raises(exe.CompanionUnavailable, match="exit 127"):
+        exe.ensure_companion(
+            {"command": "vllm-router --port 8000", "install_hint": "uv pip install vllm-router"},
+            tmp_path / "companion.log",
+            tmp_path / "companion-install.log",
+        )
+    log = (tmp_path / "companion-install.log").read_text(encoding="utf-8")
+    assert "uv pip install vllm-router" in log
+    assert "uv: command not found" in log

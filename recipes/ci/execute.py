@@ -81,8 +81,8 @@ class ComboFailure(Exception):
     """Runtime failure for one combo (marks CI red)."""
 
 
-class ComboSkip(Exception):
-    """Runtime skip for one combo (does not mark CI red)."""
+class CompanionUnavailable(Exception):
+    """A companion could not be provided here; the combo continues without it."""
 
 
 def image_tag(image: str) -> str:
@@ -346,21 +346,39 @@ def wait_tcp(port: int, timeout_s: int, proc: subprocess.Popen | None = None) ->
     raise ComboFailure(f"companion port {port} not ready after {timeout_s}s")
 
 
-def ensure_companion(comp: dict, log_path: Path) -> tuple[subprocess.Popen | None, int | None]:
-    """Start one companion; install it first when missing (template 6.2)."""
+def ensure_companion(comp: dict, log_path: Path, install_log: Path) -> tuple[subprocess.Popen | None, int | None]:
+    """Start one companion; install it first when missing (template 6.2).
+
+    Companions such as vllm-router are auxiliary: the checks in run_combo talk to
+    the engine port directly, so one that cannot be provided here raises
+    CompanionUnavailable rather than sinking the combo. The installer output is
+    kept in ``install_log``, otherwise the reason is invisible in the artifacts.
+    """
     tokens = shlex.split(str(comp.get("command") or ""))
     if not tokens:
         return None, None
     if not shutil.which(tokens[0]):
         hint = comp.get("install_hint")
         if not hint:
-            raise ComboFailure(f"companion {tokens[0]!r} missing and no install hint")
+            raise CompanionUnavailable(f"companion {tokens[0]!r} missing and no install hint")
         try:
-            subprocess.run(["bash", "-lc", str(hint)], check=True, timeout=600, capture_output=True)
-        except (subprocess.SubprocessError, OSError):
-            raise ComboSkip(f"companion install failed: {hint}") from None
+            installer = subprocess.run(
+                ["bash", "-lc", str(hint)], timeout=600, capture_output=True, text=True, errors="replace"
+            )
+        except (subprocess.SubprocessError, OSError) as e:
+            raise CompanionUnavailable(f"companion install failed: {hint} ({type(e).__name__})") from None
+        install_log.write_text(
+            f"$ {hint}\n[exit {installer.returncode}]\n"
+            f"--- stdout ---\n{installer.stdout or ''}\n"
+            f"--- stderr ---\n{installer.stderr or ''}\n",
+            encoding="utf-8",
+        )
+        if installer.returncode != 0:
+            raise CompanionUnavailable(
+                f"companion install failed (exit {installer.returncode}): {hint}; see companion-install.log"
+            )
         if not shutil.which(tokens[0]):
-            raise ComboSkip(f"companion {tokens[0]!r} still missing after install")
+            raise CompanionUnavailable(f"companion {tokens[0]!r} still missing after install")
     return start_bg(["bash", "-lc", str(comp["command"])], log_path), comp.get("port")
 
 
@@ -577,6 +595,7 @@ def run_combo(combo_dir: Path, results_dir: Path) -> int:
         "verify_seconds": None,
         "smoke_seconds": None,
         "bench": None,
+        "companion_skipped": [],
     }
 
     skip_reason = precheck(meta)
@@ -596,7 +615,16 @@ def run_combo(combo_dir: Path, results_dir: Path) -> int:
             for comp in meta.get("companions") or []:
                 if not comp.get("after"):
                     continue
-                companion, port = ensure_companion(comp, out_dir / "companion.log")
+                try:
+                    companion, port = ensure_companion(
+                        comp, out_dir / "companion.log", out_dir / "companion-install.log"
+                    )
+                except CompanionUnavailable as e:
+                    # The checks below target the engine directly, so a router we
+                    # cannot provide here must not hide them.
+                    print(f"[companion] {e}", flush=True)
+                    result["companion_skipped"].append(str(e))
+                    continue
                 if companion is not None:
                     companions.append(companion)
                     if port:
@@ -613,20 +641,25 @@ def run_combo(combo_dir: Path, results_dir: Path) -> int:
             if meta.get("bench"):
                 result["bench"] = run_bench(base_url, served, out_dir)
             result["status"] = "pass"
-        except (ComboFailure, ComboSkip) as e:
-            result.update(
-                status="skip" if isinstance(e, ComboSkip) else "fail",
-                skip_reason=str(e),
-            )
+        except ComboFailure as e:
+            result.update(status="fail", skip_reason=str(e))
         finally:
             teardown([p for p in [engine, *companions] if p is not None], out_dir)
 
     if result["status"] == "fail":
         result["log_tail"] = tail_lines(out_dir / "serve.log", LOG_TAIL_LINES)
     (out_dir / "result.json").write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    reason = f": {result['skip_reason']}" if result["skip_reason"] else ""
-    print(f"[{combo_id}] {result['status']}{reason}")
+    note = result_note(result)
+    print(f"[{combo_id}] {result['status']}" + (f": {note}" if note else ""))
     return 0 if result["status"] == "pass" or (result["status"] == "skip" and not meta.get("required")) else 1
+
+
+def result_note(result: dict) -> str:
+    """One-line annotation for the final log line and the summary table."""
+    parts = [str(result["skip_reason"])] if result.get("skip_reason") else []
+    if result.get("companion_skipped"):
+        parts.append("companion skipped: " + "; ".join(result["companion_skipped"]))
+    return " | ".join(parts)
 
 
 def summarize(results_dir: Path) -> int:
@@ -638,7 +671,7 @@ def summarize(results_dir: Path) -> int:
         bench = r.get("bench") or {}
         metrics = bench.get("metrics") or {}
         print(
-            f"| {r.get('combo_id')} | {r.get('status')} | {r.get('skip_reason') or ''} "
+            f"| {r.get('combo_id')} | {r.get('status')} | {result_note(r)} "
             f"| {r.get('readiness_seconds') or ''} | {r.get('smoke_seconds') or ''} "
             f"| {bench.get('seconds') or ''} | {metrics.get('Output token throughput (tok/s)') or ''} |"
         )
