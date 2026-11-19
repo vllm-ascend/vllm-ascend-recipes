@@ -35,7 +35,7 @@ multi_node: []
 
 恢复多机回归时，从 `.github/verification-targets.yaml` 中选择 `mode: multi-node` 的 ID 放入 `multi_node`，例如 `deepseek-v2-lite-a2-w8a8-1p1d` 或 `qwen3-30b-a3b-a2-bf16-2node`。新多机用例仍需按原 Converter DSL 编写场景及 `test_id`、登记验证目标后再加入名单。关闭的目标不会被补写为失败。
 
-当前名单共六个单机模型/硬件组合：A2 为 Qwen3-30B-A3B、Qwen3.5/3.6-27B；A3 为 Qwen3-30B-A3B；A5 为 DeepSeek-V4-Flash、GLM-5、Qwen3.5/3.6-27B。多机默认关闭，待有资源再添加。A2/A5 使用现有 8 卡 runner；A3 使用现有 `linux-aarch64-a3-800i-16-cn12-001`，可容纳 TP16 单机场景。
+当前名单共六个单机模型/硬件组合：A2 为 Qwen3-30B-A3B、Qwen3.5/3.6-27B；A3 为 Qwen3-30B-A3B；A5 为 DeepSeek-V4-Flash、GLM-5、Qwen3.5/3.6-27B。多机默认关闭，待有资源再添加。A2/A5 使用现有 8 卡 runner；A3 使用现有 `linux-aarch64-a3-800i-recipes-fed-16`，可容纳 TP16 单机场景。
 
 手动运行 `Nightly Recipe Verify` 时，默认使用上述单机名单。临时验证其他模型可填写 `recipe_allowlist`（英文路径、逗号分隔），不需要登记名单；`hardware_filter` 可限制硬件。`full_run` 则扫描全部英文 recipe，显式填写的 `recipe_allowlist` 优先。手动运行 `Multi-node framework` 默认使用多机名单，也可用 `target_ids` 临时指定已有目标。这些输入均不影响 PR，PR 审批时无需填写。
 

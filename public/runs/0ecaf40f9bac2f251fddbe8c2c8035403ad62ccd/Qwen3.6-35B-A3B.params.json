@@ -1,0 +1,58 @@
+{
+  "verification_scope": "single-node API smoke; not accuracy or full feature coverage",
+  "recipe_path": "models/en/Qwen/Qwen3.6-35B-A3B.yaml",
+  "model_id": "Eco-Tech/Qwen3.6-35B-A3B-w8a8",
+  "hw_key": "mixed",
+  "head_sha": "0ecaf40f9bac2f251fddbe8c2c8035403ad62ccd",
+  "workflow_run_id": "41633664281",
+  "trigger_type": "pr",
+  "image": "mixed; see hardware_runs",
+  "started_at": "2026-11-03T12:11:42Z",
+  "scenarios": [],
+  "hardware_runs": [
+    {
+      "verification_scope": "single-node API smoke; not accuracy or full feature coverage",
+      "recipe_path": "models/en/Qwen/Qwen3.6-35B-A3B.yaml",
+      "model_id": "Eco-Tech/Qwen3.6-35B-A3B-w8a8",
+      "hw_key": "atlas_800_a3",
+      "head_sha": "0ecaf40f9bac2f251fddbe8c2c8035403ad62ccd",
+      "workflow_run_id": "41633664281",
+      "trigger_type": "pr",
+      "image": "quay.nju.edu.cn/ascend/vllm-ascend:v0.30.0-a3",
+      "started_at": "2026-11-03T12:11:42Z",
+      "scenarios": [
+        {
+          "index": 0,
+          "npu": "Atlas 800 A3",
+          "precision": "W8A8",
+          "deployment": "Single-Node",
+          "case": "MRV2 Long Context with MTP",
+          "serve_cmd": "export HCCL_BUFFSIZE=1024 ASCEND_RT_VISIBLE_DEVICES=0,1\nexport VLLM_USE_V2_MODEL_RUNNER=1 VLLM_EXECUTE_MODEL_TIMEOUT_SECONDS=3000\nexport HCCL_OP_EXPANSION_MODE=AIV PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\nexport OMP_PROC_BIND=false OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 TASK_QUEUE_ENABLE=1\n\nvllm serve /root/.cache/modelscope/hub/models/Eco-Tech/Qwen3.6-35B-A3B-w8a8 \\\n  --host 0.0.0.0 --port 8000 \\\n  --data-parallel-size 1 --tensor-parallel-size 2 --enable-expert-parallel \\\n  --quantization ascend --served-model-name qwen3.6 \\\n  --max-num-seqs 128 --max-model-len 135168 \\\n  --max-num-batched-tokens 4096 \\\n  --trust-remote-code --safetensors-load-strategy lazy \\\n  --gpu-memory-utilization 0.9 \\\n  --dtype float16 --enable-prefix-caching \\\n  --compilation-config '{\"cudagraph_mode\":\"FULL_AND_PIECEWISE\"}' \\\n  --additional-config '{\"enable_cpu_binding\":true,\"multistream_overlap_shared_expert\":true}'",
+          "verification_status": "fail",
+          "verification_reason": "Model server did not become ready"
+        }
+      ],
+      "status": "unknown"
+    },
+    {
+      "recipe_path": "models/en/Qwen/Qwen3.6-35B-A3B.yaml",
+      "model_id": "",
+      "hw_key": "ascend_950dt",
+      "head_sha": "0ecaf40f9bac2f251fddbe8c2c8035403ad62ccd",
+      "trigger_type": "pr",
+      "image": "quay.nju.edu.cn/ascend/vllm-ascend:v0.30.0-a5",
+      "started_at": "2026-11-03T12:11:42Z",
+      "scenarios": [],
+      "skip_reason": "镜像未预装该权重 (model_id=Eco-Tech/Qwen3.6-35B-A3B-w8a8, 目录=Eco-Tech/Qwen3.6-35B-A3B-w8a8, 已尝试 ['', 'Eco-Tech', 'vllm-ascend', 'models', '/root/.cache/'])",
+      "status": "skip"
+    },
+    {
+      "recipe_path": "models/en/Qwen/Qwen3.6-35B-A3B.yaml",
+      "hw_key": "atlas_800_a2",
+      "image": "quay.nju.edu.cn/ascend/vllm-ascend:v0.30.0",
+      "scenarios": [],
+      "missing_reason": "selected hardware job did not provide results",
+      "status": "unknown"
+    }
+  ]
+}

@@ -58,3 +58,5 @@ aliases:
       # 950DT single-node uses a dedicated mixed-precision build; until it is
       # baked into the runner image the a5 scenarios are skipped cleanly.
       ascend_950dt: DeepSeek-V3.1-w8a8c8-mxfp8
+  - model_id: moonshotai/Kimi-K2.6
+    cache_dir: Kimi-K2.6-W4A8
