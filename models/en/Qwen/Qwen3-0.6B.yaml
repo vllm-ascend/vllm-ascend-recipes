@@ -1,0 +1,192 @@
+meta:
+  title: Qwen3-0.6B
+  slug: qwen3-0.6b
+  provider: Qwen
+  description: Single-node Ascend inference recipes for Qwen3-0.6B.
+  date_added: '2026-11-19'
+  difficulty: intermediate
+  hardware:
+    atlas_800_a2: experimental
+    atlas_800_a3: experimental
+model:
+  model_id: Qwen/Qwen3-0.6B
+  architecture: dense
+  parameter_count: 0.6B
+  active_parameters: null
+  context_length: 40960
+  modality: text
+  min_vllm_version: 0.21.0
+  docker_image:
+    atlas_800_a2: quay.io/ascend/vllm-ascend:nightly-main
+    atlas_800_a3: quay.io/ascend/vllm-ascend:nightly-main-a3
+  nightly_required: false
+compatible_strategies:
+- single_node_A2
+- single_node_A3
+overview: Qwen3-0.6B is a dense model for text generation with a native context window of 40,960 tokens.
+weight_download:
+- weight_version: BF16
+  sources:
+  - source: HuggingFace
+    url: https://huggingface.co/Qwen/Qwen3-0.6B
+    command: |-
+      ```bash
+      hf download Qwen/Qwen3-0.6B --local-dir "$MODEL_DIR/Qwen3-0.6B"
+      ```
+  - source: ModelScope
+    url: https://www.modelscope.cn/models/Qwen/Qwen3-0.6B
+    command: |-
+      ```bash
+      modelscope download --model Qwen/Qwen3-0.6B --local_dir "$MODEL_DIR/Qwen3-0.6B"
+      ```
+prerequisites:
+- title: Weights and devices
+  content: Set `MODEL_DIR` to the host weight parent directory in the same shell before running the download command. The
+    container mounts it at `/weights`. Install the CLI for the selected source and check available chips with `npu-smi info`.
+    Docker defaults to the largest listed TP configuration. Set `NPU_COUNT` to the selected TP size to map only the chips
+    you need.
+env_setup:
+  pip:
+    content: See the [installation guide](https://docs.vllm.ai/projects/ascend/en/latest/installation.html) for source installation
+      and driver compatibility. Replace `/weights` with the weight directory when running outside Docker.
+  container:
+    A2:
+      content: |-
+        ```bash
+        IMAGE=quay.io/ascend/vllm-ascend:nightly-main
+        MODEL_DIR="${MODEL_DIR:?Set MODEL_DIR to the absolute parent directory of the downloaded weights}"
+        NPU_COUNT="${NPU_COUNT:-1}"
+        device_flags=(
+          --device /dev/davinci0
+        )
+        devices=("${device_flags[@]:0:2*NPU_COUNT}")
+        docker pull "$IMAGE"
+        docker run --rm -it --name qwen3-${USER} --shm-size=10g --net=host \
+          "${devices[@]}" --device /dev/davinci_manager --device /dev/devmm_svm \
+          --device /dev/hisi_hdc -v /usr/local/dcmi:/usr/local/dcmi:ro \
+          -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi:ro \
+          -v /usr/local/Ascend/driver/lib64:/usr/local/Ascend/driver/lib64:ro \
+          -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info:ro \
+          -v /etc/ascend_install.info:/etc/ascend_install.info:ro \
+          -v "$MODEL_DIR:/weights:ro" "$IMAGE" bash
+        ```
+    A3:
+      content: |-
+        ```bash
+        IMAGE=quay.io/ascend/vllm-ascend:nightly-main-a3
+        MODEL_DIR="${MODEL_DIR:?Set MODEL_DIR to the absolute parent directory of the downloaded weights}"
+        NPU_COUNT="${NPU_COUNT:-1}"
+        device_flags=(
+          --device /dev/davinci0
+        )
+        devices=("${device_flags[@]:0:2*NPU_COUNT}")
+        docker pull "$IMAGE"
+        docker run --rm -it --name qwen3-${USER} --shm-size=10g --net=host \
+          "${devices[@]}" --device /dev/davinci_manager --device /dev/devmm_svm \
+          --device /dev/hisi_hdc -v /usr/local/dcmi:/usr/local/dcmi:ro \
+          -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi:ro \
+          -v /usr/local/Ascend/driver/lib64:/usr/local/Ascend/driver/lib64:ro \
+          -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info:ro \
+          -v /etc/ascend_install.info:/etc/ascend_install.info:ro \
+          -v "$MODEL_DIR:/weights:ro" "$IMAGE" bash
+        ```
+scenarios:
+- npu: Atlas 800I A2
+  precision: BF16
+  deployment: Single-Node
+  case: TP1
+  strategy: single_node_A2
+  npu_per_node: 1
+  steps:
+  - title: Start the server
+    content: |-
+      Use the original BF16 weights. This adapts the official Qwen3 quick start with tensor parallelism sized for this checkpoint.
+
+      The default service port is `8000`.
+
+      ```bash
+      export ASCEND_RT_VISIBLE_DEVICES=0
+      MODEL_PATH=Qwen/Qwen3-0.6B
+      if [[ -r /weights/Qwen3-0.6B/config.json ]]; then MODEL_PATH=/weights/Qwen3-0.6B; fi
+      vllm serve "$MODEL_PATH" --served-model-name qwen3 --dtype bfloat16 --host 127.0.0.1 --port 8000 --tensor-parallel-size 1
+      ```
+  - title: Check readiness
+    content: |-
+      After startup, use `127.0.0.1` for `<server_ip>` and the selected port. The model list should include `qwen3`.
+
+      ```bash
+      curl -sS --fail-with-body http://<server_ip>:<port>/health
+      curl -sS --fail-with-body http://<server_ip>:<port>/v1/models
+      ```
+  - title: Send an inference request
+    content: |-
+      Expect HTTP 200 and nonempty `choices[0].message.content`.
+
+      ```bash
+      curl -sS --fail-with-body http://<server_ip>:<port>/v1/chat/completions \
+        -H 'Content-Type: application/json' \
+        -d '{"model":"qwen3","messages":[{"role":"user","content":"What is the capital of France?"}],"temperature":0.6,"top_p":0.95,"top_k":20,"max_tokens":64,"chat_template_kwargs":{"enable_thinking":false}}'
+      ```
+- npu: Atlas 800I A3
+  precision: BF16
+  deployment: Single-Node
+  case: TP1
+  strategy: single_node_A3
+  npu_per_node: 1
+  steps:
+  - title: Start the server
+    content: |-
+      Use the original BF16 weights. This adapts the official Qwen3 quick start with tensor parallelism sized for this checkpoint.
+
+      The default service port is `8000`.
+
+      ```bash
+      export ASCEND_RT_VISIBLE_DEVICES=0
+      MODEL_PATH=Qwen/Qwen3-0.6B
+      if [[ -r /weights/Qwen3-0.6B/config.json ]]; then MODEL_PATH=/weights/Qwen3-0.6B; fi
+      vllm serve "$MODEL_PATH" --served-model-name qwen3 --dtype bfloat16 --host 127.0.0.1 --port 8000 --tensor-parallel-size 1
+      ```
+  - title: Check readiness
+    content: |-
+      After startup, use `127.0.0.1` for `<server_ip>` and the selected port. The model list should include `qwen3`.
+
+      ```bash
+      curl -sS --fail-with-body http://<server_ip>:<port>/health
+      curl -sS --fail-with-body http://<server_ip>:<port>/v1/models
+      ```
+  - title: Send an inference request
+    content: |-
+      Expect HTTP 200 and nonempty `choices[0].message.content`.
+
+      ```bash
+      curl -sS --fail-with-body http://<server_ip>:<port>/v1/chat/completions \
+        -H 'Content-Type: application/json' \
+        -d '{"model":"qwen3","messages":[{"role":"user","content":"What is the capital of France?"}],"temperature":0.6,"top_p":0.95,"top_k":20,"max_tokens":64,"chat_template_kwargs":{"enable_thinking":false}}'
+      ```
+evaluation:
+  accuracy:
+    content: |-
+      Configure `vllm_api_general_chat.py` using the [AISBench guide](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/evaluation/using_ais_bench.html). Set the local model path, service port and model alias `qwen3`. The tutorial uses batch size 32, maximum output 32768, temperature 0.6, top_k 20, top_p 0.95, and extract_non_reasoning_content. Keep the output limit within the server's context budget.
+
+      ```bash
+      ais_bench --models vllm_api_general_chat --datasets aime2025_gen_0_shot_chat_prompt --debug
+      ```
+  performance:
+    content: |-
+      Point the AISBench streaming config `vllm_api_stream_chat.py` at the same service. The tutorial uses batch size 90, maximum output 1500, temperature 0 and ignore_eos=True. Record request and output-token throughput, mean and P99 TTFT/TPOT. Match checkpoint, hardware, input/output lengths and concurrency before comparing runs.
+
+      ```bash
+      ais_bench --models vllm_api_stream_chat --datasets gsm8k_gen_0_shot_cot_str_perf --debug --summarizer default_perf --mode perf --num-prompts 360
+      ```
+
+      ```bash
+      vllm bench serve --model "$WEIGHT_PATH" --served-model-name qwen3 --port "$PORT" --dataset-name random --random-input-len 200 --num-prompts 200 --request-rate 1 --save-result --result-dir .
+      ```
+references:
+- title: vLLM Ascend Qwen3 Dense tutorial
+  url: https://github.com/vllm-project/vllm-ascend/blob/03f69b977b088680686af6198cc52ab2a5bae542/docs/source/tutorials/models/Qwen3-Dense.md
+- title: Official Qwen3 model card
+  url: https://huggingface.co/Qwen/Qwen3-0.6B
+- title: vLLM Ascend quick start
+  url: https://docs.vllm.ai/projects/ascend/en/latest/getting_started/quick_start.html
+guide: ''
