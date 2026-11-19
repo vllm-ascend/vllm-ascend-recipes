@@ -74,6 +74,7 @@ env_setup:
   pip:
     content: 源码安装与驱动兼容性参见[安装指南](https://docs.vllm.ai/projects/ascend/en/latest/getting_started/installation.html)。在非容器环境执行命令时，将
       `/weights` 替换为实际目录。
+      310P 源码安装若引入了 `triton-ascend` 或 `triton`，请在启动服务之前卸载它们。
   container:
     A2:
       content: |-

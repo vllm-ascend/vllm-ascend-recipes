@@ -60,6 +60,7 @@ env_setup:
   pip:
     content: See the [installation guide](https://docs.vllm.ai/projects/ascend/en/latest/installation.html) for source installation
       and driver compatibility. Replace `/weights` with the weight directory when running outside Docker.
+      For a 310P source installation, uninstall `triton-ascend` and `triton` if they were installed as dependencies.
   container:
     A2:
       content: |-
