@@ -4,7 +4,7 @@ meta:
   provider: "Qwen"
   description: "Qwen4 架构预览 MoE（总参 176B / 激活 6B），支持多模态。昇腾 Atlas 800 A3 上 W8A8-MTP DP1×TP8，已在 vLLM Ascend 0.32.0rc1 验证。"
   date_added: "2026-11-18"
-  date_updated: "2026-11-18"
+  date_updated: "2026-11-19"
   difficulty: advanced
   tasks:
     - text
@@ -61,7 +61,7 @@ features:
       - "--speculative-config"
       - '{"method":"qwen3_5_mtp","num_speculative_tokens":3,"method_extra":{"enforce_eager":false}}'
   enforce_eager_fallback:
-    description: "Disable ACLGraph capture if the host image hits Conv2D capture failures"
+    description: "Disable ACLGraph capture on older images that hit Conv2D capture failures"
     args:
       - "--enforce-eager"
 
@@ -70,13 +70,18 @@ opt_in_features:
   - enforce_eager_fallback
 
 variants:
-  w8a8_mtp_a3:
+  default:
     precision: W8A8
     vram_minimum_gb: 512
-    description: "Ascend W8A8-MTP checkpoint for A3 DP1×TP8 (verified)"
+    description: "Ascend W8A8-MTP checkpoint for A3 DP1×TP8 (verified on v0.32.0rc1-a3)"
 
 compatible_strategies:
   - single_node_A3
+
+hardware_overrides: {}
+strategy_overrides: {}
+dependencies: []
+guide: ""
 
 config_params:
   max_model_len:
@@ -89,10 +94,11 @@ config_params:
     description: "Tutorial-style 0.90 on 8×64 GiB HBM."
 
 overview: |-
-  Qwen3.8-Flash-Next 为 Qwen4 架构预览 MoE，支持多模态。
-  本 recipe 迁移官方 vLLM Ascend A3 教程路径（DP1×TP8 W8A8），
-  并记录在 Atlas 800 A3 + `v0.32.0rc1-a3` + W8A8-MTP 上的验证结果：
-  教程默认 FULL_DECODE_ONLY ACLGraph 拉起与文本对话通过；同部署多模态 OCR 通过；AISBench GSM8K 96.51。
+  Qwen3.8-Flash-Next is a Qwen4-architecture preview MoE with multimodal capability.
+  This Ascend recipe migrates the official vLLM Ascend A3 tutorial path (DP1×TP8 W8A8)
+  and records verification on Atlas 800 A3 with `v0.32.0rc1-a3` plus Eco-Tech W8A8-MTP weights.
+  On this stack, tutorial `FULL_DECODE_ONLY` ACLGraph serve + text chat PASS; multimodal
+  image OCR PASS; AISBench GSM8K accuracy 96.51.
 
 weight_download:
   - weight_version: W8A8-MTP
@@ -155,87 +161,105 @@ env_setup:
 
 scenarios:
   - npu: Atlas A3
-    title: DP1×TP8 W8A8 ACLGraph (verified)
+    precision: W8A8
+    deployment: Single-Node
+    case: DP1xTP8 ACLGraph (verified)
+    tags: [a3-dp1-tp8]
+    strategy: single_node_A3
+    steps:
+      - title: Start the server
+        content: |-
+          Atlas 800 A3 DP1×TP8 W8A8-MTP with tutorial-style FULL_DECODE_ONLY ACLGraph.
+          Verified on `v0.32.0rc1-a3`.
+
+          ```bash
+          export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
+          export VLLM_ASCEND_ENABLE_QSA_LIGHTNING_INDEXER=1
+          export VLLM_ASCEND_ENABLE_QSA_E3V=1
+          export VLLM_USE_V2_MODEL_RUNNER=1
+          export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+          export MODEL_PATH=Eco-Tech/Qwen3.8-Flash-Next-w8a8-mtp
+
+          vllm serve ${MODEL_PATH} \
+              --trust-remote-code \
+              --quantization ascend \
+              --served-model-name qwen3.8-flash-next \
+              --tensor-parallel-size 8 \
+              --data-parallel-size 1 \
+              --enable-expert-parallel \
+              --max-model-len {{max_model_len}} \
+              --gpu-memory-utilization {{gpu_memory_utilization}} \
+              --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY"}' \
+              --speculative-config '{"method":"qwen3_5_mtp","num_speculative_tokens":3,"method_extra":{"enforce_eager":false}}' \
+              --host 0.0.0.0 \
+              --port 8088
+          ```
+      - title: Service Verification
+        content: |-
+          ```bash
+          curl http://127.0.0.1:8088/v1/chat/completions \
+            -H "Content-Type: application/json" \
+            -d '{
+              "model": "qwen3.8-flash-next",
+              "messages": [{"role":"user","content":"Who are you?"}],
+              "max_tokens": 128,
+              "temperature": 0
+            }'
+          ```
+
+          Multimodal OCR smoke (replace `IMAGE_URL`):
+
+          ```bash
+          curl http://127.0.0.1:8088/v1/chat/completions \
+            -H "Content-Type: application/json" \
+            -d '{
+              "model": "qwen3.8-flash-next",
+              "messages": [{"role":"user","content":[
+                {"type":"text","text":"Read the text in the image."},
+                {"type":"image_url","image_url":{"url":"IMAGE_URL"}}
+              ]}],
+              "max_tokens": 128,
+              "temperature": 0
+            }'
+          ```
+
+verification: |-
+  Expect `/v1/models` HTTP 200 and ACL graph replay active in the serve log on `v0.32.0rc1-a3`.
+  Text chat should identify as Qwen. Multimodal OCR on the sample logo returns `TONGYI` / `Qwen`.
+
+evaluation:
+  - title: AISBench GSM8K
     content: |-
-      ```bash
-      export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
-      export VLLM_ASCEND_ENABLE_QSA_LIGHTNING_INDEXER=1
-      export VLLM_ASCEND_ENABLE_QSA_E3V=1
-      export VLLM_USE_V2_MODEL_RUNNER=1
-      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
-      export MODEL_PATH=Eco-Tech/Qwen3.8-Flash-Next-w8a8-mtp
+      Lab result on Atlas 800 A3 DP1×TP8 W8A8-MTP: GSM8K accuracy **96.51**.
 
-      vllm serve ${MODEL_PATH} \
-          --trust-remote-code \
-          --quantization ascend \
-          --served-model-name qwen3.8-flash-next \
-          --tensor-parallel-size 8 \
-          --data-parallel-size 1 \
-          --enable-expert-parallel \
-          --max-model-len 8192 \
-          --gpu-memory-utilization 0.90 \
-          --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY"}' \
-          --speculative-config '{"method":"qwen3_5_mtp","num_speculative_tokens":3,"method_extra":{"enforce_eager":false}}' \
-          --host 0.0.0.0 \
-          --port 8088
-      ```
-
-  - npu: Atlas A3
-    title: Text chat smoke
+performance:
+  - title: Notes
     content: |-
-      ```bash
-      curl http://127.0.0.1:8088/v1/chat/completions \
-        -H "Content-Type: application/json" \
-        -d '{
-          "model": "qwen3.8-flash-next",
-          "messages": [{"role":"user","content":"Who are you?"}],
-          "max_tokens": 128,
-          "temperature": 0
-        }'
-      ```
+      Formal PERF gsm8k MaxConc=8 PASS in lab salvage runs. Prefer ACLGraph path on v0.32; older images may need `--enforce-eager`.
 
-  - npu: Atlas A3
-    title: Multimodal image OCR smoke
-    content: |-
-      ```bash
-      # Replace IMAGE_URL with a publicly reachable image (e.g. Qwen logo)
-      curl http://127.0.0.1:8088/v1/chat/completions \
-        -H "Content-Type: application/json" \
-        -d '{
-          "model": "qwen3.8-flash-next",
-          "messages": [{"role":"user","content":[
-            {"type":"text","text":"Read the text in the image."},
-            {"type":"image_url","image_url":{"url":"IMAGE_URL"}}
-          ]}],
-          "max_tokens": 128,
-          "temperature": 0
-        }'
-      ```
+tuning: |-
+  On older images such as `qwen3.8-next-a3` / `v0.30.0-a3`, default ACLGraph may fail Conv2D capture.
+  Add `--enforce-eager` (and adjust MTP) as a workaround, or upgrade to `v0.32.0rc1-a3`.
 
-  - npu: Atlas A3
-    title: enforce-eager fallback (older images)
-    content: |-
-      On older images such as `qwen3.8-next-a3` / `v0.30.0-a3`, default ACLGraph may fail Conv2D capture.
-      Add `--enforce-eager` (and drop MTP enforce_eager=false) as a workaround. Prefer `v0.32.0rc1-a3` where ACLGraph PASS was verified.
+faq: |-
+  For common environment and installation issues, see the [Public FAQs](https://docs.vllm.ai/projects/ascend/en/latest/faqs.html).
 
-accuracy_and_performance: |-
-  Verified on Atlas 800 A3 (8 dies) with `v0.32.0rc1-a3` + W8A8-MTP:
-  - Serve + `/v1/models` HTTP 200; log shows ACL graph replay active for V2 target model.
-  - Text chat "Who are you?" returns Qwen identity.
-  - Multimodal OCR returns `TONGYI` / `Qwen` on the sample logo image.
-  - AISBench GSM8K accuracy **96.51**.
-  Older `qwen3.8-next-a3` / `v0.30.0-a3` stacks: ACLGraph Conv2D / PLE failures — use `--enforce-eager` or upgrade.
+  ### Why v0.32.0rc1-a3 instead of qwen3.8-next-a3?
 
-faq:
-  - q: Why v0.32.0rc1-a3 instead of the older qwen3.8-next-a3 tag?
-    a: On the older image, FULL_DECODE_ONLY ACLGraph hit Conv2D capture failure. v0.32.0rc1-a3 closes the tutorial ACLGraph path for W8A8-MTP.
-  - q: Is language-model-only required?
-    a: No. Multimodal image chat PASS was verified with vision enabled on the eager and ACLGraph paths used in lab runs.
-  - q: W8A8-MTP vs W4A8?
-    a: This recipe verifies Eco-Tech W8A8-MTP available in lab. Follow the public tutorial if you standardize on W4A8 weights once downloaded.
+  **Cause:** Older images hit Conv2D ACLGraph capture failure on the tutorial FULL_DECODE_ONLY path.
+
+  **Solution:** Use `v0.32.0rc1-a3` (verified ACLGraph PASS for W8A8-MTP), or add `--enforce-eager` as a fallback.
+
+  ### Is language-model-only required?
+
+  **Answer:** No. Multimodal image chat PASS was verified with vision enabled.
+
+  ### W8A8-MTP vs W4A8?
+
+  **Answer:** This recipe verifies Eco-Tech W8A8-MTP available in lab. Follow the public tutorial if you standardize on W4A8 weights.
 
 references:
-  - title: vLLM Ascend tutorials (Flash / Qwen3.8 family)
+  - title: vLLM Ascend documentation
     url: https://docs.vllm.ai/projects/ascend/en/latest/
   - title: ModelScope Eco-Tech W8A8-MTP
     url: https://www.modelscope.cn/models/Eco-Tech/Qwen3.8-Flash-Next-w8a8-mtp
