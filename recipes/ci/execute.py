@@ -389,24 +389,52 @@ def curl_command(base_url: str, model: str) -> str:
     )
 
 
+def curl_argv(base_url: str, model: str) -> list[str]:
+    """The page's cURL request as an argv list (same URL / headers / body).
+
+    Mirrors ``curl_command`` without the shell formatting, so the request can be
+    executed for real without going through a shell.
+    """
+    return [
+        "curl",
+        f"{base_url}/v1/chat/completions",
+        "-H",
+        "Content-Type: application/json",
+        "-d",
+        json.dumps(
+            {
+                "model": model,
+                "messages": [{"role": "user", "content": "Hello"}],
+                "max_tokens": CURL_MAX_TOKENS,
+            }
+        ),
+    ]
+
+
 def verify_service(base_url: str, model: str) -> None:
     """Service verification: run the page's cURL snippet against the server.
 
     The command is logged verbatim so the CI log shows exactly what users copy
-    from the page; the request itself is the same body (Hello / max_tokens 32).
-    ``model`` must be the id the engine actually serves (the localized run.sh
-    replaced the hub id with its local cache path).
+    from the page, then executed for real with curl so the log also carries the
+    server's response. ``model`` must be the id the engine actually serves (the
+    localized run.sh replaced the hub id with its local cache path).
     """
     print("[verify] " + curl_command(base_url, model), flush=True)
-    payload = {
-        "model": model,
-        "messages": [{"role": "user", "content": "Hello"}],
-        "max_tokens": CURL_MAX_TOKENS,
-    }
     try:
-        resp = http_post_json(base_url + "/v1/chat/completions", payload)
-    except (urllib.error.URLError, OSError, json.JSONDecodeError) as e:
-        raise ComboFailure(f"cURL verification failed: {e}") from e
+        proc = subprocess.run(curl_argv(base_url, model), capture_output=True, text=True, timeout=SMOKE_TIMEOUT_S)
+    except FileNotFoundError as e:
+        raise ComboFailure("curl not found; cannot run the page's cURL verification") from e
+    except subprocess.TimeoutExpired as e:
+        raise ComboFailure(f"cURL verification timed out after {SMOKE_TIMEOUT_S}s") from e
+    if proc.returncode != 0:
+        raise ComboFailure(
+            f"cURL verification failed (curl exit {proc.returncode}): {(proc.stderr or '').strip()[:400]}"
+        )
+    print("[verify] response: " + (proc.stdout or "").strip(), flush=True)
+    try:
+        resp = json.loads(proc.stdout)
+    except json.JSONDecodeError as e:
+        raise ComboFailure(f"cURL verification: non-JSON response: {(proc.stdout or '')[:400]}") from e
     choices = resp.get("choices") or []
     content = (choices[0].get("message") or {}).get("content") if choices else None
     if not content:
@@ -479,6 +507,7 @@ def run_bench(base_url: str, model: str, out_dir: Path) -> dict:
         raise ComboFailure(f"'vllm bench serve' timed out after {BENCH_TIMEOUT_S}s") from e
     output = (proc.stdout or "") + (proc.stderr or "")
     (out_dir / "bench.log").write_text(output, encoding="utf-8")
+    print("[bench] raw output:\n" + output.rstrip(), flush=True)
     if proc.returncode != 0:
         raise ComboFailure(
             f"'vllm bench serve' exited with code {proc.returncode}; see bench.log:\n"
