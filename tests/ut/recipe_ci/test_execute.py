@@ -263,29 +263,50 @@ def test_curl_command_matches_site_snippet():
     )
 
 
-def test_verify_service_posts_the_page_payload_and_logs_the_command(monkeypatch, capsys):
-    requests = []
+def _curl_run(monkeypatch, calls, stdout="{}", stderr="", returncode=0):
+    """Stub subprocess.run so verify_service's curl call is captured, not run."""
 
-    def post(url, payload):
-        requests.append((url, payload))
-        return {"choices": [{"message": {"content": "Hello!"}}]}
+    def run(argv, **kwargs):
+        calls.append(argv)
+        proc = type("Proc", (), {})()
+        proc.stdout, proc.stderr, proc.returncode = stdout, stderr, returncode
+        return proc
 
-    monkeypatch.setattr(exe, "http_post_json", post)
+    monkeypatch.setattr(exe.subprocess, "run", run)
+
+
+def test_verify_service_runs_the_page_curl_and_reports_the_response(monkeypatch, capsys):
+    calls = []
+    body = json.dumps({"choices": [{"message": {"content": "Hello!"}}]})
+    _curl_run(monkeypatch, calls, stdout=body)
+
     exe.verify_service("http://127.0.0.1:8100", "Eco-Tech/model-w8a8")
-    url, payload = requests[0]
-    assert url == "http://127.0.0.1:8100/v1/chat/completions"
-    assert payload == {
+
+    argv = calls[0]
+    assert argv[:2] == ["curl", "http://127.0.0.1:8100/v1/chat/completions"]
+    assert argv[2:4] == ["-H", "Content-Type: application/json"]
+    assert argv[4] == "-d"
+    assert json.loads(argv[5]) == {
         "model": "Eco-Tech/model-w8a8",
         "messages": [{"role": "user", "content": "Hello"}],
         "max_tokens": 32,
     }
-    assert "curl http://127.0.0.1:8100/v1/chat/completions \\" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    # The page snippet is echoed, and the real response is now reported.
+    assert "curl http://127.0.0.1:8100/v1/chat/completions \\" in out
+    assert '"content": "Hello!"' in out
 
 
 @pytest.mark.parametrize("resp", [{}, {"choices": []}, {"choices": [{"message": {"content": ""}}]}])
 def test_verify_service_rejects_empty_content(monkeypatch, resp):
-    monkeypatch.setattr(exe, "http_post_json", lambda *args: resp)
+    _curl_run(monkeypatch, [], stdout=json.dumps(resp))
     with pytest.raises(exe.ComboFailure):
+        exe.verify_service("http://127.0.0.1:8100", "model")
+
+
+def test_verify_service_fails_on_non_zero_curl_exit(monkeypatch):
+    _curl_run(monkeypatch, [], stderr="curl: (7) Failed to connect", returncode=7)
+    with pytest.raises(exe.ComboFailure, match="exit 7"):
         exe.verify_service("http://127.0.0.1:8100", "model")
 
 
