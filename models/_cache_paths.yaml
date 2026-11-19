@@ -63,3 +63,6 @@ aliases:
     cache_dir: Qwen3-Coder-30B-A3B-Instruct-w8a8
   - model_id: Qwen/Qwen3-VL-Embedding-2B
     cache_dir: Qwen/Qwen3-VL-Embedding-2B
+
+  - model_id: Tencent-Hunyuan/Hunyuan-A13B-Instruct
+    cache_dir: Tencent-Hunyuan/Hunyuan-A13B-Instruct
