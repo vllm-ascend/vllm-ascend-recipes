@@ -1,0 +1,11 @@
+{
+  "recipe_path": "models/en/Qwen/Qwen3-Coder-30B-A3B-Instruct.yaml",
+  "model_id": "",
+  "hw_key": "atlas_800_a3",
+  "head_sha": "58ef162a85a6633ed632ba3081d013863204a35c",
+  "trigger_type": "pr",
+  "image": "quay.nju.edu.cn/ascend/vllm-ascend:v0.30.0-a3-openeuler",
+  "started_at": "2026-11-18T17:06:59Z",
+  "scenarios": [],
+  "skip_reason": "镜像未预装该权重 (model_id=Qwen/Qwen3-Coder-30B-A3B-Instruct, 目录=Qwen3-Coder-30B-A3B-Instruct-w8a8, 已尝试 ['', 'Eco-Tech', 'vllm-ascend', 'models', '/root/.cache/'])"
+}

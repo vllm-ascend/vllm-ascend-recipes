@@ -57,9 +57,7 @@ spec:
               - name: AIS_BENCH_ENVIRONMENT_IDENTITY
                 value: runtime={{ image }}
               - name: PIP_INDEX_URL
-                value: http://cache-service.nginx-pypi-cache.svc.cluster.local/pypi/simple
-              - name: PIP_TRUSTED_HOST
-                value: cache-service.nginx-pypi-cache.svc.cluster.local
+                value: https://repo.huaweicloud.com/repository/pypi/simple
               - name: MULTI_NODE_STARTUP_TIMEOUT_SECONDS
                 value: "{{ startup_timeout_seconds }}"
               - name: MULTI_NODE_RUN_TIMEOUT_SECONDS

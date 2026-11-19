@@ -1,0 +1,23 @@
+{
+  "verification_scope": "single-node API smoke; not accuracy or full feature coverage",
+  "recipe_path": "models/en/Qwen/Qwen3-Embedding-0.6B.yaml",
+  "model_id": "Qwen/Qwen3-Embedding-0.6B",
+  "hw_key": "atlas_800_a2",
+  "head_sha": "d1ddc8c121beb1ff8203512adc89e14e42fcd7fe",
+  "workflow_run_id": "41734200819",
+  "trigger_type": "nightly",
+  "image": "quay.nju.edu.cn/ascend/vllm-ascend:v0.30.0rc2",
+  "started_at": "2026-11-03T22:58:44Z",
+  "scenarios": [
+    {
+      "index": 0,
+      "npu": "Atlas 800I A2",
+      "precision": "bf16",
+      "deployment": "Single-Node",
+      "case": "Single Node Single Card",
+      "serve_cmd": "vllm serve /root/.cache/modelscope/hub/models/Qwen/Qwen3-Embedding-0.6B \\\n    --served-model-name Qwen/Qwen3-Embedding-0.6B \\\n    --runner pooling \\\n    --port 8000 \\\n    --max-model-len 1024",
+      "verification_status": "pass",
+      "verification_reason": "Task API response validated"
+    }
+  ]
+}

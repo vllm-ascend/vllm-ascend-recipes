@@ -38,6 +38,23 @@ def load_fill_module():
 
 
 class VerificationTargetTests(unittest.TestCase):
+    def test_every_nightly_single_node_scenario_participates_in_page_lighting(self) -> None:
+        import sys
+        sys.path.insert(0, str(ROOT / ".github/_scripts"))
+        from verification_plan import build_plan, single_node_scenarios
+
+        targets = load_module().load_targets(ROOT / ".github/verification-targets.yaml")
+        missing = []
+        for job in build_plan(ROOT, "nightly")["include"]:
+            for recipe in json.loads(job["recipe_files"]):
+                data = yaml.safe_load((ROOT / recipe).read_text(encoding="utf-8"))
+                for scenario in single_node_scenarios(data, job["hardware_key"]):
+                    selector = {field: scenario[field] for field in ("npu", "precision", "deployment", "case")}
+                    if not any(target["recipe"] == recipe and target["mode"] == "single-node"
+                               and target["selector"] == selector for target in targets):
+                        missing.append((recipe, job["hardware_key"], selector))
+        self.assertEqual(missing, [], "nightly hardware must not be invisible to verification dots")
+
     def test_recipe_verification_uses_runtime_port_placeholder(self) -> None:
         """Executable local verification URLs must follow the <port> contract."""
         recipes = ROOT / "models" / "en"

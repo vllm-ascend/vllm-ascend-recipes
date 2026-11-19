@@ -33,12 +33,27 @@ class RecipeCheckTests(unittest.TestCase):
     def test_text_chat_reasoning_and_completion_responses(self):
         cases = [
             ("/v1/chat/completions", {"choices": [{"message": {"content": "Hello"}}]}),
-            ("/v1/chat/completions", {"choices": [{"message": {"reasoning_content": "Reasoning"}}]}),
+            ("/v1/chat/completions", {"choices": [{"message": {"reasoning_content": "Reasoning", "content": "Answer"}}]}),
             ("/v1/completions", {"choices": [{"text": "Hello"}]}),
         ]
         for endpoint, body in cases:
             with self.subTest(endpoint=endpoint):
                 self.assertTrue(validate_response("http://localhost" + endpoint, json.dumps(body)))
+
+    def test_reasoning_without_a_final_answer_is_not_a_chat_result(self):
+        for finish_reason in ("length", "stop", None):
+            body = {"choices": [{"message": {"content": None, "reasoning_content": "Still thinking"},
+                                 "finish_reason": finish_reason}]}
+            with self.subTest(finish_reason=finish_reason), self.assertRaises(ValueError):
+                validate_response("http://localhost/v1/chat/completions", json.dumps(body))
+
+    def test_streamed_reasoning_needs_final_content_or_tool_calls(self):
+        reasoning = 'data: {"choices":[{"delta":{"reasoning_content":"Thinking"}}]}\n\n'
+        end = 'data: {"choices":[{"delta":{},"finish_reason":"length"}]}\n\ndata: [DONE]\n'
+        with self.assertRaises(ValueError):
+            validate_response("http://localhost/v1/chat/completions", reasoning + end)
+        content = 'data: {"choices":[{"delta":{"content":"Answer"}}]}\n\n'
+        self.assertTrue(validate_response("http://localhost/v1/chat/completions", reasoning + content + end))
 
     def test_embedding_score_rerank_and_asr_response_shapes(self):
         cases = [

@@ -1,0 +1,93 @@
+{
+  "recipe_path": "models/en/DeepSeek/DeepSeek-V4-Flash.yaml",
+  "model_id": "",
+  "hw_key": "mixed",
+  "head_sha": "e60eb12093911f0be5b88696de9db499e79194d5",
+  "trigger_type": "pr",
+  "image": "mixed; see hardware_runs",
+  "started_at": "2026-10-21T08:44:32Z",
+  "scenarios": [
+    {
+      "index": 0,
+      "npu": "Atlas 800I A3",
+      "precision": "W8A8",
+      "deployment": "Single-Node",
+      "case": "Low Latency",
+      "serve_cmd": "export OMP_PROC_BIND=false\nexport OMP_NUM_THREADS=10\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\nexport LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libjemalloc.so.2:$LD_PRELOAD\nexport HCCL_BUFFSIZE=1024\nexport VLLM_ASCEND_ENABLE_FLASHCOMM1=1\nexport TASK_QUEUE_ENABLE=1\nexport HCCL_OP_EXPANSION_MODE=\"AIV\"\n\nvllm serve /root/.cache/modelscope/hub/models/DeepSeek-V4-Flash-w8a8-mtp \\\n    --max-model-len 1048576 \\\n    --max-num-batched-tokens 10240 \\\n    --served-model-name dsv4 \\\n    --gpu-memory-utilization 0.9 \\\n    --api-server-count 1 \\\n    --max-num-seqs 32 \\\n    --data-parallel-size 4 \\\n    --tensor-parallel-size 4 \\\n    --enable-expert-parallel \\\n    --tokenizer-mode deepseek_v4 \\\n    --tool-call-parser deepseek_v4 \\\n    --enable-auto-tool-choice \\\n    --reasoning-parser deepseek_v4 \\\n    --safetensors-load-strategy 'prefetch' \\\n    --model-loader-extra-config='{\"enable_multithread_load\": \"true\", \"num_threads\": 128}' \\\n    --quantization ascend \\\n    --port 8900 \\\n    --block-size 128 \\\n    --compilation-config '{\"cudagraph_mode\":\"FULL_DECODE_ONLY\"}' \\\n    --async-scheduling \\\n    --additional-config '\n    {\"ascend_compilation_config\":{\n        \"enable_npugraph_ex\":true,\n        \"enable_static_kernel\":false\n        },\n    \"enable_cpu_binding\": true,\n    \"multistream_overlap_shared_expert\":true}'",
+      "verification_status": "pass",
+      "verification_reason": "Task API response validated"
+    },
+    {
+      "index": 0,
+      "npu": "Ascend 950DT",
+      "precision": "MXFP4/MXFP8",
+      "deployment": "Single-Node",
+      "case": "High Throughput",
+      "serve_cmd": "export OMP_PROC_BIND=false\nexport OMP_NUM_THREADS=10\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\nexport HCCL_BUFFSIZE=1024\nexport ASCEND_RT_VISIBLE_DEVICES=0,1,2,3\n\nvllm serve /root/.cache/modelscope/hub/models/deepseek-ai/DeepSeek-V4-Flash \\\n    --max-model-len 1048576 \\\n    --safetensors-load-strategy prefetch \\\n    --max-num-batched-tokens 4096 \\\n    --served-model-name dsv4 \\\n    --gpu-memory-utilization 0.9 \\\n    --enable-expert-parallel \\\n    --async-scheduling \\\n    --max-num-seqs 64 \\\n    --port 8900 \\\n    --block-size 32 \\\n    --tokenizer-mode deepseek_v4 \\\n    --tool-call-parser deepseek_v4 \\\n    --enable-auto-tool-choice \\\n    --reasoning-parser deepseek_v4 \\\n    --data-parallel-size 4 \\\n    --api-server-count 1 \\\n    --compilation-config '{\"cudagraph_mode\":\"FULL_DECODE_ONLY\"}' \\\n    --additional-config '{\"enable_cpu_binding\": true, \"multistream_overlap_shared_expert\": true, \"enable_shared_expert_dp\": true}'",
+      "verification_status": "pass",
+      "verification_reason": "Task API response validated"
+    }
+  ],
+  "hardware_runs": [
+    {
+      "recipe_path": "models/en/DeepSeek/DeepSeek-V4-Flash.yaml",
+      "model_id": "",
+      "hw_key": "atlas_800_a2",
+      "head_sha": "e60eb12093911f0be5b88696de9db499e79194d5",
+      "trigger_type": "pr",
+      "image": "quay.nju.edu.cn/ascend/vllm-ascend:v0.23.0rc1",
+      "started_at": "2026-10-21T08:44:32Z",
+      "scenarios": [],
+      "skip_reason": "镜像未预装该权重 (model_id=deepseek-ai/DeepSeek-V4-Flash, 目录=DeepSeek-V4-Flash-w8a8-mtp, 已尝试 ['', 'Eco-Tech', 'vllm-ascend', 'models', '/root/.cache/'])",
+      "status": "skip"
+    },
+    {
+      "verification_scope": "single-node API smoke; not accuracy or full feature coverage",
+      "recipe_path": "models/en/DeepSeek/DeepSeek-V4-Flash.yaml",
+      "model_id": "deepseek-ai/DeepSeek-V4-Flash",
+      "hw_key": "atlas_800_a3",
+      "head_sha": "e60eb12093911f0be5b88696de9db499e79194d5",
+      "workflow_run_id": "39571832951",
+      "trigger_type": "pr",
+      "image": "quay.nju.edu.cn/ascend/vllm-ascend:v0.23.0rc1-a3",
+      "started_at": "2026-10-21T08:44:32Z",
+      "scenarios": [
+        {
+          "index": 0,
+          "npu": "Atlas 800I A3",
+          "precision": "W8A8",
+          "deployment": "Single-Node",
+          "case": "Low Latency",
+          "serve_cmd": "export OMP_PROC_BIND=false\nexport OMP_NUM_THREADS=10\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\nexport LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libjemalloc.so.2:$LD_PRELOAD\nexport HCCL_BUFFSIZE=1024\nexport VLLM_ASCEND_ENABLE_FLASHCOMM1=1\nexport TASK_QUEUE_ENABLE=1\nexport HCCL_OP_EXPANSION_MODE=\"AIV\"\n\nvllm serve /root/.cache/modelscope/hub/models/DeepSeek-V4-Flash-w8a8-mtp \\\n    --max-model-len 1048576 \\\n    --max-num-batched-tokens 10240 \\\n    --served-model-name dsv4 \\\n    --gpu-memory-utilization 0.9 \\\n    --api-server-count 1 \\\n    --max-num-seqs 32 \\\n    --data-parallel-size 4 \\\n    --tensor-parallel-size 4 \\\n    --enable-expert-parallel \\\n    --tokenizer-mode deepseek_v4 \\\n    --tool-call-parser deepseek_v4 \\\n    --enable-auto-tool-choice \\\n    --reasoning-parser deepseek_v4 \\\n    --safetensors-load-strategy 'prefetch' \\\n    --model-loader-extra-config='{\"enable_multithread_load\": \"true\", \"num_threads\": 128}' \\\n    --quantization ascend \\\n    --port 8900 \\\n    --block-size 128 \\\n    --compilation-config '{\"cudagraph_mode\":\"FULL_DECODE_ONLY\"}' \\\n    --async-scheduling \\\n    --additional-config '\n    {\"ascend_compilation_config\":{\n        \"enable_npugraph_ex\":true,\n        \"enable_static_kernel\":false\n        },\n    \"enable_cpu_binding\": true,\n    \"multistream_overlap_shared_expert\":true}'",
+          "verification_status": "pass",
+          "verification_reason": "Task API response validated"
+        }
+      ],
+      "status": "pass"
+    },
+    {
+      "verification_scope": "single-node API smoke; not accuracy or full feature coverage",
+      "recipe_path": "models/en/DeepSeek/DeepSeek-V4-Flash.yaml",
+      "model_id": "deepseek-ai/DeepSeek-V4-Flash",
+      "hw_key": "ascend_950dt",
+      "head_sha": "e60eb12093911f0be5b88696de9db499e79194d5",
+      "workflow_run_id": "39571832951",
+      "trigger_type": "pr",
+      "image": "swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/vllm-ascend:v0.23.0-a5",
+      "started_at": "2026-10-21T08:44:32Z",
+      "scenarios": [
+        {
+          "index": 0,
+          "npu": "Ascend 950DT",
+          "precision": "MXFP4/MXFP8",
+          "deployment": "Single-Node",
+          "case": "High Throughput",
+          "serve_cmd": "export OMP_PROC_BIND=false\nexport OMP_NUM_THREADS=10\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\nexport HCCL_BUFFSIZE=1024\nexport ASCEND_RT_VISIBLE_DEVICES=0,1,2,3\n\nvllm serve /root/.cache/modelscope/hub/models/deepseek-ai/DeepSeek-V4-Flash \\\n    --max-model-len 1048576 \\\n    --safetensors-load-strategy prefetch \\\n    --max-num-batched-tokens 4096 \\\n    --served-model-name dsv4 \\\n    --gpu-memory-utilization 0.9 \\\n    --enable-expert-parallel \\\n    --async-scheduling \\\n    --max-num-seqs 64 \\\n    --port 8900 \\\n    --block-size 32 \\\n    --tokenizer-mode deepseek_v4 \\\n    --tool-call-parser deepseek_v4 \\\n    --enable-auto-tool-choice \\\n    --reasoning-parser deepseek_v4 \\\n    --data-parallel-size 4 \\\n    --api-server-count 1 \\\n    --compilation-config '{\"cudagraph_mode\":\"FULL_DECODE_ONLY\"}' \\\n    --additional-config '{\"enable_cpu_binding\": true, \"multistream_overlap_shared_expert\": true, \"enable_shared_expert_dp\": true}'",
+          "verification_status": "pass",
+          "verification_reason": "Task API response validated"
+        }
+      ],
+      "status": "pass"
+    }
+  ]
+}

@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
 """Publish exact single-node configuration results from recipe params snapshots.
 
-Recipe Deployment Verification produces one recipe-level result.  Its params
-snapshot enumerates every compatible scenario that was run, so a recipe-level
-pass applies to each listed scenario.  A recipe-level failure does not identify
-the failed scenario, so it clears exact verification evidence as ``unknown``
-rather than falsely publishing every listed scenario as failed.  A skip has no
-per-scenario result and must not replace earlier evidence.
+Prefer explicit scenario outcomes, then each hardware run's legacy result.
+Failures without scenario outcomes and selected hardware without scenarios are
+unverified, while a legacy pass applies to its listed scenarios. Hardware skips
+without explicit scenario outcomes leave earlier evidence alone.
 """
 
 from __future__ import annotations
@@ -16,11 +14,19 @@ import copy
 import importlib.util
 import json
 from pathlib import Path
+import re
 from typing import Any
 
 
 SELECTOR_KEYS = ("npu", "precision", "deployment", "case")
-RESULT_STATUSES = {"pass", "fail"}
+RESULT_STATUSES = {"pass", "fail", "unknown"}
+SCENARIO_STATUSES = RESULT_STATUSES | {"skip"}
+# Hardware keys and NPU predicates used by verification_plan.single_node_scenarios.
+HARDWARE_NPU_PATTERNS = {
+    "atlas_800_a2": r"\bA2\b",
+    "atlas_800_a3": r"\bA3\b",
+    "ascend_950dt": r"\b950DT\b",
+}
 
 
 def selector_key(selector: dict[str, Any]) -> tuple[str, str, str, str]:
@@ -30,6 +36,26 @@ def selector_key(selector: dict[str, Any]) -> tuple[str, str, str, str]:
         str(selector.get("deployment", "")),
         str(selector.get("case", "")),
     )
+
+
+def run_identity(run: dict[str, Any]) -> tuple[Any, ...]:
+    if run.get("workflow_run_id") is not None:
+        return (run.get("kind"), str(run["workflow_run_id"]))
+    return (run.get("kind"), run.get("head_sha"), run.get("finished_at"))
+
+
+def should_replace_latest(previous: Any, run: dict[str, Any]) -> bool:
+    if not isinstance(previous, dict) or run_identity(previous) == run_identity(run):
+        return True
+    finished = str(run.get("finished_at") or "")
+    previous_finished = str(previous.get("finished_at") or "")
+    if finished and previous_finished and finished != previous_finished:
+        return finished > previous_finished
+    run_id = str(run.get("workflow_run_id", ""))
+    previous_id = str(previous.get("workflow_run_id", ""))
+    if run_id.isdigit() and previous_id.isdigit():
+        return int(run_id) >= int(previous_id)
+    return finished >= previous_finished
 
 
 def merge_target(existing: dict[str, Any], target: dict[str, Any], run: dict[str, Any], trigger: str) -> dict[str, Any]:
@@ -44,15 +70,13 @@ def merge_target(existing: dict[str, Any], target: dict[str, Any], run: dict[str
             "mode": target["mode"],
         }
     )
-    current[f"last_{trigger}_run"] = run
-    history = [entry for entry in current.get("history", []) if isinstance(entry, dict)]
-    identity = (run.get("kind"), run.get("workflow_run_id") or run.get("head_sha"), run.get("finished_at"))
-    known = {
-        (entry.get("kind"), entry.get("workflow_run_id") or entry.get("head_sha"), entry.get("finished_at"))
-        for entry in history
-    }
-    if identity not in known:
-        history.append(copy.deepcopy(run))
+    if should_replace_latest(current.get(f"last_{trigger}_run"), run):
+        current[f"last_{trigger}_run"] = copy.deepcopy(run)
+    history = [
+        entry for entry in current.get("history", [])
+        if isinstance(entry, dict) and run_identity(entry) != run_identity(run)
+    ]
+    history.append(copy.deepcopy(run))
     current["history"] = sorted(history, key=lambda entry: str(entry.get("finished_at", "")), reverse=True)
     targets[target["id"]] = current
     return merged
@@ -63,7 +87,7 @@ def sync_target_status(status_dir: Path, runs_dir: Path, targets: list[dict[str,
     by_recipe_and_selector = {
         (target["recipe"], selector_key(target["selector"])): target
         for target in targets
-        if target["mode"] == "single-node"
+        if target["mode"] == "single-node" and target.get("enabled", True)
     }
     updated: list[str] = []
 
@@ -77,7 +101,7 @@ def sync_target_status(status_dir: Path, runs_dir: Path, targets: list[dict[str,
         changed = False
         for trigger in ("pr", "nightly"):
             run = status.get(f"last_{trigger}_run")
-            if not isinstance(run, dict) or run.get("status") not in RESULT_STATUSES:
+            if not isinstance(run, dict) or run.get("status") not in SCENARIO_STATUSES:
                 continue
             head_sha = run.get("head_sha")
             if not isinstance(head_sha, str) or not head_sha:
@@ -89,23 +113,57 @@ def sync_target_status(status_dir: Path, runs_dir: Path, targets: list[dict[str,
                 params = json.loads(params_file.read_text(encoding="utf-8"))
             except json.JSONDecodeError:
                 continue
+            snapshot_run_id = params.get("workflow_run_id")
+            if snapshot_run_id not in (None, "") and str(snapshot_run_id) != str(run.get("workflow_run_id")):
+                continue  # A newer run can replace the archive at the same SHA.
             recipe = params.get("recipe_path")
-            scenarios = params.get("scenarios")
-            if not isinstance(recipe, str) or not isinstance(scenarios, list):
+            if not isinstance(recipe, str):
                 continue
-            for scenario in scenarios:
-                if not isinstance(scenario, dict):
+            hardware_runs = params.get("hardware_runs")
+            sources = hardware_runs if isinstance(hardware_runs, list) else [
+                {**params, "status": params.get("status", run["status"])}
+            ]
+            for source in sources:
+                if not isinstance(source, dict):
                     continue
-                target = by_recipe_and_selector.get((recipe, selector_key(scenario)))
-                if not target:
+                scenarios = source.get("scenarios", [])
+                if not isinstance(scenarios, list):
                     continue
-                exact_run = copy.deepcopy(run)
-                if exact_run["status"] == "fail":
-                    exact_run["status"] = "unknown"
-                merged = merge_target(status, target, exact_run, trigger)
-                if merged != status:
-                    status = merged
-                    changed = True
+                outcomes = []
+                for scenario in scenarios:
+                    if not isinstance(scenario, dict):
+                        continue
+                    target = by_recipe_and_selector.get((recipe, selector_key(scenario)))
+                    if not target:
+                        continue
+                    outcome = scenario.get("verification_status")
+                    if outcome not in SCENARIO_STATUSES:
+                        if source.get("status") == "skip":
+                            continue
+                        outcome = "pass" if source.get("status") == "pass" else "unknown"
+                    outcomes.append((target, outcome, scenario))
+                if not scenarios and source.get("status") != "skip":
+                    pattern = HARDWARE_NPU_PATTERNS.get(source.get("hw_key"))
+                    if pattern:
+                        outcomes.extend(
+                            (target, "unknown", {})
+                            for (target_recipe, selector), target in by_recipe_and_selector.items()
+                            if target_recipe == recipe and re.search(pattern, selector[0], re.IGNORECASE)
+                        )
+                for target, outcome, scenario in outcomes:
+                    exact_run = {**copy.deepcopy(run), "status": outcome}
+                    # Model-wide audit notes may describe a different hardware.
+                    # Only attach evidence recorded for this exact scenario.
+                    exact_run.pop("verification_note", None)
+                    exact_run.pop("verification_evidence_url", None)
+                    if scenario.get("verification_reason"):
+                        exact_run["verification_note"] = scenario["verification_reason"]
+                    if scenario.get("verification_evidence_url"):
+                        exact_run["verification_evidence_url"] = scenario["verification_evidence_url"]
+                    merged = merge_target(status, target, exact_run, trigger)
+                    if merged != status:
+                        status = merged
+                        changed = True
         if changed:
             status_file.write_text(
                 json.dumps(status, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"

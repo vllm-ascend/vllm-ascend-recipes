@@ -1,0 +1,8 @@
+{
+  "recipe_path": "models/en/Qwen/Qwen3-ASR-1.7B.yaml",
+  "hw_key": "atlas_800_a2",
+  "image": "quay.nju.edu.cn/ascend/vllm-ascend:v0.23.0",
+  "scenarios": [],
+  "missing_reason": "selected hardware job did not provide results",
+  "head_sha": "c501463f36344b5efd079d31def1e06127bf1c19"
+}

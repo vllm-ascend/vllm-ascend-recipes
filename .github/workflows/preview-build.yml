@@ -17,13 +17,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: pnpm
@@ -34,6 +34,23 @@ jobs:
       - name: Validate YAML
         run: npx tsx scripts/validate-yaml.ts
 
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Refresh configuration verification data
+        run: |
+          set -euo pipefail
+          python -m pip install --quiet pyyaml
+          python .github/_scripts/seed_target_statuses.py \
+            --status-dir public/status --targets .github/verification-targets.yaml
+          python .github/_scripts/apply_verification_corrections.py
+          python .github/_scripts/sync_single_node_target_status.py \
+            --status-dir public/status --runs-dir public/runs --targets .github/verification-targets.yaml
+          python .github/_scripts/apply_verification_corrections.py
+          python .github/_scripts/build_status_index.py \
+            --status-dir public/status --output public/status/index.json
+
       - name: Build
         run: pnpm exec astro build
         env:
@@ -41,7 +58,7 @@ jobs:
           ASTRO_BASE: '/'
 
       - name: Upload build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: pr-preview-dist-${{ github.event.pull_request.number }}
           path: ./dist

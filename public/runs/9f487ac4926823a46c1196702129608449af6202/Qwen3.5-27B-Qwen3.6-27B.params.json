@@ -22,7 +22,10 @@
       "precision": "MXFP8 / BF16",
       "deployment": "Single-Node",
       "case": "Multi Card",
-      "serve_cmd": "export VLLM_USE_MODELSCOPE=True\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\nexport HCCL_BUFFSIZE=512\nexport OMP_PROC_BIND=false\nexport OMP_NUM_THREADS=1\nexport TASK_QUEUE_ENABLE=1\nexport MODEL_PATH=Eco-Tech/Qwen3.6-27B-w8a8-mxfp8\n\nvllm serve $MODEL_PATH \\\n  --host 0.0.0.0 \\\n  --port 8000 \\\n  --data-parallel-size 8 \\\n  --tensor-parallel-size 1 \\\n  --seed 1024 \\\n  --quantization ascend \\\n  --served-model-name qwen3.6 \\\n  --max-num-seqs 32 \\\n  --max-model-len 262144 \\\n  --max-num-batched-tokens 16384 \\\n  --trust-remote-code \\\n  --gpu-memory-utilization 0.9 \\\n  --no-enable-prefix-caching \\\n  --compilation-config '{\"cudagraph_mode\":\"FULL_DECODE_ONLY\"}' \\\n  --async-scheduling \\\n  --additional-config '{\"enable_cpu_binding\":true}'"
+      "serve_cmd": "export VLLM_USE_MODELSCOPE=True\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\nexport HCCL_BUFFSIZE=512\nexport OMP_PROC_BIND=false\nexport OMP_NUM_THREADS=1\nexport TASK_QUEUE_ENABLE=1\nexport MODEL_PATH=Eco-Tech/Qwen3.6-27B-w8a8-mxfp8\n\nvllm serve $MODEL_PATH \\\n  --host 0.0.0.0 \\\n  --port 8000 \\\n  --data-parallel-size 8 \\\n  --tensor-parallel-size 1 \\\n  --seed 1024 \\\n  --quantization ascend \\\n  --served-model-name qwen3.6 \\\n  --max-num-seqs 32 \\\n  --max-model-len 262144 \\\n  --max-num-batched-tokens 16384 \\\n  --trust-remote-code \\\n  --gpu-memory-utilization 0.9 \\\n  --no-enable-prefix-caching \\\n  --compilation-config '{\"cudagraph_mode\":\"FULL_DECODE_ONLY\"}' \\\n  --async-scheduling \\\n  --additional-config '{\"enable_cpu_binding\":true}'",
+      "verification_status": "fail",
+      "verification_reason": "Model server did not become ready; the wrapper incorrectly recorded pass.",
+      "verification_evidence_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/actions/runs/39197394594/job/117883078259"
     }
   ],
   "hardware_runs": [
@@ -63,7 +66,10 @@
           "precision": "MXFP8 / BF16",
           "deployment": "Single-Node",
           "case": "Multi Card",
-          "serve_cmd": "export VLLM_USE_MODELSCOPE=True\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\nexport HCCL_BUFFSIZE=512\nexport OMP_PROC_BIND=false\nexport OMP_NUM_THREADS=1\nexport TASK_QUEUE_ENABLE=1\nexport MODEL_PATH=Eco-Tech/Qwen3.6-27B-w8a8-mxfp8\n\nvllm serve $MODEL_PATH \\\n  --host 0.0.0.0 \\\n  --port 8000 \\\n  --data-parallel-size 8 \\\n  --tensor-parallel-size 1 \\\n  --seed 1024 \\\n  --quantization ascend \\\n  --served-model-name qwen3.6 \\\n  --max-num-seqs 32 \\\n  --max-model-len 262144 \\\n  --max-num-batched-tokens 16384 \\\n  --trust-remote-code \\\n  --gpu-memory-utilization 0.9 \\\n  --no-enable-prefix-caching \\\n  --compilation-config '{\"cudagraph_mode\":\"FULL_DECODE_ONLY\"}' \\\n  --async-scheduling \\\n  --additional-config '{\"enable_cpu_binding\":true}'"
+          "serve_cmd": "export VLLM_USE_MODELSCOPE=True\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\nexport HCCL_BUFFSIZE=512\nexport OMP_PROC_BIND=false\nexport OMP_NUM_THREADS=1\nexport TASK_QUEUE_ENABLE=1\nexport MODEL_PATH=Eco-Tech/Qwen3.6-27B-w8a8-mxfp8\n\nvllm serve $MODEL_PATH \\\n  --host 0.0.0.0 \\\n  --port 8000 \\\n  --data-parallel-size 8 \\\n  --tensor-parallel-size 1 \\\n  --seed 1024 \\\n  --quantization ascend \\\n  --served-model-name qwen3.6 \\\n  --max-num-seqs 32 \\\n  --max-model-len 262144 \\\n  --max-num-batched-tokens 16384 \\\n  --trust-remote-code \\\n  --gpu-memory-utilization 0.9 \\\n  --no-enable-prefix-caching \\\n  --compilation-config '{\"cudagraph_mode\":\"FULL_DECODE_ONLY\"}' \\\n  --async-scheduling \\\n  --additional-config '{\"enable_cpu_binding\":true}'",
+          "verification_status": "fail",
+          "verification_reason": "Model server did not become ready; the wrapper incorrectly recorded pass.",
+          "verification_evidence_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/actions/runs/39197394594/job/117883078259"
         }
       ],
       "status": "pass"

@@ -54,3 +54,5 @@ aliases:
 
   - model_id: Eco-Tech/Qwen3.8-27B-w8a8
     cache_dir: Eco-Tech/Qwen3.8-27B-w8a8
+  - model_id: moonshotai/Kimi-K2.6
+    cache_dir: Kimi-K2.6-W4A8

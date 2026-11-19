@@ -1,0 +1,24 @@
+{
+  "model": "Qwen3-ASR-1.7B",
+  "last_pr_run": {
+    "kind": "pr",
+    "status": "pass",
+    "conclusion": "success",
+    "head_sha": "caa46a611799b20716aa86ddd7b7799b3bc39419",
+    "head_sha_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/commit/caa46a611799b20716aa86ddd7b7799b3bc39419",
+    "workflow_run_id": 44473900055,
+    "workflow_run_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/actions/runs/44473900055",
+    "recipe_path": "models/en/Qwen/Qwen3-ASR-1.7B.yaml",
+    "recipe_yaml_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/blob/caa46a611799b20716aa86ddd7b7799b3bc39419/models/en/Qwen/Qwen3-ASR-1.7B.yaml",
+    "params_url": "https://vllm-ascend.github.io/vllm-ascend-recipes/runs/caa46a611799b20716aa86ddd7b7799b3bc39419/Qwen3-ASR-1.7B.params.json",
+    "started_at": "2026-11-19T06:40:33Z",
+    "finished_at": "2026-11-19T07:14:30Z",
+    "pr_number": null,
+    "pr_url": null,
+    "pr_title": null,
+    "pr_author": null
+  },
+  "last_nightly_run": null,
+  "last_manual_run": null,
+  "targets": {}
+}

@@ -7,6 +7,10 @@ single_node:
       image: swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/vllm-ascend:v0.23.0
     - recipe: models/en/Qwen/Qwen3.5-27B-Qwen3.6-27B.yaml
       image: swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/vllm-ascend:v0.23.0
+    - models/en/Qwen/Qwen3-Embedding-0.6B.yaml
+    - models/en/PaddlePaddle/PaddleOCR-VL.yaml
+    - models/en/Qwen/Qwen3-Reranker.yaml
+    - models/en/Qwen/Qwen3-VL-Reranker-2B.yaml
   a3:
     - recipe: models/en/Qwen/Qwen3-30B-A3B.yaml
       image: swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/vllm-ascend:v0.23.0-a3

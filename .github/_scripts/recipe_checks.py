@@ -59,8 +59,9 @@ def validate_response(url: str, body: str) -> bool:
                 message = choice.get("message") or choice.get("delta") or {}
                 if not isinstance(message, dict):
                     raise ValueError("chat message must be an object")
-                valid = valid or bool(choice.get("text") or message.get("content")
-                                      or message.get("reasoning_content") or message.get("tool_calls"))
+                # Reasoning alone is not a final task result (e.g. a request
+                # truncated before answering). This also applies to SSE chunks.
+                valid = valid or bool(choice.get("text") or message.get("content") or message.get("tool_calls"))
         elif kind == "embedding":
             rows = _object_rows(data.get("data", []))
             valid = bool(rows) and all(isinstance(row.get("embedding"), list) and row["embedding"]

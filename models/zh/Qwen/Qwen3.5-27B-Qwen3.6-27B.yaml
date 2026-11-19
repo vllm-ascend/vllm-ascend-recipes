@@ -35,10 +35,10 @@ model:
     OMP_NUM_THREADS: "1"
     TASK_QUEUE_ENABLE: "1"
   docker_image:
-    atlas_800_a2: "quay.io/ascend/vllm-ascend:v0.18.0rc1"
-    atlas_800_a3: "quay.io/ascend/vllm-ascend:v0.18.0rc1-a3"
-    atlas_300i_duo: "quay.io/ascend/vllm-ascend:v0.23.0rc1-310p"
-    ascend_950dt: "quay.io/ascend/vllm-ascend:v0.23.0rc1-a5"
+    atlas_800_a2: "quay.io/ascend/vllm-ascend:v0.30.0rc2"
+    atlas_800_a3: "quay.io/ascend/vllm-ascend:v0.30.0rc2-a3"
+    atlas_300i_duo: "quay.io/ascend/vllm-ascend:v0.30.0rc2-310p"
+    ascend_950dt: "quay.io/ascend/vllm-ascend:v0.30.0rc2-a5"
   nightly_required: false
   install:
     # Ascend 推荐 Docker 方式;pip 需源码编译,不提供官方 wheel,隐藏 pip 标签。
@@ -749,7 +749,19 @@ scenarios:
       BF16 请将 `MODEL_PATH` 改为 `Qwen/Qwen3.6-27B` 并移除 `--quantization ascend`。Qwen3.5-27B 在有兼容权重时使用相同的混合架构运行时和 MTP 配置。
   - title: 服务验证
     content: |-
-      参见下方“功能验证”部分 —— 日志打印 `Application startup complete.` 即服务就绪。
+      此场景使用服务名 `qwen3.6`，不要直接使用下方共用示例中的 `qwen3.5`。
+
+      ```bash
+      curl --fail-with-body --silent --show-error http://localhost:<port>/v1/completions \
+        -H 'Content-Type: application/json' \
+        -d '{"model":"qwen3.6","prompt":"The future of AI is","max_tokens":50,"temperature":0}'
+      ```
+
+      ```bash
+      curl --fail-with-body --silent --show-error http://localhost:<port>/v1/chat/completions \
+        -H 'Content-Type: application/json' \
+        -d '{"model":"qwen3.6","messages":[{"role":"user","content":"The future of AI is"}],"max_completion_tokens":1024,"temperature":0.7,"top_p":0.95}'
+      ```
 
 verification: |-
   服务启动后，日志应显示：

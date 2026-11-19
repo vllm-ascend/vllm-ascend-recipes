@@ -1,0 +1,246 @@
+{
+  "meta.title": {
+    "en": "Qwen3.6-35B-A3B",
+    "zh": "Qwen3.6-35B-A3B"
+  },
+  "meta.description": {
+    "en": "A 35B multimodal MoE model with 3B active parameters, hybrid attention, long context, and W8A8 deployment options on Ascend.",
+    "zh": "35B 多模态 MoE 模型，每 token 激活 3B 参数，支持混合注意力、长上下文及多种昇腾 W8A8 部署方式。"
+  },
+  "meta.performance_headline": {
+    "en": "W8A8 serving on Atlas 800 A2/A3, Ascend 950DT, and Atlas 300I DUO",
+    "zh": "支持 Atlas 800 A2/A3、Ascend 950DT 和 Atlas 300I DUO 的 W8A8 部署"
+  },
+  "features.spec_decoding.description": {
+    "en": "Qwen3.5-style MTP with three speculative tokens.",
+    "zh": "Qwen3.5 风格 MTP，每步使用三个候选 token。"
+  },
+  "features.model_runner_v2.description": {
+    "en": "Use Model Runner V2 for the A2/A3 tutorial configuration.",
+    "zh": "在 A2/A3 教程配置中使用 Model Runner V2。"
+  },
+  "features.prefix_caching.description": {
+    "en": "Reuse KV blocks for repeated prefixes.",
+    "zh": "复用重复前缀对应的 KV 块。"
+  },
+  "variants.default.description": {
+    "en": "W8A8 quantized checkpoint for A2/A3 and Atlas 300I DUO.",
+    "zh": "用于 A2/A3 和 Atlas 300I DUO 的 W8A8 量化权重。"
+  },
+  "variants.bf16.description": {
+    "en": "Original BF16 checkpoint.",
+    "zh": "原始 BF16 权重。"
+  },
+  "variants.w8a8_mxfp8.description": {
+    "en": "W8A8 MXFP8 checkpoint for Ascend 950DT.",
+    "zh": "用于 Ascend 950DT 的 W8A8 MXFP8 量化权重。"
+  },
+  "config_params.max_model_len.description": {
+    "en": "Maximum input plus output length of a request.",
+    "zh": "单条请求输入与输出的最大 token 数。"
+  },
+  "config_params.max_num_seqs.description": {
+    "en": "Maximum active sequences per DP group.",
+    "zh": "每个 DP 组的最大活跃序列数。"
+  },
+  "config_params.max_num_batched_tokens.description": {
+    "en": "Maximum tokens processed in one scheduler step.",
+    "zh": "单个调度步骤处理的最大 token 数。"
+  },
+  "config_params.gpu_memory_utilization.description": {
+    "en": "Fraction of NPU memory available for model execution and KV cache.",
+    "zh": "模型执行与 KV 缓存可使用的 NPU 显存比例。"
+  },
+  "overview": {
+    "en": "Qwen3.6-35B-A3B is a multimodal sparse MoE model with 35B total parameters and about 3B active parameters per token. Its hybrid attention architecture supports long-context serving, W8A8 quantization, expert parallelism, and MTP.",
+    "zh": "Qwen3.6-35B-A3B 是多模态稀疏 MoE 模型，总参数量为 35B，每 token 激活约 3B 参数。其混合注意力架构支持长上下文推理、W8A8 量化、专家并行和 MTP。"
+  },
+  "weight_download[0].weight_version": {
+    "en": "BF16",
+    "zh": "BF16"
+  },
+  "weight_download[1].weight_version": {
+    "en": "W8A8",
+    "zh": "W8A8"
+  },
+  "weight_download[2].weight_version": {
+    "en": "W8A8 MXFP8",
+    "zh": "W8A8 MXFP8"
+  },
+  "weight_download[3].weight_version": {
+    "en": "W8A8C8 MXFP8",
+    "zh": "W8A8C8 MXFP8"
+  },
+  "weight_download[4].weight_version": {
+    "en": "W4A8 MXFP",
+    "zh": "W4A8 MXFP"
+  },
+  "prerequisites[0].title": {
+    "en": "Model weight",
+    "zh": "模型权重"
+  },
+  "prerequisites[0].content": {
+    "en": "The tutorial ships five weight versions. Pick the one that matches your hardware and fetch it with the weight tab above; this table records which versions exist and where each one is published.\n\n| Weight version | Hardware requirement | Published on |\n| -------------- | -------------------- | ------------ |\n| BF16 (`Qwen/Qwen3.6-35B-A3B`) | 1 Ascend 950DT (96GB x 8) node, 1 Atlas 800 A3 (64GB x 16) node, 1 Atlas 800 A2 (64GB x 8) node, or Atlas 300I DUO | ModelScope |\n| W8A8 (`Eco-Tech/Qwen3.6-35B-A3B-w8a8`) | 1 Atlas 800 A3 (64GB x 16) node, 1 Atlas 800 A2 (64GB x 8) node, or Atlas 300I DUO | ModelScope |\n| W8A8 MXFP8 (`Eco-Tech/Qwen3.6-35B-A3B-w8a8-mxfp8`) | 1 Ascend 950DT (96GB x 8) node | ModelScope |\n| W8A8C8 MXFP8 (`Eco-Tech/Qwen3.6-35B-A3B-w8a8c8-mxfp8`) | 1 Ascend 950DT (96GB x 8) node | ModelScope |\n| W4A8 MXFP (`Eco-Tech/Qwen3.6-35B-A3B-w4a8-mxfp`) | 1 Ascend 950DT (96GB x 8) node | ModelScope |\n\nThe tutorial publishes every version on ModelScope, so ModelScope is the only download host listed. Download the weight to a shared directory such as `/root/.cache/` and record the path, because the deployment commands resolve the model from it.",
+    "zh": "教程提供五个权重版本。请选择与您的硬件匹配的版本，并在上方权重页签中下载；下表记录各版本的存在情况和发布渠道。\n\n| 权重版本 | 硬件要求 | 发布渠道 |\n| -------- | -------- | -------- |\n| BF16（`Qwen/Qwen3.6-35B-A3B`） | 1 个 Ascend 950DT（96GB x 8）节点、1 个 Atlas 800 A3（64GB x 16）节点、1 个 Atlas 800 A2（64GB x 8）节点，或 Atlas 300I DUO | ModelScope |\n| W8A8（`Eco-Tech/Qwen3.6-35B-A3B-w8a8`） | 1 个 Atlas 800 A3（64GB x 16）节点、1 个 Atlas 800 A2（64GB x 8）节点，或 Atlas 300I DUO | ModelScope |\n| W8A8 MXFP8（`Eco-Tech/Qwen3.6-35B-A3B-w8a8-mxfp8`） | 1 个 Ascend 950DT（96GB x 8）节点 | ModelScope |\n| W8A8C8 MXFP8（`Eco-Tech/Qwen3.6-35B-A3B-w8a8c8-mxfp8`） | 1 个 Ascend 950DT（96GB x 8）节点 | ModelScope |\n| W4A8 MXFP（`Eco-Tech/Qwen3.6-35B-A3B-w4a8-mxfp`） | 1 个 Ascend 950DT（96GB x 8）节点 | ModelScope |\n\n教程中每个权重版本都发布在 ModelScope，因此这里只列出 ModelScope。请将权重下载到多节点共享目录（例如 `/root/.cache/`）并记录路径，部署命令会从该路径加载模型。"
+  },
+  "prerequisites[1].title": {
+    "en": "Container image and runtime",
+    "zh": "容器镜像与运行环境"
+  },
+  "prerequisites[1].content": {
+    "en": "Every command below uses `quay.io/ascend/vllm-ascend:v0.30.0` and its per-product tags (`-a3`, `-a5`, `-310p`), the same pins as `model.docker_image` and the tutorial 4.1 image commands. Nightly images are not used: the tutorial configuration fails on `nightly-main-a3` (vLLM Ascend 0.19.1rc2.dev3230+g469c6c260) with a TransData error, as recorded in the verification section. Record the main tutorial commit and the exact image digest when you reproduce a scenario.",
+    "zh": "下文所有命令使用 `quay.io/ascend/vllm-ascend:v0.30.0` 及其分产品标签（`-a3`、`-a5`、`-310p`），与 `model.docker_image` 及教程 4.1 的镜像命令保持一致。这里不使用 nightly 镜像：在 `nightly-main-a3`（vLLM Ascend 0.19.1rc2.dev3230+g469c6c260）上教程配置会因 TransData 报错而失败，详见下文“功能验证”部分。复现场景时请记录 main 教程提交与准确的镜像摘要。"
+  },
+  "env_setup.container.A3.content": {
+    "en": "```bash\nexport IMAGE=quay.io/ascend/vllm-ascend:v0.30.0-a3\nDEVS=\"\"\nfor i in $(seq 0 15); do DEVS=\"$DEVS --device /dev/davinci$i\"; done\ndocker run --rm --name vllm-ascend --net=host --shm-size=1g $DEVS \\\n  --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc \\\n  -v /usr/local/dcmi:/usr/local/dcmi \\\n  -v /usr/local/Ascend/driver/tools/hccn_tool:/usr/local/Ascend/driver/tools/hccn_tool \\\n  -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \\\n  -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \\\n  -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \\\n  -v /etc/ascend_install.info:/etc/ascend_install.info \\\n  -v /root/.cache:/root/.cache \\\n  -it $IMAGE bash\n```",
+    "zh": "```bash\nexport IMAGE=quay.io/ascend/vllm-ascend:v0.30.0-a3\nDEVS=\"\"\nfor i in $(seq 0 15); do DEVS=\"$DEVS --device /dev/davinci$i\"; done\ndocker run --rm --name vllm-ascend --net=host --shm-size=1g $DEVS \\\n  --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc \\\n  -v /usr/local/dcmi:/usr/local/dcmi \\\n  -v /usr/local/Ascend/driver/tools/hccn_tool:/usr/local/Ascend/driver/tools/hccn_tool \\\n  -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \\\n  -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \\\n  -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \\\n  -v /etc/ascend_install.info:/etc/ascend_install.info \\\n  -v /root/.cache:/root/.cache \\\n  -it $IMAGE bash\n```"
+  },
+  "env_setup.container.A2.content": {
+    "en": "```bash\nexport IMAGE=quay.io/ascend/vllm-ascend:v0.30.0\nDEVS=\"\"\nfor i in $(seq 0 7); do DEVS=\"$DEVS --device /dev/davinci$i\"; done\ndocker run --rm --name vllm-ascend --net=host --shm-size=1g $DEVS \\\n  --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc \\\n  -v /usr/local/dcmi:/usr/local/dcmi \\\n  -v /usr/local/Ascend/driver/tools/hccn_tool:/usr/local/Ascend/driver/tools/hccn_tool \\\n  -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \\\n  -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \\\n  -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \\\n  -v /etc/ascend_install.info:/etc/ascend_install.info \\\n  -v /root/.cache:/root/.cache \\\n  -it $IMAGE bash\n```",
+    "zh": "```bash\nexport IMAGE=quay.io/ascend/vllm-ascend:v0.30.0\nDEVS=\"\"\nfor i in $(seq 0 7); do DEVS=\"$DEVS --device /dev/davinci$i\"; done\ndocker run --rm --name vllm-ascend --net=host --shm-size=1g $DEVS \\\n  --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc \\\n  -v /usr/local/dcmi:/usr/local/dcmi \\\n  -v /usr/local/Ascend/driver/tools/hccn_tool:/usr/local/Ascend/driver/tools/hccn_tool \\\n  -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \\\n  -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \\\n  -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \\\n  -v /etc/ascend_install.info:/etc/ascend_install.info \\\n  -v /root/.cache:/root/.cache \\\n  -it $IMAGE bash\n```"
+  },
+  "env_setup.container.Ascend 950DT.content": {
+    "en": "```bash\nexport IMAGE=quay.io/ascend/vllm-ascend:v0.30.0-a5\nDEVS=\"\"\nfor i in $(seq 0 7); do DEVS=\"$DEVS --device /dev/davinci$i\"; done\ndocker run --rm --name vllm-ascend --net=host --shm-size=500g $DEVS \\\n  --device /dev/davinci_manager --device /dev/hisi_hdc \\\n  --device /dev/ummu --device /dev/uburma \\\n  -v /usr/local/Ascend/driver:/usr/local/Ascend/driver \\\n  -v /usr/local/Ascend/firmware:/usr/local/Ascend/firmware \\\n  -v /usr/local/dcmi:/usr/local/dcmi \\\n  -v /etc/ascend_install.info:/etc/ascend_install.info \\\n  -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \\\n  -v /root/.cache:/root/.cache \\\n  -it $IMAGE bash\n```",
+    "zh": "```bash\nexport IMAGE=quay.io/ascend/vllm-ascend:v0.30.0-a5\nDEVS=\"\"\nfor i in $(seq 0 7); do DEVS=\"$DEVS --device /dev/davinci$i\"; done\ndocker run --rm --name vllm-ascend --net=host --shm-size=500g $DEVS \\\n  --device /dev/davinci_manager --device /dev/hisi_hdc \\\n  --device /dev/ummu --device /dev/uburma \\\n  -v /usr/local/Ascend/driver:/usr/local/Ascend/driver \\\n  -v /usr/local/Ascend/firmware:/usr/local/Ascend/firmware \\\n  -v /usr/local/dcmi:/usr/local/dcmi \\\n  -v /etc/ascend_install.info:/etc/ascend_install.info \\\n  -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \\\n  -v /root/.cache:/root/.cache \\\n  -it $IMAGE bash\n```"
+  },
+  "env_setup.container.Atlas 300I DUO.content": {
+    "en": "```bash\nexport IMAGE=quay.io/ascend/vllm-ascend:v0.30.0-310p\ndocker run --rm --name vllm-ascend --shm-size=10g --net=host \\\n  --device /dev/davinci0 --device /dev/davinci1 \\\n  --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc \\\n  -v /usr/local/dcmi:/usr/local/dcmi \\\n  -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \\\n  -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \\\n  -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \\\n  -v /etc/ascend_install.info:/etc/ascend_install.info \\\n  -v /root/.cache:/root/.cache \\\n  -it $IMAGE bash\n```",
+    "zh": "```bash\nexport IMAGE=quay.io/ascend/vllm-ascend:v0.30.0-310p\ndocker run --rm --name vllm-ascend --shm-size=10g --net=host \\\n  --device /dev/davinci0 --device /dev/davinci1 \\\n  --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc \\\n  -v /usr/local/dcmi:/usr/local/dcmi \\\n  -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \\\n  -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \\\n  -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \\\n  -v /etc/ascend_install.info:/etc/ascend_install.info \\\n  -v /root/.cache:/root/.cache \\\n  -it $IMAGE bash\n```"
+  },
+  "scenarios[0].deployment": {
+    "en": "Single-Node",
+    "zh": "单节点"
+  },
+  "scenarios[0].case": {
+    "en": "MRV2 Long Context with MTP",
+    "zh": "MRV2 长上下文与 MTP"
+  },
+  "scenarios[0].steps[0].title": {
+    "en": "Start the server",
+    "zh": "启动服务"
+  },
+  "scenarios[0].steps[0].content": {
+    "en": "```bash\nexport HCCL_BUFFSIZE=1024 ASCEND_RT_VISIBLE_DEVICES=0,1\nexport VLLM_USE_V2_MODEL_RUNNER=1 VLLM_EXECUTE_MODEL_TIMEOUT_SECONDS=3000\nexport HCCL_OP_EXPANSION_MODE=AIV PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\nexport OMP_PROC_BIND=false OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 TASK_QUEUE_ENABLE=1\n\nvllm serve Eco-Tech/Qwen3.6-35B-A3B-w8a8 \\\n  --host 0.0.0.0 --port 8000 \\\n  --data-parallel-size 1 --tensor-parallel-size 2 \\\n  --quantization ascend --served-model-name qwen3.6 \\\n  --max-num-seqs {{max_num_seqs}} --max-model-len {{max_model_len}} \\\n  --max-num-batched-tokens {{max_num_batched_tokens}} \\\n  --trust-remote-code --safetensors-load-strategy lazy \\\n  --gpu-memory-utilization {{gpu_memory_utilization}} \\\n  --speculative-config '{\"method\":\"qwen3_5_mtp\",\"num_speculative_tokens\":3}' \\\n  --dtype bfloat16 --enable-prefix-caching \\\n  --compilation-config '{\"cudagraph_mode\":\"FULL_AND_PIECEWISE\"}' \\\n  --additional-config '{\"enable_cpu_binding\":true,\"multistream_overlap_shared_expert\":true}'\n```",
+    "zh": "```bash\nexport HCCL_BUFFSIZE=1024 ASCEND_RT_VISIBLE_DEVICES=0,1\nexport VLLM_USE_V2_MODEL_RUNNER=1 VLLM_EXECUTE_MODEL_TIMEOUT_SECONDS=3000\nexport HCCL_OP_EXPANSION_MODE=AIV PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\nexport OMP_PROC_BIND=false OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 TASK_QUEUE_ENABLE=1\n\nvllm serve Eco-Tech/Qwen3.6-35B-A3B-w8a8 \\\n  --host 0.0.0.0 --port 8000 \\\n  --data-parallel-size 1 --tensor-parallel-size 2 \\\n  --quantization ascend --served-model-name qwen3.6 \\\n  --max-num-seqs {{max_num_seqs}} --max-model-len {{max_model_len}} \\\n  --max-num-batched-tokens {{max_num_batched_tokens}} \\\n  --trust-remote-code --safetensors-load-strategy lazy \\\n  --gpu-memory-utilization {{gpu_memory_utilization}} \\\n  --speculative-config '{\"method\":\"qwen3_5_mtp\",\"num_speculative_tokens\":3}' \\\n  --dtype bfloat16 --enable-prefix-caching \\\n  --compilation-config '{\"cudagraph_mode\":\"FULL_AND_PIECEWISE\"}' \\\n  --additional-config '{\"enable_cpu_binding\":true,\"multistream_overlap_shared_expert\":true}'\n```"
+  },
+  "scenarios[0].steps[1].title": {
+    "en": "Verify inference",
+    "zh": "推理验证"
+  },
+  "scenarios[0].steps[1].content": {
+    "en": "```bash\ncurl http://127.0.0.1:8000/v1/completions \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"model\":\"qwen3.6\",\"prompt\":\"The future of AI is\",\"max_tokens\":50,\"temperature\":0}'\n```",
+    "zh": "```bash\ncurl http://127.0.0.1:8000/v1/completions \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"model\":\"qwen3.6\",\"prompt\":\"The future of AI is\",\"max_tokens\":50,\"temperature\":0}'\n```"
+  },
+  "scenarios[1].deployment": {
+    "en": "Single-Node",
+    "zh": "单节点"
+  },
+  "scenarios[1].case": {
+    "en": "MRV2 Long Context with MTP",
+    "zh": "MRV2 长上下文与 MTP"
+  },
+  "scenarios[1].steps[0].title": {
+    "en": "Start the server",
+    "zh": "启动服务"
+  },
+  "scenarios[1].steps[0].content": {
+    "en": "```bash\nexport HCCL_BUFFSIZE=1024 ASCEND_RT_VISIBLE_DEVICES=0,1\nexport VLLM_USE_V2_MODEL_RUNNER=1 VLLM_EXECUTE_MODEL_TIMEOUT_SECONDS=3000\nexport HCCL_OP_EXPANSION_MODE=AIV PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\nexport OMP_PROC_BIND=false OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 TASK_QUEUE_ENABLE=1\n\nvllm serve Eco-Tech/Qwen3.6-35B-A3B-w8a8 \\\n  --host 0.0.0.0 --port 8000 \\\n  --data-parallel-size 1 --tensor-parallel-size 2 \\\n  --quantization ascend --served-model-name qwen3.6 \\\n  --max-num-seqs 128 --max-model-len 32768 \\\n  --max-num-batched-tokens 1024 \\\n  --trust-remote-code --safetensors-load-strategy lazy \\\n  --gpu-memory-utilization {{gpu_memory_utilization}} \\\n  --speculative-config '{\"method\":\"qwen3_5_mtp\",\"num_speculative_tokens\":3}' \\\n  --dtype bfloat16 --enable-prefix-caching \\\n  --compilation-config '{\"cudagraph_mode\":\"NONE\"}' \\\n  --additional-config '{\"enable_cpu_binding\":true,\"multistream_overlap_shared_expert\":true}'\n```",
+    "zh": "```bash\nexport HCCL_BUFFSIZE=1024 ASCEND_RT_VISIBLE_DEVICES=0,1\nexport VLLM_USE_V2_MODEL_RUNNER=1 VLLM_EXECUTE_MODEL_TIMEOUT_SECONDS=3000\nexport HCCL_OP_EXPANSION_MODE=AIV PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\nexport OMP_PROC_BIND=false OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 TASK_QUEUE_ENABLE=1\n\nvllm serve Eco-Tech/Qwen3.6-35B-A3B-w8a8 \\\n  --host 0.0.0.0 --port 8000 \\\n  --data-parallel-size 1 --tensor-parallel-size 2 \\\n  --quantization ascend --served-model-name qwen3.6 \\\n  --max-num-seqs 128 --max-model-len 32768 \\\n  --max-num-batched-tokens 1024 \\\n  --trust-remote-code --safetensors-load-strategy lazy \\\n  --gpu-memory-utilization {{gpu_memory_utilization}} \\\n  --speculative-config '{\"method\":\"qwen3_5_mtp\",\"num_speculative_tokens\":3}' \\\n  --dtype bfloat16 --enable-prefix-caching \\\n  --compilation-config '{\"cudagraph_mode\":\"NONE\"}' \\\n  --additional-config '{\"enable_cpu_binding\":true,\"multistream_overlap_shared_expert\":true}'\n```"
+  },
+  "scenarios[1].steps[1].title": {
+    "en": "Verify inference",
+    "zh": "推理验证"
+  },
+  "scenarios[1].steps[1].content": {
+    "en": "```bash\ncurl http://127.0.0.1:8000/v1/completions \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"model\":\"qwen3.6\",\"prompt\":\"The future of AI is\",\"max_tokens\":50,\"temperature\":0}'\n```",
+    "zh": "```bash\ncurl http://127.0.0.1:8000/v1/completions \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"model\":\"qwen3.6\",\"prompt\":\"The future of AI is\",\"max_tokens\":50,\"temperature\":0}'\n```"
+  },
+  "scenarios[2].deployment": {
+    "en": "Single-Node",
+    "zh": "单节点"
+  },
+  "scenarios[2].case": {
+    "en": "MXFP8 with Static Kernel and MTP",
+    "zh": "MXFP8 静态 Kernel 与 MTP"
+  },
+  "scenarios[2].steps[0].title": {
+    "en": "Start the server",
+    "zh": "启动服务"
+  },
+  "scenarios[2].steps[0].content": {
+    "en": "```bash\nexport ASCEND_RT_VISIBLE_DEVICES=0 VLLM_USE_V2_MODEL_RUNNER=1\nexport VLLM_EXECUTE_MODEL_TIMEOUT_SECONDS=3000 PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\nexport OMP_PROC_BIND=false OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 TASK_QUEUE_ENABLE=1\n\nvllm serve Eco-Tech/Qwen3.6-35B-A3B-w8a8-mxfp8 \\\n  --host 0.0.0.0 --port 8000 --served-model-name qwen3.6 \\\n  --trust-remote-code --quantization ascend --safetensors-load-strategy lazy \\\n  --tensor-parallel-size 1 --data-parallel-size 1 \\\n  --max-model-len {{max_model_len}} --max-num-seqs {{max_num_seqs}} \\\n  --max-num-batched-tokens {{max_num_batched_tokens}} \\\n  --gpu-memory-utilization {{gpu_memory_utilization}} \\\n  --speculative-config '{\"method\":\"qwen3_5_mtp\",\"num_speculative_tokens\":3}' \\\n  --compilation-config '{\"cudagraph_mode\":\"FULL_DECODE_ONLY\"}' \\\n  --additional-config '{\"enable_cpu_binding\":true,\"ascend_compilation_config\":{\"enable_npugraph_ex\":true,\"enable_static_kernel\":true,\"enable_super_kernel\":false}}' \\\n  --enable-prefix-caching\n```",
+    "zh": "```bash\nexport ASCEND_RT_VISIBLE_DEVICES=0 VLLM_USE_V2_MODEL_RUNNER=1\nexport VLLM_EXECUTE_MODEL_TIMEOUT_SECONDS=3000 PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\nexport OMP_PROC_BIND=false OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 TASK_QUEUE_ENABLE=1\n\nvllm serve Eco-Tech/Qwen3.6-35B-A3B-w8a8-mxfp8 \\\n  --host 0.0.0.0 --port 8000 --served-model-name qwen3.6 \\\n  --trust-remote-code --quantization ascend --safetensors-load-strategy lazy \\\n  --tensor-parallel-size 1 --data-parallel-size 1 \\\n  --max-model-len {{max_model_len}} --max-num-seqs {{max_num_seqs}} \\\n  --max-num-batched-tokens {{max_num_batched_tokens}} \\\n  --gpu-memory-utilization {{gpu_memory_utilization}} \\\n  --speculative-config '{\"method\":\"qwen3_5_mtp\",\"num_speculative_tokens\":3}' \\\n  --compilation-config '{\"cudagraph_mode\":\"FULL_DECODE_ONLY\"}' \\\n  --additional-config '{\"enable_cpu_binding\":true,\"ascend_compilation_config\":{\"enable_npugraph_ex\":true,\"enable_static_kernel\":true,\"enable_super_kernel\":false}}' \\\n  --enable-prefix-caching\n```"
+  },
+  "scenarios[2].steps[1].title": {
+    "en": "Verify inference",
+    "zh": "推理验证"
+  },
+  "scenarios[2].steps[1].content": {
+    "en": "```bash\ncurl http://127.0.0.1:8000/v1/completions \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"model\":\"qwen3.6\",\"prompt\":\"The future of AI is\",\"max_tokens\":50,\"temperature\":0}'\n```",
+    "zh": "```bash\ncurl http://127.0.0.1:8000/v1/completions \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"model\":\"qwen3.6\",\"prompt\":\"The future of AI is\",\"max_tokens\":50,\"temperature\":0}'\n```"
+  },
+  "scenarios[3].deployment": {
+    "en": "Single-Node",
+    "zh": "单节点"
+  },
+  "scenarios[3].case": {
+    "en": "TP2 Conservative Context",
+    "zh": "TP2 保守上下文配置"
+  },
+  "scenarios[3].steps[0].title": {
+    "en": "Start the server",
+    "zh": "启动服务"
+  },
+  "scenarios[3].steps[0].content": {
+    "en": "```bash\nexport ASCEND_RT_VISIBLE_DEVICES=0,1\nvllm serve Eco-Tech/Qwen3.6-35B-A3B-w8a8 \\\n  --host 127.0.0.1 --port 8080 --tensor-parallel-size 2 \\\n  --gpu-memory-utilization 0.90 --max-num-seqs 16 \\\n  --served-model-name qwen3.6 --dtype float16 \\\n  --additional-config '{\"ascend_compilation_config\":{\"enable_npugraph_ex\":false}}' \\\n  --compilation-config '{\"cudagraph_mode\":\"FULL_DECODE_ONLY\",\"cudagraph_capture_sizes\":[1,8]}' \\\n  --quantization ascend --max-model-len 20480 --no-enable-prefix-caching\n```",
+    "zh": "```bash\nexport ASCEND_RT_VISIBLE_DEVICES=0,1\nvllm serve Eco-Tech/Qwen3.6-35B-A3B-w8a8 \\\n  --host 127.0.0.1 --port 8080 --tensor-parallel-size 2 \\\n  --gpu-memory-utilization 0.90 --max-num-seqs 16 \\\n  --served-model-name qwen3.6 --dtype float16 \\\n  --additional-config '{\"ascend_compilation_config\":{\"enable_npugraph_ex\":false}}' \\\n  --compilation-config '{\"cudagraph_mode\":\"FULL_DECODE_ONLY\",\"cudagraph_capture_sizes\":[1,8]}' \\\n  --quantization ascend --max-model-len 20480 --no-enable-prefix-caching\n```"
+  },
+  "scenarios[3].steps[1].title": {
+    "en": "Verify inference",
+    "zh": "推理验证"
+  },
+  "scenarios[3].steps[1].content": {
+    "en": "```bash\ncurl http://127.0.0.1:8080/v1/completions \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"model\":\"qwen3.6\",\"prompt\":\"The future of AI is\",\"max_tokens\":50,\"temperature\":0}'\n```",
+    "zh": "```bash\ncurl http://127.0.0.1:8080/v1/completions \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"model\":\"qwen3.6\",\"prompt\":\"The future of AI is\",\"max_tokens\":50,\"temperature\":0}'\n```"
+  },
+  "verification": {
+    "en": "On two Atlas 800T A3 NPUs with checkpoint revision 1a118d717bcbd59480f4a110fe22181d21711b4d, vLLM Ascend 0.19.1rc2.dev3230+g469c6c260 and CANN 9.2.1, the W8A8 tutorial configuration failed during initialization with both Model Runner V1 and V2. The runtime reports `Transdata op, groups should be greater than 1, but now is 1`. Disabling `multistream_overlap_shared_expert` did not remove the error. The original configuration remains experimental and has not passed end-to-end acceptance on this nightly image.",
+    "zh": "在两卡 Atlas 800T A3、权重 revision 1a118d717bcbd59480f4a110fe22181d21711b4d、vLLM Ascend 0.19.1rc2.dev3230+g469c6c260 与 CANN 9.2.1 环境中，W8A8 教程配置在 Model Runner V1 和 V2 的初始化阶段均失败，底层错误为 `Transdata op, groups should be greater than 1, but now is 1`。关闭 `multistream_overlap_shared_expert` 后错误仍存在。原始配置保持 experimental，尚未通过该 nightly 镜像的端到端验收。"
+  },
+  "performance.accuracy": {
+    "en": "The official tutorial reports MMMU accuracy 83.3 and GPQA accuracy 83.3 using AISBench in generation mode. See [Using AISBench](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/evaluation/using_ais_bench.html) for the evaluation workflow.",
+    "zh": "官方教程使用 AISBench 在生成模式下测得 MMMU 准确率 83.3、GPQA 准确率 83.3。评测流程参见 [使用 AISBench](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/evaluation/using_ais_bench.html)。"
+  },
+  "performance.benchmark": {
+    "en": "The tutorial publishes no scenario-specific performance number, so this check is not applicable. Record measured results with [vLLM benchmark](https://docs.vllm.ai/en/latest/benchmarking/) and link the official tutorial when submitting evidence.",
+    "zh": "教程没有发布分场景性能数字，因此本项不适用。使用 [vLLM benchmark](https://docs.vllm.ai/en/latest/benchmarking/) 记录实测结果，并在提交证据时链接官方教程。"
+  },
+  "tuning": {
+    "en": "For long context, use TP2 or more and reduce `--max-num-seqs` if HBM is insufficient. For high throughput, use multiple local DP groups and tune `--max-num-batched-tokens`. For low latency, prefer full decode ACLGraph and disable speculative decoding by default.\n\nOn Atlas 800 A2 this scenario keeps the W8A8 checkpoint, disables expert parallelism and\nuses `--dtype bfloat16` to avoid the FP16 activation path that triggers the grouped-matmul\nscale dtype limitation on 910B4. This combination starts successfully on the 32 GB A2\nrunner. Expert parallelism will be restored once vllm-ascend#20702 ships in the public image.\n\nOn Atlas 800 A3, the W8A8 scenario uses the same BF16 and no-expert-parallel combination\nas a temporary workaround for the public v0.30.0-a3 image. This does not verify the original\nFP16 + expert-parallel tutorial scenario, which remains blocked until vllm-ascend#20702 or\nan equivalent scale-dtype fix is available in the image.",
+    "zh": "长上下文场景使用 TP2 或更高配置，显存不足时降低 `--max-num-seqs`。高吞吐场景使用多个本地 DP 组并调整 `--max-num-batched-tokens`。低时延场景优先使用全量 Decode ACLGraph，并默认关闭投机解码。\n\nAtlas 800 A2 场景保留 W8A8 权重，关闭专家并行，并使用 `--dtype bfloat16` 避开触发\n910B4 grouped-matmul scale dtype 限制的 FP16 激活路径；该组合已在 32 GB A2 runner 上\n成功启动。待上游 vllm-ascend#20702 进入公开镜像后，恢复专家并行。\n\nAtlas 800 A3 的 W8A8 场景同样采用 BF16 并关闭专家并行，作为公开 v0.30.0-a3 镜像的\n临时绕过方案。这不代表原 FP16 + 专家并行教程场景已通过验证；该场景仍需等待\nvllm-ascend#20702 或等价的 scale dtype 修复进入镜像。"
+  },
+  "references[0].title": {
+    "en": "Official vLLM-Ascend tutorial (main)",
+    "zh": "官方 vLLM-Ascend 教程（main）"
+  },
+  "references[1].title": {
+    "en": "BF16 checkpoint",
+    "zh": "BF16 权重"
+  },
+  "references[2].title": {
+    "en": "W8A8 checkpoint",
+    "zh": "W8A8 权重"
+  },
+  "references[3].title": {
+    "en": "W8A8 MXFP8 checkpoint",
+    "zh": "W8A8 MXFP8 权重"
+  },
+  "references[4].title": {
+    "en": "W8A8C8 MXFP8 checkpoint",
+    "zh": "W8A8C8 MXFP8 权重"
+  },
+  "references[5].title": {
+    "en": "W4A8 MXFP checkpoint",
+    "zh": "W4A8 MXFP 权重"
+  }
+}

@@ -146,8 +146,9 @@ cleanup() {
 trap cleanup EXIT
 
 # Reuse the runtime image's framework dependencies while keeping AISBench in
-# the shared cache. Kubernetes supplies the cluster-local Python package index;
-# local runs use the caller's existing pip configuration.
+# the shared cache. Kubernetes supplies the Huawei Cloud public Python package
+# index through PIP_INDEX_URL; local runs use the caller's existing pip
+# configuration.
 "$AIS_BENCH_PYTHON" -m venv --system-site-packages "$staging_directory/venv"
 echo "Installing ${AIS_BENCH_PACKAGE_NAME}==${AIS_BENCH_PACKAGE_VERSION}"
 "$staging_directory/venv/bin/python" -m pip install \

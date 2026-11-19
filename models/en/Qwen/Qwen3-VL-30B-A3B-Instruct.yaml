@@ -4,10 +4,12 @@ meta:
   provider: "Qwen"
   description: "Qwen3-VL-30B-A3B-Instruct is a sparse Mixture-of-Experts vision-language model with about 30B total parameters and about 3B active parameters per token. It supports image understanding, video understanding, multimodal dialogue, and long-context serving."
   date_added: 2026-08-29
+  date_updated: 2026-10-12
   difficulty: intermediate
   tasks: [multimodal]
-  performance_headline: "Single-node W8A8 deployment on Ascend 950DT (96 GB × 8)"
+  performance_headline: "Single-node serving on Atlas 800I A3 (BF16, TP2) or Ascend 950DT (W8A8, TP8)"
   hardware:
+    atlas_800_a3: verified
     ascend_950dt: experimental
 
 model:
@@ -19,57 +21,50 @@ model:
   context_length: 262144
   modality: multimodal
   base_args:
-    - "--distributed-executor-backend"
-    - "mp"
     - "--data-parallel-size"
     - "1"
-    - "--tensor-parallel-size"
-    - "8"
     - "--enable-expert-parallel"
     - "--seed"
     - "1024"
-    - "--quantization"
-    - "ascend"
     - "--served-model-name"
     - "qwen3-vl-30b"
-    - "--trust-remote-code"
   base_env:
     VLLM_USE_MODELSCOPE: "True"
     PYTORCH_NPU_ALLOC_CONF: "expandable_segments:True"
     HCCL_OP_EXPANSION_MODE: "AIV"
-    HCCL_BUFFSIZE: "400"
-    OMP_PROC_BIND: "false"
-    OMP_NUM_THREADS: "100"
-    TASK_QUEUE_ENABLE: "1"
-    VLLM_ASCEND_ENABLE_FLASHCOMM1: "1"
   docker_image:
+    atlas_800_a3: "quay.io/ascend/vllm-ascend:v0.23.0-a3"
     ascend_950dt: "quay.io/ascend/vllm-ascend:v0.23.0-a5"
   nightly_required: false
   install:
     pip: false
     docker:
-      command: "docker pull quay.io/ascend/vllm-ascend:v0.23.0-a5"
-      note: "Use the public v0.23.0 A5 image; the complete device and driver mounts are shown below."
+      command: "docker pull quay.io/ascend/vllm-ascend:v0.23.0-a3"
+      note: "Atlas 800I A3 uses the v0.23.0 A3 image and Ascend 950DT uses the v0.23.0 A5 image; the complete device and driver mounts are shown below."
 
 features:
   expert_parallel:
     label: "Expert Parallelism"
-    description: "Distributes MoE experts across the eight NPU ranks."
+    description: "Distributes MoE experts across NPU ranks."
     args: ["--enable-expert-parallel"]
   flashcomm1:
     label: "FlashComm1"
-    description: "Ascend communication optimization used by the tutorial baseline."
+    description: "Ascend communication optimization used by the Ascend 950DT W8A8 baseline."
     env:
       VLLM_ASCEND_ENABLE_FLASHCOMM1: "1"
   prefix_caching:
     label: "Prefix Caching"
-    description: "Disabled in the image-only tutorial baseline."
+    description: "Disabled in the tutorial baselines; enable for repeated-prefix workloads."
     args: ["--enable-prefix-caching"]
     flag_when_false: "--no-enable-prefix-caching"
   compilation_config:
     label: "Compilation Config"
-    description: "Full decode ACLGraph replay used by the tutorial baseline."
+    description: "Full decode ACLGraph replay used by the tutorial baselines."
     args: ["--compilation-config", "{\"cudagraph_mode\":\"FULL_DECODE_ONLY\"}"]
+  fused_mc2:
+    label: "Fused MC2"
+    description: "Fused MoE communication kernel used by the Atlas 800I A3 BF16 baseline."
+    args: ["--additional-config", "{\"enable_fused_mc2\": 1}"]
 
 opt_in_features: [prefix_caching]
 
@@ -78,22 +73,48 @@ variants:
     precision: W8A8
     vram_minimum_gb: 36
     description: "W8A8 quantized checkpoint for one Ascend 950DT node."
+  bf16:
+    model_id: "Qwen/Qwen3-VL-30B-A3B-Instruct"
+    precision: BF16
+    vram_minimum_gb: 72
+    description: "Original BF16 checkpoint for one Atlas 800I A3 node (also runs on one Atlas 800 A2 node) with tensor parallelism 2."
+    supported_hardware: [atlas_800_a3]
 
-compatible_strategies: [single_node_A5]
+compatible_strategies: [single_node_A3, single_node_A5]
 hardware_overrides: {}
 strategy_overrides: {}
 guide: ""
+
+performance_model_names:
+  - "Qwen3-VL-30B-A3B-Instruct"
 
 config_params:
   gpu_memory_utilization:
     default: 0.9
     type: number
     description: "Fraction of NPU memory vLLM uses for KV-cache capacity."
+  max_model_len:
+    default: 32768
+    type: number
+    description: "Maximum input plus output length of a single request."
+  max_num_seqs:
+    default: 32
+    type: number
+    description: "Maximum number of active requests scheduled per DP group."
 
 overview: |-
   Qwen3-VL-30B-A3B-Instruct is a sparse MoE model in the Qwen3-VL family. Its vision-language design supports image understanding, video understanding, and multimodal dialogue while activating about 3B parameters per token.
 
 weight_download:
+  - weight_version: BF16
+    sources:
+      - source: ModelScope
+        url: https://modelscope.cn/models/Qwen/Qwen3-VL-30B-A3B-Instruct
+        command: |-
+          ```bash
+          pip install modelscope
+          modelscope download --model Qwen/Qwen3-VL-30B-A3B-Instruct
+          ```
   - weight_version: W8A8 MXFP8
     sources:
       - source: ModelScope
@@ -107,10 +128,52 @@ weight_download:
 prerequisites:
   - title: Model weight
     content: |-
-      The W8A8 checkpoint requires one Ascend 950DT node with eight 96 GB NPUs. Download the public ModelScope checkpoint before starting the service.
+      The BF16 checkpoint requires one Atlas 800I A3 node with sixteen 64 GB NPUs, or one Atlas 800 A2 node with eight 64 GB NPUs, using tensor parallelism 2. The W8A8 checkpoint requires one Ascend 950DT node with eight 96 GB NPUs. Download the checkpoint from ModelScope before starting the service.
 
 env_setup:
   container:
+    A3:
+      content: |-
+        Pull the public v0.23.0 A3 image and start it with the device and driver mounts from the official tutorial.
+
+        ```bash
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0-a3
+        export NAME=vllm-ascend
+
+        docker run --rm \
+          --name $NAME \
+          --net=host \
+          --shm-size=512g \
+          --privileged=true \
+          --device /dev/davinci0 \
+          --device /dev/davinci1 \
+          --device /dev/davinci2 \
+          --device /dev/davinci3 \
+          --device /dev/davinci4 \
+          --device /dev/davinci5 \
+          --device /dev/davinci6 \
+          --device /dev/davinci7 \
+          --device /dev/davinci8 \
+          --device /dev/davinci9 \
+          --device /dev/davinci10 \
+          --device /dev/davinci11 \
+          --device /dev/davinci12 \
+          --device /dev/davinci13 \
+          --device /dev/davinci14 \
+          --device /dev/davinci15 \
+          --device /dev/davinci_manager \
+          --device /dev/devmm_svm \
+          --device /dev/hisi_hdc \
+          -v /usr/local/dcmi:/usr/local/dcmi \
+          -v /usr/local/Ascend/driver/tools/hccn_tool:/usr/local/Ascend/driver/tools/hccn_tool \
+          -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+          -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \
+          -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
+          -v /etc/ascend_install.info:/etc/ascend_install.info \
+          -v /etc/hccn.conf:/etc/hccn.conf \
+          -v /root/.cache:/root/.cache \
+          -it $IMAGE bash
+        ```
     A5:
       content: |-
         Pull the public v0.23.0 A5 image and start it with the device and driver mounts from the official tutorial.
@@ -149,6 +212,211 @@ env_setup:
         ```
 
 scenarios:
+  - npu: Atlas 800I A3
+    precision: BF16
+    deployment: Single-Node
+    case: Image-Only Online Serving (A3)
+    tags: [a3-single]
+    strategy: single_node_A3
+    steps:
+      - title: Start the server
+        content: |-
+          This scenario runs the original BF16 checkpoint on one Atlas 800I A3 node (sixteen 64 GB NPUs) with tensor parallelism 2 and accepts image inputs only.
+
+          ```bash
+          export VLLM_USE_MODELSCOPE=True
+          export HCCL_BUFFSIZE=1024
+          export HCCL_OP_EXPANSION_MODE="AIV"
+          export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+
+          vllm serve your_model_path \
+            --host 0.0.0.0 \
+            --port 8000 \
+            --served-model-name qwen3-vl-30b \
+            --data-parallel-size 1 \
+            --tensor-parallel-size 2 \
+            --enable-expert-parallel \
+            --seed 1024 \
+            --max-num-seqs {{max_num_seqs}} \
+            --max-model-len {{max_model_len}} \
+            --max-num-batched-tokens 16384 \
+            --gpu-memory-utilization {{gpu_memory_utilization}} \
+            {{prefix_caching}} \
+            --mm-processor-cache-gb 0 \
+            --limit-mm-per-prompt.image 1 \
+            --limit-mm-per-prompt.video 0 \
+            --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY","cudagraph_capture_sizes":[1,2,4,8,16,24,32]}' \
+            {{fused_mc2}}
+          ```
+      - title: Verify the service
+        content: |-
+          ```bash
+          curl http://<server_ip>:<port>/v1/chat/completions \
+            -H "Content-Type: application/json" \
+            -d '{
+              "model": "qwen3-vl-30b",
+              "messages": [
+                {"role": "user", "content": "Who are you?"}
+              ],
+              "max_tokens": 256,
+              "temperature": 0
+            }'
+          ```
+
+          The service returns HTTP 200 OK with a JSON response containing the `choices` field.
+      - title: Verify image understanding
+        content: |-
+          ```bash
+          curl http://<server_ip>:<port>/v1/chat/completions \
+            -H "Content-Type: application/json" \
+            -d '{
+              "model": "qwen3-vl-30b",
+              "messages": [
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "user", "content": [
+                  {"type": "image_url", "image_url": {"url": "https://modelscope.oss-cn-beijing.aliyuncs.com/resource/qwen.png"}},
+                  {"type": "text", "text": "What is the text in the illustration?"}
+                ]}
+              ],
+              "max_completion_tokens": 100,
+              "temperature": 0
+            }'
+          ```
+
+          The HTTP status is 200 and the JSON response contains a `choices` field with generated text, for example text similar to `TONGYI Qwen`.
+  - npu: Atlas 800I A3
+    precision: BF16
+    deployment: Single-Node
+    case: Video Serving (A3)
+    tags: [a3-single, video]
+    strategy: single_node_A3
+    steps:
+      - title: Start the server
+        content: |-
+          Video requests consume more memory, so the video scenario uses a smaller `--max-num-seqs` (8), a longer `--max-model-len` (128000), and a local media path for video files.
+
+          ```bash
+          mkdir -p /media
+
+          export VLLM_USE_MODELSCOPE=True
+          export HCCL_BUFFSIZE=1024
+          export HCCL_OP_EXPANSION_MODE="AIV"
+          export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+
+          vllm serve your_model_path \
+            --host 0.0.0.0 \
+            --port 8000 \
+            --served-model-name qwen3-vl-30b \
+            --data-parallel-size 1 \
+            --tensor-parallel-size 2 \
+            --enable-expert-parallel \
+            --seed 1024 \
+            --max-num-seqs 8 \
+            --max-model-len 128000 \
+            --max-num-batched-tokens 4096 \
+            --gpu-memory-utilization 0.9 \
+            --no-enable-prefix-caching \
+            --mm-processor-cache-gb 0 \
+            --limit-mm-per-prompt.image 1 \
+            --limit-mm-per-prompt.video 1 \
+            --allowed-local-media-path /media \
+            --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY","cudagraph_capture_sizes":[1,2,4,8,16,24,32]}' \
+            --additional-config '{"enable_fused_mc2": 1}'
+          ```
+      - title: Verify the service
+        content: |-
+          ```bash
+          curl http://<server_ip>:<port>/v1/chat/completions \
+            -H "Content-Type: application/json" \
+            -d '{
+              "model": "qwen3-vl-30b",
+              "messages": [
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "user", "content": [
+                  {"type": "image_url", "image_url": {"url": "https://modelscope.oss-cn-beijing.aliyuncs.com/resource/qwen.png"}},
+                  {"type": "text", "text": "What is the text in the illustration?"}
+                ]}
+              ],
+              "max_completion_tokens": 100,
+              "temperature": 0
+            }'
+          ```
+
+          The HTTP status is 200 and the JSON response contains a `choices` field with generated text.
+
+          For a video request, use a video URL that the server can access. The example below uses a public sample video; for local files, mount the host media directory to `/media` and use a `file:///media/...` URL instead:
+
+          ```bash
+          curl http://<server_ip>:<port>/v1/chat/completions \
+            -H "Content-Type: application/json" \
+            -d '{
+              "model": "qwen3-vl-30b",
+              "messages": [
+                {"role": "user", "content": [
+                  {"type": "video_url", "video_url": {"url": "https://qianwen-res.oss-cn-beijing.aliyuncs.com/Qwen3-Omni/demo/draw.mp4"}},
+                  {"type": "text", "text": "Describe this video."}
+                ]}
+              ],
+              "max_completion_tokens": 256,
+              "temperature": 0
+            }'
+          ```
+  - npu: Atlas 800I A3
+    precision: BF16
+    deployment: Single-Node
+    case: Functional Graph Validation (A3)
+    tags: [a3-single, pp]
+    strategy: single_node_A3
+    steps:
+      - title: Start the server
+        content: |-
+          This two-NPU functional scenario uses pipeline parallelism (`--tensor-parallel-size 1 --pipeline-parallel-size 2`) with a short context to validate full decode ACLGraph behavior.
+
+          The `--hf-overrides` argument is required when pipeline parallelism is enabled on vLLM v0.23.0: the PP capability check validates `text_config.architectures`, which multimodal checkpoints do not set by default. Without this override, startup fails with `No model architectures are specified`.
+
+          ```bash
+          export VLLM_USE_MODELSCOPE=True
+          export HCCL_BUFFSIZE=1024
+          export HCCL_OP_EXPANSION_MODE="AIV"
+          export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+
+          vllm serve your_model_path \
+            --host 0.0.0.0 \
+            --port 8000 \
+            --served-model-name qwen3-vl-30b \
+            --data-parallel-size 1 \
+            --tensor-parallel-size 1 \
+            --pipeline-parallel-size 2 \
+            --enable-expert-parallel \
+            --seed 1024 \
+            --max-num-seqs 8 \
+            --max-model-len 4096 \
+            --max-num-batched-tokens 1024 \
+            --gpu-memory-utilization 0.9 \
+            --no-enable-prefix-caching \
+            --mm-processor-cache-gb 0 \
+            --limit-mm-per-prompt.image 1 \
+            --limit-mm-per-prompt.video 0 \
+            --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY","cudagraph_capture_sizes":[1,2,4,8,16,24,32]}' \
+            --additional-config '{"enable_fused_mc2": 1}' \
+            --hf-overrides '{"text_config": {"architectures": ["Qwen3MoeForCausalLM"]}}'
+          ```
+      - title: Verify the service
+        content: |-
+          ```bash
+          curl http://<server_ip>:<port>/v1/chat/completions \
+            -H "Content-Type: application/json" \
+            -d '{
+              "model": "qwen3-vl-30b",
+              "messages": [
+                {"role": "user", "content": "Who are you?"}
+              ],
+              "max_tokens": 256,
+              "temperature": 0
+            }'
+          ```
+
+          The service returns HTTP 200 OK with a JSON response containing the `choices` field.
   - npu: Ascend 950DT
     precision: W8A8
     deployment: Single-Node
@@ -215,14 +483,14 @@ verification: |-
 
 performance:
   accuracy: |-
-    The official tutorial reports an AISBench result of 0.58 for `mmmu_val` using `acc,none` in generation mode. See [Using AISBench](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/evaluation/using_ais_bench.html) for the evaluation workflow.
+    The official tutorial reports an AISBench result of 0.58 for `mmmu_val` using `acc,none` in generation mode. On a single Atlas 800I A3 node, a reproduced run with the TP2 BF16 scenario (seed 1024, temperature 0) scores 66.22 overall accuracy over the full 900-question validation set, meeting the reference. Note that AISBench passes MMMU images to the server as `file://` local paths, so the serving command must add `--allowed-local-media-path <path to MMMU_images>`. See [Using AISBench](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/evaluation/using_ais_bench.html) for the evaluation workflow.
   benchmark: |-
     For serving-pipeline validation, run [vLLM benchmark](https://docs.vllm.ai/en/latest/benchmarking/) with the documented command:
 
     ```bash
     export VLLM_USE_MODELSCOPE=True
     vllm bench serve \
-      --model Eco-Tech/Qwen3-VL-30B-A3B-Instruct-w8a8-mxfp8 \
+      --model Qwen/Qwen3-VL-30B-A3B-Instruct \
       --served-model-name qwen3-vl-30b \
       --dataset-name random \
       --random-input 200 \
@@ -233,15 +501,35 @@ performance:
     ```
 
 tuning: |-
-  Start with image-only serving. Reduce `--max-model-len`, `--max-num-seqs`, `--max-num-batched-tokens`, or `--gpu-memory-utilization` if startup runs out of memory. Enable video only when needed and tune multimodal prompt limits for the workload.
+  Recommended tuning order (from the official tutorial):
+
+  1. Start from the image-only baseline and confirm the service is stable.
+  2. Tune `--max-model-len` for the workload; `128000` is a practical value for many image/video workloads.
+  3. Tune `--gpu-memory-utilization` only after the service is stable.
+  4. Tune `--max-num-batched-tokens`: larger values usually improve prefill throughput but increase activation memory; video-heavy workloads usually need conservative values.
+  5. Tune `--max-num-seqs` for the target concurrency; video requests are more memory intensive than image requests, so start with a smaller value.
+  6. Enable video inputs only when the workload needs them and tune `--limit-mm-per-prompt` accordingly.
+  7. Tune ACLGraph capture: `FULL_DECODE_ONLY` is recommended for decode; when setting `cudagraph_capture_sizes` manually, include the common decode batch sizes.
+
+  Model-specific options: `--allowed-local-media-path /media` avoids slow network video downloads during serving; `--compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY"}'` reduces operator dispatch overhead and stabilizes decode performance; `--pipeline-parallel-size 2` provides another two-card validation layout using shorter context and lower batch tokens.
 
 faq: |-
-  For startup OOM, begin with image-only inputs and video disabled. Prefix caching benefits repeated prefixes; compare it against the baseline for workloads with unique images or random prompts.
+  **Startup OOM.** Long context, high image resolution, video inputs, large `--max-num-seqs`, large `--max-num-batched-tokens`, or high `--gpu-memory-utilization` can leave insufficient HBM headroom. Start with image-only serving (`--limit-mm-per-prompt.video 0`), reduce `--max-model-len`, lower `--max-num-seqs`, lower `--max-num-batched-tokens`, or reduce `--gpu-memory-utilization`. Keep `PYTORCH_NPU_ALLOC_CONF=expandable_segments:True`.
+
+  **The service reserves more memory than expected for image-only requests.** Allowing video inputs can reserve memory for long visual embeddings and preprocessing paths. Use `--limit-mm-per-prompt.video 0` for image-only serving and enable video only when the workload needs it.
+
+  **A video request fails with a local file path.** The server can only access local media paths that are mounted into the container and allowed by `--allowed-local-media-path`. Mount the host media directory to `/media`, start the server with `--allowed-local-media-path /media`, and use a request URL like `file:///media/...` (replace `...` with the video filename).
+
+  **Enabling prefix caching does not improve performance.** Prefix caching only helps when requests share reusable prefixes. Unique images, unique videos, or random prompts may add memory pressure without visible gains. Enable prefix caching for repeated-prefix workloads; for random benchmarks or memory-constrained video workloads, compare with prefix caching disabled.
+
+  **Multimodal accuracy evaluation fails to insert image tokens.** Qwen3-VL multimodal tasks rely on the model chat template to insert image placeholder tokens before multimodal processing. Enable chat template application in the evaluation configuration; for lm_eval-based multimodal tasks, set `apply_chat_template` to true.
 
 references:
   - title: "Official vLLM-Ascend tutorial (v0.23.0)"
     url: https://github.com/vllm-project/vllm-ascend/blob/v0.23.0/docs/source/tutorials/models/Qwen3-VL-30B-A3B-Instruct.md
-  - title: "ModelScope checkpoint"
+  - title: "BF16 checkpoint"
+    url: https://modelscope.cn/models/Qwen/Qwen3-VL-30B-A3B-Instruct
+  - title: "W8A8 checkpoint"
     url: https://modelscope.cn/models/Eco-Tech/Qwen3-VL-30B-A3B-Instruct-w8a8-mxfp8
   - title: "vLLM-Ascend Docker installation"
     url: https://docs.vllm.ai/projects/ascend/en/latest/installation.html

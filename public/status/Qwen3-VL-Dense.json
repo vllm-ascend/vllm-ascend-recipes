@@ -1,0 +1,24 @@
+{
+  "model": "Qwen3-VL-Dense",
+  "last_pr_run": {
+    "kind": "pr",
+    "status": "fail",
+    "conclusion": "failure",
+    "head_sha": "6d606116f338e1210eeffb275d9f4e33cf2f1e72",
+    "head_sha_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/commit/6d606116f338e1210eeffb275d9f4e33cf2f1e72",
+    "workflow_run_id": 41448583161,
+    "workflow_run_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/actions/runs/41448583161",
+    "recipe_path": "models/en/Qwen/Qwen3-VL-Dense.yaml",
+    "recipe_yaml_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/blob/6d606116f338e1210eeffb275d9f4e33cf2f1e72/models/en/Qwen/Qwen3-VL-Dense.yaml",
+    "params_url": "https://vllm-ascend.github.io/vllm-ascend-recipes/runs/6d606116f338e1210eeffb275d9f4e33cf2f1e72/Qwen3-VL-Dense.params.json",
+    "started_at": "2026-11-02T12:55:01Z",
+    "finished_at": "2026-11-02T13:29:55Z",
+    "pr_number": null,
+    "pr_url": null,
+    "pr_title": null,
+    "pr_author": null
+  },
+  "last_nightly_run": null,
+  "last_manual_run": null,
+  "targets": {}
+}

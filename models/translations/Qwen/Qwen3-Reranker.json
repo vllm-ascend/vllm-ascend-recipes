@@ -1,0 +1,174 @@
+{
+  "meta.title": {
+    "en": "Qwen3-Reranker",
+    "zh": "Qwen3-Reranker"
+  },
+  "meta.description": {
+    "en": "Qwen3 Reranker series for text ranking (0.6B / 4B / 8B). Built on Qwen3 dense backbones and served via vLLM-Ascend pooling runner with the /v1/rerank API.",
+    "zh": "Qwen3 Reranker 文本排序系列（0.6B / 4B / 8B）。基于 Qwen3 稠密骨干，通过 vLLM-Ascend pooling runner 提供 /v1/rerank 服务。"
+  },
+  "meta.performance_headline": {
+    "en": "Single-node pooling serve on Atlas 800 A2/A3 and Atlas 300I DUO",
+    "zh": "Atlas 800 A2/A3 与 Atlas 300I DUO 单节点 pooling 部署"
+  },
+  "model.install.docker.note": {
+    "en": "Official Ascend image; full device/driver mounts are covered in env_setup.container.",
+    "zh": "Ascend 官方镜像；完整设备/驱动挂载见 env_setup.container。"
+  },
+  "variants.default.description": {
+    "en": "BF16 Qwen3-Reranker-0.6B (tutorial baseline)",
+    "zh": "BF16 Qwen3-Reranker-0.6B（教程基线）"
+  },
+  "variants.reranker_4b.description": {
+    "en": "BF16 Qwen3-Reranker-4B",
+    "zh": "BF16 Qwen3-Reranker-4B"
+  },
+  "variants.reranker_8b.description": {
+    "en": "BF16 Qwen3-Reranker-8B",
+    "zh": "BF16 Qwen3-Reranker-8B"
+  },
+  "config_params.max_model_len.description": {
+    "en": "Maximum context length (input + output tokens). Keep conservative on Atlas 300I DUO to avoid OOM.",
+    "zh": "最大上下文长度（单请求输入+输出）。在 Atlas 300I DUO 上建议取保守值，避免 OOM。"
+  },
+  "overview": {
+    "en": "The Qwen3 Reranker model series is designed for text ranking tasks. Building upon the dense foundational models of the Qwen3 series, it provides reranking models in 0.6B, 4B, and 8B sizes. This recipe shows how to serve the official original checkpoints with vLLM Ascend using the pooling runner and the OpenAI-compatible `/v1/rerank` API. Requires vLLM Ascend 0.9.2rc1 or newer.",
+    "zh": "Qwen3 Reranker 系列面向文本排序任务。基于 Qwen3 稠密基础模型，提供 0.6B、4B、8B 多规格重排序模型。本 recipe 展示如何用 vLLM Ascend 的 pooling runner 拉起官方原始权重，并通过 OpenAI 兼容的 `/v1/rerank` 接口验证。需要 vLLM Ascend 0.9.2rc1 及以上版本。"
+  },
+  "weight_download[0].weight_version": {
+    "en": "BF16 (0.6B)",
+    "zh": "BF16 (0.6B)"
+  },
+  "weight_download[1].weight_version": {
+    "en": "BF16 (4B)",
+    "zh": "BF16 (4B)"
+  },
+  "weight_download[2].weight_version": {
+    "en": "BF16 (8B)",
+    "zh": "BF16 (8B)"
+  },
+  "prerequisites[0].title": {
+    "en": "Model Weight",
+    "zh": "模型权重"
+  },
+  "prerequisites[0].content": {
+    "en": "| Weight Version       | Download Links |\n|-----------------------|----------------|\n| `Qwen3-Reranker-8B`   | [ModelScope](https://www.modelscope.cn/models/Qwen/Qwen3-Reranker-8B) |\n| `Qwen3-Reranker-4B`   | [ModelScope](https://www.modelscope.cn/models/Qwen/Qwen3-Reranker-4B) |\n| `Qwen3-Reranker-0.6B` | [ModelScope](https://www.modelscope.cn/models/Qwen/Qwen3-Reranker-0.6B) |\n\nIt is recommended to download the model weight to a shared cache directory such as `/root/.cache/`.\n\n> **Path description**: Record the local path and ensure subsequent `vllm serve` commands point to the same directory (or use the HuggingFace / ModelScope model id with cache enabled).",
+    "zh": "| 权重版本              | 下载链接 |\n|-----------------------|----------|\n| `Qwen3-Reranker-8B`   | [ModelScope](https://www.modelscope.cn/models/Qwen/Qwen3-Reranker-8B) |\n| `Qwen3-Reranker-4B`   | [ModelScope](https://www.modelscope.cn/models/Qwen/Qwen3-Reranker-4B) |\n| `Qwen3-Reranker-0.6B` | [ModelScope](https://www.modelscope.cn/models/Qwen/Qwen3-Reranker-0.6B) |\n\n建议将权重下载到共享缓存目录，例如 `/root/.cache/`。\n\n> **路径说明**：记录本地下载路径，确保后续 `vllm serve` 命令指向同一目录（或启用缓存后直接使用 HuggingFace / ModelScope 模型 id）。"
+  },
+  "env_setup.container.A3.content": {
+    "en": "Start the docker image on each node.\n\n```bash\nexport IMAGE=quay.io/ascend/vllm-ascend:v0.23.0rc1-a3\ndocker run --rm \\\n    --name vllm-ascend \\\n    --shm-size=1g \\\n    --net=host \\\n    --privileged=true \\\n    --device /dev/davinci0 \\\n    --device /dev/davinci_manager \\\n    --device /dev/devmm_svm \\\n    --device /dev/hisi_hdc \\\n    -v /usr/local/dcmi:/usr/local/dcmi \\\n    -v /usr/local/Ascend/driver/tools/hccn_tool:/usr/local/Ascend/driver/tools/hccn_tool \\\n    -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \\\n    -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \\\n    -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \\\n    -v /etc/ascend_install.info:/etc/ascend_install.info \\\n    -v /root/.cache:/root/.cache \\\n    -it $IMAGE bash\n```",
+    "zh": "在每个节点启动 Docker 镜像。\n\n```bash\nexport IMAGE=quay.io/ascend/vllm-ascend:v0.23.0rc1-a3\ndocker run --rm \\\n    --name vllm-ascend \\\n    --shm-size=1g \\\n    --net=host \\\n    --privileged=true \\\n    --device /dev/davinci0 \\\n    --device /dev/davinci_manager \\\n    --device /dev/devmm_svm \\\n    --device /dev/hisi_hdc \\\n    -v /usr/local/dcmi:/usr/local/dcmi \\\n    -v /usr/local/Ascend/driver/tools/hccn_tool:/usr/local/Ascend/driver/tools/hccn_tool \\\n    -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \\\n    -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \\\n    -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \\\n    -v /etc/ascend_install.info:/etc/ascend_install.info \\\n    -v /root/.cache:/root/.cache \\\n    -it $IMAGE bash\n```"
+  },
+  "env_setup.container.A2.content": {
+    "en": "Start the docker image on each node.\n\n```bash\nexport IMAGE=quay.io/ascend/vllm-ascend:v0.23.0rc1\ndocker run --rm \\\n    --name vllm-ascend \\\n    --shm-size=1g \\\n    --net=host \\\n    --privileged=true \\\n    --device /dev/davinci0 \\\n    --device /dev/davinci_manager \\\n    --device /dev/devmm_svm \\\n    --device /dev/hisi_hdc \\\n    -v /usr/local/dcmi:/usr/local/dcmi \\\n    -v /usr/local/Ascend/driver/tools/hccn_tool:/usr/local/Ascend/driver/tools/hccn_tool \\\n    -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \\\n    -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \\\n    -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \\\n    -v /etc/ascend_install.info:/etc/ascend_install.info \\\n    -v /root/.cache:/root/.cache \\\n    -it $IMAGE bash\n```",
+    "zh": "在每个节点启动 Docker 镜像。\n\n```bash\nexport IMAGE=quay.io/ascend/vllm-ascend:v0.23.0rc1\ndocker run --rm \\\n    --name vllm-ascend \\\n    --shm-size=1g \\\n    --net=host \\\n    --privileged=true \\\n    --device /dev/davinci0 \\\n    --device /dev/davinci_manager \\\n    --device /dev/devmm_svm \\\n    --device /dev/hisi_hdc \\\n    -v /usr/local/dcmi:/usr/local/dcmi \\\n    -v /usr/local/Ascend/driver/tools/hccn_tool:/usr/local/Ascend/driver/tools/hccn_tool \\\n    -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \\\n    -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \\\n    -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \\\n    -v /etc/ascend_install.info:/etc/ascend_install.info \\\n    -v /root/.cache:/root/.cache \\\n    -it $IMAGE bash\n```"
+  },
+  "env_setup.container.300I DUO.content": {
+    "en": "Start the docker image on each node.\n\n```bash\nexport IMAGE=quay.io/ascend/vllm-ascend:v0.23.0rc1-310p\ndocker run --rm \\\n    --name vllm-ascend \\\n    --shm-size=1g \\\n    --net=host \\\n    --privileged=true \\\n    --device /dev/davinci0 \\\n    --device /dev/davinci_manager \\\n    --device /dev/devmm_svm \\\n    --device /dev/hisi_hdc \\\n    -v /usr/local/dcmi:/usr/local/dcmi \\\n    -v /usr/local/Ascend/driver/tools/hccn_tool:/usr/local/Ascend/driver/tools/hccn_tool \\\n    -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \\\n    -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \\\n    -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \\\n    -v /etc/ascend_install.info:/etc/ascend_install.info \\\n    -v /root/.cache:/root/.cache \\\n    -it $IMAGE bash\n```",
+    "zh": "在每个节点启动 Docker 镜像。\n\n```bash\nexport IMAGE=quay.io/ascend/vllm-ascend:v0.23.0rc1-310p\ndocker run --rm \\\n    --name vllm-ascend \\\n    --shm-size=1g \\\n    --net=host \\\n    --privileged=true \\\n    --device /dev/davinci0 \\\n    --device /dev/davinci_manager \\\n    --device /dev/devmm_svm \\\n    --device /dev/hisi_hdc \\\n    -v /usr/local/dcmi:/usr/local/dcmi \\\n    -v /usr/local/Ascend/driver/tools/hccn_tool:/usr/local/Ascend/driver/tools/hccn_tool \\\n    -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \\\n    -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \\\n    -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \\\n    -v /etc/ascend_install.info:/etc/ascend_install.info \\\n    -v /root/.cache:/root/.cache \\\n    -it $IMAGE bash\n```"
+  },
+  "env_setup.pip.content": {
+    "en": "If you prefer not to use the Docker image, install `vllm-ascend` from source. Refer to the [Installation Guide](https://docs.vllm.ai/projects/ascend/en/latest/installation.html).",
+    "zh": "若不使用上述 Docker 镜像，可从源码安装 `vllm-ascend`。详见 [安装指南](https://docs.vllm.ai/projects/ascend/zh-cn/latest/installation.html)。"
+  },
+  "scenarios[0].deployment": {
+    "en": "Single-Node",
+    "zh": "Single-Node"
+  },
+  "scenarios[0].case": {
+    "en": "Single Node Single Card",
+    "zh": "Single Node Single Card"
+  },
+  "scenarios[0].steps[0].title": {
+    "en": "Start the server",
+    "zh": "启动服务"
+  },
+  "scenarios[0].steps[0].content": {
+    "en": "Serve the official original Qwen3-Reranker checkpoint with the pooling runner. The `hf_overrides` route the model to `Qwen3ForSequenceClassification` and extract the yes/no classifier vectors from `lm_head`.\n\n```bash\nexport ASCEND_RT_VISIBLE_DEVICES=0\nexport OMP_PROC_BIND=false\nexport OMP_NUM_THREADS=1\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\n\nvllm serve Qwen/Qwen3-Reranker-0.6B \\\n    --served-model-name Qwen/Qwen3-Reranker-0.6B \\\n    --runner pooling \\\n    --hf_overrides '{\"architectures\": [\"Qwen3ForSequenceClassification\"],\"classifier_from_token\": [\"no\", \"yes\"],\"is_original_qwen3_reranker\": true}' \\\n    --port 8000 \\\n    --max-model-len {{max_model_len}}\n```\n\n> - Replace `Qwen/Qwen3-Reranker-0.6B` with `Qwen/Qwen3-Reranker-4B` or `Qwen/Qwen3-Reranker-8B` as needed.\n> - `--max-model-len` is the maximum input+output length for a single request. Prefer an explicit conservative value (for example `1024`) when the automatic context length would allocate an oversized attention mask.",
+    "zh": "使用 pooling runner 拉起官方原始 Qwen3-Reranker 权重。`hf_overrides` 会将模型路由到 `Qwen3ForSequenceClassification`，并从 `lm_head` 提取 yes/no 分类向量。\n\n```bash\nexport ASCEND_RT_VISIBLE_DEVICES=0\nexport OMP_PROC_BIND=false\nexport OMP_NUM_THREADS=1\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\n\nvllm serve Qwen/Qwen3-Reranker-0.6B \\\n    --served-model-name Qwen/Qwen3-Reranker-0.6B \\\n    --runner pooling \\\n    --hf_overrides '{\"architectures\": [\"Qwen3ForSequenceClassification\"],\"classifier_from_token\": [\"no\", \"yes\"],\"is_original_qwen3_reranker\": true}' \\\n    --port 8000 \\\n    --max-model-len {{max_model_len}}\n```\n\n> - 可按需将 `Qwen/Qwen3-Reranker-0.6B` 替换为 `Qwen/Qwen3-Reranker-4B` 或 `Qwen/Qwen3-Reranker-8B`。\n> - `--max-model-len` 表示单请求输入+输出的最大长度。当自动解析出的上下文过大时，请显式设置保守值（例如 `1024`），避免注意力 mask 显存爆炸。"
+  },
+  "scenarios[0].steps[1].title": {
+    "en": "Service Verification",
+    "zh": "服务验证"
+  },
+  "scenarios[0].steps[1].content": {
+    "en": "After the service is started, verify it with the `/v1/rerank` request in the verification section below.",
+    "zh": "服务启动后，使用下方 verification 章节中的 `/v1/rerank` 请求进行验证。"
+  },
+  "scenarios[1].deployment": {
+    "en": "Single-Node",
+    "zh": "Single-Node"
+  },
+  "scenarios[1].case": {
+    "en": "Single Node Single Card (A2)",
+    "zh": "Single Node Single Card (A2)"
+  },
+  "scenarios[1].steps[0].title": {
+    "en": "Start the server",
+    "zh": "启动服务"
+  },
+  "scenarios[1].steps[0].content": {
+    "en": "```bash\nexport ASCEND_RT_VISIBLE_DEVICES=0\nexport OMP_PROC_BIND=false\nexport OMP_NUM_THREADS=1\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\n\nvllm serve Qwen/Qwen3-Reranker-0.6B \\\n    --served-model-name Qwen/Qwen3-Reranker-0.6B \\\n    --runner pooling \\\n    --hf_overrides '{\"architectures\": [\"Qwen3ForSequenceClassification\"],\"classifier_from_token\": [\"no\", \"yes\"],\"is_original_qwen3_reranker\": true}' \\\n    --port 8000 \\\n    --max-model-len {{max_model_len}}\n```",
+    "zh": "```bash\nexport ASCEND_RT_VISIBLE_DEVICES=0\nexport OMP_PROC_BIND=false\nexport OMP_NUM_THREADS=1\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\n\nvllm serve Qwen/Qwen3-Reranker-0.6B \\\n    --served-model-name Qwen/Qwen3-Reranker-0.6B \\\n    --runner pooling \\\n    --hf_overrides '{\"architectures\": [\"Qwen3ForSequenceClassification\"],\"classifier_from_token\": [\"no\", \"yes\"],\"is_original_qwen3_reranker\": true}' \\\n    --port 8000 \\\n    --max-model-len {{max_model_len}}\n```"
+  },
+  "scenarios[1].steps[1].title": {
+    "en": "Service Verification",
+    "zh": "服务验证"
+  },
+  "scenarios[1].steps[1].content": {
+    "en": "After the service is started, verify it with the `/v1/rerank` request in the verification section below.",
+    "zh": "服务启动后，使用下方 verification 章节中的 `/v1/rerank` 请求进行验证。"
+  },
+  "scenarios[2].deployment": {
+    "en": "Single-Node",
+    "zh": "Single-Node"
+  },
+  "scenarios[2].case": {
+    "en": "300I DUO",
+    "zh": "300I DUO"
+  },
+  "scenarios[2].steps[0].title": {
+    "en": "Start the server",
+    "zh": "启动服务"
+  },
+  "scenarios[2].steps[0].content": {
+    "en": "On Atlas 300I DUO, limit the capture sizes and disable `fuse_norm_quant` due to limited hardware streams.\n\n```bash\nexport ASCEND_RT_VISIBLE_DEVICES=0\nexport OMP_PROC_BIND=false\nexport OMP_NUM_THREADS=1\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\n\nvllm serve Qwen/Qwen3-Reranker-0.6B \\\n    --served-model-name Qwen/Qwen3-Reranker-0.6B \\\n    --runner pooling \\\n    --hf_overrides '{\"architectures\": [\"Qwen3ForSequenceClassification\"],\"classifier_from_token\": [\"no\", \"yes\"],\"is_original_qwen3_reranker\": true}' \\\n    --compilation-config '{\"cudagraph_capture_sizes\": [1024,512]}' \\\n    --additional-config '{\"ascend_compilation_config\": {\"fuse_norm_quant\": false}}' \\\n    --dtype float16 \\\n    --port 8000 \\\n    --max-model-len {{max_model_len}}\n```\n\n> `--compilation-config`: on Atlas 300I DUO, `cudagraph_capture_sizes` must stay small because hardware streams are limited.",
+    "zh": "在 Atlas 300I DUO 上，因硬件流数量有限，需限制 capture sizes，并关闭 `fuse_norm_quant`。\n\n```bash\nexport ASCEND_RT_VISIBLE_DEVICES=0\nexport OMP_PROC_BIND=false\nexport OMP_NUM_THREADS=1\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\n\nvllm serve Qwen/Qwen3-Reranker-0.6B \\\n    --served-model-name Qwen/Qwen3-Reranker-0.6B \\\n    --runner pooling \\\n    --hf_overrides '{\"architectures\": [\"Qwen3ForSequenceClassification\"],\"classifier_from_token\": [\"no\", \"yes\"],\"is_original_qwen3_reranker\": true}' \\\n    --compilation-config '{\"cudagraph_capture_sizes\": [1024,512]}' \\\n    --additional-config '{\"ascend_compilation_config\": {\"fuse_norm_quant\": false}}' \\\n    --dtype float16 \\\n    --port 8000 \\\n    --max-model-len {{max_model_len}}\n```\n\n> `--compilation-config`：在 Atlas 300I DUO 上，`cudagraph_capture_sizes` 需保持较小。"
+  },
+  "scenarios[2].steps[1].title": {
+    "en": "Service Verification",
+    "zh": "服务验证"
+  },
+  "scenarios[2].steps[1].content": {
+    "en": "After the service is started, verify it with the `/v1/rerank` request in the verification section below.",
+    "zh": "服务启动后，使用下方 verification 章节中的 `/v1/rerank` 请求进行验证。"
+  },
+  "verification": {
+    "en": "Once your server is started, verify with:\n\n```python\nimport requests\n\nurl = \"http://127.0.0.1:8000/v1/rerank\"\n\n# Please use the query_template and document_template to format the query and\n# document for better reranker results.\n\nprefix = '<|im_start|>system\\nJudge whether the Document meets the requirements based on the Query and the Instruct provided. Note that the answer can only be \"yes\" or \"no\".<|im_end|>\\n<|im_start|>user\\n'\nsuffix = \"<|im_end|>\\n<|im_start|>assistant\\n<think>\\n\\n</think>\\n\\n\"\n\nquery_template = \"{prefix}<Instruct>: {instruction}\\n<Query>: {query}\\n\"\ndocument_template = \"<Document>: {doc}{suffix}\"\n\ninstruction = (\n    \"Given a web search query, retrieve relevant passages that answer the query\"\n)\n\nquery = \"What is the capital of China?\"\n\ndocuments = [\n    \"The capital of China is Beijing.\",\n    \"Gravity is a force that attracts two bodies towards each other. It gives weight to physical objects and is responsible for the movement of planets around the sun.\",\n]\n\ndocuments = [\n    document_template.format(doc=doc, suffix=suffix) for doc in documents\n]\n\nresponse = requests.post(\n    url,\n    json={\n        \"query\": query_template.format(\n            prefix=prefix, instruction=instruction, query=query\n        ),\n        \"documents\": documents,\n    },\n).json()\n\nprint(response)\n```\n\nExpected result: HTTP 200 with a JSON body containing `relevance_score`. The first document (Beijing) should score much higher than the second.\n\nFor more usage examples, see the [vLLM pooling/score examples](https://github.com/vllm-project/vllm/tree/main/examples/pooling/score).",
+    "zh": "服务启动后，可用以下脚本验证：\n\n```python\nimport requests\n\nurl = \"http://127.0.0.1:8000/v1/rerank\"\n\n# Please use the query_template and document_template to format the query and\n# document for better reranker results.\n\nprefix = '<|im_start|>system\\nJudge whether the Document meets the requirements based on the Query and the Instruct provided. Note that the answer can only be \"yes\" or \"no\".<|im_end|>\\n<|im_start|>user\\n'\nsuffix = \"<|im_end|>\\n<|im_start|>assistant\\n<think>\\n\\n</think>\\n\\n\"\n\nquery_template = \"{prefix}<Instruct>: {instruction}\\n<Query>: {query}\\n\"\ndocument_template = \"<Document>: {doc}{suffix}\"\n\ninstruction = (\n    \"Given a web search query, retrieve relevant passages that answer the query\"\n)\n\nquery = \"What is the capital of China?\"\n\ndocuments = [\n    \"The capital of China is Beijing.\",\n    \"Gravity is a force that attracts two bodies towards each other. It gives weight to physical objects and is responsible for the movement of planets around the sun.\",\n]\n\ndocuments = [\n    document_template.format(doc=doc, suffix=suffix) for doc in documents\n]\n\nresponse = requests.post(\n    url,\n    json={\n        \"query\": query_template.format(\n            prefix=prefix, instruction=instruction, query=query\n        ),\n        \"documents\": documents,\n    },\n).json()\n\nprint(response)\n```\n\n期望结果：HTTP 200，JSON 中包含 `relevance_score`。第一条文档（Beijing）分数应明显高于第二条。\n\n更多用法见 [vLLM pooling/score examples](https://github.com/vllm-project/vllm/tree/main/examples/pooling/score)。"
+  },
+  "evaluation.accuracy.content": {
+    "en": "### Using MTEB\n\n1. Refer to [MTEB](https://docs.mteb.org/) for details.\n2. Run:\n\n```python\nimport os\n\nfrom mteb.models.vllm_wrapper import VllmCrossEncoderWrapper\n\nif __name__ == \"__main__\":\n    import mteb\n\n    data_path = \"/home/data/mteb_data\"\n    os.environ[\"HF_DATASETS_CACHE\"] = data_path\n    os.environ[\"HF_ENDPOINT\"] = \"https://hf-mirror.com\"\n\n    model = VllmCrossEncoderWrapper(\n        \"/root/.cache/Qwen3-Reranker-0.6B\",\n        revision=\"norm\",\n        dtype=\"float16\",\n        enforce_eager=True,\n        max_model_len=10240,\n        hf_overrides={\n            \"architectures\": [\"Qwen3ForSequenceClassification\"],\n            \"classifier_from_token\": [\"no\", \"yes\"],\n            \"is_original_qwen3_reranker\": True,\n        },\n    )\n\n    cache = mteb.ResultCache(\"/home/data/mteb_data\")\n    tasks = mteb.get_tasks(tasks=[\"MultiLongDocReranking\"])\n    results = mteb.evaluate(\n        model, tasks=tasks, cache=cache, overwrite_strategy=\"always\"\n    )\n    print(results)\n```",
+    "zh": "### 使用 MTEB\n\n1. 详见 [MTEB](https://docs.mteb.org/)。\n2. 运行：\n\n```python\nimport os\n\nfrom mteb.models.vllm_wrapper import VllmCrossEncoderWrapper\n\nif __name__ == \"__main__\":\n    import mteb\n\n    data_path = \"/home/data/mteb_data\"\n    os.environ[\"HF_DATASETS_CACHE\"] = data_path\n    os.environ[\"HF_ENDPOINT\"] = \"https://hf-mirror.com\"\n\n    model = VllmCrossEncoderWrapper(\n        \"/root/.cache/Qwen3-Reranker-0.6B\",\n        revision=\"norm\",\n        dtype=\"float16\",\n        enforce_eager=True,\n        max_model_len=10240,\n        hf_overrides={\n            \"architectures\": [\"Qwen3ForSequenceClassification\"],\n            \"classifier_from_token\": [\"no\", \"yes\"],\n            \"is_original_qwen3_reranker\": True,\n        },\n    )\n\n    cache = mteb.ResultCache(\"/home/data/mteb_data\")\n    tasks = mteb.get_tasks(tasks=[\"MultiLongDocReranking\"])\n    results = mteb.evaluate(\n        model, tasks=tasks, cache=cache, overwrite_strategy=\"always\"\n    )\n    print(results)\n```"
+  },
+  "performance.benchmark": {
+    "en": "### Using vLLM Benchmark\n\nExample for `Qwen3-Reranker-0.6B` (refer to the [vLLM benchmark CLI](https://docs.vllm.ai/en/latest/benchmarking/cli/)):\n\n```bash\nvllm bench serve \\\n    --model Qwen/Qwen3-Reranker-0.6B \\\n    --backend vllm-rerank \\\n    --port 8000 \\\n    --dataset-name random-rerank \\\n    --endpoint /v1/rerank \\\n    --random-input 200 \\\n    --save-result \\\n    --result-dir ./\n```",
+    "zh": "### 使用 vLLM Benchmark\n\n以 `Qwen3-Reranker-0.6B` 为例（详见 [vLLM benchmark CLI](https://docs.vllm.ai/en/latest/benchmarking/cli/)）：\n\n```bash\nvllm bench serve \\\n    --model Qwen/Qwen3-Reranker-0.6B \\\n    --backend vllm-rerank \\\n    --port 8000 \\\n    --dataset-name random-rerank \\\n    --endpoint /v1/rerank \\\n    --random-input 200 \\\n    --save-result \\\n    --result-dir ./\n```"
+  },
+  "faq": {
+    "en": "For common environment, installation, and general parameter issues, please refer to the [Public FAQs](https://docs.vllm.ai/projects/ascend/en/latest/faqs.html).",
+    "zh": "环境、安装与通用参数问题，请参考 [公共 FAQ](https://docs.vllm.ai/projects/ascend/zh-cn/latest/faqs.html)。"
+  },
+  "references[0].title": {
+    "en": "Qwen3-Reranker-0.6B on ModelScope",
+    "zh": "Qwen3-Reranker-0.6B on ModelScope"
+  },
+  "references[1].title": {
+    "en": "Qwen3-Reranker tutorial (vLLM Ascend)",
+    "zh": "Qwen3-Reranker tutorial (vLLM Ascend)"
+  },
+  "references[2].title": {
+    "en": "vLLM Ascend GitHub",
+    "zh": "vLLM Ascend GitHub"
+  }
+}
