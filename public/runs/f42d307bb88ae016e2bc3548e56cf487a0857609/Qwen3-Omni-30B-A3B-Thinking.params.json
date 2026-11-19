@@ -1,0 +1,11 @@
+{
+  "recipe_path": "models/en/Qwen/Qwen3-Omni-30B-A3B-Thinking.yaml",
+  "model_id": "",
+  "hw_key": "atlas_800_a3",
+  "head_sha": "f42d307bb88ae016e2bc3548e56cf487a0857609",
+  "trigger_type": "pr",
+  "image": "quay.nju.edu.cn/ascend/vllm-ascend:v0.30.0-a3-openeuler",
+  "started_at": "2026-11-18T17:35:21Z",
+  "scenarios": [],
+  "skip_reason": "镜像未预装该权重 (model_id=Qwen/Qwen3-Omni-30B-A3B-Thinking, 目录=Qwen3-Omni-30B-A3B-Thinking-w8a8, 已尝试 ['', 'Eco-Tech', 'vllm-ascend', 'models', '/root/.cache/'])"
+}

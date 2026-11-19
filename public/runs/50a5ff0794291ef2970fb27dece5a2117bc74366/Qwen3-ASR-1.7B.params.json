@@ -1,0 +1,23 @@
+{
+  "verification_scope": "single-node API smoke; not accuracy or full feature coverage",
+  "recipe_path": "models/en/Qwen/Qwen3-ASR-1.7B.yaml",
+  "model_id": "Qwen/Qwen3-ASR-1.7B",
+  "hw_key": "atlas_800_a2",
+  "head_sha": "50a5ff0794291ef2970fb27dece5a2117bc74366",
+  "workflow_run_id": "41448111624",
+  "trigger_type": "pr",
+  "image": "quay.nju.edu.cn/ascend/vllm-ascend:v0.23.0",
+  "started_at": "2026-11-02T12:51:33Z",
+  "scenarios": [
+    {
+      "index": 0,
+      "npu": "Atlas 800I A2",
+      "precision": "bf16",
+      "deployment": "Single-Node",
+      "case": "Single Node Single Card (A2)",
+      "serve_cmd": "export ASCEND_RT_VISIBLE_DEVICES=0\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\n\nvllm serve /root/.cache/modelscope/hub/models/Qwen/Qwen3-ASR-1.7B \\\n    --served-model-name qwen3-asr \\\n    --tensor-parallel-size 1 \\\n    --max-model-len 4096 \\\n    --gpu-memory-utilization 0.9 \\\n    --enforce-eager \\\n    --port 8000",
+      "verification_status": "pass",
+      "verification_reason": "Task API response validated"
+    }
+  ]
+}

@@ -29,7 +29,7 @@
   },
   "features.compilation_config.description": {
     "en": "Full decode ACLGraph replay used by the tutorial baselines.",
-    "zh": "Full decode ACLGraph replay used by the tutorial baselines."
+    "zh": "教程基线使用完整 decode ACLGraph 回放。"
   },
   "features.fused_mc2.description": {
     "en": "Fused MoE communication kernel used by the Atlas 800I A3 BF16 baseline.",

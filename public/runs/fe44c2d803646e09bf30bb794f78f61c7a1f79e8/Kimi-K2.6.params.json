@@ -1,0 +1,23 @@
+{
+  "verification_scope": "single-node API smoke; not accuracy or full feature coverage",
+  "recipe_path": "models/en/MoonshotAI/Kimi-K2.6.yaml",
+  "model_id": "moonshotai/Kimi-K2.6",
+  "hw_key": "atlas_800_a3",
+  "head_sha": "fe44c2d803646e09bf30bb794f78f61c7a1f79e8",
+  "workflow_run_id": "41990077072",
+  "trigger_type": "pr",
+  "image": "quay.nju.edu.cn/ascend/vllm-ascend:v0.30.0rc1-a3",
+  "started_at": "2026-11-05T07:50:37Z",
+  "scenarios": [
+    {
+      "index": 0,
+      "npu": "Atlas 800I A3",
+      "precision": "W4A8",
+      "deployment": "Single-Node",
+      "case": "High Throughput",
+      "serve_cmd": "export HCCL_OP_EXPANSION_MODE=\"AIV\"\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\nexport OMP_PROC_BIND=false\nexport OMP_NUM_THREADS=1\nexport TASK_QUEUE_ENABLE=1\nexport VLLM_ASCEND_ENABLE_MLAPO=1\n# [Optional] jemalloc\n# jemalloc is for better performance, if `libjemalloc.so` is installed on your machine, you can turn it on.\nexport LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libjemalloc.so.2:$LD_PRELOAD\n# System tuning (requires root; skipped automatically in unprivileged environments)\necho performance | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor 2>/dev/null || true\nsysctl -w vm.swappiness=0 2>/dev/null || true\nsysctl -w kernel.numa_balancing=0 2>/dev/null || true\nsysctl -w kernel.sched_migration_cost_ns=50000 2>/dev/null || true\nexport HCCL_BUFFSIZE=600\nexport VLLM_ASCEND_ENABLE_FLASHCOMM1=1\nexport VLLM_ASCEND_BALANCE_SCHEDULING=0\n\nvllm serve /root/.cache/modelscope/hub/models/Eco-Tech/Kimi-K2.6-W4A8 \\\n    --quantization ascend \\\n    --tool-call-parser kimi_k2 \\\n    --reasoning-parser kimi_k2 \\\n    --allowed-local-media-path / \\\n    --served-model-name kimi_k26 \\\n    --trust-remote-code \\\n    --tensor-parallel-size 4 \\\n    --data-parallel-size 4 \\\n    --no-enable-prefix-caching \\\n    --enable-expert-parallel \\\n    --port 8000 \\\n    --max-num-seqs 4 \\\n    --max-model-len 34816 \\\n    --max-num-batched-tokens 16384 \\\n    --gpu-memory-utilization 0.87 \\\n    --seed 42 \\\n    --async-scheduling \\\n    --compilation-config '{\"cudagraph_mode\":\"FULL_DECODE_ONLY\"}' \\\n    --profiler-config '{\"profiler\": \"torch\", \"torch_profiler_dir\": \"./vllm_profile\", \"torch_profiler_with_stack\": true}' \\\n    --mm-processor-cache-gb 0 \\\n    --mm-encoder-tp-mode data \\\n    --additional-config '{\"enable_balance_scheduling\": true}' \\",
+      "verification_status": "pass",
+      "verification_reason": "Task API response validated"
+    }
+  ]
+}
