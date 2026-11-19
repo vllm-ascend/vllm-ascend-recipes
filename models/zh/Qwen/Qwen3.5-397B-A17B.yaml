@@ -204,10 +204,11 @@ scenarios:
           export HCCL_OP_EXPANSION_MODE="AIV"
           export VLLM_USE_V2_MODEL_RUNNER=0
 
-          echo performance | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
-          sysctl -w vm.swappiness=0
-          sysctl -w kernel.numa_balancing=0
-          sysctl kernel.sched_migration_cost_ns=50000
+          # Host-level tuning; skipped gracefully inside the verify container (read-only /sys, no sysctl perms)
+          echo performance | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor 2>/dev/null || true
+          sysctl -w vm.swappiness=0 2>/dev/null || true
+          sysctl -w kernel.numa_balancing=0 2>/dev/null || true
+          sysctl kernel.sched_migration_cost_ns=50000 2>/dev/null || true
 
             # 注(第一方偏差):下方 enable_fused_mc2=1 偏离教程 §9.1(=2)——本栈 TP16 下 MegaMoe 路径
             # 拒绝 dummy-run token 数;根因待查。
