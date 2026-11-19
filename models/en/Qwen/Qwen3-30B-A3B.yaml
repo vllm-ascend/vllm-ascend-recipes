@@ -485,9 +485,9 @@ scenarios:
       Check readiness and send a real inference request; a model listing alone does not verify inference.
 
       ```bash
-      curl --fail --silent --show-error http://<server_ip>:<port>/health
-      curl --fail --silent --show-error http://<server_ip>:<port>/v1/models
-      curl --fail --silent --show-error http://<server_ip>:<port>/v1/chat/completions \
+      curl --fail-with-body --silent --show-error http://<server_ip>:<port>/health
+      curl --fail-with-body --silent --show-error http://<server_ip>:<port>/v1/models
+      curl --fail-with-body --silent --show-error http://<server_ip>:<port>/v1/chat/completions \
           -H 'Content-Type: application/json' \
           -d '{"model":"qwen3","messages":[{"role":"user","content":"Explain tensor parallelism briefly."}],"temperature":0,"max_completion_tokens":256,"chat_template_kwargs":{"enable_thinking":false}}'
       ```
@@ -547,9 +547,9 @@ scenarios:
       Check readiness and send a real inference request; a model listing alone does not verify inference.
 
       ```bash
-      curl --fail --silent --show-error http://<server_ip>:<port>/health
-      curl --fail --silent --show-error http://<server_ip>:<port>/v1/models
-      curl --fail --silent --show-error http://<server_ip>:<port>/v1/chat/completions \
+      curl --fail-with-body --silent --show-error http://<server_ip>:<port>/health
+      curl --fail-with-body --silent --show-error http://<server_ip>:<port>/v1/models
+      curl --fail-with-body --silent --show-error http://<server_ip>:<port>/v1/chat/completions \
           -H 'Content-Type: application/json' \
           -d '{"model":"qwen3","messages":[{"role":"user","content":"Explain tensor parallelism briefly."}],"temperature":0,"max_completion_tokens":256,"chat_template_kwargs":{"enable_thinking":false}}'
       ```
@@ -622,7 +622,7 @@ scenarios:
     service-check:
       language: bash
       content: |-
-        response=$(curl --fail --silent --show-error \
+        response=$(curl --fail-with-body --silent --show-error \
           "http://${API_NODE_0_IP}:7100/v1/completions" \
           -H 'Content-Type: application/json' \
           -d '{"model":"qwen3","prompt":"The future of AI is","max_tokens":50,"temperature":0}')
@@ -684,9 +684,9 @@ scenarios:
       Check readiness and send a real inference request; a model listing alone does not verify inference.
 
       ```bash
-      curl --fail --silent --show-error http://<server_ip>:<port>/health
-      curl --fail --silent --show-error http://<server_ip>:<port>/v1/models
-      curl --fail --silent --show-error http://<server_ip>:<port>/v1/chat/completions \
+      curl --fail-with-body --silent --show-error http://<server_ip>:<port>/health
+      curl --fail-with-body --silent --show-error http://<server_ip>:<port>/v1/models
+      curl --fail-with-body --silent --show-error http://<server_ip>:<port>/v1/chat/completions \
           -H 'Content-Type: application/json' \
           -d '{"model":"qwen3","messages":[{"role":"user","content":"Explain tensor parallelism briefly."}],"temperature":0,"max_completion_tokens":256,"chat_template_kwargs":{"enable_thinking":false}}'
       ```
@@ -731,9 +731,9 @@ scenarios:
       Check readiness and send a real inference request; a model listing alone does not verify inference.
 
       ```bash
-      curl --fail --silent --show-error http://<server_ip>:<port>/health
-      curl --fail --silent --show-error http://<server_ip>:<port>/v1/models
-      curl --fail --silent --show-error http://<server_ip>:<port>/v1/chat/completions \
+      curl --fail-with-body --silent --show-error http://<server_ip>:<port>/health
+      curl --fail-with-body --silent --show-error http://<server_ip>:<port>/v1/models
+      curl --fail-with-body --silent --show-error http://<server_ip>:<port>/v1/chat/completions \
           -H 'Content-Type: application/json' \
           -d '{"model":"qwen3","messages":[{"role":"user","content":"Explain tensor parallelism briefly."}],"temperature":0,"max_completion_tokens":256,"chat_template_kwargs":{"enable_thinking":false}}'
       ```
@@ -779,9 +779,9 @@ scenarios:
       Check readiness and send a real inference request; a model listing alone does not verify inference.
 
       ```bash
-      curl --fail --silent --show-error http://<server_ip>:<port>/health
-      curl --fail --silent --show-error http://<server_ip>:<port>/v1/models
-      curl --fail --silent --show-error http://<server_ip>:<port>/v1/chat/completions \
+      curl --fail-with-body --silent --show-error http://<server_ip>:<port>/health
+      curl --fail-with-body --silent --show-error http://<server_ip>:<port>/v1/models
+      curl --fail-with-body --silent --show-error http://<server_ip>:<port>/v1/chat/completions \
           -H 'Content-Type: application/json' \
           -d '{"model":"qwen3","messages":[{"role":"user","content":"Explain tensor parallelism briefly."}],"temperature":0,"max_completion_tokens":256,"chat_template_kwargs":{"enable_thinking":false}}'
       ```
@@ -826,9 +826,9 @@ scenarios:
       Check readiness and send a real inference request; a model listing alone does not verify inference.
 
       ```bash
-      curl --fail --silent --show-error http://<server_ip>:<port>/health
-      curl --fail --silent --show-error http://<server_ip>:<port>/v1/models
-      curl --fail --silent --show-error http://<server_ip>:<port>/v1/chat/completions \
+      curl --fail-with-body --silent --show-error http://<server_ip>:<port>/health
+      curl --fail-with-body --silent --show-error http://<server_ip>:<port>/v1/models
+      curl --fail-with-body --silent --show-error http://<server_ip>:<port>/v1/chat/completions \
           -H 'Content-Type: application/json' \
           -d '{"model":"qwen3","messages":[{"role":"user","content":"Explain tensor parallelism briefly."}],"temperature":0,"max_completion_tokens":256,"chat_template_kwargs":{"enable_thinking":false}}'
       ```
@@ -875,9 +875,9 @@ scenarios:
       Check readiness and send a real inference request; a model listing alone does not verify inference.
 
       ```bash
-      curl --fail --silent --show-error http://<server_ip>:<port>/health
-      curl --fail --silent --show-error http://<server_ip>:<port>/v1/models
-      curl --fail --silent --show-error http://<server_ip>:<port>/v1/chat/completions \
+      curl --fail-with-body --silent --show-error http://<server_ip>:<port>/health
+      curl --fail-with-body --silent --show-error http://<server_ip>:<port>/v1/models
+      curl --fail-with-body --silent --show-error http://<server_ip>:<port>/v1/chat/completions \
           -H 'Content-Type: application/json' \
           -d '{"model":"qwen3","messages":[{"role":"user","content":"Explain tensor parallelism briefly."}],"temperature":0,"max_completion_tokens":256,"chat_template_kwargs":{"enable_thinking":false}}'
       ```

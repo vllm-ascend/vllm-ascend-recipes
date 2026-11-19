@@ -484,9 +484,9 @@ scenarios:
       检查服务健康状态并发送真实推理请求；模型列表就绪不能替代推理成功。
 
       ```bash
-      curl --fail --silent --show-error http://<server_ip>:<port>/health
-      curl --fail --silent --show-error http://<server_ip>:<port>/v1/models
-      curl --fail --silent --show-error http://<server_ip>:<port>/v1/chat/completions \
+      curl --fail-with-body --silent --show-error http://<server_ip>:<port>/health
+      curl --fail-with-body --silent --show-error http://<server_ip>:<port>/v1/models
+      curl --fail-with-body --silent --show-error http://<server_ip>:<port>/v1/chat/completions \
           -H 'Content-Type: application/json' \
           -d '{"model":"qwen3","messages":[{"role":"user","content":"Explain tensor parallelism briefly."}],"temperature":0,"max_completion_tokens":256,"chat_template_kwargs":{"enable_thinking":false}}'
       ```
@@ -546,9 +546,9 @@ scenarios:
       检查服务健康状态并发送真实推理请求；模型列表就绪不能替代推理成功。
 
       ```bash
-      curl --fail --silent --show-error http://<server_ip>:<port>/health
-      curl --fail --silent --show-error http://<server_ip>:<port>/v1/models
-      curl --fail --silent --show-error http://<server_ip>:<port>/v1/chat/completions \
+      curl --fail-with-body --silent --show-error http://<server_ip>:<port>/health
+      curl --fail-with-body --silent --show-error http://<server_ip>:<port>/v1/models
+      curl --fail-with-body --silent --show-error http://<server_ip>:<port>/v1/chat/completions \
           -H 'Content-Type: application/json' \
           -d '{"model":"qwen3","messages":[{"role":"user","content":"Explain tensor parallelism briefly."}],"temperature":0,"max_completion_tokens":256,"chat_template_kwargs":{"enable_thinking":false}}'
       ```
@@ -621,7 +621,7 @@ scenarios:
     service-check:
       language: bash
       content: |-
-        response=$(curl --fail --silent --show-error \
+        response=$(curl --fail-with-body --silent --show-error \
           "http://${API_NODE_0_IP}:7100/v1/completions" \
           -H 'Content-Type: application/json' \
           -d '{"model":"qwen3","prompt":"The future of AI is","max_tokens":50,"temperature":0}')
@@ -683,9 +683,9 @@ scenarios:
       检查服务健康状态并发送真实推理请求；模型列表就绪不能替代推理成功。
 
       ```bash
-      curl --fail --silent --show-error http://<server_ip>:<port>/health
-      curl --fail --silent --show-error http://<server_ip>:<port>/v1/models
-      curl --fail --silent --show-error http://<server_ip>:<port>/v1/chat/completions \
+      curl --fail-with-body --silent --show-error http://<server_ip>:<port>/health
+      curl --fail-with-body --silent --show-error http://<server_ip>:<port>/v1/models
+      curl --fail-with-body --silent --show-error http://<server_ip>:<port>/v1/chat/completions \
           -H 'Content-Type: application/json' \
           -d '{"model":"qwen3","messages":[{"role":"user","content":"Explain tensor parallelism briefly."}],"temperature":0,"max_completion_tokens":256,"chat_template_kwargs":{"enable_thinking":false}}'
       ```
@@ -730,9 +730,9 @@ scenarios:
       检查服务健康状态并发送真实推理请求；模型列表就绪不能替代推理成功。
 
       ```bash
-      curl --fail --silent --show-error http://<server_ip>:<port>/health
-      curl --fail --silent --show-error http://<server_ip>:<port>/v1/models
-      curl --fail --silent --show-error http://<server_ip>:<port>/v1/chat/completions \
+      curl --fail-with-body --silent --show-error http://<server_ip>:<port>/health
+      curl --fail-with-body --silent --show-error http://<server_ip>:<port>/v1/models
+      curl --fail-with-body --silent --show-error http://<server_ip>:<port>/v1/chat/completions \
           -H 'Content-Type: application/json' \
           -d '{"model":"qwen3","messages":[{"role":"user","content":"Explain tensor parallelism briefly."}],"temperature":0,"max_completion_tokens":256,"chat_template_kwargs":{"enable_thinking":false}}'
       ```
@@ -778,9 +778,9 @@ scenarios:
       检查服务健康状态并发送真实推理请求；模型列表就绪不能替代推理成功。
 
       ```bash
-      curl --fail --silent --show-error http://<server_ip>:<port>/health
-      curl --fail --silent --show-error http://<server_ip>:<port>/v1/models
-      curl --fail --silent --show-error http://<server_ip>:<port>/v1/chat/completions \
+      curl --fail-with-body --silent --show-error http://<server_ip>:<port>/health
+      curl --fail-with-body --silent --show-error http://<server_ip>:<port>/v1/models
+      curl --fail-with-body --silent --show-error http://<server_ip>:<port>/v1/chat/completions \
           -H 'Content-Type: application/json' \
           -d '{"model":"qwen3","messages":[{"role":"user","content":"Explain tensor parallelism briefly."}],"temperature":0,"max_completion_tokens":256,"chat_template_kwargs":{"enable_thinking":false}}'
       ```
@@ -825,9 +825,9 @@ scenarios:
       检查服务健康状态并发送真实推理请求；模型列表就绪不能替代推理成功。
 
       ```bash
-      curl --fail --silent --show-error http://<server_ip>:<port>/health
-      curl --fail --silent --show-error http://<server_ip>:<port>/v1/models
-      curl --fail --silent --show-error http://<server_ip>:<port>/v1/chat/completions \
+      curl --fail-with-body --silent --show-error http://<server_ip>:<port>/health
+      curl --fail-with-body --silent --show-error http://<server_ip>:<port>/v1/models
+      curl --fail-with-body --silent --show-error http://<server_ip>:<port>/v1/chat/completions \
           -H 'Content-Type: application/json' \
           -d '{"model":"qwen3","messages":[{"role":"user","content":"Explain tensor parallelism briefly."}],"temperature":0,"max_completion_tokens":256,"chat_template_kwargs":{"enable_thinking":false}}'
       ```
@@ -874,9 +874,9 @@ scenarios:
       检查服务健康状态并发送真实推理请求；模型列表就绪不能替代推理成功。
 
       ```bash
-      curl --fail --silent --show-error http://<server_ip>:<port>/health
-      curl --fail --silent --show-error http://<server_ip>:<port>/v1/models
-      curl --fail --silent --show-error http://<server_ip>:<port>/v1/chat/completions \
+      curl --fail-with-body --silent --show-error http://<server_ip>:<port>/health
+      curl --fail-with-body --silent --show-error http://<server_ip>:<port>/v1/models
+      curl --fail-with-body --silent --show-error http://<server_ip>:<port>/v1/chat/completions \
           -H 'Content-Type: application/json' \
           -d '{"model":"qwen3","messages":[{"role":"user","content":"Explain tensor parallelism briefly."}],"temperature":0,"max_completion_tokens":256,"chat_template_kwargs":{"enable_thinking":false}}'
       ```
