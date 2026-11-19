@@ -254,33 +254,6 @@ def assert_parallel_sizes(combo: dict, argv: list[str]) -> tuple[int, int, int]:
     return tp, dp, pp
 
 
-def parse_companions(render: dict) -> list[dict]:
-    """Extract companion processes (template 6.2): command, port, after flag
-    and the install hint from the description's ``Requires:`` line."""
-    companions = []
-    for comp in render.get("companions") or []:
-        command = str(comp.get("command") or "")
-        tokens = shlex.split(command)
-        port = None
-        for i, token in enumerate(tokens):
-            if token == "--port" and i + 1 < len(tokens):
-                try:
-                    port = int(tokens[i + 1])
-                except ValueError:
-                    port = None
-        match = re.search(r"Requires:\s*(.+)", str(comp.get("description") or ""))
-        companions.append(
-            {
-                "label": comp.get("label"),
-                "command": command,
-                "port": port,
-                "after": bool(comp.get("after")),
-                "install_hint": match.group(1).strip() if match else None,
-            }
-        )
-    return companions
-
-
 def derive_timeouts(env: dict) -> tuple[int, int]:
     """Readiness timeout and GHA job timeout (template 7).
 
@@ -464,7 +437,6 @@ def plan_combo(
         "hub": hub,
         "env": env,
         "argv": argv,
-        "companions": parse_companions(render),
         "strategy": render.get("strategy"),
         "deploy_type": render.get("deploy_type"),
         "source_url": source_url,

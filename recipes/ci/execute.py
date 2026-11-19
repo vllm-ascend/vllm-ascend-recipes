@@ -23,7 +23,7 @@ Consumes the artifacts produced by ``recipes/ci/generate.py`` on the NPU job:
    weights cache (main model + speculative draft model),
 2. log the resolved serve command, run ``run.sh`` (engine) and capture
    ``serve.log``,
-3. poll ``/v1/models`` until ready, start companions (vllm-router etc.),
+3. poll ``/v1/models`` until ready,
 4. run the recipes page's cURL service verification, then the smoke test
    (``POST /v1/chat/completions`` or ``POST /v1/rerank``),
 5. benchmark chat combos with the page's ``vllm bench serve`` snippet,
@@ -42,9 +42,7 @@ import math
 import os
 import re
 import shlex
-import shutil
 import signal
-import socket
 import subprocess
 import sys
 import time
@@ -56,7 +54,6 @@ POLL_INTERVAL_S = 5
 HTTP_TIMEOUT_S = 10
 SMOKE_TIMEOUT_S = 120
 SMOKE_MAX_TOKENS = 8
-COMPANION_READY_TIMEOUT_S = 600
 TEARDOWN_WAIT_S = 30
 LOG_TAIL_LINES = 100
 BENCH_TIMEOUT_S = 3600
@@ -79,10 +76,6 @@ SKIP_WEIGHTS_CHECK_ENV = "RECIPE_CI_SKIP_WEIGHTS_CHECK"
 
 class ComboFailure(Exception):
     """Runtime failure for one combo (marks CI red)."""
-
-
-class ComboSkip(Exception):
-    """Runtime skip for one combo (does not mark CI red)."""
 
 
 def image_tag(image: str) -> str:
@@ -332,38 +325,6 @@ def wait_ready(proc: subprocess.Popen, base_url: str, timeout_s: int, log_path: 
     )
 
 
-def wait_tcp(port: int, timeout_s: int, proc: subprocess.Popen | None = None) -> None:
-    """Wait until a companion TCP port accepts connections."""
-    deadline = time.monotonic() + timeout_s
-    while time.monotonic() < deadline:
-        if proc is not None and proc.poll() is not None:
-            raise ComboFailure(f"companion exited early with code {proc.returncode}")
-        try:
-            with socket.create_connection(("127.0.0.1", port), timeout=5):
-                return
-        except OSError:
-            time.sleep(POLL_INTERVAL_S)
-    raise ComboFailure(f"companion port {port} not ready after {timeout_s}s")
-
-
-def ensure_companion(comp: dict, log_path: Path) -> tuple[subprocess.Popen | None, int | None]:
-    """Start one companion; install it first when missing (template 6.2)."""
-    tokens = shlex.split(str(comp.get("command") or ""))
-    if not tokens:
-        return None, None
-    if not shutil.which(tokens[0]):
-        hint = comp.get("install_hint")
-        if not hint:
-            raise ComboFailure(f"companion {tokens[0]!r} missing and no install hint")
-        try:
-            subprocess.run(["bash", "-lc", str(hint)], check=True, timeout=600, capture_output=True)
-        except (subprocess.SubprocessError, OSError):
-            raise ComboSkip(f"companion install failed: {hint}") from None
-        if not shutil.which(tokens[0]):
-            raise ComboSkip(f"companion {tokens[0]!r} still missing after install")
-    return start_bg(["bash", "-lc", str(comp["command"])], log_path), comp.get("port")
-
-
 def smoke(base_url: str, model: str, kind: str = "chat") -> None:
     """Check chat content or the historical Qwen VL reranker tutorial pair."""
     if kind == "rerank":
@@ -584,7 +545,6 @@ def run_combo(combo_dir: Path, results_dir: Path) -> int:
         result.update(status="skip", skip_reason=skip_reason)
     else:
         engine: subprocess.Popen | None = None
-        companions: list[subprocess.Popen] = []
         started = time.monotonic()
         try:
             run_sh = localized_run_sh(combo_dir, out_dir, meta)
@@ -593,14 +553,6 @@ def run_combo(combo_dir: Path, results_dir: Path) -> int:
             base_url = f"http://127.0.0.1:{meta['port']}"
             models = wait_ready(engine, base_url, int(meta["readiness_timeout_s"]), out_dir / "serve.log")
             result["readiness_seconds"] = round(time.monotonic() - started, 1)
-            for comp in meta.get("companions") or []:
-                if not comp.get("after"):
-                    continue
-                companion, port = ensure_companion(comp, out_dir / "companion.log")
-                if companion is not None:
-                    companions.append(companion)
-                    if port:
-                        wait_tcp(int(port), COMPANION_READY_TIMEOUT_S, companion)
             # Requests must name the model the engine actually serves: the
             # localized run.sh replaced the hub id with its local cache path.
             served = str(models[0]["id"]) if models else str(meta["model_id"])
@@ -613,13 +565,10 @@ def run_combo(combo_dir: Path, results_dir: Path) -> int:
             if meta.get("bench"):
                 result["bench"] = run_bench(base_url, served, out_dir)
             result["status"] = "pass"
-        except (ComboFailure, ComboSkip) as e:
-            result.update(
-                status="skip" if isinstance(e, ComboSkip) else "fail",
-                skip_reason=str(e),
-            )
+        except ComboFailure as e:
+            result.update(status="fail", skip_reason=str(e))
         finally:
-            teardown([p for p in [engine, *companions] if p is not None], out_dir)
+            teardown([p for p in [engine] if p is not None], out_dir)
 
     if result["status"] == "fail":
         result["log_tail"] = tail_lines(out_dir / "serve.log", LOG_TAIL_LINES)

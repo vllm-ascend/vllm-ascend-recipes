@@ -70,17 +70,6 @@ A5_RENDER = {
     "deploy_type": "single_node",
     "node_count": 1,
     "selection": {"hardware": "ascend_950dt_8x", "adjusted": [], "pd": None},
-    "companions": [
-        {
-            "label": "vLLM Router",
-            "after": True,
-            "description": "Routes client requests. Requires: uv pip install vllm-router",
-            "command": (
-                "vllm-router \\\n  --host 0.0.0.0 \\\n  --port 8000 \\\n"
-                "  --intra-node-data-parallel-size 4 \\\n  --worker-urls http://localhost:8100"
-            ),
-        }
-    ],
 }
 
 A5_ENTRY = {
@@ -213,12 +202,6 @@ def test_plan_combo_happy_path():
     assert meta["runner_image"] == ("swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/vllm-ascend:v0.23.0-a5")
     assert meta["readiness_timeout_s"] == 1800
     assert meta["job_timeout_min"] == 90
-    # Companion: vllm-router on port 8000 with an install hint.
-    assert len(meta["companions"]) == 1
-    companion = meta["companions"][0]
-    assert companion["port"] == 8000
-    assert companion["after"] is True
-    assert companion["install_hint"] == "uv pip install vllm-router"
 
 
 def test_plan_combo_bench_follows_smoke_test_and_override():
