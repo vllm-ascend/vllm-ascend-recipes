@@ -274,23 +274,27 @@ class VerificationPlanTests(unittest.TestCase):
 
 class RecipeParserTests(unittest.TestCase):
     def parse(self, scenarios, hardware="ascend_950dt", missing_weights=False, *, alias=True, standard_cache=False,
-              verification="", tasks=None):
+              verification="", tasks=None, model_id="Example/model", staged_checkpoints=()):
         script = (ROOT / "scripts/verify-recipe.sh").read_text(encoding="utf-8")
         parser = script.split("<<'PYEOF'\n", 1)[1].split("\nPYEOF", 1)[0]
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             recipe = root / "recipe.yaml"
-            recipe.write_text(yaml.safe_dump({"model": {"model_id": "Example/model"},
+            recipe.write_text(yaml.safe_dump({"model": {"model_id": model_id},
                                              "meta": {"tasks": tasks or ["text-generation"]},
                                              "verification": verification, "scenarios": scenarios}), encoding="utf-8")
             cache = root / "weights"
             cache.mkdir()
             if not missing_weights:
-                weights = cache / ("Example/model" if standard_cache else "model")
+                weights = cache / (model_id if standard_cache else "model")
                 weights.mkdir(parents=True)
                 (weights / "config.json").write_text('{}', encoding="utf-8")
+            for checkpoint in staged_checkpoints:
+                weights = cache / checkpoint
+                weights.mkdir(parents=True)
+                (weights / "config.json").write_text("{}", encoding="utf-8")
             aliases = root / "aliases.yaml"
-            aliases.write_text(yaml.safe_dump({"aliases": [{"model_id": "Example/model", "cache_dir": "model"}] if alias else []}), encoding="utf-8")
+            aliases.write_text(yaml.safe_dump({"aliases": [{"model_id": model_id, "cache_dir": "model"}] if alias else []}), encoding="utf-8")
             env = {**os.environ, "PYTHONUTF8": "1", "RECIPE_REPO_ROOT": str(ROOT),
                    "RECIPE_CACHE_BASE": str(cache)}
             env.pop("RECIPE_TARGET_ID", None)
@@ -334,6 +338,44 @@ class RecipeParserTests(unittest.TestCase):
         command = result["scenarios"][0]["serve_cmd"]
         self.assertIn("vllm serve " + shlex.quote(result["cache_path"]), command)
         self.assertIn("--served-model-name model", command)
+
+    def test_qwen3_32b_checkpoints_are_resolved_per_scenario(self):
+        recipe = yaml.safe_load((ROOT / "models/en/Qwen/Qwen3-32B.yaml").read_text(encoding="utf-8"))
+        hardware = "atlas_800_a3"
+        w8a8_id = "vllm-ascend/Qwen3-32B-W8A8"
+        w4a4_id = "vllm-ascend/Qwen3-32B-W4A4"
+
+        model_id = recipe["model"]["model_id"]
+
+        result = self.parse(recipe["scenarios"], hardware=hardware, model_id=model_id,
+                            staged_checkpoints=[w8a8_id])
+        self.assertEqual(result["action"], "verify")
+        by_precision = {}
+        for item in result["scenarios"]:
+            by_precision.setdefault(item["precision"], []).append(item)
+        bf16, = by_precision["BF16"]
+        w4a4, = by_precision["W4A4"]
+        self.assertIn("MODEL_PATH=" + shlex.quote(bf16["cache_path"]), bf16["serve_cmd"])
+        self.assertEqual(bf16["skip_reason"], "")
+        self.assertIn(w4a4_id, w4a4["skip_reason"])
+
+        eagle3_count = 0
+        for item in by_precision["W8A8"]:
+            self.assertTrue(Path(item["cache_path"]).as_posix().endswith("/" + w8a8_id))
+            self.assertIn("vllm serve " + shlex.quote(item["cache_path"]), item["serve_cmd"])
+            if "your_eagle3_model_path" in item["serve_cmd"]:
+                self.assertIn("draft checkpoint", item["skip_reason"])
+                eagle3_count += 1
+            else:
+                self.assertEqual(item["skip_reason"], "")
+        self.assertEqual(eagle3_count, 2)
+
+        result = self.parse(recipe["scenarios"], hardware=hardware, model_id=model_id,
+                            missing_weights=True, staged_checkpoints=[w4a4_id])
+        self.assertEqual(result["action"], "verify")
+        runnable, = [item for item in result["scenarios"] if not item["skip_reason"]]
+        self.assertEqual(runnable["precision"], "W4A4")
+        self.assertTrue(Path(runnable["cache_path"]).as_posix().endswith("/" + w4a4_id))
 
     def test_log_example_does_not_hide_later_global_request(self):
         verification = "```bash\nINFO: Server ready\n```\n```bash\ncurl http://<node_ip>:<port>/v1/embeddings\n```"

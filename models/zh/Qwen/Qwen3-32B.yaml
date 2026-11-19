@@ -224,6 +224,7 @@ scenarios:
       ```
 - npu: Atlas 800I A2
   precision: W8A8
+  checkpoint_model_id: vllm-ascend/Qwen3-32B-W8A8
   deployment: Single-Node
   case: TP4
   strategy: single_node_A2
@@ -271,6 +272,7 @@ scenarios:
       ```
 - npu: Atlas 800I A3
   precision: W8A8
+  checkpoint_model_id: vllm-ascend/Qwen3-32B-W8A8
   deployment: Single-Node
   case: TP4
   strategy: single_node_A3
@@ -318,6 +320,7 @@ scenarios:
       ```
 - npu: Atlas 800I A2
   precision: W4A4
+  checkpoint_model_id: vllm-ascend/Qwen3-32B-W4A4
   deployment: Single-Node
   case: TP2
   strategy: single_node_A2
@@ -367,6 +370,7 @@ scenarios:
       ```
 - npu: Atlas 800I A3
   precision: W4A4
+  checkpoint_model_id: vllm-ascend/Qwen3-32B-W4A4
   deployment: Single-Node
   case: TP2
   strategy: single_node_A3
@@ -416,6 +420,7 @@ scenarios:
       ```
 - npu: Atlas 800I A3
   precision: W8A8
+  checkpoint_model_id: vllm-ascend/Qwen3-32B-W8A8
   deployment: Single-Node
   case: High Throughput
   strategy: single_node_A3
@@ -467,6 +472,7 @@ scenarios:
       ```
 - npu: Atlas 800I A3
   precision: W8A8
+  checkpoint_model_id: vllm-ascend/Qwen3-32B-W8A8
   deployment: Single-Node
   case: Long Context
   strategy: single_node_A3
@@ -519,6 +525,7 @@ scenarios:
       ```
 - npu: Atlas 800I A3
   precision: W8A8
+  checkpoint_model_id: vllm-ascend/Qwen3-32B-W8A8
   deployment: Single-Node
   case: Low Latency
   strategy: single_node_A3

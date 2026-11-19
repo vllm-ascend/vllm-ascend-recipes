@@ -134,14 +134,10 @@ def resolve_placeholders(content, data):
 # weights under `Eco-Tech/` and one that ships them under `models/` (or
 # any future layout) both work without changing the alias file.
 #
-# Without an alias, use the standard org/name cache only if config.json is
-# present. Missing weights are skipped, never downloaded or substituted with
-# another model. Earlier fallback behavior made the
-# runner boot a Qwen tokenizer with GLM flags and produced confusing
-# failures (`max_model_len > derived`, `cudagraph_capture_sizes not
-# multiples of tp_size`, etc.).
+# Explicit scenario checkpoints use their own identity and can also reuse
+# the alias table. Keep legacy recipe-level resolution for other scenarios.
 CACHE_BASE = os.environ.get('RECIPE_CACHE_BASE', '/root/.cache/modelscope/hub/models')
-CACHE_PREFIXES = ('', 'Eco-Tech', 'vllm-ascend', 'models', '/root/.cache/')   # tried in this order; first hit wins
+CACHE_PREFIXES = ('', 'Eco-Tech', 'vllm-ascend', 'models', '/root/.cache/')
 model_id_for_path = data.get('model', {}).get('model_id', '')
 if not model_id_for_path:
     raise ValueError('Recipe must declare model.model_id')
@@ -151,37 +147,27 @@ try:
 except Exception as e:
     print(json.dumps({'action': 'skip', 'reason': f'cache_paths 文件解析失败: {e}'}))
     sys.exit(0)
-CACHE_DIR_BY_MODEL = {}
-for a in aliases:
-    CACHE_DIR_BY_MODEL[a['model_id']] = a['cache_dir']
-# Aliases remain authoritative for custom/quantized layouts. New models
-# in the standard org/name directory need no separate configuration PR.
-aliased = model_id_for_path in CACHE_DIR_BY_MODEL
-cache_dir_raw = CACHE_DIR_BY_MODEL.get(model_id_for_path, model_id_for_path)
-if isinstance(cache_dir_raw, dict):
-    cache_dir = cache_dir_raw.get(hw_key, cache_dir_raw.get('default'))
-    if cache_dir is None:
-        print(json.dumps({
-            'action': 'skip',
-            'reason': f'cache_paths 未配置 {hw_key} 的权重目录 (model_id={model_id_for_path})',
-        }))
-        sys.exit(0)
-else:
-    cache_dir = cache_dir_raw
-CACHE_PATH = None
-for prefix in CACHE_PREFIXES:
-    candidate = os.path.join(CACHE_BASE, prefix, cache_dir)
-    if os.path.isdir(candidate) and (aliased or os.path.isfile(os.path.join(candidate, 'config.json'))):
-        CACHE_PATH = candidate
-        if prefix != CACHE_PREFIXES[0]:
-            print(f"DEBUG: cache resolved under non-default prefix '{prefix}/' for {model_id_for_path}", file=sys.stderr)
-        break
-if CACHE_PATH is None:
-    print(json.dumps({
-        'action': 'skip',
-        'reason': f'镜像未预装该权重 (model_id={model_id_for_path}, 目录={cache_dir}, 已尝试 {list(CACHE_PREFIXES)})',
-    }))
-    sys.exit(0)
+CACHE_DIR_BY_MODEL = {a['model_id']: a['cache_dir'] for a in aliases}
+
+
+def resolve_cache(model_id, *, require_config=False):
+    cache_dir = CACHE_DIR_BY_MODEL.get(model_id, model_id)
+    if isinstance(cache_dir, dict):
+        cache_dir = cache_dir.get(hw_key, cache_dir.get('default'))
+    if cache_dir is not None:
+        for prefix in CACHE_PREFIXES:
+            candidate = os.path.join(CACHE_BASE, prefix, cache_dir)
+            if not os.path.isdir(candidate):
+                continue
+            if (require_config or model_id not in CACHE_DIR_BY_MODEL) and not os.path.isfile(
+                os.path.join(candidate, 'config.json')
+            ):
+                continue
+            return candidate, cache_dir
+    return None, cache_dir
+
+
+default_cache, default_cache_dir = resolve_cache(model_id_for_path)
 
 # Plan and execute the same single-node scenarios; multi-node/PD is handled
 # exclusively by verify_multi_node.yaml, even when it shares this recipe.
@@ -189,6 +175,13 @@ from verification_plan import single_node_scenarios
 scenarios = single_node_scenarios(data, hw_key)
 if not scenarios:
     print(json.dumps({'action': 'skip', 'reason': f'No executable single-node scenarios for {hw_key}'}))
+    sys.exit(0)
+if not default_cache and not any(s.get('checkpoint_model_id') for s in scenarios):
+    if default_cache_dir is None:
+        reason = f'cache_paths 未配置 {hw_key} 的权重目录 (model_id={model_id_for_path})'
+    else:
+        reason = f'镜像未预装该权重 (model_id={model_id_for_path}, 目录={default_cache_dir}, 已尝试 {list(CACHE_PREFIXES)})'
+    print(json.dumps({'action': 'skip', 'reason': reason}))
     sys.exit(0)
 commands = []
 for s in scenarios:
@@ -205,23 +198,39 @@ for s in scenarios:
         # Remove %%CONFIG:...%% markers (key may contain hyphens)
         bash_content = re.sub(r'%%CONFIG:[^%]+%%', '', bash_content)
         bash_content = re.sub(r'%%/CONFIG:[^%]+%%', '', bash_content)
-        # Replace placeholder model paths with actual weights on the runner
-        bash_content = bash_content.replace('your_model_path', CACHE_PATH)
-        # The cache is offline. Resolve the recipe's literal hub ID too,
-        # without accidentally replacing --served-model-name or curl payloads.
-        # Quantized scenarios can name the configured cache alias rather than
-        # model.model_id (e.g. Eco-Tech/Qwen3.6-27B-w8a8-mxfp8).
-        # Only rewrite known identities; never replace served names or payloads.
-        identities = {model_id_for_path, cache_dir, os.path.relpath(CACHE_PATH, CACHE_BASE)}
-        for identity in sorted(identities, key=len, reverse=True):
-            bash_content = re.sub(r'(\bvllm\s+serve\s+)([\'\"]?)' + re.escape(identity) + r'\2(?=\s|$)',
-                                  lambda m: m.group(1) + shlex.quote(CACHE_PATH), bash_content)
-            bash_content = re.sub(r'(?m)^(\s*(?:export\s+)?MODEL_PATH=)([\'\"]?)' + re.escape(identity) + r'\2(?=\s|$)',
-                                  lambda m: m.group(1) + shlex.quote(CACHE_PATH), bash_content)
-        # Resolve {{name}} config/feature placeholders (mirrors the page)
+        # Explicit scenario IDs override the default cache. Their published
+        # commands use a /weights mount; CI substitutes only the model operand.
+        scenario_model_id = s.get('checkpoint_model_id')
+        skip_reason = ''
+        if scenario_model_id:
+            cache_path, _ = resolve_cache(scenario_model_id, require_config=True)
+            if cache_path:
+                bash_content, replacements = re.subn(
+                    r'(\bvllm\s+serve\s+)\S+',
+                    lambda m: m.group(1) + shlex.quote(cache_path),
+                    bash_content,
+                    count=1,
+                )
+                if not replacements:
+                    raise ValueError(f'Cannot bind cached checkpoint for {scenario_model_id}')
+            if 'your_eagle3_model_path' in bash_content:
+                skip_reason = 'Eagle3 preset needs a separately staged draft checkpoint'
+        else:
+            cache_path, cache_dir = default_cache, default_cache_dir
+            if cache_path:
+                bash_content = bash_content.replace('your_model_path', cache_path)
+                identities = {model_id_for_path, cache_dir, os.path.relpath(cache_path, CACHE_BASE)}
+                for identity in sorted(identities, key=len, reverse=True):
+                    bash_content = re.sub(r'(\bvllm\s+serve\s+)([\'\"]?)' + re.escape(identity) + r'\2(?=\s|$)',
+                                          lambda m: m.group(1) + shlex.quote(cache_path), bash_content)
+                    bash_content = re.sub(r'(?m)^(\s*(?:export\s+)?MODEL_PATH=)([\'\"]?)' + re.escape(identity) + r'\2(?=\s|$)',
+                                          lambda m: m.group(1) + shlex.quote(cache_path), bash_content)
+            # Preserve the legacy smoke behavior for older recipes.
+            bash_content = re.sub(r'.*--speculative-config.*\n?', '', bash_content)
+        if not cache_path:
+            checkpoint = scenario_model_id or model_id_for_path
+            skip_reason = f'Checkpoint not staged on the runner: {checkpoint}'
         bash_content = resolve_placeholders(bash_content, data)
-        # Remove speculative-config lines (contain placeholder paths)
-        bash_content = re.sub(r'.*--speculative-config.*\n?', '', bash_content)
         if 'vllm serve' in bash_content:
             serve_cmd = bash_content.strip()
     
@@ -251,6 +260,8 @@ for s in scenarios:
             'deployment': s.get('deployment', ''),
             'case': s.get('case', ''),
             'serve_cmd': serve_cmd,
+            'cache_path': cache_path or '',
+            'skip_reason': skip_reason,
             'verify_cmds': verify_cmds,
             'benchmark_chat': any('/v1/chat/completions' in cmd for cmd in verify_cmds)
                               and '--runner pooling' not in serve_cmd,
@@ -267,7 +278,7 @@ result = {
     'hw_key': hw_key,
     'pip_setup': pip_content,
     'container_setup': container_content,
-    'cache_path': CACHE_PATH,
+    'cache_path': default_cache or '',
     'scenarios': commands,
 }
 print(json.dumps(result))
@@ -323,10 +334,7 @@ PYEOF
 fi
 
 MODEL_ID=$(echo "$RECIPE_INFO" | $PYTHON -c "import sys,json; print(json.loads(sys.stdin.read()).get('model_id',''))")
-CACHE_PATH=$(echo "$RECIPE_INFO" | $PYTHON -c "import sys,json; print(json.loads(sys.stdin.read()).get('cache_path',''))")
-export CACHE_PATH
 log_info "Model: $MODEL_ID"
-log_info "Cached weights: $CACHE_PATH"
 log_info "Hardware: $(echo "$RECIPE_INFO" | $PYTHON -c "import sys,json; print(json.loads(sys.stdin.read()).get('hw_key',''))")"
 
 # Install vllm-ascend
@@ -372,7 +380,9 @@ with open('/tmp/scenario_list.txt', 'w') as flist:
             f.write(serve)
         with open(f'/tmp/scenario_{i}_verify.sh', 'w') as f:
             f.write(verify)
-        flist.write(f'{i}|{s[\"npu\"]}|{s[\"precision\"]}|{s[\"deployment\"]}|{s[\"case\"]}\n')
+        if '|' in s.get('cache_path', '') or '|' in s.get('skip_reason', ''):
+            raise ValueError('Invalid scenario cache path or skip reason')
+        flist.write(f'{i}|{s[\"npu\"]}|{s[\"precision\"]}|{s[\"deployment\"]}|{s[\"case\"]}|{s.get(\"cache_path\", \"\")}|{s.get(\"skip_reason\", \"\")}\n')
 
 # === Dump execution params (consumed by publish-status workflow) ===
 PARAMS_DIR = os.environ.get('RUN_PARAMS_DIR', '/tmp/verify-results')
@@ -425,7 +435,7 @@ record_scenario_result() {
     STATUS=1
   fi
 }
-while IFS='|' read -r idx npu precision deployment case_name; do
+while IFS='|' read -r idx npu precision deployment case_name CACHE_PATH skip_reason; do
   [ -z "$idx" ] && continue
   SCENARIO_FAILED=0
 
@@ -437,6 +447,13 @@ while IFS='|' read -r idx npu precision deployment case_name; do
   VERIFY_CMD=$(cat "/tmp/scenario_${idx}_verify.sh" 2>/dev/null || echo "")
 
   log_info "--- Scenario [$idx]: $npu / $precision / $deployment / $case_name ---"
+  if [[ -n "$skip_reason" ]]; then
+    log_warn "  Skipping scenario: $skip_reason"
+    SKIPPED=1
+    record_scenario_result skip "$skip_reason"
+    continue
+  fi
+  log_info "  Cached weights: $CACHE_PATH"
   log_info "  Serve command:"
   echo "$SERVE_CMD" | while IFS= read -r line; do log_info "    $line"; done
 
@@ -490,6 +507,9 @@ SCRIPT_HEREDOC
       log_info "  Server ready after ${i}s"
       break
     fi
+    if ! kill -0 "$SERVE_PID" 2>/dev/null; then
+      break
+    fi
     if [[ $((i % 30)) -eq 0 ]]; then
       log_info "  Still waiting... (${i}s elapsed)"
       npu-smi info || true
@@ -498,8 +518,13 @@ SCRIPT_HEREDOC
   done
 
   if [[ "$READY" -eq 0 ]]; then
-    log_error "  Server failed to become ready within 900s"
-    kill $SERVE_PID 2>/dev/null || true
+    if kill -0 "$SERVE_PID" 2>/dev/null; then
+      log_error "  Server failed to become ready within 900s"
+      kill "$SERVE_PID" 2>/dev/null || true
+    else
+      log_error "  Server exited before readiness"
+      wait "$SERVE_PID" 2>/dev/null || true
+    fi
     STATUS=1
     record_scenario_result fail "Model server did not become ready"
     continue
