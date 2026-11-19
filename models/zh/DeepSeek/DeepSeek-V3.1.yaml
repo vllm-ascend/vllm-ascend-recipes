@@ -313,7 +313,7 @@ scenarios:
       ```
 
 - npu: Ascend 950DT
-  precision: W4A4MLP+W8A8C8Attn
+  precision: W4A4C8 MXFP4
   deployment: Single-Node
   case: High Throughput
   tags: [a5-single]
@@ -321,7 +321,7 @@ scenarios:
   steps:
   - title: 启动服务
     content: |-
-      Ascend 950DT 单机部署使用混合精度权重（`w4a4_mlp-w8a8c8_attn`）。950DT 上自 **vllm-ascend v0.23.0rc1** 起支持本模型。
+      Ascend 950DT 单机部署使用 W4A4C8 MXFP4 混合精度权重（`Eco-Tech/DeepSeek-V3.1-w4a4c8-mxfp4`）。教程原单机构建（`w4a4_mlp-w8a8c8_attn`）无公开发布版本；更重的 W8A8C8 MXFP8 构建（面向 8 节点 PD 部署）会把单机 96GB 卡的 `gpu-memory-utilization` 预算占满，KV cache 无剩余空间。注意：下方 `--speculative-config` 行启用 MTP；若下载的 checkpoint 不含 MTP 草稿模块，请移除该行。950DT 上自 **vllm-ascend v0.23.0rc1** 起支持本模型。
 
       ```shell
         export HCCL_BUFFSIZE=512
@@ -334,7 +334,7 @@ scenarios:
         export TASK_QUEUE_ENABLE=1
 
         export VLLM_ASCEND_ENABLE_MLAPO=1
-        # 700G-class weight loading exceeds the default engine-ready timeout
+        # Large single-node weight loading exceeds the default engine-ready timeout
         export VLLM_ENGINE_READY_TIMEOUT_S=7200
 
         vllm serve your_model_path \
@@ -1159,6 +1159,8 @@ tuning: |-
   > |Low Latency (16K)|Server-D Node|16|4|8|36K|3|
   > |Long Context (64K)|Server-P Node|16|8|1(PCP2DCP8)|36K|3|
   > |Long Context (64K)|Server-D Node|16|4|8|36K|3|
+  >
+  > 注：Table 3 的 Weight Version 列沿用教程原始命名；这些单机构建未公开发布。当前公开可用、供上方场景使用的权重为 `Eco-Tech/DeepSeek-V3.1-w4a4c8-mxfp4`。
   >
   > #### Table 3: Scenario Overview(Ascend 950DT)
   >

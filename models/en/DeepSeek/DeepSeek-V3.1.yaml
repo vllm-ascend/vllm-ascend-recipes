@@ -313,7 +313,7 @@ scenarios:
       ```
 
 - npu: Ascend 950DT
-  precision: W4A4MLP+W8A8C8Attn
+  precision: W4A4C8 MXFP4
   deployment: Single-Node
   case: High Throughput
   tags: [a5-single]
@@ -321,7 +321,7 @@ scenarios:
   steps:
   - title: Start the server
     content: |-
-      Ascend 950DT single-node deployment uses the mixed-precision weights (`w4a4_mlp-w8a8c8_attn`). The model is supported from **vllm-ascend v0.23.0rc1** on 950DT.
+      Ascend 950DT single-node deployment uses the mixed-precision W4A4C8 MXFP4 weights (`Eco-Tech/DeepSeek-V3.1-w4a4c8-mxfp4`). The tutorial's original single-node build (`w4a4_mlp-w8a8c8_attn`) was never publicly released, and the heavier W8A8C8 MXFP8 build (intended for the 8-node PD deployment) fills a single node's 96 GB cards right up to the `gpu-memory-utilization` budget, leaving no room for KV cache. Note: the `--speculative-config` line below enables MTP; if your downloaded checkpoint does not ship the MTP draft module, remove that line. The model is supported from **vllm-ascend v0.23.0rc1** on 950DT.
 
       ```shell
         export HCCL_BUFFSIZE=512
@@ -334,7 +334,7 @@ scenarios:
         export TASK_QUEUE_ENABLE=1
 
         export VLLM_ASCEND_ENABLE_MLAPO=1
-        # 700G-class weight loading exceeds the default engine-ready timeout
+        # Large single-node weight loading exceeds the default engine-ready timeout
         export VLLM_ENGINE_READY_TIMEOUT_S=7200
 
         vllm serve your_model_path \
@@ -1160,6 +1160,8 @@ tuning: |-
   > |Low Latency (16K)|Server-D Node|16|4|8|36K|3|
   > |Long Context (64K)|Server-P Node|16|8|1(PCP2DCP8)|36K|3|
   > |Long Context (64K)|Server-D Node|16|4|8|36K|3|
+  >
+  > Note: the Weight Version column in Table 3 uses the tutorial's original naming; those single-node builds were never publicly released. The public weights used by the scenario above are `Eco-Tech/DeepSeek-V3.1-w4a4c8-mxfp4`.
   >
   > #### Table 3: Scenario Overview(Ascend 950DT)
   >
