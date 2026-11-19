@@ -2,7 +2,7 @@
   "model": "Qwen3-Coder-30B-A3B-Instruct",
   "last_pr_run": {
     "kind": "pr",
-    "status": "skip",
+    "status": "pass",
     "conclusion": "success",
     "head_sha": "bef2f53df3ea08d03d8d37e5d50fcf014ece0472",
     "head_sha_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/commit/bef2f53df3ea08d03d8d37e5d50fcf014ece0472",
@@ -12,7 +12,7 @@
     "recipe_yaml_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/blob/bef2f53df3ea08d03d8d37e5d50fcf014ece0472/models/en/Qwen/Qwen3-Coder-30B-A3B-Instruct.yaml",
     "params_url": "https://vllm-ascend.github.io/vllm-ascend-recipes/runs/bef2f53df3ea08d03d8d37e5d50fcf014ece0472/Qwen3-Coder-30B-A3B-Instruct.params.json",
     "started_at": "2026-11-18T18:54:52Z",
-    "finished_at": "2026-11-18T19:02:54Z",
+    "finished_at": "2026-11-19T11:29:16Z",
     "pr_number": null,
     "pr_url": null,
     "pr_title": null,
