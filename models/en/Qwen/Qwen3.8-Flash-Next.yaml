@@ -228,15 +228,15 @@ verification: |-
   Text chat should identify as Qwen. Multimodal OCR on the sample logo returns `TONGYI` / `Qwen`.
 
 evaluation:
-  - title: AISBench GSM8K
+  accuracy:
     content: |-
-      Lab result on Atlas 800 A3 DP1×TP8 W8A8-MTP: GSM8K accuracy **96.51**.
+      Lab result on Atlas 800 A3 DP1×TP8 W8A8-MTP: AISBench GSM8K accuracy **96.51**.
 
 performance:
-  - title: Notes
-    content: |-
-      Formal PERF gsm8k MaxConc=8 PASS in lab salvage runs. Prefer ACLGraph path on v0.32; older images may need `--enforce-eager`.
-
+  accuracy: |-
+    AISBench GSM8K ACC 96.51 on Atlas 800 A3 with `v0.32.0rc1-a3` + Eco-Tech W8A8-MTP.
+  benchmark: |-
+    Formal PERF gsm8k MaxConc=8 PASS in lab salvage runs. Prefer ACLGraph path on v0.32; older images may need `--enforce-eager`.
 tuning: |-
   On older images such as `qwen3.8-next-a3` / `v0.30.0-a3`, default ACLGraph may fail Conv2D capture.
   Add `--enforce-eager` (and adjust MTP) as a workaround, or upgrade to `v0.32.0rc1-a3`.
