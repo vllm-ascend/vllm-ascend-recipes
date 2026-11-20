@@ -1,0 +1,24 @@
+{
+  "model": "Qwen3-Coder-30B-A3B-Instruct",
+  "last_pr_run": {
+    "kind": "pr",
+    "status": "pass",
+    "conclusion": "success",
+    "head_sha": "72522a49844474b597610ec8007f5161e66ac139",
+    "head_sha_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/commit/72522a49844474b597610ec8007f5161e66ac139",
+    "workflow_run_id": 44662576405,
+    "workflow_run_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/actions/runs/44662576405",
+    "recipe_path": "models/en/Qwen/Qwen3-Coder-30B-A3B-Instruct.yaml",
+    "recipe_yaml_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/blob/72522a49844474b597610ec8007f5161e66ac139/models/en/Qwen/Qwen3-Coder-30B-A3B-Instruct.yaml",
+    "params_url": "https://vllm-ascend.github.io/vllm-ascend-recipes/runs/72522a49844474b597610ec8007f5161e66ac139/Qwen3-Coder-30B-A3B-Instruct.params.json",
+    "started_at": "2026-11-20T02:41:18Z",
+    "finished_at": "2026-11-20T03:10:25Z",
+    "pr_number": null,
+    "pr_url": null,
+    "pr_title": null,
+    "pr_author": null
+  },
+  "last_nightly_run": null,
+  "last_manual_run": null,
+  "targets": {}
+}

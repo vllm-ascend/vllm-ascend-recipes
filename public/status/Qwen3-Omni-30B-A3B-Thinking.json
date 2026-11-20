@@ -1,0 +1,24 @@
+{
+  "model": "Qwen3-Omni-30B-A3B-Thinking",
+  "last_pr_run": {
+    "kind": "pr",
+    "status": "pass",
+    "conclusion": "success",
+    "head_sha": "b37fba2f2bb2d59c72db9b1dd5af3014d60a2b1e",
+    "head_sha_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/commit/b37fba2f2bb2d59c72db9b1dd5af3014d60a2b1e",
+    "workflow_run_id": 44669062185,
+    "workflow_run_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/actions/runs/44669062185",
+    "recipe_path": "models/en/Qwen/Qwen3-Omni-30B-A3B-Thinking.yaml",
+    "recipe_yaml_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/blob/b37fba2f2bb2d59c72db9b1dd5af3014d60a2b1e/models/en/Qwen/Qwen3-Omni-30B-A3B-Thinking.yaml",
+    "params_url": "https://vllm-ascend.github.io/vllm-ascend-recipes/runs/b37fba2f2bb2d59c72db9b1dd5af3014d60a2b1e/Qwen3-Omni-30B-A3B-Thinking.params.json",
+    "started_at": "2026-11-20T03:38:03Z",
+    "finished_at": "2026-11-20T04:02:29Z",
+    "pr_number": null,
+    "pr_url": null,
+    "pr_title": null,
+    "pr_author": null
+  },
+  "last_nightly_run": null,
+  "last_manual_run": null,
+  "targets": {}
+}

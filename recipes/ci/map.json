@@ -35,13 +35,49 @@
           "variant": "ascend_w8a8",
           "features": { "spec_decoding": "mtp" },
           "frontend": "python",
-          "expect": { "dp": 4, "tp": 4 },
-          "override": {
-            "extra_args": { "--tensor-parallel-size": "4" },
-            "extra_env": {
-              "ASCEND_RT_VISIBLE_DEVICES": "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15"
-            }
-          },
+          "expect": { "dp": 2, "tp": 8 },
+          "nodes": 1
+        }
+      ]
+    },
+    {
+      "name": "Qwen3-VL-Reranker-2B",
+      "yaml": "recipes/models/Qwen/Qwen3-VL-Reranker-2B.yaml",
+      "hf_id": "Qwen/Qwen3-VL-Reranker-2B",
+      "combos": [
+        {
+          "id": "a3-qwen3-vl-reranker-2b",
+          "hardware": "ascend_910c",
+          "variant": "default",
+          "frontend": "python",
+          "features": {},
+          "expect": { "tp": 1, "dp": 1, "pp": 1 },
+          "override": { "extra_env": { "VLLM_USE_MODELSCOPE": "True" } },
+          "smoke_test": "rerank",
+          "required": true,
+          "nodes": 1
+        }
+      ]
+    },
+    {
+      "name": "Qwen3.6-35B-A3B",
+      "yaml": "recipes/overlays/Qwen/Qwen3.6-35B-A3B.yaml",
+      "hf_id": "Qwen/Qwen3.6-35B-A3B",
+      "combos": [
+        {
+          "id": "a3-910c-w8a8-a3-mtp",
+          "hardware": "ascend_910c",
+          "variant": "ascend_w8a8_a3",
+          "features": { "spec_decoding": "mtp" },
+          "expect": { "spec_decoding": "qwen3_5_mtp", "tp": 2 },
+          "nodes": 1
+        },
+        {
+          "id": "a5-950dt-w8a8-mxfp8-mtp",
+          "hardware": "ascend_950dt",
+          "variant": "ascend_w8a8_mxfp8_a5",
+          "features": { "spec_decoding": "mtp" },
+          "expect": { "spec_decoding": "qwen3_5_mtp", "tp": 1 },
           "nodes": 1
         }
       ]

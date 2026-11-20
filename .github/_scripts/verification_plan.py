@@ -41,10 +41,10 @@ RUNNERS = {
         8: "linux-aarch64-a2b4-8",
     },
     "a3": {
-        2: "linux-aarch64-a3-800i-2-cn12-001",
-        4: "linux-aarch64-a3-800i-4-cn12-001",
-        8: "linux-aarch64-a3-800i-8-cn12-001",
-        16: "linux-aarch64-a3-800i-16-cn12-001",
+        2: "linux-aarch64-a3-800i-recipes-fed-2",
+        4: "linux-aarch64-a3-800i-recipes-fed-4",
+        8: "linux-aarch64-a3-800i-recipes-fed-8",
+        16: "linux-aarch64-a3-800i-recipes-fed-16",
     },
     "a5": {
         0: "linux-aarch64-a5-0",

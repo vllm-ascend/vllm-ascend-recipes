@@ -70,17 +70,6 @@ A5_RENDER = {
     "deploy_type": "single_node",
     "node_count": 1,
     "selection": {"hardware": "ascend_950dt_8x", "adjusted": [], "pd": None},
-    "companions": [
-        {
-            "label": "vLLM Router",
-            "after": True,
-            "description": "Routes client requests. Requires: uv pip install vllm-router",
-            "command": (
-                "vllm-router \\\n  --host 0.0.0.0 \\\n  --port 8000 \\\n"
-                "  --intra-node-data-parallel-size 4 \\\n  --worker-urls http://localhost:8100"
-            ),
-        }
-    ],
 }
 
 A5_ENTRY = {
@@ -206,18 +195,21 @@ def test_plan_combo_happy_path():
     assert meta["port"] == 8100
     assert meta["hub"] == "huggingface"
     assert meta["draft_model"] is None
+    assert meta["bench"] is True  # chat combos benchmark by default
     assert meta["features_resolved"] == {"spec_decoding": "dspark"}
     assert meta["runner"] == "linux-aarch64-a5-4"
     assert meta["image"] == "quay.io/ascend/vllm-ascend:v0.23.0-a5"
     assert meta["runner_image"] == ("swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/vllm-ascend:v0.23.0-a5")
     assert meta["readiness_timeout_s"] == 1800
     assert meta["job_timeout_min"] == 90
-    # Companion: vllm-router on port 8000 with an install hint.
-    assert len(meta["companions"]) == 1
-    companion = meta["companions"][0]
-    assert companion["port"] == 8000
-    assert companion["after"] is True
-    assert companion["install_hint"] == "uv pip install vllm-router"
+
+
+def test_plan_combo_bench_follows_smoke_test_and_override():
+    # Rerank combos have no page "Bench" snippet, so benchmarking stays off
+    # unless the map turns it on; chat combos can opt out explicitly.
+    assert _plan(A5_RENDER, dict(A5_COMBO, smoke_test="rerank"))["bench"] is False
+    assert _plan(A5_RENDER, dict(A5_COMBO, smoke_test="rerank", bench=True))["bench"] is True
+    assert _plan(A5_RENDER, dict(A5_COMBO, bench=False))["bench"] is False
 
 
 def test_plan_combo_modelscope_and_draft_model():
@@ -547,3 +539,176 @@ def test_main_hardware_filter(tmp_path, monkeypatch):
     assert sorted(r["combo_id"] for r in manifest["combos"]) == ["a3-c", "a5-c"]
     matrix = json.loads((out_dir2 / "matrix.json").read_text(encoding="utf-8"))
     assert sorted(m["combo"] for m in matrix["include"]) == ["a3-c", "a5-c"]
+
+
+# --- --models filter (manual dispatch) ----------------------------------------
+
+
+def _two_model_map(tmp_path):
+    map_file = tmp_path / "map.json"
+    map_file.write_text(
+        json.dumps(
+            {
+                "schema_version": gen.SCHEMA_VERSION,
+                "entries": [
+                    {
+                        "name": "Model-A",
+                        "yaml": "recipes/overlays/org/A.yaml",
+                        "hf_id": "org/A",
+                        "combos": [{"id": "a5-c", "hardware": "ascend_950dt_8x", "variant": "default", "nodes": 1}],
+                    },
+                    {
+                        "name": "Model-B",
+                        "yaml": "recipes/overlays/org/B.yaml",
+                        "hf_id": "org/B",
+                        "combos": [{"id": "a3-c", "hardware": "ascend_910c", "variant": "default", "nodes": 1}],
+                    },
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    labels_file = tmp_path / "runner_label.json"
+    labels_file.write_text(
+        json.dumps(
+            {
+                "linux-aarch64-a5-4": {"chip": "a5", "npu_num": 4},
+                "linux-aarch64-a3-4": {"chip": "a3", "npu_num": 4},
+            }
+        ),
+        encoding="utf-8",
+    )
+    return ["--map", str(map_file), "--runner-labels", str(labels_file)]
+
+
+def _fetch_by_hardware(site, hf_id, combo):
+    render = A3_RENDER if combo["hardware"] == "ascend_910c" else A5_RENDER
+    return dict(render), SOURCE_URL
+
+
+def _combos_of(out_dir: Path) -> list[str]:
+    manifest = json.loads((out_dir / "manifest.json").read_text(encoding="utf-8"))
+    return sorted(r["combo_id"] for r in manifest["combos"])
+
+
+def test_main_models_filter_matches_name_and_hf_id(tmp_path, monkeypatch):
+    # --models exists so a manual dispatch can select a model without knowing
+    # which entry a bare combo ID such as a3-c belongs to.
+    common = _two_model_map(tmp_path)
+    monkeypatch.setattr(gen, "fetch_render", _fetch_by_hardware)
+
+    assert gen.main(common + ["--out", str(tmp_path / "name"), "--models", "Model-A"]) == 0
+    assert _combos_of(tmp_path / "name") == ["a5-c"]
+
+    # hf_id works too, and matching is case-insensitive.
+    assert gen.main(common + ["--out", str(tmp_path / "hf"), "--models", "ORG/B"]) == 0
+    assert _combos_of(tmp_path / "hf") == ["a3-c"]
+
+    assert gen.main(common + ["--out", str(tmp_path / "both"), "--models", "Model-A, org/B"]) == 0
+    assert _combos_of(tmp_path / "both") == ["a3-c", "a5-c"]
+
+
+def test_main_models_combines_with_hardware_as_and(tmp_path, monkeypatch):
+    # Model-B only declares an A3 combo, so A5 + Model-B matches nothing: the
+    # filters are an intersection, and a green run of zero combos would hide it.
+    common = _two_model_map(tmp_path)
+    monkeypatch.setattr(gen, "fetch_render", _fetch_by_hardware)
+    out_dir = tmp_path / "conflict"
+    with pytest.raises(SystemExit):
+        gen.main(common + ["--out", str(out_dir), "--hardware", "a5", "--models", "Model-B"])
+    assert not (out_dir / "manifest.json").exists()
+
+
+def test_main_unknown_model_is_rejected(tmp_path, monkeypatch):
+    common = _two_model_map(tmp_path)
+    monkeypatch.setattr(gen, "fetch_render", _fetch_by_hardware)
+    with pytest.raises(SystemExit):
+        gen.main(common + ["--out", str(tmp_path / "typo"), "--models", "Model-Typo"])
+
+
+def test_main_empty_change_set_without_filters_stays_green(tmp_path, monkeypatch):
+    # PRs pass the three filters as empty strings; an empty change set is a
+    # normal no-op and must not trip the filter mismatch guard.
+    common = _two_model_map(tmp_path)
+    monkeypatch.setattr(gen, "fetch_render", _fetch_by_hardware)
+    baseline = tmp_path / "base.json"
+    baseline.write_text((tmp_path / "map.json").read_text(encoding="utf-8"), encoding="utf-8")
+    out_dir = tmp_path / "unchanged"
+    rc = gen.main(
+        common
+        + ["--out", str(out_dir), "--hardware", "", "--combos", "", "--models", "", "--baseline-map", str(baseline)]
+    )
+    assert rc == 0
+    assert _combos_of(out_dir) == []
+
+
+def test_changed_combo_ids_preserves_unchanged_models():
+    baseline = {"site": "https://recipes.vllm.ai", "entries": [dict(A5_ENTRY, combos=[A5_COMBO])]}
+    current = json.loads(json.dumps(baseline))
+    assert gen.changed_combo_ids(current, baseline) == set()
+    current["entries"].append({"hf_id": "Qwen/Qwen3-VL-Reranker-2B", "combos": [{"id": "reranker"}]})
+    assert gen.changed_combo_ids(current, baseline) == {"reranker"}
+    current["entries"][0]["combos"][0]["expect"]["dp"] = 2
+    assert gen.changed_combo_ids(current, baseline) == {"reranker", A5_COMBO["id"]}
+
+
+def test_changed_combo_ids_includes_entry_and_global_changes():
+    baseline = {"site": "https://recipes.vllm.ai", "entries": [dict(A5_ENTRY, combos=[A5_COMBO])]}
+    current = json.loads(json.dumps(baseline))
+    current["entries"][0]["hf_id"] = "other/model"
+    assert gen.changed_combo_ids(current, baseline) == {A5_COMBO["id"]}
+    current = json.loads(json.dumps(baseline))
+    current["site"] = "https://preview.example"
+    assert gen.changed_combo_ids(current, baseline) == {A5_COMBO["id"]}
+
+
+def test_main_selects_changed_or_explicit_combos(tmp_path, monkeypatch):
+    baseline = {"schema_version": 1, "entries": [dict(A5_ENTRY, combos=[A5_COMBO])]}
+    current = json.loads(json.dumps(baseline))
+    current["entries"][0]["combos"].append(dict(A5_COMBO, id="new-combo"))
+    source, base, labels = (tmp_path / name for name in ("map.json", "base.json", "labels.json"))
+    source.write_text(json.dumps(current), encoding="utf-8")
+    base.write_text(json.dumps(baseline), encoding="utf-8")
+    labels.write_text(json.dumps(RUNNER_LABELS), encoding="utf-8")
+    fetched = []
+
+    def fetch(site, hf_id, combo):
+        fetched.append(combo["id"])
+        return dict(A5_RENDER), SOURCE_URL
+
+    monkeypatch.setattr(gen, "fetch_render", fetch)
+    common = ["--map", str(source), "--runner-labels", str(labels)]
+    assert gen.main(common + ["--out", str(tmp_path / "changed"), "--baseline-map", str(base)]) == 0
+    assert fetched == ["new-combo"]
+    fetched.clear()
+    assert gen.main(common + ["--out", str(tmp_path / "explicit"), "--combos", A5_COMBO["id"]]) == 0
+    assert fetched == [A5_COMBO["id"]]
+    with pytest.raises(SystemExit):
+        gen.main(common + ["--out", str(tmp_path / "invalid"), "--combos", "typo"])
+    assert fetched == [A5_COMBO["id"]]
+
+
+def test_plan_combo_carries_rerank_smoke_and_required_policy():
+    meta = _plan(A5_RENDER, dict(A5_COMBO, smoke_test="rerank", required=True))
+    assert meta["smoke_test"] == "rerank"
+    assert meta["required"] is True
+    with pytest.raises(gen.ComboFailure, match="smoke_test"):
+        _plan(A5_RENDER, dict(A5_COMBO, smoke_test="typo"))
+
+
+def test_required_combo_without_runner_fails_generation(tmp_path, monkeypatch):
+    monkeypatch.setattr(gen, "fetch_render", lambda *args: (dict(A5_RENDER), SOURCE_URL))
+    combo = dict(A5_COMBO, required=True)
+    row = gen.process_combo(A5_ENTRY, combo, "https://recipes.vllm.ai", {}, REWRITES, tmp_path)
+    assert row["status"] == "skipped"
+    assert gen.write_outputs(tmp_path, [row]) == 1
+
+
+def test_pooling_uses_serving_parallelism_instead_of_full_node_docker_mounts():
+    render = dict(A3_RENDER)
+    render["argv"] = ["vllm", "serve", "Qwen/Qwen3-VL-Reranker-2B", "--runner", "pooling", "--tensor-parallel-size", "1"]
+    render["env"] = {}
+    render["docker_argv"] = ["docker", "run"] + [f"/dev/davinci{i}" for i in range(16)]
+    meta = _plan(render, dict(A5_COMBO, hardware="ascend_910c", expect={"tp": 1, "dp": 1}))
+    assert meta["required_npu"] == 1
+    assert meta["runner"] == "linux-aarch64-a3-2"

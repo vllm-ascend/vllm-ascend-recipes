@@ -62,6 +62,11 @@ PD_STRATEGY = "pd_cluster"
 # recipes hardware profile id -> runner chip id (runner_label.json "chip")
 HARDWARE_CHIP = {
     "ascend_910c": "a3",
+    # The plain A5 profile is a separate id from ascend_950dt_8x: variants
+    # that only declare it (Qwen3.6-35B-A3B W8A8 MXFP8) render nowhere else,
+    # and asking for ascend_950dt_8x makes the site fall back
+    # (selection.adjusted) and trip the fallback assertion.
+    "ascend_950dt": "a5",
     "ascend_950dt_8x": "a5",
     "ascend_950pr_8x": "a5",
 }
@@ -249,33 +254,6 @@ def assert_parallel_sizes(combo: dict, argv: list[str]) -> tuple[int, int, int]:
     return tp, dp, pp
 
 
-def parse_companions(render: dict) -> list[dict]:
-    """Extract companion processes (template 6.2): command, port, after flag
-    and the install hint from the description's ``Requires:`` line."""
-    companions = []
-    for comp in render.get("companions") or []:
-        command = str(comp.get("command") or "")
-        tokens = shlex.split(command)
-        port = None
-        for i, token in enumerate(tokens):
-            if token == "--port" and i + 1 < len(tokens):
-                try:
-                    port = int(tokens[i + 1])
-                except ValueError:
-                    port = None
-        match = re.search(r"Requires:\s*(.+)", str(comp.get("description") or ""))
-        companions.append(
-            {
-                "label": comp.get("label"),
-                "command": command,
-                "port": port,
-                "after": bool(comp.get("after")),
-                "install_hint": match.group(1).strip() if match else None,
-            }
-        )
-    return companions
-
-
 def derive_timeouts(env: dict) -> tuple[int, int]:
     """Readiness timeout and GHA job timeout (template 7).
 
@@ -411,10 +389,16 @@ def plan_combo(
     argv, env = apply_override(combo, argv, env)
     features_resolved = resolve_spec_mode(combo, argv)
     tp, dp, pp = assert_parallel_sizes(combo, argv)
+    smoke_test = combo.get("smoke_test", "chat")
+    if smoke_test not in ("chat", "rerank"):
+        raise ComboFailure(f"unknown smoke_test {smoke_test!r}")
 
     visible = env.get(NPU_VISIBILITY_ENV)
     visible_count = len(str(visible).split(",")) if visible else 0
-    required_npu = max(tp * dp * pp, visible_count, declared_device_count(render))
+    # Pooling executes the structured serve argv, not the renderer's generic
+    # full-node Docker example. Keep declared-mount sizing for legacy MoE cases.
+    mounts = 0 if argv_value(argv, "--runner") == "pooling" else declared_device_count(render)
+    required_npu = max(tp * dp * pp, visible_count, mounts)
 
     image = str(render.get("docker_image") or "")
     if not image:
@@ -434,6 +418,11 @@ def plan_combo(
         "variant": combo["variant"],
         "features_requested": combo.get("features") or {},
         "features_resolved": features_resolved,
+        "smoke_test": smoke_test,
+        # Benchmarking follows the recipes page's "Bench" snippet, which only
+        # exists for chat models; rerank combos opt out by default.
+        "bench": bool(combo.get("bench", smoke_test == "chat")),
+        "required": bool(combo.get("required", False)),
         "override": combo.get("override") or {},
         "image": image,
         "runner_image": runner_image,
@@ -448,7 +437,6 @@ def plan_combo(
         "hub": hub,
         "env": env,
         "argv": argv,
-        "companions": parse_companions(render),
         "strategy": render.get("strategy"),
         "deploy_type": render.get("deploy_type"),
         "source_url": source_url,
@@ -505,6 +493,7 @@ def process_combo(
         "runner": None,
         "image": None,
         "timeout_minutes": None,
+        "required": bool(combo.get("required", False)),
     }
     try:
         if (combo.get("nodes") or 1) != 1:
@@ -559,13 +548,34 @@ def write_outputs(out_dir: Path, rows: list[dict]) -> int:
             f"| {r['combo_id']} | {r['status']} | {r['reason'] or ''} | {r['runner'] or ''} | {r['image'] or ''} |"
         )
     (out_dir / "summary.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
-    return 1 if any(r["status"] == "failed" for r in rows) else 0
+    return 1 if any(r["status"] == "failed" or (r.get("required") and r["status"] == "skipped") for r in rows) else 0
+
+
+def changed_combo_ids(current: dict, baseline: dict) -> set[str]:
+    """Select map additions/changes without fetching unrelated large models."""
+    def indexed(data):
+        return {
+            combo["id"]: (dict((k, v) for k, v in entry.items() if k != "combos"), combo)
+            for entry in data.get("entries", []) for combo in entry.get("combos", [])
+        }
+
+    candidates, previous = indexed(current), indexed(baseline)
+    if {k: v for k, v in current.items() if k != "entries"} != {k: v for k, v in baseline.items() if k != "entries"}:
+        return set(candidates)
+    return {key for key, value in candidates.items() if previous.get(key) != value}
+
+
+def model_keys(entry: dict) -> set[str]:
+    """Lowercased identifiers a --models filter can match an entry on."""
+    return {str(value).lower() for value in (entry.get("name"), entry.get("hf_id")) if value}
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--map", required=True, type=Path, help="MAP json (recipes/ci/map.json)")
     parser.add_argument("--out", required=True, type=Path, help="output directory for artifacts")
+    parser.add_argument("--combos", default="", help="comma-separated combo IDs; empty = all")
+    parser.add_argument("--baseline-map", type=Path, help="only generate added/changed map combos (PRs)")
     parser.add_argument(
         "--runner-labels",
         required=True,
@@ -577,6 +587,11 @@ def main(argv: list[str] | None = None) -> int:
         default="",
         help="comma-separated chips to run (a2/a3/a5); empty = all (manual dispatch filter)",
     )
+    parser.add_argument(
+        "--models",
+        default="",
+        help="comma-separated entry names or hf_ids to run; empty = all (manual dispatch filter)",
+    )
     args = parser.parse_args(argv)
 
     map_data = json.loads(args.map.read_text(encoding="utf-8"))
@@ -587,16 +602,46 @@ def main(argv: list[str] | None = None) -> int:
     site = str(map_data.get("site") or DEFAULT_SITE)
     rewrites = list(map_data.get("runner_image_rewrites") or [])
     wanted = {h.strip() for h in args.hardware.split(",") if h.strip()}
+    wanted_models = {m.strip().lower() for m in args.models.split(",") if m.strip()}
+    if wanted_models:
+        known_models = set().union(*(model_keys(e) for e in map_data.get("entries", [])))
+        unknown_models = sorted(wanted_models - known_models)
+        if unknown_models:
+            parser.error("unknown models: " + ", ".join(unknown_models))
+    known = [c["id"] for e in map_data.get("entries", []) for c in e.get("combos", [])]
+    if len(known) != len(set(known)):
+        parser.error("combo IDs must be unique")
+    requested = {c.strip() for c in args.combos.split(",") if c.strip()} or None
+    if requested and requested - set(known):
+        parser.error("unknown combo IDs: " + ", ".join(sorted(requested - set(known))))
+    selected = requested
+    if args.baseline_map:
+        baseline = json.loads(args.baseline_map.read_text(encoding="utf-8"))
+        changed = changed_combo_ids(map_data, baseline)
+        selected = changed if selected is None else selected & changed
 
     rows = []
     for entry in map_data.get("entries", []):
+        if wanted_models and not wanted_models & model_keys(entry):
+            print(f"[{entry.get('name')}] filtered out by --models {','.join(sorted(wanted_models))}")
+            continue
         for combo in entry.get("combos", []):
+            if selected is not None and combo["id"] not in selected:
+                continue
             if wanted and HARDWARE_CHIP.get(str(combo.get("hardware"))) not in wanted:
                 print(f"[{combo.get('id')}] filtered out by --hardware {','.join(sorted(wanted))}")
                 continue
             row = process_combo(entry, combo, site, runner_labels, rewrites, args.out)
             rows.append(row)
             print(f"[{row['combo_id']}] {row['status']}" + (f": {row['reason']}" if row["reason"] else ""))
+
+    # Filters combine with AND, so an explicit selection can empty the run; fail
+    # loudly instead of reporting a green pipeline that executed nothing.
+    if not rows and (wanted or wanted_models or requested):
+        parser.error(
+            "no combo matched the requested filters: "
+            f"hardware='{args.hardware}' models='{args.models}' combos='{args.combos}'"
+        )
 
     exit_code = write_outputs(args.out, rows)
     print(

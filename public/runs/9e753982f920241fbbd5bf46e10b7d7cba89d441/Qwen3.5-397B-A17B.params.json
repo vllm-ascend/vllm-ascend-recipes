@@ -1,0 +1,23 @@
+{
+  "verification_scope": "single-node API smoke; not accuracy or full feature coverage",
+  "recipe_path": "models/en/Qwen/Qwen3.5-397B-A17B.yaml",
+  "model_id": "Eco-Tech/Qwen3.5-397B-A17B-w8a8-mtp",
+  "hw_key": "atlas_800_a3",
+  "head_sha": "9e753982f920241fbbd5bf46e10b7d7cba89d441",
+  "workflow_run_id": "42597299101",
+  "trigger_type": "pr",
+  "image": "quay.nju.edu.cn/ascend/vllm-ascend:nightly-main-a3",
+  "started_at": "2026-11-09T09:57:19Z",
+  "scenarios": [
+    {
+      "index": 0,
+      "npu": "Atlas 800I A3",
+      "precision": "W8A8",
+      "deployment": "Single-Node",
+      "case": "Single-Node Online Deployment (TP16, 133K context)",
+      "serve_cmd": "# Load model from ModelScope to speed up download (skip when using local weights).\nexport VLLM_USE_MODELSCOPE=True\nexport HCCL_BUFFSIZE=1024\nexport HCCL_OP_EXPANSION_MODE=\"AIV\"\nexport VLLM_USE_V2_MODEL_RUNNER=0\n\necho performance | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor\nsysctl -w vm.swappiness=0\nsysctl -w kernel.numa_balancing=0\nsysctl kernel.sched_migration_cost_ns=50000\n\n  # NOTE (first-party deviation): enable_fused_mc2=1 below deviates from tutorial §9.1 (=2) —\n  # the MegaMoe path rejected the dummy-run token count at TP16 on this stack; root cause pending.\nvllm serve /root/.cache/modelscope/hub/models/Eco-Tech/Qwen3.5-397B-A17B-w8a8-mtp \\\n  --host 0.0.0.0 \\\n  --port 8000 \\\n  --data-parallel-size 1 \\\n  --tensor-parallel-size 16 \\\n  --enable-expert-parallel \\\n  --seed 1024 \\\n  --quantization ascend \\\n  --served-model-name qwen3.5 \\\n  --max-num-seqs 128 \\\n  --max-model-len 133000 \\\n  --max-num-batched-tokens 16384 \\\n  --trust-remote-code \\\n  --gpu-memory-utilization 0.90 \\\n  --enable-prefix-caching \\\n  --compilation-config '{\"cudagraph_mode\":\"FULL_DECODE_ONLY\"}' \\\n  --additional-config '{\"enable_cpu_binding\": true, \"enable_fused_mc2\": 1, \"enable_flashcomm1\": true}'",
+      "verification_status": "fail",
+      "verification_reason": "Model server did not become ready"
+    }
+  ]
+}
