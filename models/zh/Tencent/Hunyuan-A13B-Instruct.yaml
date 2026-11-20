@@ -184,16 +184,16 @@ verification: |-
   Expect tutorial chat curl PASS and serve log `Loading model weights took 37.4562 GB` per NPU.
 
 evaluation:
-  - title: AISBench
+  accuracy:
     content: |-
-      PERF gsm8k MaxConc=16 PASS (TTFT≈247.7ms, TPOT≈44.8ms).
       Historical GSM8K ACC ≈93.93 (tutorial target 94.77; not force-rerun this cycle).
+      AISBench PERF gsm8k MaxConc=16 PASS (TTFT≈247.7ms, TPOT≈44.8ms).
 
 performance:
-  - title: Static weight KPI
-    content: |-
-      Lab A3 (v0.23.0-a3): weights **37.4562 GB/NPU** (MATCH tutorial ~37.46).
-
+  accuracy: |-
+    Lab A3 (v0.23.0-a3): static weights **37.4562 GB/NPU** (MATCH tutorial ~37.46).
+  benchmark: |-
+    AISBench PERF gsm8k MaxConc=16 PASS (TTFT≈247.7ms, TPOT≈44.8ms).
 tuning: |-
   Keep TP=4 for the official single-node tutorial path. Two-die hosts cannot satisfy that configuration.
 
