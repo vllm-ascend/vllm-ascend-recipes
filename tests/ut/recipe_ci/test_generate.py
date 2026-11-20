@@ -205,10 +205,10 @@ def test_plan_combo_happy_path():
 
 
 def test_plan_combo_bench_follows_smoke_test_and_override():
-    # Rerank combos have no page "Bench" snippet, so benchmarking stays off
-    # unless the map turns it on; chat combos can opt out explicitly.
-    assert _plan(A5_RENDER, dict(A5_COMBO, smoke_test="rerank"))["bench"] is False
-    assert _plan(A5_RENDER, dict(A5_COMBO, smoke_test="rerank", bench=True))["bench"] is True
+    # Both chat and rerank benchmark by default (chat uses the page's snippet,
+    # rerank the recipe YAML's); a combo can opt out explicitly.
+    assert _plan(A5_RENDER, dict(A5_COMBO, smoke_test="rerank"))["bench"] is True
+    assert _plan(A5_RENDER, dict(A5_COMBO, smoke_test="rerank", bench=False))["bench"] is False
     assert _plan(A5_RENDER, dict(A5_COMBO, bench=False))["bench"] is False
 
 
