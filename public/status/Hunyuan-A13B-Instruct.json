@@ -1,0 +1,24 @@
+{
+  "model": "Hunyuan-A13B-Instruct",
+  "last_pr_run": {
+    "kind": "pr",
+    "status": "unknown",
+    "conclusion": "failure",
+    "head_sha": "43da97dadb4f2d0e1adfc9d37708e5816d5dbacf",
+    "head_sha_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/commit/43da97dadb4f2d0e1adfc9d37708e5816d5dbacf",
+    "workflow_run_id": 44491081896,
+    "workflow_run_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/actions/runs/44491081896",
+    "recipe_path": "models/en/Tencent/Hunyuan-A13B-Instruct.yaml",
+    "recipe_yaml_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/blob/43da97dadb4f2d0e1adfc9d37708e5816d5dbacf/models/en/Tencent/Hunyuan-A13B-Instruct.yaml",
+    "params_url": "https://vllm-ascend.github.io/vllm-ascend-recipes/runs/43da97dadb4f2d0e1adfc9d37708e5816d5dbacf/Hunyuan-A13B-Instruct.params.json",
+    "started_at": "",
+    "finished_at": "2026-11-20T02:47:57Z",
+    "pr_number": null,
+    "pr_url": null,
+    "pr_title": null,
+    "pr_author": null
+  },
+  "last_nightly_run": null,
+  "last_manual_run": null,
+  "targets": {}
+}
