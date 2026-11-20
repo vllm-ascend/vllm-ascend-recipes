@@ -1,0 +1,850 @@
+meta:
+  title: "Qwen3.6-27B"
+  slug: "qwen3.6-27b"
+  provider: "Qwen"
+  description: "Qwen3.6-27B is a dense hybrid Mamba-Transformer multimodal model (gated delta networks + full attention, 27B parameters, 262144-token context, MTP head). This recipe covers W8A8, W8A8 MXFP8, W8A8C8 MXFP8 and BF16 deployment on Atlas 800 A2/A3, Ascend 950DT and Atlas 300I DUO."
+  date_added: 2026-07-27
+  tasks:
+    - text
+    - multimodal
+  performance_headline: "DP-first W8A8 (TP=2) on Atlas 800 A3/A2, TP=1 + DP=8 on Ascend 950DT, FP16 TP on Atlas 300I DUO"
+  date_updated: 2026-11-18
+  difficulty: advanced
+  related_recipes:
+    - "Qwen/Qwen3.5-27B"
+  hardware:
+    atlas_800_a2: experimental
+    atlas_800_a3: verified
+    ascend_950dt: experimental
+    atlas_300i_duo: experimental
+
+model:
+  model_id: "Qwen/Qwen3.6-27B"
+  min_vllm_version: "0.30.0"
+  architecture: dense
+  parameter_count: "27B"
+  active_parameters: null
+  context_length: 262144
+  modality: multimodal
+  base_args:
+    - "--trust-remote-code"
+  base_env:
+    VLLM_USE_MODELSCOPE: "True"
+    PYTORCH_NPU_ALLOC_CONF: "expandable_segments:True"
+    HCCL_BUFFSIZE: "512"
+    OMP_PROC_BIND: "false"
+    OMP_NUM_THREADS: "1"
+    TASK_QUEUE_ENABLE: "1"
+  docker_image:
+    atlas_800_a2: "quay.io/ascend/vllm-ascend:v0.30.0"
+    atlas_800_a3: "quay.io/ascend/vllm-ascend:v0.30.0-a3"
+    ascend_950dt: "quay.io/ascend/vllm-ascend:v0.30.0-a5"
+    atlas_300i_duo: "quay.io/ascend/vllm-ascend:v0.30.0-310p"
+  nightly_required: false
+  install:
+    # Ascend ships no vllm-ascend wheel on PyPI; the pinned image is the only
+    # supported install path, so the pip tab is hidden.
+    pip: false
+    docker:
+      command: "docker run --rm --net=host --shm-size=1g --device /dev/davinci0 --device /dev/davinci1 --device /dev/davinci2 --device /dev/davinci3 --device /dev/davinci4 --device /dev/davinci5 --device /dev/davinci6 --device /dev/davinci7 --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc -v /usr/local/dcmi:/usr/local/dcmi -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info -v /etc/ascend_install.info:/etc/ascend_install.info -v /root/.cache:/root/.cache -it quay.io/ascend/vllm-ascend:v0.30.0 bash"
+      note: "Pinned Ascend image; the full per-SKU device and driver mounts are listed in env_setup."
+
+# —— Upstream-aligned extension fields (features / variants / strategies) ——
+features:
+  spec_decoding:
+    label: "MTP Spec Decoding"
+    description: "MTP speculative decoding (qwen3_5_mtp, 3 tokens) — both Qwen3.5-27B and Qwen3.6-27B share this MTP head"
+    args: ["--speculative-config", '{"method": "qwen3_5_mtp", "num_speculative_tokens": 3}']
+  compilation_config:
+    label: "Compilation Config"
+    description: "Full ACL graph execution in decode (--compilation-config cudagraph_mode=FULL_DECODE_ONLY)"
+    args: ["--compilation-config", '{"cudagraph_mode":"FULL_DECODE_ONLY"}']
+  async_scheduling:
+    label: "Async Scheduling"
+    description: "Asynchronous scheduling to overlap CPU scheduling with NPU computation"
+    args: ["--async-scheduling"]
+  prefix_caching:
+    label: "Prefix Caching"
+    description: "KV-cache prefix caching (--enable-prefix-caching / --no-enable-prefix-caching)"
+    args: ["--enable-prefix-caching"]
+    flag_when_false: "--no-enable-prefix-caching"
+  cpu_binding:
+    label: "CPU Binding"
+    description: "Pin Ascend worker threads and NPU IRQs to the CPU ranges closest to the driven NPU"
+    args: ["--additional-config", '{"enable_cpu_binding":true}']
+
+opt_in_features:
+  - prefix_caching
+
+variants:
+  default:
+    model_id: "Eco-Tech/Qwen3.6-27B-w8a8"
+    precision: W8A8
+    label: "W8A8"
+    vram_minimum_gb: 33
+    description: "ModelSlim W8A8 checkpoint; the recommended default on Atlas 800 A2/A3"
+  bf16:
+    model_id: "Qwen/Qwen3.6-27B"
+    precision: bf16
+    label: "BF16"
+    vram_minimum_gb: 65
+    description: "Full-precision BF16 weights (~55.6 GB) — needs TP=2 on 64 GB dies"
+    supported_hardware: [atlas_800_a2, atlas_800_a3, ascend_950dt]
+  a5_mxfp8:
+    model_id: "Eco-Tech/Qwen3.6-27B-w8a8-mxfp8"
+    precision: MXFP8
+    label: "W8A8 MXFP8 (A5)"
+    vram_minimum_gb: 33
+    description: "W8A8 MXFP8 checkpoint without an FP8 KV cache — short-sequence workloads on Ascend 950DT"
+    supported_hardware: [ascend_950dt]
+  a5_c8_mxfp8:
+    model_id: "Eco-Tech/Qwen3.6-27B-w8a8c8-mxfp8"
+    precision: MXFP8
+    label: "W8A8C8 MXFP8 (A5, FP8 KV)"
+    vram_minimum_gb: 33
+    description: "W8A8C8 MXFP8 checkpoint with an FP8 KV cache (--kv-cache-dtype mxfp8) — long-sequence workloads on Ascend 950DT"
+    supported_hardware: [ascend_950dt]
+  p310:
+    model_id: "Eco-Tech/Qwen3.6-27B-W8A8-310P"
+    precision: W8A8
+    label: "W8A8 (300I DUO)"
+    vram_minimum_gb: 33
+    description: "310P-specific W8A8 checkpoint for Atlas 300I DUO, which only supports TP and requires FP16 runtime"
+    supported_hardware: [atlas_300i_duo]
+
+compatible_strategies:
+  - single_node_A2
+  - single_node_A3
+  - single_node_310p
+  - single_node_A5
+
+hardware_overrides: {}
+
+strategy_overrides: {}
+
+dependencies: []
+
+guide: ""
+
+# —— Configurable value params (page/CI extension; defaults = tutorial baseline) ——
+config_params:
+  max_model_len:
+    default: 133120
+    type: number
+    description: "Maximum context length (input + output tokens); the model supports up to 262144"
+  max_num_seqs:
+    default: 32
+    type: number
+    description: "Maximum number of concurrent sequences per DP group"
+  gpu_memory_utilization:
+    default: 0.85
+    type: number
+    description: "Fraction of NPU HBM used for the KV cache"
+
+overview: |-
+  Qwen3.6-27B is the flagship dense model of the Qwen3.6 family and shares Qwen3.5-27B's hybrid attention design: gated delta networks for three of every four blocks plus a full-attention block. It takes text plus image/video input, serves a 262144-token context, and ships the MTP head used by `qwen3_5_mtp` speculative decoding.
+
+  Two families of weights exist. On Atlas 800 A2/A3 the ModelSlim W8A8 checkpoint is the default and the deployment principle is **DP-first** (about 30 GB of weights per die, TP=2, rest to DP). On Ascend 950DT the W8A8C8 MXFP8 checkpoint with an FP8 KV cache is the long-sequence choice at TP=1 + DP=8; the W8A8 MXFP8 checkpoint without an FP8 KV cache covers shorter sequences.
+weight_download:
+# ---- Qwen3.6-27B BF16 ----
+- weight_version: Qwen3.6-27B BF16
+  sources:
+  - source: ModelScope
+    url: https://modelscope.cn/models/Qwen/Qwen3.6-27B
+    command: |-
+      ```bash
+      pip install modelscope
+      modelscope download --model Qwen/Qwen3.6-27B
+      ```
+  - source: HuggingFace
+    url: https://huggingface.co/Qwen/Qwen3.6-27B
+    command: |-
+      ```bash
+      pip install -U huggingface_hub
+      huggingface-cli download Qwen/Qwen3.6-27B
+      ```
+  - source: Modelers
+    url: ''
+    command: |-
+      ```bash
+      pip install modelers
+      modelers download --model Qwen/Qwen3.6-27B
+      ```
+  - source: GitCode
+    url: ''
+    command: |-
+      ```bash
+      git clone https://gitcode.com/Qwen/Qwen3.6-27B.git
+      ```
+
+# ---- Qwen3.6-27B W8A8 ----
+- weight_version: Qwen3.6-27B-w8a8
+  sources:
+  - source: ModelScope
+    url: https://www.modelscope.cn/models/Eco-Tech/Qwen3.6-27B-w8a8
+    command: |-
+      ```bash
+      pip install modelscope
+      modelscope download --model Eco-Tech/Qwen3.6-27B-w8a8
+      ```
+  - source: HuggingFace
+    url: ''
+    command: |-
+      ```bash
+      pip install -U huggingface_hub
+      huggingface-cli download Eco-Tech/Qwen3.6-27B-w8a8
+      ```
+  - source: Modelers
+    url: ''
+    command: |-
+      ```bash
+      pip install modelers
+      modelers download --model Eco-Tech/Qwen3.6-27B-w8a8
+      ```
+  - source: GitCode
+    url: ''
+    command: |-
+      ```bash
+      git clone https://gitcode.com/Eco-Tech/Qwen3.6-27B-w8a8.git
+      ```
+
+# ---- Qwen3.6-27B W8A8 MXFP8 (Ascend 950DT, no FP8 KV cache) ----
+- weight_version: Qwen3.6-27B-w8a8-mxfp8
+  sources:
+  - source: ModelScope
+    url: https://www.modelscope.cn/models/Eco-Tech/Qwen3.6-27B-w8a8-mxfp8
+    command: |-
+      ```bash
+      pip install modelscope
+      modelscope download --model Eco-Tech/Qwen3.6-27B-w8a8-mxfp8
+      ```
+
+# ---- Qwen3.6-27B W8A8C8 MXFP8 (Ascend 950DT, FP8 KV cache) ----
+- weight_version: Qwen3.6-27B-w8a8c8-mxfp8
+  sources:
+  - source: ModelScope
+    url: https://www.modelscope.cn/models/Eco-Tech/Qwen3.6-27B-w8a8c8-mxfp8
+    command: |-
+      ```bash
+      pip install modelscope
+      modelscope download --model Eco-Tech/Qwen3.6-27B-w8a8c8-mxfp8
+      ```
+
+# ---- Qwen3.6-27B W8A8 310P (Atlas 300I DUO) ----
+- weight_version: Qwen3.6-27B-W8A8-310P
+  sources:
+  - source: ModelScope
+    url: https://www.modelscope.cn/models/Eco-Tech/Qwen3.6-27B-W8A8-310P
+    command: |-
+      ```bash
+      pip install modelscope
+      modelscope download --model Eco-Tech/Qwen3.6-27B-W8A8-310P
+      ```
+
+quantization:
+  content: |-
+    Pre-quantized builds live under the `Eco-Tech/` namespace on ModelScope and all carry the shared MTP head:
+
+    | Checkpoint | Use |
+    |------------|-----|
+    | `Qwen3.6-27B-w8a8` | Atlas 800 A2/A3 default (no FP8 KV cache) |
+    | `Qwen3.6-27B-w8a8-mxfp8` | Ascend 950DT, short sequences (no FP8 KV cache) |
+    | `Qwen3.6-27B-w8a8c8-mxfp8` | Ascend 950DT, long sequences (requires `--kv-cache-dtype mxfp8`) |
+    | `Qwen3.6-27B-W8A8-310P` | Atlas 300I DUO, FP16 runtime |
+
+    Every quantized weight needs `--quantization ascend`. BF16 (`Qwen/Qwen3.6-27B`) does not. `--kv-cache-dtype mxfp8` stores full-attention KV as E4M3 with E8M0 scales and requires `--block-size` to be a multiple of 512 (default 512).
+
+prerequisites:
+- title: Hardware
+  content: |-
+    - **Atlas 800 A3** (64 GB × 16): one node. The 16-NPU layout is TP=2 + DP=8; TP=8 + DP=2 for 256K+ context.
+    - **Atlas 800 A2** (64 GB × 8): one node. The 8-NPU layout is TP=2 + DP=4.
+    - **Ascend 950DT** (96 GB × 8): one node, TP=1 + DP=8. The W8A8C8 MXFP8 checkpoint is the long-sequence path.
+    - **Atlas 300I DUO**: at least two devices; only TP is supported (TP=2 or TP=4), FP16 runtime only.
+
+- title: Version floor
+  content: |-
+    `min_vllm_version` is `0.30.0`. Qwen3.6-27B is first supported in `vllm-ascend:v0.18.0rc1`, and Atlas 300I DUO / Ascend 950DT support starts at `v0.23.0rc1`, but this recipe's rendered commands are validated only against the v0.30.0 image line.
+
+env_setup:
+  pip:
+    content: |-
+      There is no Ascend wheel on PyPI, so a source build is the only pip path:
+
+      ```bash
+      git clone https://github.com/vllm-project/vllm-ascend.git
+      cd vllm-ascend
+      pip install -e .
+      ```
+
+      Verify:
+      ```bash
+      pip show vllm-ascend
+      ```
+
+  container:
+    "Atlas 800 A3":
+      content: |-
+        ```bash
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.30.0-a3
+        docker run --rm \
+            --name vllm-ascend \
+            --shm-size=1g \
+            --net=host \
+            --device /dev/davinci0 --device /dev/davinci1 --device /dev/davinci2 --device /dev/davinci3 \
+            --device /dev/davinci4 --device /dev/davinci5 --device /dev/davinci6 --device /dev/davinci7 \
+            --device /dev/davinci8 --device /dev/davinci9 --device /dev/davinci10 --device /dev/davinci11 \
+            --device /dev/davinci12 --device /dev/davinci13 --device /dev/davinci14 --device /dev/davinci15 \
+            --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc \
+            -v /usr/local/dcmi:/usr/local/dcmi \
+            -v /usr/local/Ascend/driver/tools/hccn_tool:/usr/local/Ascend/driver/tools/hccn_tool \
+            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+            -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \
+            -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
+            -v /etc/ascend_install.info:/etc/ascend_install.info \
+            -v /root/.cache:/root/.cache \
+            -it $IMAGE bash
+        ```
+    "Atlas 800 A2":
+      content: |-
+        ```bash
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.30.0
+        docker run --rm \
+            --name vllm-ascend \
+            --shm-size=1g \
+            --net=host \
+            --device /dev/davinci0 --device /dev/davinci1 --device /dev/davinci2 --device /dev/davinci3 \
+            --device /dev/davinci4 --device /dev/davinci5 --device /dev/davinci6 --device /dev/davinci7 \
+            --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc \
+            -v /usr/local/dcmi:/usr/local/dcmi \
+            -v /usr/local/Ascend/driver/tools/hccn_tool:/usr/local/Ascend/driver/tools/hccn_tool \
+            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+            -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \
+            -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
+            -v /etc/ascend_install.info:/etc/ascend_install.info \
+            -v /root/.cache:/root/.cache \
+            -it $IMAGE bash
+        ```
+    "Ascend 950DT":
+      content: |-
+        ```bash
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.30.0-a5
+        docker run --rm \
+            --name vllm-ascend \
+            --net=host \
+            --shm-size=1g \
+            --device /dev/davinci0 --device /dev/davinci1 --device /dev/davinci2 --device /dev/davinci3 \
+            --device /dev/davinci4 --device /dev/davinci5 --device /dev/davinci6 --device /dev/davinci7 \
+            --device /dev/davinci_manager --device /dev/hisi_hdc \
+            --device /dev/ummu --device /dev/uburma \
+            -v /usr/local/Ascend/driver:/usr/local/Ascend/driver \
+            -v /etc/ascend_install.info:/etc/ascend_install.info \
+            -v /etc/hccl_rootinfo.json:/etc/hccl_rootinfo.json \
+            -v /etc/hixlep/:/etc/hixlep/ \
+            -v /usr/local/sbin:/usr/local/sbin \
+            -v /usr/local/dcmi:/usr/local/dcmi \
+            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+            -v /usr/lib64:/usr/lib64 \
+            -v /root/.cache:/root/.cache \
+            -it $IMAGE bash
+        ```
+    "Atlas 300I DUO":
+      content: |-
+        ```bash
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.30.0-310p
+        docker run --rm \
+            --name vllm-ascend \
+            --shm-size=1g \
+            --device /dev/davinci0 --device /dev/davinci1 --device /dev/davinci2 --device /dev/davinci3 \
+            --device /dev/davinci4 --device /dev/davinci5 --device /dev/davinci6 --device /dev/davinci7 \
+            --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc \
+            -v /usr/local/dcmi:/usr/local/dcmi \
+            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+            -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \
+            -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
+            -v /etc/ascend_install.info:/etc/ascend_install.info \
+            -v /root/.cache:/root/.cache \
+            -p 8080:8080 \
+            -it $IMAGE bash
+        ```
+
+        On Atlas 300I DUO you may need to remove the conflicting Triton builds in the source-install path:
+
+        ```bash
+        pip uninstall -y triton-ascend triton
+        ```
+
+scenarios:
+# ===== Atlas 800 A2, W8A8, TP=2 + DP=4 =====
+- npu: Atlas 800I A2
+  precision: W8A8
+  deployment: Single-Node
+  case: Multi Card
+  tags: [a2-single]
+  strategy: single_node_A2
+  steps:
+  - title: Start the server
+    content: |-
+      **Status: experimental.** The tutorial's Atlas 800 A2 layout assumes 64 GB dies (64G × 8). This repository's A2 verification runner is an Atlas 800I A2 with **910B4 parts (32 GB per die)**, where the 133k-context W8A8 configuration does not fit: weights take ~15 GB per die and the KV cache pushes the die past 32 GB, so the engines never become ready. The command below keeps the tutorial topology (TP2 + DP4) but caps `--max-model-len` at 32768 so it can run on these 32 GB dies; use the tutorial's 133000 on 64 GB A2 hardware.
+
+      ```bash
+      #!/bin/sh
+      export MODEL_PATH=Eco-Tech/Qwen3.6-27B-w8a8
+      export VLLM_USE_MODELSCOPE=True
+      export VLLM_ENGINE_READY_TIMEOUT=1800
+      export HCCL_BUFFSIZE=512
+      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+      export OMP_PROC_BIND=false
+      export OMP_NUM_THREADS=1
+      export TASK_QUEUE_ENABLE=1
+
+      vllm serve $MODEL_PATH \
+          --host 0.0.0.0 \
+          --port 8000 \
+          --data-parallel-size 4 \
+          --tensor-parallel-size 2 \
+          --quantization ascend \
+          --served-model-name qwen3.6 \
+          --max-num-seqs {{max_num_seqs}} \
+          --max-model-len 32768 \
+          --max-num-batched-tokens 16384 \
+          --trust-remote-code \
+          --allowed-local-media-path / \
+          --dtype bfloat16 \
+          --reasoning-parser qwen3 \
+          --mm-processor-cache-gb 0 \
+          --mm-encoder-tp-mode data \
+          --mm-processor-cache-type shm \
+          --gpu-memory-utilization {{gpu_memory_utilization}} \
+          {{prefix_caching}} \
+          {{spec_decoding}} \
+          {{compilation_config}} \
+          {{cpu_binding}} \
+          {{async_scheduling}}
+      ```
+  - title: Service verification
+    content: |-
+      See the `verification` section below.
+
+# ===== Atlas 800 A3, W8A8, TP=2 + DP=8 =====
+- npu: Atlas 800I A3
+  precision: W8A8
+  deployment: Single-Node
+  case: Multi Card
+  tags: [a3-single]
+  strategy: single_node_A3
+  steps:
+  - title: Start the server
+    content: |-
+      **Status: experimental — awaiting a real-device run.** This is the tutorial's Atlas 800 A3 layout (TP=2 + DP=8 fills all 16 NPUs). The badge stays `experimental` until the rendered command is executed end-to-end on an A3 node.
+
+      ```bash
+      #!/bin/sh
+      export MODEL_PATH=Eco-Tech/Qwen3.6-27B-w8a8
+      export VLLM_USE_MODELSCOPE=True
+      export HCCL_BUFFSIZE=512
+      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+      export OMP_PROC_BIND=false
+      export OMP_NUM_THREADS=1
+      export TASK_QUEUE_ENABLE=1
+
+      vllm serve $MODEL_PATH \
+          --host 0.0.0.0 \
+          --port 8000 \
+          --data-parallel-size 8 \
+          --tensor-parallel-size 2 \
+          --quantization ascend \
+          --served-model-name qwen3.6 \
+          --max-num-seqs {{max_num_seqs}} \
+          --max-model-len {{max_model_len}} \
+          --max-num-batched-tokens 16384 \
+          --trust-remote-code \
+          --allowed-local-media-path / \
+          --dtype bfloat16 \
+          --reasoning-parser qwen3 \
+          --mm-processor-cache-gb 0 \
+          --mm-encoder-tp-mode data \
+          --mm-processor-cache-type shm \
+          --gpu-memory-utilization {{gpu_memory_utilization}} \
+          {{prefix_caching}} \
+          {{spec_decoding}} \
+          {{compilation_config}} \
+          {{cpu_binding}} \
+          {{async_scheduling}}
+      ```
+  - title: Service verification
+    content: |-
+      See the `verification` section below.
+
+# ===== Atlas 800 A3, W8A8, TP=2 + DP=8, Low Latency (128k) =====
+- npu: Atlas 800I A3
+  precision: W8A8
+  deployment: Single-Node
+  case: Low Latency (128k)
+  tags: [a3-single, low-latency]
+  strategy: single_node_A3
+  steps:
+  - title: Start the server
+    content: |-
+      **Status: experimental — awaiting a real-device run.** This is the tutorial's Low Latency row for Atlas 800 A3: the same TP=2 + DP=8 topology as the throughput case, but `--max-num-seqs 4` and `--max-num-batched-tokens 4096` to cut batch latency. The badge stays `experimental` until the rendered command is executed end-to-end on an A3 node.
+
+      ```bash
+      #!/bin/sh
+      export MODEL_PATH=Eco-Tech/Qwen3.6-27B-w8a8
+      export VLLM_USE_MODELSCOPE=True
+      export HCCL_BUFFSIZE=512
+      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+      export OMP_PROC_BIND=false
+      export OMP_NUM_THREADS=1
+      export TASK_QUEUE_ENABLE=1
+
+      vllm serve $MODEL_PATH \
+          --host 0.0.0.0 \
+          --port 8000 \
+          --data-parallel-size 8 \
+          --tensor-parallel-size 2 \
+          --quantization ascend \
+          --served-model-name qwen3.6 \
+          --max-num-seqs 4 \
+          --max-model-len 133000 \
+          --max-num-batched-tokens 4096 \
+          --trust-remote-code \
+          --allowed-local-media-path / \
+          --dtype bfloat16 \
+          --reasoning-parser qwen3 \
+          --mm-processor-cache-gb 0 \
+          --mm-encoder-tp-mode data \
+          --mm-processor-cache-type shm \
+          --gpu-memory-utilization {{gpu_memory_utilization}} \
+          {{prefix_caching}} \
+          {{spec_decoding}} \
+          {{compilation_config}} \
+          {{cpu_binding}} \
+          {{async_scheduling}}
+      ```
+  - title: Service verification
+    content: |-
+      See the `verification` section below.
+
+# ===== Atlas 800 A3, BF16, TP=2 =====
+- npu: Atlas 800I A3
+  precision: BF16
+  deployment: Single-Node
+  case: Multi Card
+  tags: [a3-single]
+  strategy: single_node_A3
+  steps:
+  - title: Start the server
+    content: |-
+      **Status: experimental.** The tutorial's weight table covers BF16 on Atlas 800 A3/A2 but spells out only the W8A8 commands, so this BF16 layout is derived from the W8A8 one: drop `--quantization ascend` and use the BF16 weight id. No standalone BF16 measurement exists.
+
+      ```bash
+      #!/bin/sh
+      export MODEL_PATH=Qwen/Qwen3.6-27B
+      export VLLM_USE_MODELSCOPE=True
+      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+      export OMP_NUM_THREADS=1
+      export TASK_QUEUE_ENABLE=1
+
+      vllm serve $MODEL_PATH \
+          --host 0.0.0.0 \
+          --port 8000 \
+          --tensor-parallel-size 2 \
+          --served-model-name qwen3.6 \
+          --max-num-seqs {{max_num_seqs}} \
+          --max-model-len {{max_model_len}} \
+          --max-num-batched-tokens 16384 \
+          --trust-remote-code \
+          --allowed-local-media-path / \
+          --dtype bfloat16 \
+          --reasoning-parser qwen3 \
+          --mm-processor-cache-gb 0 \
+          --mm-encoder-tp-mode data \
+          --mm-processor-cache-type shm \
+          --gpu-memory-utilization {{gpu_memory_utilization}} \
+          {{prefix_caching}} \
+          {{spec_decoding}} \
+          {{compilation_config}} \
+          {{cpu_binding}} \
+          {{async_scheduling}}
+      ```
+  - title: Service verification
+    content: |-
+      See the `verification` section below.
+
+# ===== Atlas 800 A3, W8A8, long context TP=8 + DP=2 =====
+- npu: Atlas 800I A3
+  precision: W8A8
+  deployment: Single-Node
+  case: Long Context (256K+)
+  tags: [a3-single, long-context]
+  strategy: single_node_A3
+  steps:
+  - title: Start the server
+    content: |-
+      **Status: experimental.** For 256K+ context, shard the KV cache across eight dies (TP=8) and keep two DP groups, then raise `--max-model-len` to the model maximum of 262144.
+
+      ```bash
+      #!/bin/sh
+      export MODEL_PATH=Eco-Tech/Qwen3.6-27B-w8a8
+      export VLLM_USE_MODELSCOPE=True
+      export HCCL_BUFFSIZE=512
+      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+      export OMP_NUM_THREADS=1
+      export TASK_QUEUE_ENABLE=1
+
+      vllm serve $MODEL_PATH \
+          --host 0.0.0.0 \
+          --port 8000 \
+          --data-parallel-size 2 \
+          --tensor-parallel-size 8 \
+          --quantization ascend \
+          --served-model-name qwen3.6 \
+          --max-num-seqs 8 \
+          --max-model-len 262144 \
+          --max-num-batched-tokens 8192 \
+          --trust-remote-code \
+          --allowed-local-media-path / \
+          --dtype bfloat16 \
+          --reasoning-parser qwen3 \
+          --mm-processor-cache-gb 0 \
+          --mm-encoder-tp-mode data \
+          --mm-processor-cache-type shm \
+          --gpu-memory-utilization 0.90 \
+          {{prefix_caching}} \
+          {{spec_decoding}} \
+          {{compilation_config}} \
+          {{cpu_binding}} \
+          {{async_scheduling}}
+      ```
+  - title: Service verification
+    content: |-
+      See the `verification` section below.
+
+# ===== Ascend 950DT, W8A8C8 MXFP8 (FP8 KV cache), TP=1 + DP=8 =====
+- npu: Ascend 950DT
+  precision: MXFP8 / BF16
+  deployment: Single-Node
+  case: Multi Card
+  tags: [a5-single]
+  strategy: single_node_A5
+  steps:
+  - title: Start the server (W8A8C8 MXFP8, FP8 KV cache)
+    content: |-
+      **Status: experimental — no 950DT hardware available.** This is the tutorial's long-sequence path: `--kv-cache-dtype mxfp8` keeps full-attention KV in FP8. For short-sequence workloads use `Eco-Tech/Qwen3.6-27B-w8a8-mxfp8` and remove `--kv-cache-dtype mxfp8`. BF16 works on this platform too (set `MODEL_PATH=Qwen/Qwen3.6-27B` and drop `--quantization ascend`).
+
+      ```bash
+      #!/bin/sh
+      export MODEL_PATH=Eco-Tech/Qwen3.6-27B-w8a8c8-mxfp8
+      export VLLM_USE_MODELSCOPE=True
+      export HCCL_BUFFSIZE=1024
+      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+      export OMP_PROC_BIND=false
+      export OMP_NUM_THREADS=1
+      export TASK_QUEUE_ENABLE=1
+
+      vllm serve $MODEL_PATH \
+          --host 0.0.0.0 \
+          --port 8000 \
+          --data-parallel-size 8 \
+          --tensor-parallel-size 1 \
+          --quantization ascend \
+          --kv-cache-dtype mxfp8 \
+          --served-model-name qwen3.6 \
+          --max-num-seqs {{max_num_seqs}} \
+          --max-model-len 153600 \
+          --max-num-batched-tokens 16384 \
+          --trust-remote-code \
+          --allowed-local-media-path / \
+          --reasoning-parser qwen3 \
+          --mm-processor-cache-gb 0 \
+          --mm-encoder-tp-mode data \
+          --mm-processor-cache-type shm \
+          --gpu-memory-utilization 0.90 \
+          {{prefix_caching}} \
+          {{spec_decoding}} \
+          {{compilation_config}} \
+          --additional-config '{"enable_cpu_binding": true, "enable_flashcomm1": true}'
+      ```
+  - title: Service verification
+    content: |-
+      Use the served name `qwen3.6` on this platform:
+
+      ```bash
+      curl --fail-with-body --silent --show-error http://localhost:<port>/v1/completions \
+        -H 'Content-Type: application/json' \
+        -d '{"model":"qwen3.6","prompt":"The future of AI is","max_tokens":50,"temperature":0}'
+      ```
+
+      ```bash
+      curl --fail-with-body --silent --show-error http://localhost:<port>/v1/chat/completions \
+        -H 'Content-Type: application/json' \
+        -d '{"model":"qwen3.6","messages":[{"role":"user","content":"The future of AI is"}],"max_completion_tokens":4096,"temperature":0.7,"top_p":0.95,"chat_template_kwargs":{"enable_thinking":false}}'
+      ```
+
+# ===== Atlas 300I DUO, W8A8-310P, TP=4, FP16 =====
+- npu: Atlas 300I DUO
+  precision: W8A8
+  deployment: Single-Node
+  case: 300I DUO (TP)
+  tags: [310p-single]
+  strategy: single_node_310p
+  steps:
+  - title: Start the server
+    content: |-
+      **Status: experimental — no 310P hardware available.** Use the 310P-specific checkpoint (`Qwen3.6-27B-W8A8-310P`). Atlas 300I DUO supports TP only (TP=2 or TP=4) and an FP16 runtime; `enable_npugraph_ex` is not available, so it is switched off explicitly.
+
+      ```bash
+      #!/bin/sh
+      export MODEL_PATH=Eco-Tech/Qwen3.6-27B-W8A8-310P
+      export VLLM_USE_MODELSCOPE=True
+      export OMP_NUM_THREADS=1
+
+      vllm serve $MODEL_PATH \
+          --host 0.0.0.0 \
+          --port 8000 \
+          --tensor-parallel-size 4 \
+          --quantization ascend \
+          --served-model-name qwen3.6 \
+          --max-num-seqs 128 \
+          --max-model-len 16384 \
+          --trust-remote-code \
+          --gpu-memory-utilization 0.90 \
+          --mamba-ssm-cache-dtype float16 \
+          --dtype float16 \
+          --speculative-config '{"method": "qwen3_5_mtp", "num_speculative_tokens": 1}' \
+          --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY", "cudagraph_capture_sizes": [2, 16]}' \
+          --additional-config '{"ascend_compilation_config": {"enable_npugraph_ex": false}}'
+      ```
+  - title: Service verification
+    content: |-
+      See the `verification` section below. Use `--served-model-name qwen3.6` and 16384 as the context ceiling.
+
+verification: |-
+  After the service starts, the log should show:
+  ```text
+  (APIServer pid=<pid>) INFO:     Started server process [<pid>]
+  (APIServer pid=<pid>) INFO:     Waiting for application startup.
+  (APIServer pid=<pid>) INFO:     Application startup complete.
+  ```
+
+  Smoke-test the **Completions API**:
+  ```bash
+  curl http://localhost:<port>/v1/completions \
+      -H "Content-Type: application/json" \
+      -d '{
+          "model": "qwen3.6",
+          "prompt": "The future of AI is",
+          "max_tokens": 50,
+          "temperature": 0
+      }'
+  ```
+
+  And the **Chat Completions API**:
+  ```bash
+  curl http://localhost:<port>/v1/chat/completions \
+      -H "Content-Type: application/json" \
+      -d '{
+          "model": "qwen3.6",
+          "messages": [{"role": "user", "content": "The future of AI is"}],
+          "max_completion_tokens": 4096,
+          "chat_template_kwargs": {"enable_thinking": false},
+          "temperature": 0.7,
+          "top_p": 0.95
+      }'
+  ```
+
+  Expected: HTTP 200 OK with a `choices` field carrying generated text.
+
+evaluation:
+  accuracy:
+    content: |-
+      ### Using AISBench (recommended)
+
+      Follow the vllm-ascend AISBench guide with `--served-model-name qwen3.6`. The upstream tutorial publishes an accuracy table only for Qwen3.5-27B-w8a8 (gsm8k 96.74) and states that Qwen3.6-27B "can be obtained in the same way and is not listed here" — so no Qwen3.6-27B number exists upstream, and none is claimed here.
+
+      ### Using Language Model Evaluation Harness (lm_eval)
+
+      ```shell
+      lm_eval \
+        --model local-completions \
+        --model_args model=qwen3.6,base_url=http://127.0.0.1:8000/v1/completions,tokenized_requests=False,trust_remote_code=True \
+        --tasks gsm8k \
+        --output_path ./
+      ```
+  performance:
+    content: |-
+      ### Using AISBench
+
+      See the vllm-ascend AISBench performance-evaluation guide.
+
+      ### Using vllm bench serve
+
+      ```bash
+      export VLLM_USE_MODELSCOPE=True
+      vllm bench serve --model Eco-Tech/Qwen3.6-27B-w8a8 \
+        --dataset-name random --random-input 200 --num-prompts 200 \
+        --request-rate 1 --save-result --result-dir ./
+      ```
+
+      No throughput or latency figures are published for this recipe on Ascend.
+
+tuning: |-
+  ### Parallelism strategy (DP-first)
+
+  `Qwen3.6-27B-w8a8` is roughly 30 GB, so it fits on a single 64 GB HBM die. Keep **TP=2** as the default on Atlas 800 A2/A3 and give the remaining dies to DP. **TP=8 is only for 256K+ context**, where sharding the KV cache across eight dies is what makes the window reachable. On Ascend 950DT the C8 checkpoint fits one 96 GB die, so **TP=1 + DP=8** is the throughput default.
+
+  **Atlas 300I DUO**: TP only — TP=2 or TP=4, FP16 runtime, `--max-model-len` capped at 16384 here (raise it only after checking HBM headroom).
+
+  | Scenario | Deployment | NPUs | Weight | Notes |
+  |----------|------------|------|--------|-------|
+  | High Throughput (128K ctx) | Single-Node A2 | 8 | Qwen3.6-27B-w8a8 | TP=2 + DP=4 — uses all 8 NPUs for parallel request batches |
+  | High Throughput (128K ctx) | Single-Node A3 | 16 | Qwen3.6-27B-w8a8 | TP=2 + DP=8 — uses all 16 NPUs for parallel request batches |
+  | Low Latency (128K ctx) | Single-Node A3 | 16 | Qwen3.6-27B-w8a8 | TP=2 + DP=8, `--max-num-seqs 4` — lower per-layer Allreduce overhead for small interactive batches |
+  | Long Context (256K+ ctx) | Single-Node A3 | 16 | Qwen3.6-27B-w8a8 | TP=8 + DP=2 — shards the KV cache across 8 NPUs |
+  | High Throughput (128K ctx) | Single-Node 950DT | 8 | Qwen3.6-27B-w8a8c8-mxfp8 | TP=1 + DP=8 with `--kv-cache-dtype mxfp8` |
+  | Long Context (256K+ ctx) | Single-Node 950DT | 8 | Qwen3.6-27B-w8a8c8-mxfp8 | TP=1 + DP=8, raise `--max-model-len` to 262144 |
+  | Short context, FP16 | Single-Node 300I DUO | 2-8 | Qwen3.6-27B-W8A8-310P | TP=2 or TP=4, `--dtype float16` |
+
+  | Scenario | Config | TP | DP | Max Num Seqs | Max Num Batched Tokens | Max Model Len | MTP Num | Async Scheduling |
+  |----------|--------|----|----|--------------|------------------------|---------------|---------|-------------------|
+  | High Throughput (128K) | Single-Node A2 | 2 | 4 | 32 | 16384 | 133000 | 3 | On |
+  | High Throughput (128K) | Single-Node A3 | 2 | 8 | 32 | 16384 | 133120 | 3 | On |
+  | Low Latency (128K) | Single-Node A3 | 2 | 8 | 4 | 4096 | 133120 | 3 | On |
+  | Long Context (256K+) | Single-Node A3 | 8 | 2 | 8 | 8192 | 262144 | 3 | On |
+  | High Throughput (128K) | Single-Node 950DT | 1 | 8 | 32 | 16384 | 153600 | 3 | On |
+  | Long Context (256K+) | Single-Node 950DT | 1 | 8 | 32 | 16384 | 262144 | 3 | On |
+  | Short context | Single-Node 300I DUO | 2-4 | 1 | 128 | 8192 | 16384 | 1 | Off |
+
+  ### Key levers
+
+  - `--gpu-memory-utilization`: raise it to grow the KV cache; too high risks OOM because the warm-up peak differs from steady-state usage.
+  - `--max-num-batched-tokens`: larger means lower latency but more activation HBM.
+  - `--kv-cache-dtype mxfp8`: required by the W8A8C8 checkpoint; only supported on 950PR/950DT products, and it forces `--block-size` to a multiple of 512.
+  - `--speculative-config`: both Qwen3.5-27B and Qwen3.6-27B use `qwen3_5_mtp`; on Atlas 300I DUO set `num_speculative_tokens` to 1.
+  - `--compilation-config cudagraph_mode=FULL_DECODE_ONLY`: recommended; `PIECEWISE` is the alternative. On Atlas 300I DUO use at most two capture sizes.
+  - `--additional-config '{"enable_cpu_binding": true, "enable_flashcomm1": true}'`: CPU binding plus FlashComm1 (splits the TP AllReduce into Reduce-Scatter/All-Gather) on Ascend 950DT.
+
+faq: |-
+  Common environment, installation and parameter questions are collected in the vLLM-Ascend public FAQ:
+  https://docs.vllm.ai/projects/ascend/en/latest/faqs.html
+
+references:
+- title: Qwen3.6-27B model card (HuggingFace)
+  url: https://huggingface.co/Qwen/Qwen3.6-27B
+- title: Qwen3.6-27B (ModelScope)
+  url: https://modelscope.cn/models/Qwen/Qwen3.6-27B
+- title: Qwen3.6-27B-w8a8 (Eco-Tech, ModelScope)
+  url: https://www.modelscope.cn/models/Eco-Tech/Qwen3.6-27B-w8a8
+- title: Qwen3.6-27B-w8a8c8-mxfp8 (Eco-Tech, ModelScope)
+  url: https://www.modelscope.cn/models/Eco-Tech/Qwen3.6-27B-w8a8c8-mxfp8
+- title: Qwen3.6-27B-W8A8-310P (Eco-Tech, ModelScope)
+  url: https://www.modelscope.cn/models/Eco-Tech/Qwen3.6-27B-W8A8-310P
+- title: vllm-ascend tutorial (release v0.30.0)
+  url: https://github.com/vllm-project/vllm-ascend/blob/v0.30.0/docs/source/tutorials/models/Qwen3.5-27B-Qwen3.6-27B.md
+- title: Additional Configuration
+  url: https://docs.vllm.ai/projects/ascend/en/latest/user_guide/configuration/additional_config.html
+- title: Feature matrix
+  url: https://docs.vllm.ai/projects/ascend/en/latest/user_guide/support_matrix/feature_matrix.html
+- title: vLLM-Ascend public FAQ
+  url: https://docs.vllm.ai/projects/ascend/en/latest/faqs.html
