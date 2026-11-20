@@ -22,6 +22,7 @@
 import { parse } from 'yaml';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 type AnyRecord = Record<string, unknown>;
 
@@ -252,8 +253,8 @@ function checkRecipe(file: string, data: AnyRecord): string[] {
   return errors;
 }
 
-const enDir = new URL('../models/en/', import.meta.url).pathname;
-const zhDir = new URL('../models/zh/', import.meta.url).pathname;
+const enDir = fileURLToPath(new URL('../models/en/', import.meta.url));
+const zhDir = fileURLToPath(new URL('../models/zh/', import.meta.url));
 const enFiles = findYamlFiles(enDir);
 const zhFiles = new Set(findYamlFiles(zhDir).map((p) => p.replace(/\/zh\//, '/en/')));
 

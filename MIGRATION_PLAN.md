@@ -12,13 +12,14 @@
 | 🔴 待迁移 | 34 |
 | **总计** | **37** |
 
-### 已迁移模型 (3)
+### 已迁移模型 (4)
 
 | # | 模型 | 文件 |
 |---|------|------|
 | 1 | Qwen3-235B-A22B | `models/{en,zh}/Qwen/Qwen3-235B-A22B.yaml` |
 | 2 | Qwen3-30B-A3B | `models/{en,zh}/Qwen/Qwen3-30B-A3B.yaml` |
 | 3 | DeepSeek-V4-Flash | `models/{en,zh}/deepseek-ai/DeepSeek-V4-Flash.yaml` |
+| 4 | Qwen3.5-Dense (2B/4B/9B) | `models/{en,zh}/Qwen/Qwen3.5-Dense.yaml` |
 
 ---
 

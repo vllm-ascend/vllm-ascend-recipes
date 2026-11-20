@@ -1,0 +1,573 @@
+meta:
+  title: "Qwen3.5-Dense (Qwen3.5-2B/4B/9B)"
+  slug: "qwen3.5-dense"
+  provider: "Qwen"
+  description: "Qwen3.5-2B、Qwen3.5-4B、Qwen3.5-9B 是 Qwen3.5 系列的稠密混合 Mamba-Transformer 语言模型，共享相同的混合注意力设计（GDN + 全注意力），在昇腾 310P 推理产品上部署方式一致，适用于对话、内容创作、代码生成等通用文本生成任务。"
+  date_added: 2026-11-04
+  tasks:
+    - text
+  performance_headline: "Atlas 300I DUO / Atlas 200I Pro（310P）单节点部署，支持 TP=1 / TP=2"
+  difficulty: beginner
+  related_recipes:
+    - "Qwen/Qwen3.5-27B-Qwen3.6-27B"
+  hardware:
+    atlas_300i_duo: verified
+    atlas_200i_pro: experimental
+
+model:
+  model_id: "Qwen/Qwen3.5-9B"
+  min_vllm_version: "0.23.0rc1"
+  architecture: dense
+  parameter_count: "2B/4B/9B"
+  active_parameters: null
+  context_length: 262144
+  modality: text
+  base_args:
+    - "--trust-remote-code"
+  base_env:
+    VLLM_USE_MODELSCOPE: "True"
+  docker_image:
+    atlas_300i_duo: "quay.io/ascend/vllm-ascend:v0.23.0rc1-310p"
+    atlas_200i_pro: "quay.io/ascend/vllm-ascend:v0.23.0rc1-310p"
+  nightly_required: false
+  install:
+    # 昇腾推荐 Docker 方式；pip 需源码编译，不提供官方 wheel，隐藏 pip 标签。
+    pip: false
+    docker:
+      command: "docker run --rm --name vllm-ascend --shm-size=10g --device /dev/davinci0 ... --device /dev/davinci7 --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc -v /root/.cache:/root/.cache -p 8080:8080 -it quay.io/ascend/vllm-ascend:v0.23.0rc1-310p bash"
+      note: "昇腾官方镜像；完整设备/驱动挂载见 env_setup.container。"
+
+# —— 上游对齐：features / variants / strategies / overrides / guide ——
+features:
+  spec_decoding:
+    label: "MTP Spec Decoding"
+    description: "Qwen3.5 Dense 系列带 MTP 头的投机解码（qwen3_5_mtp），推荐 num_speculative_tokens 为 1"
+    args: ["--speculative-config", '{"method": "qwen3_5_mtp", "num_speculative_tokens": 1}']
+  compilation_config:
+    label: "Compilation Config"
+    description: "decode 阶段 ACL 图执行（--compilation-config cudagraph_mode=FULL_DECODE_ONLY）；capture size 按 n * (num_speculative_tokens + 1) 推导"
+    args: ["--compilation-config", '{"cudagraph_mode": "FULL_DECODE_ONLY", "cudagraph_capture_sizes": [2, 16]}']
+
+opt_in_features: []
+
+variants:
+  default:
+    precision: fp16
+    vram_minimum_gb: 22
+    description: "FP16 权重（Qwen/Qwen3.5-9B）；2B 与 4B 检查点分别约需 5 GB/10 GB"
+  fp16_2b:
+    model_id: "Qwen/Qwen3.5-2B"
+    precision: fp16
+    vram_minimum_gb: 5
+    description: "Qwen3.5-2B 的 FP16 权重"
+  fp16_4b:
+    model_id: "Qwen/Qwen3.5-4B"
+    precision: fp16
+    vram_minimum_gb: 10
+    description: "Qwen3.5-4B 的 FP16 权重"
+  w8a8_310p_2b:
+    model_id: "Eco-Tech/Qwen3.5-2B-W8A8-310P"
+    precision: W8A8
+    vram_minimum_gb: 3
+    description: "Qwen3.5-2B 的 INT8（W8A8）权重，面向 310P 执行路径"
+    supported_hardware: [atlas_300i_duo, atlas_200i_pro]
+  w8a8_310p_4b:
+    model_id: "Eco-Tech/Qwen3.5-4B-W8A8-310P"
+    precision: W8A8
+    vram_minimum_gb: 5
+    description: "Qwen3.5-4B 的 INT8（W8A8）权重，面向 310P 执行路径"
+    supported_hardware: [atlas_300i_duo, atlas_200i_pro]
+  w8a8_310p_9b:
+    model_id: "Eco-Tech/Qwen3.5-9B-W8A8-310P"
+    precision: W8A8
+    vram_minimum_gb: 11
+    description: "Qwen3.5-9B 的 INT8（W8A8）权重，面向 310P 执行路径"
+    supported_hardware: [atlas_300i_duo, atlas_200i_pro]
+
+compatible_strategies:
+  - single_node_310p
+
+hardware_overrides: {}
+strategy_overrides: {}
+
+dependencies: []
+
+guide: ""
+
+# —— 可配置数值参数（页面/CI 扩展；默认值 = tutorial 基线）——
+config_params:
+  model_path:
+    default: "Qwen/Qwen3.5-2B"
+    type: string
+    description: "权重路径或 ModelScope 模型 ID：Qwen/Qwen3.5-2B / 4B / 9B（或 Eco-Tech 的 W8A8-310P 权重）；需与下载时记录的目录一致"
+  tensor_parallel_size:
+    default: 1
+    type: number
+    description: "张量并行大小：Atlas 300I DUO 上 TP=1 或 TP=2；Atlas 200I Pro 上 TP=1"
+  max_model_len:
+    default: 16384
+    type: number
+    description: "最大上下文长度（单请求输入+输出 token 数之和）；按显存实际情况配置，设置过高可能导致 OOM"
+  max_num_seqs:
+    default: 32
+    type: number
+    description: "并发序列最大数量；按显存实际情况配置，设置过高可能导致 OOM"
+  gpu_memory_utilization:
+    default: 0.9
+    type: number
+    description: "vLLM 实际推理使用的 HBM 显存比例；按显存实际情况配置，设置过高可能导致 OOM"
+
+overview: |-
+  Qwen3.5-2B、Qwen3.5-4B、Qwen3.5-9B 是 Qwen3.5 系列的稠密混合 Mamba-Transformer 语言模型，共享相同的混合注意力设计（GDN + 全注意力），适用于对话、内容创作、代码生成等通用文本生成任务。
+
+weight_download:
+# ---- Qwen/Qwen3.5-2B FP16 ----
+- weight_version: Qwen3.5-2B FP16
+  sources:
+  - source: ModelScope
+    url: https://www.modelscope.cn/models/Qwen/Qwen3.5-2B
+    command: |-
+      ```bash
+      pip install modelscope
+      modelscope download --model Qwen/Qwen3.5-2B
+      ```
+  - source: HuggingFace
+    url: https://huggingface.co/Qwen/Qwen3.5-2B
+    command: |-
+      ```bash
+      pip install -U huggingface_hub
+      huggingface-cli download Qwen/Qwen3.5-2B
+      ```
+
+# ---- Qwen/Qwen3.5-4B FP16 ----
+- weight_version: Qwen3.5-4B FP16
+  sources:
+  - source: ModelScope
+    url: https://www.modelscope.cn/models/Qwen/Qwen3.5-4B
+    command: |-
+      ```bash
+      pip install modelscope
+      modelscope download --model Qwen/Qwen3.5-4B
+      ```
+  - source: HuggingFace
+    url: https://huggingface.co/Qwen/Qwen3.5-4B
+    command: |-
+      ```bash
+      pip install -U huggingface_hub
+      huggingface-cli download Qwen/Qwen3.5-4B
+      ```
+
+# ---- Qwen/Qwen3.5-9B FP16 ----
+- weight_version: Qwen3.5-9B FP16
+  sources:
+  - source: ModelScope
+    url: https://www.modelscope.cn/models/Qwen/Qwen3.5-9B
+    command: |-
+      ```bash
+      pip install modelscope
+      modelscope download --model Qwen/Qwen3.5-9B
+      ```
+  - source: HuggingFace
+    url: https://huggingface.co/Qwen/Qwen3.5-9B
+    command: |-
+      ```bash
+      pip install -U huggingface_hub
+      huggingface-cli download Qwen/Qwen3.5-9B
+      ```
+
+# ---- Eco-Tech/Qwen3.5-2B-W8A8-310P INT8 ----
+- weight_version: Qwen3.5-2B-W8A8-310P INT8
+  sources:
+  - source: ModelScope
+    url: https://www.modelscope.cn/models/Eco-Tech/Qwen3.5-2B-W8A8-310P
+    command: |-
+      ```bash
+      pip install modelscope
+      modelscope download --model Eco-Tech/Qwen3.5-2B-W8A8-310P
+      ```
+  - source: HuggingFace
+    url: ''
+    command: |-
+      ```bash
+      pip install -U huggingface_hub
+      huggingface-cli download Eco-Tech/Qwen3.5-2B-W8A8-310P
+      ```
+
+# ---- Eco-Tech/Qwen3.5-4B-W8A8-310P INT8 ----
+- weight_version: Qwen3.5-4B-W8A8-310P INT8
+  sources:
+  - source: ModelScope
+    url: https://www.modelscope.cn/models/Eco-Tech/Qwen3.5-4B-W8A8-310P
+    command: |-
+      ```bash
+      pip install modelscope
+      modelscope download --model Eco-Tech/Qwen3.5-4B-W8A8-310P
+      ```
+  - source: HuggingFace
+    url: ''
+    command: |-
+      ```bash
+      pip install -U huggingface_hub
+      huggingface-cli download Eco-Tech/Qwen3.5-4B-W8A8-310P
+      ```
+
+# ---- Eco-Tech/Qwen3.5-9B-W8A8-310P INT8 ----
+- weight_version: Qwen3.5-9B-W8A8-310P INT8
+  sources:
+  - source: ModelScope
+    url: https://www.modelscope.cn/models/Eco-Tech/Qwen3.5-9B-W8A8-310P
+    command: |-
+      ```bash
+      pip install modelscope
+      modelscope download --model Eco-Tech/Qwen3.5-9B-W8A8-310P
+      ```
+  - source: HuggingFace
+    url: ''
+    command: |-
+      ```bash
+      pip install -U huggingface_hub
+      huggingface-cli download Eco-Tech/Qwen3.5-9B-W8A8-310P
+      ```
+
+# 注意：官方 tutorial 未给出 W8A8-310P 权重的服务化启动命令；
+# 服务化指导将在真机验证后补充。
+
+prerequisites:
+- title: Hardware
+  content: |-
+    - **Atlas 300I DUO**：仅支持单节点部署，支持 TP 场景（按可用设备选择 TP=1 或 TP=2）。
+    - **Atlas 200I Pro**：仅支持单节点部署；单个可见 NPU 使用 TP=1。
+    - 最低版本要求：Atlas 300I DUO 和 Atlas 200I Pro 对 Qwen3.5-2B/4B/9B 的支持从 `vllm-ascend:v0.23.0rc1` 开始。强烈建议使用最新 rc 版本或最新正式版本。
+
+- title: 模型权重路径
+  content: |-
+    将模型权重下载到本地目录（如 `/root/.cache/` 或 `/home/data/`）并记录该路径。确保后续部署命令中的模型路径与该目录一致。
+
+env_setup:
+  pip:
+    content: |-
+      ```bash
+      git clone https://github.com/vllm-project/vllm-ascend.git
+      cd vllm-ascend
+      pip install -e .
+      ```
+
+      验证：
+      ```bash
+      pip show vllm-ascend
+      ```
+
+      > **在 Atlas 300I DUO 和 Atlas 200I Pro 上**，可能需要卸载 `triton-ascend` 和 `triton` 以避免依赖冲突。
+
+      ```bash
+      pip uninstall -y triton-ascend triton
+      ```
+
+  container:
+    "Atlas 300I DUO":
+      content: |-
+        ```bash
+        export IMAGE=m.daocloud.io/quay.io/ascend/vllm-ascend:v0.23.0rc1-310p
+        docker run --rm \
+            --name vllm-ascend \
+            --shm-size=10g \
+            --device /dev/davinci0 \
+            --device /dev/davinci1 \
+            --device /dev/davinci2 \
+            --device /dev/davinci3 \
+            --device /dev/davinci4 \
+            --device /dev/davinci5 \
+            --device /dev/davinci6 \
+            --device /dev/davinci7 \
+            --device /dev/davinci_manager \
+            --device /dev/devmm_svm \
+            --device /dev/hisi_hdc \
+            -v /usr/local/dcmi:/usr/local/dcmi \
+            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+            -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \
+            -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
+            -v /etc/ascend_install.info:/etc/ascend_install.info \
+            -v /root/.cache:/root/.cache \
+            -p 8080:8080 \
+            -it $IMAGE bash
+        ```
+
+        `docker run` 成功后，使用 `docker ps` 验证：容器 `vllm-ascend` 处于 `Up` 状态即表示安装成功。
+    "Atlas 200I Pro":
+      content: |-
+        根据 NPU ID 调整 `--device=/dev/davinci0`。
+
+        **Ubuntu 24.04：**
+        ```bash
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0rc1-310p
+
+        docker run --rm \
+        --privileged \
+        --name vllm-ascend \
+        --shm-size=10g \
+        --device=/dev/davinci0:/dev/davinci0 \
+        --device=/dev/davinci_manager \
+        --device=/dev/ascend_manager \
+        --device=/dev/user_config \
+        -v /etc/sys_version.conf:/etc/sys_version.conf \
+        -v /etc/ld.so.conf.d/mind_so.conf:/etc/ld.so.conf.d/mind_so.conf \
+        -v /etc/hdcBasic.cfg:/etc/hdcBasic.cfg \
+        -v /var/dmp_daemon:/var/dmp_daemon \
+        -v /usr/lib64/libmmpa.so:/usr/lib64/libmmpa.so \
+        -v /usr/lib64/libcrypto.so.1.1:/usr/lib64/libcrypto.so.1.1 \
+        -v /usr/local/sbin/npu-smi:/usr/local/sbin/npu-smi \
+        -v /usr/lib64/libstackcore.so:/usr/lib64/libstackcore.so \
+        -v /usr/lib/aarch64-linux-gnu/libyaml-0.so.2:/usr/lib64/libyaml-0.so.2 \
+        -v /etc/slog.conf:/etc/slog.conf \
+        -v /var/slogd:/var/slogd \
+        -v /usr/local/Ascend/driver/lib64:/usr/local/Ascend/driver/lib64 \
+        -v /usr/lib64/libtensorflow.so:/usr/lib64/libtensorflow.so \
+        -v /root/.cache:/root/.cache \
+        -p 8080:8080 \
+        -it $IMAGE bash
+        ```
+
+        **openEuler 24.03：** 使用匹配的 `-310p-openeuler` 镜像。
+        ```bash
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0rc1-310p-openeuler
+
+        docker run --rm \
+        --privileged \
+        --name vllm-ascend \
+        --shm-size=10g \
+        --device=/dev/davinci0:/dev/davinci0 \
+        --device=/dev/davinci_manager \
+        --device=/dev/ascend_manager \
+        --device=/dev/user_config \
+        -v /etc/sys_version.conf:/etc/sys_version.conf \
+        -v /etc/ld.so.conf.d/mind_so.conf:/etc/ld.so.conf.d/mind_so.conf \
+        -v /etc/hdcBasic.cfg:/etc/hdcBasic.cfg \
+        -v /var/dmp_daemon:/var/dmp_daemon \
+        -v /usr/lib64/libsemanage.so.2:/usr/lib64/libsemanage.so.2 \
+        -v /usr/lib64/libmmpa.so:/usr/lib64/libmmpa.so \
+        -v /usr/lib64/libcrypto.so.1.1:/usr/lib64/libcrypto.so.1.1 \
+        -v /usr/lib64/libyaml-0.so.2.0.9:/usr/lib64/libyaml-0.so.2 \
+        -v /usr/local/sbin/npu-smi:/usr/local/sbin/npu-smi \
+        -v /usr/lib64/libstackcore.so:/usr/lib64/libstackcore.so \
+        -v /etc/slog.conf:/etc/slog.conf \
+        -v /var/slogd:/var/slogd \
+        -v /usr/local/Ascend/driver/lib64:/usr/local/Ascend/driver/lib64 \
+        -v /usr/lib64/libtensorflow.so:/usr/lib64/libtensorflow.so \
+        -v /root/.cache:/root/.cache \
+        -p 8080:8080 \
+        -it $IMAGE bash
+        ```
+
+scenarios:
+# ===== Atlas 300I DUO 单节点 FP16 =====
+- npu: Atlas 300I DUO
+  precision: FP16
+  deployment: 单节点
+  case: TP（1~2 卡）
+  tags: [310p-single]
+  strategy: single_node_310p
+  steps:
+  - title: 启动服务
+    content: |-
+      单节点部署在一个节点内完成 Prefill 与 Decode。当前平台支持 **TP** 场景——按可用设备选择 **TP=1** 或 **TP=2**。
+
+      ```bash
+      #!/bin/sh
+      # 从 ModelScope 加载模型以加速下载
+      export VLLM_USE_MODELSCOPE=True
+
+      # 模型权重路径；可以是 ModelScope 模型 ID 或本地目录路径
+      # 确保模型路径与下载时记录的目录一致
+      export MODEL_PATH={{model_path}}
+
+      vllm serve $MODEL_PATH \
+      --host 127.0.0.1 \
+      --port 8080 \
+      --tensor-parallel-size {{tensor_parallel_size}} \
+      --served-model-name qwen3.5 \
+      --max-num-seqs {{max_num_seqs}} \
+      --max-model-len {{max_model_len}} \
+      --trust-remote-code \
+      --gpu-memory-utilization {{gpu_memory_utilization}} \
+      --mamba-ssm-cache-dtype float16 \
+      --dtype float16 \
+      --speculative-config '{"method": "qwen3_5_mtp","num_speculative_tokens":1}' \
+      --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY", "cudagraph_capture_sizes": [2,16]}' \
+      --additional-config '{"ascend_compilation_config": {"enable_npugraph_ex": false}}'
+      ```
+
+      > - `--dtype float16` 在 Atlas 300I DUO 与 Atlas 200I Pro 上必须设置——这些设备仅支持 FP16 数据类型。
+      > - `--mamba-ssm-cache-dtype float16`——这些平台仅支持 `float16`。
+      > - `--max-model-len`、`--max-num-seqs`、`--gpu-memory-utilization`——按显存实际情况配置，设置过高可能导致 OOM。
+      > - `--compilation-config`：开启 TP 时，硬件 event-id 约束最多允许两个 capture sizes。带 MTP 时每个 capture size 按 `n * (num_speculative_tokens + 1)` 推导——如无 MTP 的 `[1,2,4,8]` 在 `num_speculative_tokens: 1` 时变为 `[2,4,8,16]`。
+      > - 必须配置 `--additional-config '{"ascend_compilation_config": {"enable_npugraph_ex": false}}'`，因为这些平台不支持 `enable_npugraph_ex`。
+  - title: 服务验证
+    content: |-
+      服务启动成功后，启动日志显示：
+      ```text
+      (APIServer pid=<pid>) INFO:     Application startup complete.
+      ```
+
+      然后发送真实请求验证——参见下方功能验证部分。
+
+# ===== Atlas 200I Pro 单节点 FP16 =====
+- npu: Atlas 200I Pro
+  precision: FP16
+  deployment: 单节点
+  case: 单卡（TP=1）
+  tags: [310p-single]
+  strategy: single_node_310p
+  steps:
+  - title: 启动服务
+    content: |-
+      Atlas 200I Pro 上单个可见 NPU 使用 **TP=1**。启动命令基线与 Atlas 300I DUO 相同：
+
+      ```bash
+      #!/bin/sh
+      export VLLM_USE_MODELSCOPE=True
+      export MODEL_PATH={{model_path}}
+
+      vllm serve $MODEL_PATH \
+      --host 127.0.0.1 \
+      --port 8080 \
+      --tensor-parallel-size 1 \
+      --served-model-name qwen3.5 \
+      --max-num-seqs {{max_num_seqs}} \
+      --max-model-len {{max_model_len}} \
+      --trust-remote-code \
+      --gpu-memory-utilization {{gpu_memory_utilization}} \
+      --mamba-ssm-cache-dtype float16 \
+      --dtype float16 \
+      --speculative-config '{"method": "qwen3_5_mtp","num_speculative_tokens":1}' \
+      --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY", "cudagraph_capture_sizes": [2,16]}' \
+      --additional-config '{"ascend_compilation_config": {"enable_npugraph_ex": false}}'
+      ```
+  - title: 服务验证
+    content: |-
+      与 Atlas 300I DUO 场景相同——按下方功能验证部分的说明，通过日志和真实请求进行验证。
+
+verification: |-
+  服务启动后，可以通过发送 prompt 调用模型。支持 `completions` 和 `chat.completions` 两种 API。使用配置的 `--served-model-name`（即 `qwen3.5`）。如使用了 `--port 8080` 或 `-p 8080:8080`，请相应调整 URL。
+
+  **Completions API：**
+  ```bash
+  curl http://127.0.0.1:<port>/v1/completions \
+      -H "Content-Type: application/json" \
+      -d '{
+          "model": "qwen3.5",
+          "prompt": "The future of AI is",
+          "max_completion_tokens": 50,
+          "temperature": 0
+      }'
+  ```
+
+  **Chat Completions API：**
+  ```bash
+  curl http://127.0.0.1:<port>/v1/chat/completions \
+      -H "Content-Type: application/json" \
+      -d '{
+          "model": "qwen3.5",
+          "messages": [
+              {"role": "user", "content": "The future of AI is"}
+          ],
+          "max_completion_tokens": 1024,
+          "temperature": 0.7,
+          "top_p": 0.95
+      }'
+  ```
+
+  预期结果：返回 HTTP 200 OK，JSON 响应包含带有生成文本的 `choices` 字段。
+
+performance:
+  accuracy: |-
+    ### 使用 AISBench
+
+    参见 vllm-ascend AISBench 使用指南。执行后可获得精度结果。以下为 `Qwen3.5-2B`、`Qwen3.5-4B`、`Qwen3.5-9B` 在 Atlas 300I DUO 上的精度结果，仅供参考。
+
+    配置文件：`benchmarks/ais_bench/benchmark/configs/models/vllm_api/vllm_api_general_chat.py`
+    ```python
+    from ais_bench.benchmark.models import VLLMCustomAPIChat
+    from ais_bench.benchmark.utils.model_postprocessors import extract_non_reasoning_content
+
+    models = [
+        dict(
+            attr="service",
+            type=VLLMCustomAPIChat,
+            abbr="vllm-api-general-chat",
+            path="your_model_path",
+            model="qwen3.5",
+            request_rate=0,
+            retry=2,
+            host_ip="127.0.0.1",
+            host_port=8080,
+            max_out_len=4096,
+            batch_size=16,
+            trust_remote_code=False,
+            generation_kwargs=dict(
+                temperature=0.0,
+                ignore_eos=False,
+                chat_template_kwargs = {"enable_thinking": False},
+            ),
+            pred_postprocessor=dict(type=extract_non_reasoning_content)
+        )
+    ]
+    ```
+
+    | 模型 | dataset | version | metric | mode | vllm-api-general-chat |
+    |-------|---------|---------|--------|------|------------------------|
+    | Qwen3.5-2B | gsm8k | - | accuracy | gen | 77.71 |
+    | Qwen3.5-2B | textvqa | - | accuracy | gen | 76.09 |
+    | Qwen3.5-4B | gsm8k | - | accuracy | gen | 93.18 |
+    | Qwen3.5-4B | textvqa | - | accuracy | gen | 79.08 |
+    | Qwen3.5-9B | gsm8k | - | accuracy | gen | 95.30 |
+    | Qwen3.5-9B | textvqa | - | accuracy | gen | 82.33 |
+  performance: |-
+    ### 使用 AISBench
+
+    参见 vllm-ascend AISBench 性能评测指南。
+
+tuning: |-
+  ### 推荐配置
+
+  > 以下配置仅供参考。最优配置取决于模型规格、最大输入/输出长度和实际显存大小。
+  >
+  > **Atlas 300I DUO / Atlas 200I Pro**：当前仅支持 TP 场景。Atlas 200I Pro 建议 **TP=1**；Atlas 300I DUO 支持 **TP=1** 和 **TP=2**，按可用设备选择。`--max-model-len`、`--max-num-seqs`、`--gpu-memory-utilization` 按实际显存配置，设置过高可能导致 OOM。
+
+  ### 关键参数说明
+
+  - `--tensor-parallel-size`：Atlas 200I Pro 建议 **TP=1**；Atlas 300I DUO 支持 **TP=1** 和 **TP=2**，按可用设备选择。
+  - `--max-model-len`：上下文长度（单请求输入+输出之和）；按实际显存配置，过高可能导致 OOM。
+  - `--max-num-seqs`：可并发处理的最大请求数；按实际显存配置。
+  - `--gpu-memory-utilization`：vLLM 实际推理使用的 HBM 显存比例（默认 `0.9`）。
+  - `--dtype float16` 和 `--mamba-ssm-cache-dtype float16`：Atlas 300I DUO 与 Atlas 200I Pro 仅支持 FP16。
+  - `--speculative-config` 使用 `qwen3_5_mtp`：面向带 MTP 头的 Qwen3.5 Dense 模型；推荐 `num_speculative_tokens: 1`（1~5 之间在时延与吞吐/接受率之间权衡）。
+  - `--compilation-config`：推荐 `cudagraph_mode: FULL_DECODE_ONLY`；开启 TP 时最多允许两个 capture sizes（硬件 event-id 约束）；带 MTP 时按 `n * (num_speculative_tokens + 1)` 推导。
+  - `--additional-config '{"ascend_compilation_config": {"enable_npugraph_ex": false}}'`：必须设置——这些平台不支持 `enable_npugraph_ex`。
+
+  ### 调优指南
+
+  参见 vllm-ascend 性能调优文档与功能矩阵，获取更详细的功能说明。
+
+faq: |-
+  常见环境、安装及通用参数问题，请参考 vLLM-Ascend 公共 FAQ：
+  https://docs.vllm.ai/projects/ascend/en/latest/faqs.html
+
+references:
+- title: Qwen3.5-Dense tutorial（vllm-ascend v0.23.0）
+  url: https://github.com/vllm-project/vllm-ascend/blob/v0.23.0/docs/source/tutorials/models/Qwen3.5-Dense.md
+- title: Qwen/Qwen3.5-2B（ModelScope）
+  url: https://www.modelscope.cn/models/Qwen/Qwen3.5-2B
+- title: Qwen/Qwen3.5-4B（ModelScope）
+  url: https://www.modelscope.cn/models/Qwen/Qwen3.5-4B
+- title: Qwen/Qwen3.5-9B（ModelScope）
+  url: https://www.modelscope.cn/models/Qwen/Qwen3.5-9B
+- title: Eco-Tech/Qwen3.5-2B-W8A8-310P（ModelScope）
+  url: https://www.modelscope.cn/models/Eco-Tech/Qwen3.5-2B-W8A8-310P
+- title: Eco-Tech/Qwen3.5-4B-W8A8-310P（ModelScope）
+  url: https://www.modelscope.cn/models/Eco-Tech/Qwen3.5-4B-W8A8-310P
+- title: Eco-Tech/Qwen3.5-9B-W8A8-310P（ModelScope）
+  url: https://www.modelscope.cn/models/Eco-Tech/Qwen3.5-9B-W8A8-310P
+- title: 支持模型列表（vllm-ascend）
+  url: https://docs.vllm.ai/projects/ascend/en/latest/user_guide/support_matrix/supported_models.html
+- title: vLLM-Ascend 公共 FAQ
+  url: https://docs.vllm.ai/projects/ascend/en/latest/faqs.html
