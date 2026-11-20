@@ -1,0 +1,215 @@
+meta:
+  title: "Hunyuan-A13B-Instruct"
+  slug: "hunyuan-a13b-instruct"
+  provider: "Tencent"
+  description: "Tencent Hunyuan A13B instruct MoE (80B total / 13B active) on Ascend. Tutorial path is single-node 4-NPU TP=4 BF16."
+  date_added: "2026-10-29"
+  date_updated: "2026-11-19"
+  difficulty: intermediate
+  tasks:
+    - text-generation
+  performance_headline: "Atlas A3 4-NPU TP=4 BF16 verified; static weights 37.4562 GB/NPU"
+  related_recipes: []
+  hardware:
+    atlas_800_a3: verified
+    atlas_800_a2: experimental
+    atlas_300i_duo: experimental
+
+model:
+  model_id: "Tencent-Hunyuan/Hunyuan-A13B-Instruct"
+  min_vllm_version: "0.23.0"
+  architecture: moe
+  parameter_count: "80B"
+  active_parameters: "13B"
+  context_length: 262144
+  modality: text
+  base_args:
+    - "--trust-remote-code"
+    - "--served-model-name"
+    - "Hunyuan"
+    - "--tensor-parallel-size"
+    - "4"
+    - "--max-model-len"
+    - "32768"
+    - "--gpu-memory-utilization"
+    - "0.90"
+  base_env:
+    HCCL_INTRA_ROCE_ENABLE: "1"
+    ASCEND_RT_VISIBLE_DEVICES: "0,1,2,3"
+    PYTORCH_NPU_ALLOC_CONF: "expandable_segments:True"
+    HCCL_BUFFSIZE: "512"
+  docker_image:
+    atlas_800_a3: "quay.io/ascend/vllm-ascend:v0.23.0-a3"
+    atlas_800_a2: "quay.io/ascend/vllm-ascend:v0.23.0"
+  nightly_required: false
+  install:
+    pip: false
+    docker:
+      command: "docker run --rm --name vllm-ascend --shm-size=1g --device /dev/davinci0 --device /dev/davinci1 --device /dev/davinci2 --device /dev/davinci3 --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc -v /root/.cache:/root/.cache -it quay.io/ascend/vllm-ascend:v0.23.0-a3 bash"
+      note: "Needs four Ascend dies in the container; full mounts follow env_setup.container."
+
+features: {}
+opt_in_features: []
+
+variants:
+  default:
+    precision: bf16
+    vram_minimum_gb: 160
+    description: "BF16 checkpoint. Tutorial static weight ~37.5 GiB/NPU at TP=4."
+
+compatible_strategies:
+  - single_node_A3
+
+hardware_overrides: {}
+strategy_overrides: {}
+dependencies: []
+guide: ""
+
+config_params:
+  max_model_len:
+    default: 32768
+    type: number
+    description: "Tutorial default 32768; model supports up to 256k with enough KV headroom."
+  gpu_memory_utilization:
+    default: 0.90
+    type: number
+    description: "Tutorial default 0.90 on 4×64 GiB HBM."
+
+overview: |-
+  Hunyuan-A13B-Instruct is Tencent's fine-grained MoE (80B total / 13B active) with native CoT.
+  This Ascend recipe migrates the official vLLM Ascend tutorial single-node 4-NPU path.
+  Verified on Atlas A3 (VIS=0,1,2,3 TP=4, max-model-len=32768, image v0.23.0-a3):
+  tutorial curl PASS; docker log `Loading model weights took 37.4562 GB` matches tutorial static-weight KPI 37.46 GB/NPU;
+  AISBench PERF gsm8k MaxConc=16 PASS.
+
+weight_download:
+  - weight_version: BF16
+    sources:
+      - source: ModelScope
+        url: https://www.modelscope.cn/models/Tencent-Hunyuan/Hunyuan-A13B-Instruct
+        command: |-
+          ```bash
+          pip install modelscope
+          modelscope download --model Tencent-Hunyuan/Hunyuan-A13B-Instruct
+          ```
+      - source: HuggingFace
+        url: https://huggingface.co/tencent/Hunyuan-A13B-Instruct
+        command: ""
+      - source: Modelers
+        url: ""
+        command: ""
+      - source: GitCode
+        url: ""
+        command: ""
+
+prerequisites:
+  - title: Model Weight
+    content: |-
+      | Weight Version | Hardware Requirements | Download Links |
+      |----------------|------------------------|----------------|
+      | BF16 | Atlas 800 A3 with ≥4 Ascend910 dies (TP=4) | [ModelScope](https://www.modelscope.cn/models/Tencent-Hunyuan/Hunyuan-A13B-Instruct) |
+
+      > **Path description**: Record the local path and pass it to `vllm serve`.
+
+env_setup:
+  container:
+    A3:
+      content: |-
+        ```bash
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0-a3
+        export NAME=vllm-ascend
+
+        docker run --rm \
+            --name $NAME \
+            --net=host \
+            --shm-size=1g \
+            --device /dev/davinci0 \
+            --device /dev/davinci1 \
+            --device /dev/davinci2 \
+            --device /dev/davinci3 \
+            --device /dev/davinci_manager \
+            --device /dev/devmm_svm \
+            --device /dev/hisi_hdc \
+            -v /usr/local/dcmi:/usr/local/dcmi \
+            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+            -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \
+            -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
+            -v /etc/ascend_install.info:/etc/ascend_install.info \
+            -v /root/.cache:/root/.cache \
+            -p 8000:8000 \
+            -it $IMAGE bash
+        ```
+  pip:
+    content: |-
+      Install matching Ascend torch / torch_npu 2.10, `vllm==0.23.0`, and the A3 variant `vllm-ascend==0.23.0` wheel.
+
+scenarios:
+  - npu: Atlas A3
+    precision: bf16
+    deployment: Single-Node
+    case: Single Node TP4 (A3)
+    tags: [a3-tp4]
+    strategy: single_node_A3
+    steps:
+      - title: Start the server
+        content: |-
+          ```bash
+          export HCCL_INTRA_ROCE_ENABLE=1
+          export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3
+          export MODEL_PATH=Tencent-Hunyuan/Hunyuan-A13B-Instruct
+
+          vllm serve ${MODEL_PATH} \
+              --trust-remote-code \
+              --host 0.0.0.0 \
+              --port 8000 \
+              --served-model-name Hunyuan \
+              --tensor-parallel-size 4 \
+              --max-model-len {{max_model_len}} \
+              --gpu-memory-utilization {{gpu_memory_utilization}}
+          ```
+      - title: Service Verification
+        content: |-
+          ```bash
+          curl http://127.0.0.1:8000/v1/chat/completions \
+            -H "Content-Type: application/json" \
+            -d '{
+              "model": "Hunyuan",
+              "messages": [{"role":"user","content":"Give me a short introduction to large language models."}],
+              "max_tokens": 100,
+              "temperature": 0.7
+            }'
+          ```
+
+verification: |-
+  Expect tutorial chat curl PASS and serve log `Loading model weights took 37.4562 GB` per NPU.
+
+evaluation:
+  accuracy:
+    content: |-
+      Historical GSM8K ACC ≈93.93 (tutorial target 94.77; not force-rerun this cycle).
+      AISBench PERF gsm8k MaxConc=16 PASS (TTFT≈247.7ms, TPOT≈44.8ms).
+
+performance:
+  accuracy: |-
+    Lab A3 (v0.23.0-a3): static weights **37.4562 GB/NPU** (MATCH tutorial ~37.46).
+  benchmark: |-
+    AISBench PERF gsm8k MaxConc=16 PASS (TTFT≈247.7ms, TPOT≈44.8ms).
+tuning: |-
+  Keep TP=4 for the official single-node tutorial path. Two-die hosts cannot satisfy that configuration.
+
+faq: |-
+  For common environment and installation issues, see the [Public FAQs](https://docs.vllm.ai/projects/ascend/en/latest/faqs.html).
+
+  ### Why TP=4?
+
+  **Answer:** The official Ascend tutorial single-node path uses four dies. Two-die hosts cannot satisfy that configuration.
+
+  ### ModelScope vs HuggingFace id?
+
+  **Answer:** Tutorial uses a local `Hunyuan-A13B-Instruct` path; ModelScope id is `Tencent-Hunyuan/Hunyuan-A13B-Instruct`, HF id `tencent/Hunyuan-A13B-Instruct`.
+
+references:
+  - title: vLLM Ascend tutorial Hunyuan-A13B-Instruct
+    url: https://docs.vllm.ai/projects/ascend/en/latest/tutorials/models/Hunyuan-A13B-Instruct.html
+  - title: ModelScope weights
+    url: https://www.modelscope.cn/models/Tencent-Hunyuan/Hunyuan-A13B-Instruct
