@@ -1,0 +1,569 @@
+﻿meta:
+  title: "Qwen3-Coder-30B-A3B-Instruct"
+  slug: "qwen3-coder-30b-a3b-instruct"
+  provider: "Qwen"
+  description: "A 30.5B-parameter Mixture-of-Experts coding model with 3.3B activated parameters, agentic coding and function-calling support, and a native context window of 262144 tokens."
+  date_added: 2026-11-19
+  performance_headline: "Single-node W8A8 deployment on Atlas 800I A3 for high throughput, low latency, and 128K long context"
+  difficulty: intermediate
+  hardware:
+    atlas_800_a3: verified
+
+model:
+  model_id: "Qwen/Qwen3-Coder-30B-A3B-Instruct"
+  min_vllm_version: "0.30.0"
+  architecture: moe
+  parameter_count: "30.5B"
+  active_parameters: "3.3B"
+  context_length: 262144
+  modality: text
+  base_args:
+    - "--trust-remote-code"
+  base_env:
+    HCCL_BUFFSIZE: "1024"
+    OMP_PROC_BIND: "false"
+    OMP_NUM_THREADS: "1"
+    PYTORCH_NPU_ALLOC_CONF: "expandable_segments:True"
+  docker_image:
+    atlas_800_a3: "quay.io/ascend/vllm-ascend:v0.30.0-a3-openeuler"
+  nightly_required: false
+  install:
+    pip: false
+    docker:
+      command: "docker run --rm --net=host --shm-size=128g -v /models:/models --device /dev/davinci0 --device /dev/davinci1 --device /dev/davinci2 --device /dev/davinci3 -it quay.io/ascend/vllm-ascend:v0.30.0-a3-openeuler bash"
+      note: "Official Ascend image; full device/driver mounts are covered in env_setup.container."
+
+features:
+  expert_parallel:
+    description: "MoE expert parallelism across the TP ranks (scenarios that use TP4)"
+    args: ["--enable-expert-parallel"]
+  compilation_config:
+    label: "Compilation Config"
+    description: "Full ACL graph execution in decode (--compilation-config cudagraph_mode=FULL_DECODE_ONLY)"
+    args: ["--compilation-config", '{"cudagraph_mode": "FULL_DECODE_ONLY"}']
+  async_scheduling:
+    label: "Async Scheduling"
+    description: "Asynchronous scheduling to overlap CPU scheduling with NPU computation"
+    args: ["--async-scheduling"]
+  prefix_caching:
+    label: "Prefix Caching"
+    description: "KV-cache prefix caching (disabled by default in the validated scenarios)"
+    args: ["--enable-prefix-caching"]
+    flag_when_false: "--no-enable-prefix-caching"
+
+  spec_decoding:
+    label: "Eagle3 Spec Decoding"
+    description: "Optional Eagle3 speculative decoding; replace your_eagle3_model_path with the downloaded draft model path"
+    args: ["--speculative-config", '{"method": "eagle3", "model": "your_eagle3_model_path", "num_speculative_tokens": 3}']
+
+opt_in_features:
+  - prefix_caching
+  - spec_decoding
+
+variants:
+  default:
+    precision: W8A8
+    vram_minimum_gb: 32
+    description: "W8A8 quantized weights on Atlas 800I A3"
+  bf16:
+    model_id: "Qwen/Qwen3-Coder-30B-A3B-Instruct"
+    precision: bf16
+    vram_minimum_gb: 64
+    description: "BF16 weights on Atlas 800I A3"
+
+compatible_strategies:
+  - single_node_A3
+
+hardware_overrides: {}
+strategy_overrides: {}
+
+dependencies:
+  - note: "Optional Eagle3 draft model for speculative decoding (replace your_eagle3_model_path)"
+    command: "pip install modelscope && modelscope download --model AngelSlim/Qwen3-a3B_eagle3"
+    optional: true
+
+guide: ""
+
+config_params:
+  max_model_len:
+    default: 37364
+    type: number
+    description: "Maximum context length (input + output tokens)"
+  max_num_seqs:
+    default: 100
+    type: number
+    description: "Maximum number of concurrent sequences"
+  gpu_memory_utilization:
+    default: 0.95
+    type: number
+    description: "Fraction of NPU memory available for the KV cache"
+
+overview: |-
+  Qwen3-Coder-30B-A3B-Instruct is a Mixture-of-Experts coding model with 30.5B total parameters and 3.3B activated per token. It targets agentic coding, repository-level code generation, and tool calling, and supports a native context length of 262144 tokens. This recipe covers the three single-node scenarios used by the upstream tutorial: high throughput (TP1), low latency (TP4 with expert parallelism), and long context (TP4 with 131072 tokens).
+
+weight_download:
+- weight_version: BF16
+  sources:
+  - source: ModelScope
+    url: https://www.modelscope.cn/models/Qwen/Qwen3-Coder-30B-A3B-Instruct
+    command: |-
+      ```bash
+      pip install modelscope
+      modelscope download --model Qwen/Qwen3-Coder-30B-A3B-Instruct
+      ```
+  - source: HuggingFace
+    url: https://huggingface.co/Qwen/Qwen3-Coder-30B-A3B-Instruct
+    command: |-
+      ```bash
+      pip install -U huggingface_hub
+      huggingface-cli download Qwen/Qwen3-Coder-30B-A3B-Instruct
+      ```
+  - source: Modelers
+    url: ''
+    command: ''
+  - source: GitCode
+    url: ''
+    command: ''
+- weight_version: W8A8 (Pre-quantized)
+  sources:
+  - source: ModelScope
+    url: https://www.modelscope.cn/models/Eco-Tech/Qwen3-Coder-30B-A3B-Instruct-w8a8
+    command: |-
+      ```bash
+      pip install modelscope
+      modelscope download --model Eco-Tech/Qwen3-Coder-30B-A3B-Instruct-w8a8
+      ```
+  - source: HuggingFace
+    url: ''
+    command: ''
+  - source: Modelers
+    url: ''
+    command: ''
+  - source: GitCode
+    url: ''
+    command: ''
+- weight_version: Eagle3 Draft Model (optional)
+  sources:
+  - source: ModelScope
+    url: https://www.modelscope.cn/models/AngelSlim/Qwen3-a3B_eagle3
+    command: |-
+      ```bash
+      pip install modelscope
+      modelscope download --model AngelSlim/Qwen3-a3B_eagle3
+      ```
+  - source: HuggingFace
+    url: https://huggingface.co/AngelSlim/Qwen3-a3B_eagle3
+    command: |-
+      ```bash
+      pip install -U huggingface_hub
+      huggingface-cli download AngelSlim/Qwen3-a3B_eagle3
+      ```
+  - source: Modelers
+    url: ''
+    command: ''
+  - source: GitCode
+    url: ''
+    command: ''
+
+quantization:
+  content: |-
+    The W8A8 checkpoint uses a hybrid strategy:
+
+    - **Embedding layer**: BF16 (not quantized)
+    - **Q/K normalization** (`q_norm`, `k_norm`): BF16 weights and biases
+    - **Attention projections** (`q/k/v/o_proj`): static W8A8 with per-tensor scales; biases remain BF16
+    - **MoE routing gate** (`mlp.gate`): BF16
+    - **MoE expert projections** (`gate/up/down_proj`): dynamic W8A8, with input scales computed during inference
+
+    If the pre-quantized checkpoint is unavailable, quantize the BF16 model with **msmodelslim** following the [Quantization Guide](https://docs.vllm.ai/projects/ascend/en/latest/user_guide/feature_guide/quantization.html).
+
+prerequisites:
+- title: Model Weight
+  content: |-
+    | Model | Hardware Requirement | Download |
+    | --- | --- | --- |
+    | Qwen3-Coder-30B-A3B-Instruct (BF16) | Atlas 800I A3 (64GB, 1~2 cards) | [Download](https://www.modelscope.cn/models/Qwen/Qwen3-Coder-30B-A3B-Instruct) |
+    | Qwen3-Coder-30B-A3B-Instruct-W8A8 | Atlas 800I A3 (64GB, 1~2 cards) | [Download](https://www.modelscope.cn/models/Eco-Tech/Qwen3-Coder-30B-A3B-Instruct-w8a8) |
+    | Eagle3 Draft Model (optional) | Atlas 800I A3 | [Download](https://www.modelscope.cn/models/AngelSlim/Qwen3-a3B_eagle3) |
+
+    The card counts are recommendations and can be adjusted. Keep the weights in a shared directory visible to the container.
+- title: Driver and Firmware
+  content: |-
+    Install the Ascend driver and firmware on the host before starting the container. Refer to the [Ascend HDK installation guide](https://www.hiascend.com/document) for the versions supported by your server.
+
+env_setup:
+  container:
+    A3:
+      content: |-
+        Use the official vLLM-Ascend all-in-one image validated for this recipe.
+
+        **Docker Pull:**
+
+        ```bash
+        docker pull quay.io/ascend/vllm-ascend:v0.30.0-a3-openeuler
+        ```
+
+        **Docker Run:**
+
+        ```bash
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.30.0-a3-openeuler
+
+        docker run \
+            --name vllm-ascend-env \
+            --shm-size=128g \
+            --net=host \
+            --privileged=true \
+            --device /dev/davinci0 \
+            --device /dev/davinci1 \
+            --device /dev/davinci2 \
+            --device /dev/davinci3 \
+            --device /dev/davinci_manager \
+            --device /dev/devmm_svm \
+            --device /dev/hisi_hdc \
+            -v /usr/local/Ascend/driver:/usr/local/Ascend/driver \
+            -v /usr/local/dcmi:/usr/local/dcmi \
+            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+            -v /etc/ascend_install.info:/etc/ascend_install.info \
+            -v /models:/models \
+            -it -d $IMAGE bash
+        ```
+
+        > **Note**: Atlas 800I A3 has 8 NPUs with a dual-die design (16 chips). This recipe uses at most 4 chips (`/dev/davinci0` to `/dev/davinci3`). Add more device mounts if you want to expose the remaining chips.
+
+scenarios:
+- npu: Atlas 800I A3
+  precision: W8A8
+  deployment: Single-Node
+  case: High Throughput
+  tags: [a3-single]
+  strategy: single_node_A3
+  steps:
+  - title: Start the server
+    content: |-
+      Single-chip deployment (TP1) maximizes aggregate throughput for many concurrent requests. The server below uses chip 0 and a 37364-token context window.
+
+      ```bash
+      export ASCEND_RT_VISIBLE_DEVICES=0
+      export HCCL_OP_EXPANSION_MODE="AIV"
+      export HCCL_BUFFSIZE=1024
+      export OMP_PROC_BIND=false
+      export OMP_NUM_THREADS=1
+      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+
+      vllm serve your_model_path \
+          --served-model-name qwen3-coder \
+          --trust-remote-code \
+          --max-num-seqs {{max_num_seqs}} \
+          --max-model-len {{max_model_len}} \
+          --max-num-batched-tokens 16384 \
+          --tensor-parallel-size 1 \
+          --distributed_executor_backend "mp" \
+          {{prefix_caching}} \
+          {{async_scheduling}} \
+          --quantization ascend \
+          {{compilation_config}} \
+          --additional-config '{"weight_nz_mode": 2}' \
+          --gpu-memory-utilization {{gpu_memory_utilization}} \
+          --port 8000 \
+          {{spec_decoding}}
+      ```
+
+      > - `--quantization ascend` is required for the W8A8 checkpoint.
+      > - `--no-enable-prefix-caching` is the validated default; enable prefix caching only after measuring the hit rate of your workload.
+      > - `--max-num-seqs` and `--max-model-len` can be reduced when NPU memory is shared with other services.
+  - title: Verify the service
+    content: |-
+      ```bash
+      curl http://localhost:<port>/v1/chat/completions \
+          -H "Content-Type: application/json" \
+          -d '{
+              "model": "qwen3-coder",
+              "messages": [
+                  {"role": "user", "content": "Write a Python function named fib that returns the n-th Fibonacci number. Output only code."}
+              ],
+              "temperature": 0,
+              "max_tokens": 512
+          }'
+      ```
+
+      Expected result: HTTP 200 with a `choices` array whose content contains a `def fib` definition.
+  - title: Benchmark
+    content: |-
+      ```bash
+      vllm bench serve \
+          --model your_model_path \
+          --served-model-name qwen3-coder \
+          --host 127.0.0.1 \
+          --port 8000 \
+          --dataset-name random \
+          --random-input-len 2048 \
+          --random-output-len 2048 \
+          --num-prompts 100 \
+          --max-concurrency 32 \
+          --seed 1234 \
+          --ignore-eos \
+          --save-result \
+          --result-dir ./
+      ```
+
+      Measured on Atlas 800I A3 with the v0.30.0 image: 100/100 successful requests, 756.42 output tok/s, mean TTFT 1205.82 ms, mean TPOT 36.56 ms.
+- npu: Atlas 800I A3
+  precision: W8A8
+  deployment: Single-Node
+  case: Low Latency
+  tags: [a3-single]
+  strategy: single_node_A3
+  steps:
+  - title: Start the server
+    content: |-
+      Four-chip tensor parallelism with expert parallelism reduces per-token latency. FlashComm1 is enabled for this scenario.
+
+      ```bash
+      export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3
+      export HCCL_OP_EXPANSION_MODE="AIV"
+      export HCCL_BUFFSIZE=1024
+      export OMP_PROC_BIND=false
+      export OMP_NUM_THREADS=1
+      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+
+      vllm serve your_model_path \
+          --served-model-name qwen3-coder \
+          --trust-remote-code \
+          --max-num-seqs {{max_num_seqs}} \
+          --max-model-len {{max_model_len}} \
+          --max-num-batched-tokens 16384 \
+          --tensor-parallel-size 4 \
+          --enable-expert-parallel \
+          --distributed_executor_backend "mp" \
+          {{prefix_caching}} \
+          {{async_scheduling}} \
+          --quantization ascend \
+          {{compilation_config}} \
+          --additional-config '{"enable_flashcomm1": true, "weight_nz_mode": 2}' \
+          --gpu-memory-utilization {{gpu_memory_utilization}} \
+          --port 8000 \
+          {{spec_decoding}}
+      ```
+
+      > - Assign four chips to `ASCEND_RT_VISIBLE_DEVICES`; TP4 maps one rank to each chip.
+      > - `--enable-expert-parallel` distributes the 128 MoE experts across the four ranks.
+  - title: Verify the service
+    content: |-
+      ```bash
+      curl http://localhost:<port>/v1/chat/completions \
+          -H "Content-Type: application/json" \
+          -d '{
+              "model": "qwen3-coder",
+              "messages": [
+                  {"role": "user", "content": "Reply with exactly one word: OK"}
+              ],
+              "temperature": 0,
+              "max_tokens": 64
+          }'
+      ```
+
+      Expected result: HTTP 200 with a non-empty `choices` array.
+  - title: Benchmark
+    content: |-
+      ```bash
+      vllm bench serve \
+          --model your_model_path \
+          --served-model-name qwen3-coder \
+          --host 127.0.0.1 \
+          --port 8000 \
+          --dataset-name random \
+          --random-input-len 2048 \
+          --random-output-len 2048 \
+          --num-prompts 100 \
+          --max-concurrency 32 \
+          --seed 1234 \
+          --ignore-eos \
+          --save-result \
+          --result-dir ./
+      ```
+
+      Measured on Atlas 800I A3 with the v0.30.0 image: 100/100 successful requests, 1219.29 output tok/s, mean TTFT 1007.98 ms, mean TPOT 21.35 ms.
+- npu: Atlas 800I A3
+  precision: W8A8
+  deployment: Single-Node
+  case: Long Context
+  tags: [a3-single]
+  strategy: single_node_A3
+  steps:
+  - title: Start the server
+    content: |-
+      The long-context scenario keeps TP4 with expert parallelism, raises the context limit to 131072 tokens, and lowers `--max-num-seqs` to 14 to leave room for the KV cache. Qwen3-Coder natively supports 262144 tokens, so no RoPE scaling is required for 131072.
+
+      ```bash
+      export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3
+      export HCCL_OP_EXPANSION_MODE="AIV"
+      export HCCL_BUFFSIZE=1024
+      export OMP_PROC_BIND=false
+      export OMP_NUM_THREADS=1
+      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+
+      vllm serve your_model_path \
+          --served-model-name qwen3-coder \
+          --trust-remote-code \
+          --max-num-seqs 14 \
+          --max-model-len 131072 \
+          --max-num-batched-tokens 16384 \
+          --tensor-parallel-size 4 \
+          --enable-expert-parallel \
+          --distributed_executor_backend "mp" \
+          {{prefix_caching}} \
+          {{async_scheduling}} \
+          --quantization ascend \
+          {{compilation_config}} \
+          --additional-config '{"enable_flashcomm1": true, "weight_nz_mode": 2}' \
+          --gpu-memory-utilization {{gpu_memory_utilization}} \
+          --port 8000 \
+          {{spec_decoding}}
+      ```
+
+      > - For contexts above 262144 tokens, add `--hf-overrides '{"rope_parameters": {"rope_type": "yarn", "factor": 4, "original_max_position_embeddings": 262144}}'`.
+      > - Reduce `--max-num-seqs` further if the measured KV-cache usage approaches the NPU memory limit.
+  - title: Verify the service
+    content: |-
+      Send a prompt that exceeds 32768 tokens and check that the answer stays coherent.
+
+      ```bash
+      curl http://localhost:<port>/v1/chat/completions \
+          -H "Content-Type: application/json" \
+          -d '{
+              "model": "qwen3-coder",
+              "messages": [
+                  {"role": "user", "content": "Summarize the key risks of a large-scale software migration in three bullet points."}
+              ],
+              "temperature": 0,
+              "max_tokens": 256
+          }'
+      ```
+
+      Expected result: HTTP 200 with a non-empty `choices` array and no timeout.
+  - title: Benchmark
+    content: |-
+      ```bash
+      vllm bench serve \
+          --model your_model_path \
+          --served-model-name qwen3-coder \
+          --host 127.0.0.1 \
+          --port 8000 \
+          --dataset-name random \
+          --random-input-len 8192 \
+          --random-output-len 512 \
+          --num-prompts 20 \
+          --max-concurrency 4 \
+          --seed 1234 \
+          --ignore-eos \
+          --save-result \
+          --result-dir ./
+      ```
+
+      Measured on Atlas 800I A3 with the v0.30.0 image: 20/20 successful requests, 221.63 output tok/s, mean TTFT 735.66 ms, mean TPOT 16.64 ms. A separate 60025-token prompt returned the correct answer in 3.58 s.
+
+verification: |-
+  After the service is started, send a chat request. Replace `<port>` with the port from the `vllm serve` command.
+
+  ```bash
+  curl http://localhost:<port>/v1/chat/completions \
+      -H "Content-Type: application/json" \
+      -d '{
+          "model": "qwen3-coder",
+          "messages": [
+              {"role": "user", "content": "Give me a short introduction to large language models."}
+          ],
+          "temperature": 0.6,
+          "top_p": 0.95,
+          "max_tokens": 512
+      }'
+  ```
+
+  Expected result: HTTP 200 with a JSON body containing a non-empty `choices` field.
+
+evaluation:
+  accuracy:
+    content: |-
+      ### Using EvalScope
+
+      Install EvalScope in an isolated environment and point it at the running OpenAI-compatible endpoint:
+
+      ```bash
+      python3 -m venv /root/eval-venv
+      /root/eval-venv/bin/pip install -U "numpy>=2.0" evalscope
+      /root/eval-venv/bin/evalscope eval \
+          --model qwen3-coder \
+          --api-url http://127.0.0.1:8000/v1 \
+          --api-key EMPTY \
+          --eval-type openai_api \
+          --datasets gsm8k \
+          --limit 100 \
+          --eval-batch-size 8
+      ```
+
+      **Accuracy result (Atlas 800I A3, vLLM-Ascend v0.30.0, W8A8, 100 samples):**
+
+      | Dataset | Metric | Score |
+      | --- | --- | --- |
+      | GSM8K | accuracy | 98.00% |
+
+      The upstream tutorial reports 90.14% for GSM8K with AISBench; the difference is within sampling variance for a 100-question subset.
+
+performance:
+  accuracy: |-
+    ### Using EvalScope
+
+    See the evaluation section for the command. Accuracy was measured against the high-throughput TP1 service with the W8A8 checkpoint.
+
+  benchmark: |-
+    ### Measured Results
+
+    All numbers below were collected on one Atlas 800I A3 node (16 chips available; at most 4 used) with `quay.io/ascend/vllm-ascend:v0.30.0-a3-openeuler`.
+
+    | Scenario | TP | Requests | Concurrency | Output tok/s | Mean TTFT (ms) | Mean TPOT (ms) |
+    | --- | --- | --- | --- | --- | --- | --- |
+    | High Throughput | 1 | 100/100 | 32 | 756.42 | 1205.82 | 36.56 |
+    | Low Latency | 4 | 100/100 | 32 | 1219.29 | 1007.98 | 21.35 |
+    | Long Context | 4 | 20/20 | 4 | 221.63 | 735.66 | 16.64 |
+
+    Benchmark shapes: 2048 input / 2048 output tokens for high throughput and low latency; 8192 input / 512 output tokens for long context.
+
+    #### Scenario Overview
+
+    | Scenario | Deployment Mode | Total NPUs | Weight Version | Key Considerations |
+    | --- | --- | --- | --- | --- |
+    | High Throughput | Single-Node (TP1) | 1 (A3) | W8A8 | Single-chip deployment maximizes concurrent request processing |
+    | Low Latency | Single-Node (TP4) | 2 (A3) | W8A8 | Multi-chip TP with expert parallelism reduces per-token latency |
+    | Long Context | Single-Node (TP4) | 2 (A3) | W8A8 | Fewer concurrent sequences leave room for a 131072-token context |
+
+    > On Atlas 800I A3 each NPU contains two dies (chips), so TP4 uses 4 chips = 2 NPUs.
+
+tuning: |-
+  ### Tuning Guidelines
+
+  - Increase `--max-num-seqs` for throughput until NPU memory or the scheduler becomes the bottleneck.
+  - Decrease `--max-num-seqs` and `--max-model-len` when requests time out under long prompts.
+  - Prefix caching is disabled in the validated scenarios because random benchmark inputs produce no cache hits. Enable it for workloads with shared prefixes and measure the hit rate first.
+  - Refer to the [Performance Tuning Guide](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/performance_and_debug/optimization_and_tuning.html) for additional options.
+
+faq: |-
+  **Why is `--quantization ascend` required?** The validated checkpoint is W8A8. Remove the flag only when serving the BF16 checkpoint.
+
+  **Is Eagle3 speculative decoding supported?** Yes. The optional draft model is exposed as an off-by-default `spec_decoding` feature and was functionally validated on Atlas 800I A3 at TP1 (3/3 HTTP 200 responses, no ERROR/Traceback in the logs). Replace `your_eagle3_model_path` with the local draft-model directory before enabling it. The performance tables above remain the non-Eagle3 baseline.
+
+  **Why does the long-context scenario stop at 131072 tokens?** The model supports 262144 tokens natively, but 131072 is the value validated in this recipe. Raise it after checking KV-cache memory, and add YaRN overrides above 262144.
+
+references:
+- title: vLLM-Ascend Tutorial (historical v0.23.0)
+  url: https://docs.vllm.ai/projects/ascend/en/v0.23.0/tutorials/models/Qwen3-Coder-30B-A3B.html
+- title: ModelScope Model Download (BF16)
+  url: https://www.modelscope.cn/models/Qwen/Qwen3-Coder-30B-A3B-Instruct
+- title: ModelScope Model Download (W8A8)
+  url: https://www.modelscope.cn/models/Eco-Tech/Qwen3-Coder-30B-A3B-Instruct-w8a8
+- title: vLLM-Ascend Additional Configuration
+  url: https://docs.vllm.ai/projects/ascend/en/latest/user_guide/configuration/additional_config.html
+- title: Eagle3 Draft Model
+  url: https://www.modelscope.cn/models/AngelSlim/Qwen3-a3B_eagle3
+
+- title: vLLM-Ascend GitHub
+  url: https://github.com/vllm-project/vllm-ascend
