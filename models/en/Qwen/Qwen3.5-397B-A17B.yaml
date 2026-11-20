@@ -30,7 +30,6 @@ model:
     # speculative method (tutorial §5.1); it is declared per scenario below.
   base_env:
     HCCL_OP_EXPANSION_MODE: "AIV"
-    VLLM_USE_V2_MODEL_RUNNER: "0"
   docker_image:
     atlas_800_a2: "quay.io/ascend/vllm-ascend:nightly-main"
     atlas_800_a3: "quay.io/ascend/vllm-ascend:nightly-main-a3"
@@ -211,7 +210,6 @@ scenarios:
           export VLLM_USE_MODELSCOPE=True
           export HCCL_BUFFSIZE=1024
           export HCCL_OP_EXPANSION_MODE="AIV"
-          export VLLM_USE_V2_MODEL_RUNNER=0
 
           # Host-level tuning; skipped gracefully inside the verify container (read-only /sys, no sysctl perms)
           echo performance | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor 2>/dev/null || true
@@ -295,7 +293,6 @@ scenarios:
           export HCCL_SOCKET_IFNAME="${nic_name}"
           export HCCL_BUFFSIZE=1024
           export HCCL_OP_EXPANSION_MODE=AIV
-          export VLLM_USE_V2_MODEL_RUNNER=0
           export VLLM_USE_FASTOKENS=1
           export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
           export LD_LIBRARY_PATH="/usr/local/Ascend/ascend-toolkit/latest/python/site-packages/mooncake:${LD_LIBRARY_PATH:-}"
@@ -488,8 +485,7 @@ scenarios:
           set (`HCCL_IF_IP`/`GLOO_SOCKET_IFNAME`/`HCCL_SOCKET_IFNAME` bound to the service
           NIC, `HCCL_BUFFSIZE=1024`) plus
           `--additional-config '{"enable_cpu_binding":true, "multistream_overlap_shared_expert": true}'`
-          (tutorial §5.2; `VLLM_USE_V2_MODEL_RUNNER=0` from this recipe's base_env is carried
-          over as well). `--data-parallel-start-rank` must never be set on node 0, and the
+          (tutorial §5.2). `--data-parallel-start-rank` must never be set on node 0, and the
           `--data-parallel-rpc-port` must match on all nodes.
 
   - npu: Ascend 950DT

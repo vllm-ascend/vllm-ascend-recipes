@@ -29,7 +29,6 @@ model:
     # 注意:W8A8 checkpoint 自带 MTP draft,经 qwen3_5_mtp 投机方法消费(教程 §5.1);按场景在下方声明。
   base_env:
     HCCL_OP_EXPANSION_MODE: "AIV"
-    VLLM_USE_V2_MODEL_RUNNER: "0"
   docker_image:
     atlas_800_a2: "quay.io/ascend/vllm-ascend:nightly-main"
     atlas_800_a3: "quay.io/ascend/vllm-ascend:nightly-main-a3"
@@ -202,7 +201,6 @@ scenarios:
           export VLLM_USE_MODELSCOPE=True
           export HCCL_BUFFSIZE=1024
           export HCCL_OP_EXPANSION_MODE="AIV"
-          export VLLM_USE_V2_MODEL_RUNNER=0
 
           # Host-level tuning; skipped gracefully inside the verify container (read-only /sys, no sysctl perms)
           echo performance | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor 2>/dev/null || true
@@ -284,7 +282,6 @@ scenarios:
           export HCCL_SOCKET_IFNAME="${nic_name}"
           export HCCL_BUFFSIZE=1024
           export HCCL_OP_EXPANSION_MODE=AIV
-          export VLLM_USE_V2_MODEL_RUNNER=0
           export VLLM_USE_FASTOKENS=1
           export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
           export LD_LIBRARY_PATH="/usr/local/Ascend/ascend-toolkit/latest/python/site-packages/mooncake:${LD_LIBRARY_PATH:-}"
@@ -468,7 +465,7 @@ scenarios:
           $node0_ip`,环境变量同(`HCCL_IF_IP`/`GLOO_SOCKET_IFNAME`/`HCCL_SOCKET_IFNAME` 绑定
           服务网卡、`HCCL_BUFFSIZE=1024`),外加 `--additional-config
           '{"enable_cpu_binding":true, "multistream_overlap_shared_expert": true}'`(教程
-          §5.2;本 recipe base_env 的 `VLLM_USE_V2_MODEL_RUNNER=0` 一并继承)。节点 0 永远不要设 `--data-parallel-start-rank`;`--data-parallel-rpc-port`
+          §5.2)。节点 0 永远不要设 `--data-parallel-start-rank`;`--data-parallel-rpc-port`
           全节点一致。
 
   - npu: Ascend 950DT
