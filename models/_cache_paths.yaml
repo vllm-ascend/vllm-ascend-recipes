@@ -51,6 +51,9 @@ aliases:
 
   - model_id: PaddlePaddle/PaddleOCR-VL
     cache_dir: PaddlePaddle/PaddleOCR-VL
+
+  - model_id: Qwen/Qwen3-ASR-1.7B
+    cache_dir: Qwen/Qwen3-ASR-1.7B
   - model_id: moonshotai/Kimi-K2.6
     cache_dir: Kimi-K2.6-W4A8
 
