@@ -1,0 +1,24 @@
+{
+  "model": "Qwen3.8-Flash-Next",
+  "last_pr_run": {
+    "kind": "pr",
+    "status": "unknown",
+    "conclusion": "failure",
+    "head_sha": "752a17777313450fb8330dc1803870088f3143dc",
+    "head_sha_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/commit/752a17777313450fb8330dc1803870088f3143dc",
+    "workflow_run_id": 44491080593,
+    "workflow_run_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/actions/runs/44491080593",
+    "recipe_path": "models/en/Qwen/Qwen3.8-Flash-Next.yaml",
+    "recipe_yaml_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/blob/752a17777313450fb8330dc1803870088f3143dc/models/en/Qwen/Qwen3.8-Flash-Next.yaml",
+    "params_url": "https://vllm-ascend.github.io/vllm-ascend-recipes/runs/752a17777313450fb8330dc1803870088f3143dc/Qwen3.8-Flash-Next.params.json",
+    "started_at": "",
+    "finished_at": "2026-11-20T02:48:12Z",
+    "pr_number": null,
+    "pr_url": null,
+    "pr_title": null,
+    "pr_author": null
+  },
+  "last_nightly_run": null,
+  "last_manual_run": null,
+  "targets": {}
+}
