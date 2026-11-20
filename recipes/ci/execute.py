@@ -24,9 +24,10 @@ Consumes the artifacts produced by ``recipes/ci/generate.py`` on the NPU job:
 2. log the resolved serve command, run ``run.sh`` (engine) and capture
    ``serve.log``,
 3. poll ``/v1/models`` until ready,
-4. run the recipes page's cURL service verification, then the smoke test
-   (``POST /v1/chat/completions`` or ``POST /v1/rerank``),
-5. benchmark chat combos with the page's ``vllm bench serve`` snippet,
+4. run the type-appropriate cURL service verification, then the smoke test
+   (``/v1/chat/completions`` for chat, ``/v1/rerank`` for rerank models),
+5. benchmark chat and rerank combos with the type-appropriate
+   ``vllm bench serve`` snippet,
 6. teardown and write ``result.json`` (pass / fail / skip).
 
 Exit code: 0 for pass or optional skip, 1 for fail or required skip. Stdlib only - runs inside the recipe
@@ -59,13 +60,27 @@ LOG_TAIL_LINES = 100
 BENCH_TIMEOUT_S = 3600
 
 # The recipes page's install card carries a "cURL" and a "Bench" popover whose
-# commands are fixed templates (only model / host / port vary). These mirror
+# chat commands are fixed templates (only model / host / port vary). These mirror
 # those snippets verbatim; the page uses the same 32 max_tokens for cURL.
 CURL_MAX_TOKENS = 32
 BENCH_NUM_PROMPTS = 100
 BENCH_INPUT_LEN = 1024
 BENCH_OUTPUT_LEN = 1024
 BENCH_MAX_CONCURRENCY = 32
+
+# Rerank combos have no template on the page yet (upstream issue
+# vllm-project/recipes#1273), so their cURL / bench mirror the recipe YAML's
+# verification and performance blocks instead (models/*/Qwen/Qwen3-VL-Reranker-2B.yaml).
+RERANK_QUERY = "What is the capital of China?"
+RERANK_DOCUMENTS = [
+    "The capital of China is Beijing.",
+    "Gravity is a force that attracts two bodies towards each other. It gives weight to physical objects "
+    "and is responsible for the movement of planets around the sun.",
+]
+RERANK_BENCH_BACKEND = "vllm-rerank"
+RERANK_BENCH_DATASET = "random-rerank"
+RERANK_BENCH_ENDPOINT = "/v1/rerank"
+RERANK_BENCH_INPUT = 200
 
 _BENCH_METRIC_RE = re.compile(r"^([A-Za-z][^:]*?):\s+(-?[\d.]+)\s*$")
 
@@ -325,38 +340,45 @@ def wait_ready(proc: subprocess.Popen, base_url: str, timeout_s: int, log_path: 
     )
 
 
+def rerank_request(model: str) -> dict:
+    """The recipe YAML's ``/v1/rerank`` body: one query, two tutorial documents."""
+    return {"model": model, "query": RERANK_QUERY, "documents": list(RERANK_DOCUMENTS)}
+
+
+def assert_rerank_scores(resp: object, label: str) -> tuple[float, float]:
+    """Validate a ``/v1/rerank`` response; return ``(relevant, unrelated)``.
+
+    Expects exactly two finite ``relevance_score`` values and requires the
+    relevant document (index 0) to outscore the unrelated one, matching the
+    recipe YAML's expected result.
+    """
+    results = resp.get("results") if isinstance(resp, dict) else None
+    if not isinstance(results, list) or len(results) != 2:
+        raise ComboFailure(f"{label}: expected scores for both documents")
+    scores: dict[int, float] = {}
+    for item in results:
+        if not isinstance(item, dict):
+            raise ComboFailure(f"{label}: invalid result item")
+        index, score = item.get("index"), item.get("relevance_score")
+        if type(index) is not int or index not in (0, 1) or index in scores:
+            raise ComboFailure(f"{label}: invalid or duplicate document index")
+        if isinstance(score, bool) or not isinstance(score, (int, float)) or not math.isfinite(score):
+            raise ComboFailure(f"{label}: invalid relevance_score")
+        scores[index] = score
+    if scores[0] <= scores[1]:
+        raise ComboFailure(f"{label}: the relevant document did not score higher")
+    return scores[0], scores[1]
+
+
 def smoke(base_url: str, model: str, kind: str = "chat") -> None:
-    """Check chat content or the historical Qwen VL reranker tutorial pair."""
+    """Check chat content or the recipe YAML's rerank tutorial pair."""
     if kind == "rerank":
-        payload = {
-            "model": model,
-            "query": "What is the capital of China?",
-            "documents": [
-                "The capital of China is Beijing.",
-                "Gravity is a force that attracts two bodies towards each other. It gives weight to physical objects "
-                "and is responsible for the movement of planets around the sun.",
-            ],
-        }
         try:
-            resp = http_post_json(base_url + "/v1/rerank", payload)
+            resp = http_post_json(base_url + "/v1/rerank", rerank_request(model))
         except (urllib.error.URLError, OSError, json.JSONDecodeError) as e:
             raise ComboFailure(f"rerank smoke request failed: {e}") from e
-        results = resp.get("results") if isinstance(resp, dict) else None
-        if not isinstance(results, list) or len(results) != 2:
-            raise ComboFailure("rerank smoke: expected scores for both documents")
-        scores = {}
-        for item in results:
-            if not isinstance(item, dict):
-                raise ComboFailure("rerank smoke: invalid result item")
-            index, score = item.get("index"), item.get("relevance_score")
-            if type(index) is not int or index not in (0, 1) or index in scores:
-                raise ComboFailure("rerank smoke: invalid or duplicate document index")
-            if isinstance(score, bool) or not isinstance(score, (int, float)) or not math.isfinite(score):
-                raise ComboFailure("rerank smoke: invalid relevance_score")
-            scores[index] = score
-        if scores[0] <= scores[1]:
-            raise ComboFailure("rerank smoke: the relevant document did not score higher")
-        print(f"[smoke] rerank passed: relevant={scores[0]}, unrelated={scores[1]}", flush=True)
+        relevant, unrelated = assert_rerank_scores(resp, "rerank smoke")
+        print(f"[smoke] rerank passed: relevant={relevant}, unrelated={unrelated}", flush=True)
         return
     payload = {
         "model": model,
@@ -373,11 +395,21 @@ def smoke(base_url: str, model: str, kind: str = "chat") -> None:
         raise ComboFailure("smoke: empty message content (resp=" + json.dumps(resp)[:400] + ")")
 
 
-def curl_command(base_url: str, model: str) -> str:
-    """Rebuild the recipes site's cURL snippet (install card > cURL popover).
+def curl_command(base_url: str, model: str, kind: str = "chat") -> str:
+    """Rebuild the type-appropriate service-verification cURL snippet.
 
-    Only host / port / model vary on the page; the body is fixed.
+    Chat mirrors the recipes page's install-card cURL popover verbatim (only
+    host / port / model vary). Rerank mirrors the recipe YAML's verification
+    block (``POST /v1/rerank``); the page has no rerank template yet
+    (vllm-project/recipes#1273).
     """
+    if kind == "rerank":
+        body = json.dumps(rerank_request(model), indent=2)
+        return (
+            f"curl {base_url}/v1/rerank \\\n"
+            '  -H "Content-Type: application/json" \\\n'
+            f"  -d '{body}'"
+        )
     return (
         f"curl {base_url}/v1/chat/completions \\\n"
         '  -H "Content-Type: application/json" \\\n'
@@ -389,39 +421,33 @@ def curl_command(base_url: str, model: str) -> str:
     )
 
 
-def curl_argv(base_url: str, model: str) -> list[str]:
-    """The page's cURL request as an argv list (same URL / headers / body).
+def curl_argv(base_url: str, model: str, kind: str = "chat") -> list[str]:
+    """The cURL request as an argv list (same URL / headers / body as the snippet).
 
     Mirrors ``curl_command`` without the shell formatting, so the request can be
     executed for real without going through a shell.
     """
-    return [
-        "curl",
-        f"{base_url}/v1/chat/completions",
-        "-H",
-        "Content-Type: application/json",
-        "-d",
-        json.dumps(
-            {
-                "model": model,
-                "messages": [{"role": "user", "content": "Hello"}],
-                "max_tokens": CURL_MAX_TOKENS,
-            }
-        ),
-    ]
+    if kind == "rerank":
+        endpoint, payload = "/v1/rerank", rerank_request(model)
+    else:
+        endpoint, payload = (
+            "/v1/chat/completions",
+            {"model": model, "messages": [{"role": "user", "content": "Hello"}], "max_tokens": CURL_MAX_TOKENS},
+        )
+    return ["curl", f"{base_url}{endpoint}", "-H", "Content-Type: application/json", "-d", json.dumps(payload)]
 
 
-def verify_service(base_url: str, model: str) -> None:
-    """Service verification: run the page's cURL snippet against the server.
+def verify_service(base_url: str, model: str, kind: str = "chat") -> None:
+    """Service verification: run the type-appropriate cURL snippet.
 
-    The command is logged verbatim so the CI log shows exactly what users copy
-    from the page, then executed for real with curl so the log also carries the
+    The command is logged verbatim so the CI log shows exactly what users are
+    told to run, then executed for real with curl so the log also carries the
     server's response. ``model`` must be the id the engine actually serves (the
     localized run.sh replaced the hub id with its local cache path).
     """
-    print("[verify] " + curl_command(base_url, model), flush=True)
+    print("[verify] " + curl_command(base_url, model, kind), flush=True)
     try:
-        proc = subprocess.run(curl_argv(base_url, model), capture_output=True, text=True, timeout=SMOKE_TIMEOUT_S)
+        proc = subprocess.run(curl_argv(base_url, model, kind), capture_output=True, text=True, timeout=SMOKE_TIMEOUT_S)
     except FileNotFoundError as e:
         raise ComboFailure("curl not found; cannot run the page's cURL verification") from e
     except subprocess.TimeoutExpired as e:
@@ -435,40 +461,40 @@ def verify_service(base_url: str, model: str) -> None:
         resp = json.loads(proc.stdout)
     except json.JSONDecodeError as e:
         raise ComboFailure(f"cURL verification: non-JSON response: {(proc.stdout or '')[:400]}") from e
+    if kind == "rerank":
+        assert_rerank_scores(resp, "cURL verification")
+        return
     choices = resp.get("choices") or []
     content = (choices[0].get("message") or {}).get("content") if choices else None
     if not content:
         raise ComboFailure("cURL verification: empty message content (resp=" + json.dumps(resp)[:400] + ")")
 
 
-def bench_command(base_url: str, model: str) -> list[str]:
-    """Rebuild the recipes site's Bench snippet (install card > Bench popover).
+def bench_command(base_url: str, model: str, kind: str = "chat") -> list[str]:
+    """Rebuild the type-appropriate ``vllm bench serve`` snippet.
 
-    Every flag except model / host / port is the site's fixed default, so the CI
-    benchmark matches what the page tells users to run.
+    Chat mirrors the recipes page's Bench popover (every flag except model /
+    host / port is the page's fixed default). Rerank mirrors the recipe YAML's
+    performance block (``--backend vllm-rerank``), minus the YAML's
+    ``--save-result`` so the raw output stays on stdout for the CI log.
     """
     host, _, port = base_url.removeprefix("http://").partition(":")
-    return [
-        "vllm",
-        "bench",
-        "serve",
-        "--model",
-        model,
-        "--host",
-        host or "127.0.0.1",
-        "--port",
-        port or "8000",
-        "--dataset-name",
-        "random",
-        "--random-input-len",
-        str(BENCH_INPUT_LEN),
-        "--random-output-len",
-        str(BENCH_OUTPUT_LEN),
-        "--num-prompts",
-        str(BENCH_NUM_PROMPTS),
-        "--max-concurrency",
-        str(BENCH_MAX_CONCURRENCY),
-    ]
+    argv = ["vllm", "bench", "serve", "--model", model, "--host", host or "127.0.0.1", "--port", port or "8000"]
+    if kind == "rerank":
+        argv += [
+            "--backend", RERANK_BENCH_BACKEND,
+            "--dataset-name", RERANK_BENCH_DATASET,
+            "--endpoint", RERANK_BENCH_ENDPOINT,
+            "--random-input", str(RERANK_BENCH_INPUT),
+        ]
+    else:
+        argv += [
+            "--dataset-name", "random",
+            "--random-input-len", str(BENCH_INPUT_LEN),
+            "--random-output-len", str(BENCH_OUTPUT_LEN),
+        ]
+    argv += ["--num-prompts", str(BENCH_NUM_PROMPTS), "--max-concurrency", str(BENCH_MAX_CONCURRENCY)]
+    return argv
 
 
 def parse_bench_metrics(text: str) -> dict[str, float]:
@@ -489,14 +515,14 @@ def parse_bench_metrics(text: str) -> dict[str, float]:
     return metrics
 
 
-def run_bench(base_url: str, model: str, out_dir: Path) -> dict:
-    """Benchmark the served model with the page's ``vllm bench serve`` snippet.
+def run_bench(base_url: str, model: str, out_dir: Path, kind: str = "chat") -> dict:
+    """Benchmark the served model with the type-appropriate ``vllm bench serve``.
 
     The raw output is kept as ``bench.log`` (uploaded with the results) and the
     parsed metrics feed ``result.json``. Any failure marks the combo red: the
     benchmark is part of the recipe verification, not a best-effort extra.
     """
-    argv = bench_command(base_url, model)
+    argv = bench_command(base_url, model, kind)
     print("[bench] " + " ".join(shlex.quote(token) for token in argv), flush=True)
     started = time.monotonic()
     try:
@@ -586,13 +612,12 @@ def run_combo(combo_dir: Path, results_dir: Path) -> int:
             # localized run.sh replaced the hub id with its local cache path.
             served = str(models[0]["id"]) if models else str(meta["model_id"])
             smoke_test = meta.get("smoke_test", "chat")
-            if smoke_test == "chat":
-                verify_service(base_url, served)
-                result["verify_seconds"] = round(time.monotonic() - started, 1)
+            verify_service(base_url, served, smoke_test)
+            result["verify_seconds"] = round(time.monotonic() - started, 1)
             smoke(base_url, served, smoke_test)
             result["smoke_seconds"] = round(time.monotonic() - started, 1)
             if meta.get("bench"):
-                result["bench"] = run_bench(base_url, served, out_dir)
+                result["bench"] = run_bench(base_url, served, out_dir, smoke_test)
             result["status"] = "pass"
         except ComboFailure as e:
             result.update(status="fail", skip_reason=str(e))
