@@ -1,0 +1,483 @@
+# DeepSeek-V4-Pro recipe (en) — source of truth: vllm-ascend v0.23.0 tutorial docs/source/tutorials/models/DeepSeek-V4-Pro.md
+# Tutorial versions cited per section. Weights: w4a8-mtp (2xA3 128Gx8 or 4xA2 64Gx8), 0813-w4a8 (DSpark built-in), 0813-w4a4c8 (950PR/950DT, msmodelslim local quant).
+meta:
+  title: "DeepSeek-V4-Pro"
+  slug: "deepseek-v4-pro"
+  provider: "DeepSeek"
+  description: "Maximum reasoning-effort mode of DeepSeek-V4 with mHC residual connections and hybrid Compress-4/Compress-128 attention; top-tier open-source coding and reasoning performance."
+  date_added: "2026-10-16"
+  difficulty: advanced
+  tasks:
+    - text
+  performance_headline: "2x Atlas 800 A3 (128G x 8) dp2 tp16 W4A8-MTP serving; AISBench GPQA 89.90 / GSM8K 96.21 (tutorial §7)"
+  hardware:
+    atlas_800_a3: verified   # tutorial §5.1/§7 publish official deployment & measured accuracy on 2x A3 (repo convention per the existing GLM-5 / DeepSeek-V4-Flash recipes). First-party serving re-run (scenario 0) completed 2026-10-28 on 2x Atlas 800T A3 (64G x 8 — a lower-spec SKU than the 128G x 8 tutorial claim): smoke + benchmark passed on the pinned v0.23.0rc1-a3 image, see PR description
+    atlas_800_a2: experimental   # kept off the verified claim on purpose: no A2 scenario in this recipe; expect A2-leg skips until a decision (see PR description)
+    ascend_950pr: experimental   # w4a4c8 targets 950PR&950DT products (tutorial §3.1/§10)
+    ascend_950dt: experimental   # w4a4c8 targets 950PR&950DT products (tutorial §3.1/§10)
+
+model:
+  model_id: "vllm-ascend/DeepSeek-V4-Pro-w4a8-mtp"   # org per tutorial serve path; download org is Eco-Tech (see weight_download)
+  architecture: moe
+  parameter_count: "685B-class"   # source: HF model card (not stated in tutorial)
+  active_parameters: "37B-class"  # source: HF model card
+  context_length: 135000          # validated serving length in tutorial §5.1 (150000 in the DSpark PD example; the MTP PD example uses 131072)
+  modality: text
+  base_args:
+    - "--quantization ascend"
+    - "--enable-expert-parallel"
+    - "--tokenizer-mode deepseek_v4"
+    - "--tool-call-parser deepseek_v4"
+    - "--enable-auto-tool-choice"
+    - "--reasoning-parser deepseek_v4"
+    # NOTE: the tutorial template also carries `--attention_config.indexer_kv_dtype int8`,
+    # but the pinned image v0.23.0rc1-a3 rejects it at startup (pydantic unexpected keyword;
+    # first-party run 2026-10-28). Omitted here — re-add only on a newer image.
+    - "--model-loader-extra-config"
+    - '{"enable_multithread_load": true, "num_threads": 128}'
+  base_env:
+    HCCL_OP_EXPANSION_MODE: "AIV"
+    OMP_PROC_BIND: "false"
+    OMP_NUM_THREADS: "10"
+    PYTORCH_NPU_ALLOC_CONF: "expandable_segments:True"
+    TASK_QUEUE_ENABLE: "1"
+  docker_image:
+    atlas_800_a3: "quay.io/ascend/vllm-ascend:v0.23.0rc1-a3"
+    atlas_800_a2: "quay.io/ascend/vllm-ascend:v0.23.0rc1"
+  nightly_required: false
+  install:
+    pip: false
+    docker:
+      command: "docker run --rm --name vllm-ascend --shm-size=512g --net=host --privileged=true -v /root/.cache:/root/.cache -it quay.io/ascend/vllm-ascend:v0.23.0rc1-a3 bash"
+      note: "Simplified; full mount set (incl. /etc/hccn.conf) in env_setup.container (tutorial §4.1)."
+
+features:
+  expert_parallel:
+    description: "MoE expert parallelism (tutorial §5.1)"
+    args: ["--enable-expert-parallel"]
+  spec_decoding:
+    label: "MTP / DSpark Spec Decoding"
+    description: "MTP with 1 token for the w4a8-mtp checkpoint; dspark for DeepSeek-V4-Pro-0813-w4a8 (draft built in) — use the token count declared by the checkpoint, the example uses 5. All ranks must match (tutorial §5.1)."
+    args: ["--speculative-config", '{"num_speculative_tokens": 1, "method": "mtp", "enforce_eager": true}']
+  flashcomm1:
+    label: "FlashComm1"
+    description: "FlashComm communication optimization; auto-enabled when DSA-CP is on (tutorial §5.1). The scenario below enables it via the enable_flashcomm1 member of --additional-config (equivalent to this env toggle, per the DeepSeek-V4-Flash recipe)."
+    env:
+      VLLM_ASCEND_ENABLE_FLASHCOMM1: "1"
+  prefix_caching:
+    label: "Prefix Caching"
+    description: "Kept at its default (enabled) state in the A3 baseline — tutorial §5.1 A3 tab carries no disabling flag; --no-enable-prefix-caching appears in the A2 tab and the §5.2.1 decode template, and the DSpark scenario removes it to enable the feature."
+    args: ["--enable-prefix-caching"]
+    flag_when_false: "--no-enable-prefix-caching"
+
+compatible_strategies:
+  - multi_node_dp
+  - pd_cluster
+
+guide: ""
+performance_model_names:
+  - "DeepSeek-V4-Pro-w4a8-mtp"
+  - "DeepSeek-V4-Pro-0813-w4a8"
+
+overview: |-
+  DeepSeek-V4-Pro is the maximum reasoning-effort mode of DeepSeek-V4, adding Manifold-
+  Constrained Hyper-Connections (mHC) and a hybrid Compress-4/Compress-128 attention
+  architecture over the DeepSeekMoE base (tutorial §1). The W4A8-MTP checkpoint serves on
+  2x Atlas 800 A3 (128G x 8) or 4x Atlas 800 A2 (64G x 8) in a dp2 tp16 / dp4 tp8 layout;
+  the 0813-w4a8 checkpoint ships DSpark draft weights (5 tokens) with no separate draft path;
+  the w4a4c8 ultra-low-bit build targets 950PR/950DT products (quantize locally with
+  msmodelslim). PD separation uses MooncakeHybridConnector with dedicated prefill and decode
+  pools. Reference accuracy on 2x A3: AISBench GPQA 89.90, GSM8K 96.21 (§7).
+
+weight_download:
+  - weight_version: W4A8-MTP
+    sources:
+      - source: ModelScope   # tutorial §3.1
+        url: "https://www.modelscope.cn/models/Eco-Tech/DeepSeek-V4-Pro-w4a8-mtp"
+        command: |
+          # requires 2x Atlas 800 A3 (128G x 8) or 4x Atlas 800 A2 (64G x 8)
+          modelscope download --model Eco-Tech/DeepSeek-V4-Pro-w4a8-mtp
+  - weight_version: 0813 W4A8 (DSpark built-in)
+    sources:
+      - source: ModelScope   # tutorial §3.1
+        url: "https://www.modelscope.cn/models/Eco-Tech/DeepSeek-V4-Pro-0813-w4a8"
+        command: |
+          modelscope download --model Eco-Tech/DeepSeek-V4-Pro-0813-w4a8
+  - weight_version: 0813 W4A4C8 (950PR/950DT)
+    sources:
+      - source: Local quantization with msmodelslim   # tutorial §3.1
+        url: "https://gitcode.com/Ascend/msmodelslim/blob/master/lab_practice/deepseek_v4/deepseek_v4_pro_w4a4c8.yaml"
+        command: |
+          # quantize locally with msmodelslim per the linked yaml
+
+prerequisites:
+- title: Model Weight
+  content: |-
+    See the three variants in weight_download. `modelscope download` places weights under the source org directory (e.g.
+    `.../hub/models/Eco-Tech/DeepSeek-V4-Pro-w4a8-mtp`); keep the serve path consistent
+    with wherever the weights land (the tutorial §5 examples assume the cache root).
+
+- title: Verify Multi-node Communication (Optional)
+  content: |-
+    Verify per [verify multi-node communication environment](https://docs.vllm.ai/projects/ascend/en/latest/installation.html#installation-multi-node-interconnect)
+    before multi-node deployment (tutorial §3.2).
+
+- title: Firewall (multi-node)
+  content: |-
+    Ensure the DP RPC port (13399 in the scenario below) is reachable between nodes —
+    stop or open the firewall accordingly (e.g. `systemctl stop firewalld`), otherwise the
+    node-1 connection is rejected and the master reports a misleading "No route to host".
+
+env_setup:
+  container:
+    A3:
+      content: |-
+        A3 image (tutorial §4.1) — note `--shm-size=512g` and the `/etc/hccn.conf` mount:
+
+        ```bash
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0rc1-a3
+        docker run --rm \
+            --name vllm-ascend \
+            --shm-size=512g \
+            --net=host \
+            --privileged=true \
+            --device /dev/davinci0 \
+            --device /dev/davinci1 \
+            --device /dev/davinci2 \
+            --device /dev/davinci3 \
+            --device /dev/davinci4 \
+            --device /dev/davinci5 \
+            --device /dev/davinci6 \
+            --device /dev/davinci7 \
+            --device /dev/davinci8 \
+            --device /dev/davinci9 \
+            --device /dev/davinci10 \
+            --device /dev/davinci11 \
+            --device /dev/davinci12 \
+            --device /dev/davinci13 \
+            --device /dev/davinci14 \
+            --device /dev/davinci15 \
+            --device /dev/davinci_manager \
+            --device /dev/devmm_svm \
+            --device /dev/hisi_hdc \
+            -v /usr/local/dcmi:/usr/local/dcmi \
+            -v /usr/local/Ascend/driver/tools/hccn_tool:/usr/local/Ascend/driver/tools/hccn_tool \
+            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+            -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \
+            -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
+            -v /etc/ascend_install.info:/etc/ascend_install.info \
+            -v /etc/hccn.conf:/etc/hccn.conf \
+            -v /root/.cache:/root/.cache \
+            -it $IMAGE bash
+        ```
+
+        Verify with `docker ps` after startup (tutorial §4.1).
+    A2:
+      content: |-
+        Same as A3 with `IMAGE=quay.io/ascend/vllm-ascend:v0.23.0rc1` (no suffix) and 8 devices
+        (tutorial §4.1 A2 tab).
+
+scenarios:
+  - npu: Atlas 800I A3
+    precision: W4A8
+    deployment: "Multi-Node"
+    case: "Multi-Node Online Deployment (dp2 tp16, 2 nodes)"
+    tags: [a3-multi]
+    strategy: multi_node_dp
+    steps:
+      - title: "Start the server (node 0 = master)"
+        content: |-
+          `DeepSeek-V4-Pro-w4a8-mtp` requires at least 2x Atlas 800 A3 (128G x 8) or 4x Atlas 800
+          A2 (64G x 8) (tutorial §5.1); a first-party run also completed on the lower-spec
+          2x Atlas 800T A3 (64G x 8) SKU — see PR description. Node 0 omits `--data-parallel-start-rank` even for rank 0
+          (§5.1 key parameters):
+
+          ```bash
+          nic_name="xxx"
+          local_ip="xxx"
+          node0_ip="xxxx"
+
+          export HCCL_OP_EXPANSION_MODE="AIV"
+          export HCCL_IF_IP=$local_ip
+          export GLOO_SOCKET_IFNAME=$nic_name
+          export TP_SOCKET_IFNAME=$nic_name
+          export HCCL_SOCKET_IFNAME=$nic_name
+          export HCCL_BUFFSIZE=2048
+          export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+          export OMP_PROC_BIND=false
+          export OMP_NUM_THREADS=10
+          export TASK_QUEUE_ENABLE=1
+          # 790G weights exceed the default engine-ready timeout on first load (first-party run)
+          export VLLM_ENGINE_READY_TIMEOUT_S=7200
+
+          vllm serve your_model_path \
+            --host 0.0.0.0 \
+            --port 8000 \
+            --data-parallel-address $node0_ip \
+            --data-parallel-rpc-port 13399 \
+            --data-parallel-size 2 \
+            --data-parallel-size-local 1 \
+            --tensor-parallel-size 16 \
+            --enable-expert-parallel \
+            --served-model-name dsv4 \
+            --max-model-len 135000 \
+            --max-num-batched-tokens 4096 \
+            --max-num-seqs 32 \
+            --gpu-memory-utilization 0.9 \
+            --block-size 128 \
+            --tokenizer-mode deepseek_v4 \
+            --tool-call-parser deepseek_v4 \
+            --enable-auto-tool-choice \
+            --reasoning-parser deepseek_v4 \
+            --model-loader-extra-config='{"enable_multithread_load": true, "num_threads": 128}' \
+            --quantization ascend \
+            --speculative-config '{"num_speculative_tokens": 1,"method": "mtp","enforce_eager": true}' \
+            --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY"}' \
+            --additional-config '
+              {"ascend_compilation_config":{
+                  "enable_npugraph_ex":true,
+                  "enable_static_kernel":false
+                  },
+              "enable_cpu_binding": true,
+              "enable_flashcomm1": true,
+              "multistream_overlap_shared_expert":true}'
+          ```
+      - title: "Start the server (node 1, headless)"
+        content: |-
+          Same environment variables as node 0. The node-1 serve command adds `--headless`
+          and `--data-parallel-start-rank 1` (tutorial §5.1 Node1 block):
+
+          ```bash
+          vllm serve your_model_path \
+            --host 0.0.0.0 \
+            --port 8000 \
+            --headless \
+            --data-parallel-address $node0_ip \
+            --data-parallel-rpc-port 13399 \
+            --data-parallel-size 2 \
+            --data-parallel-size-local 1 \
+            --data-parallel-start-rank 1 \
+            --tensor-parallel-size 16 \
+            --enable-expert-parallel \
+            --served-model-name dsv4 \
+            --max-model-len 135000 \
+            --max-num-batched-tokens 4096 \
+            --max-num-seqs 32 \
+            --gpu-memory-utilization 0.9 \
+            --block-size 128 \
+            --tokenizer-mode deepseek_v4 \
+            --tool-call-parser deepseek_v4 \
+            --enable-auto-tool-choice \
+            --reasoning-parser deepseek_v4 \
+            --model-loader-extra-config='{"enable_multithread_load": true, "num_threads": 128}' \
+            --quantization ascend \
+            --speculative-config '{"num_speculative_tokens": 1,"method": "mtp","enforce_eager": true}' \
+            --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY"}' \
+            --additional-config '
+              {"ascend_compilation_config":{
+                  "enable_npugraph_ex":true,
+                  "enable_static_kernel":false
+                  },
+              "enable_cpu_binding": true,
+              "enable_flashcomm1": true,
+              "multistream_overlap_shared_expert":true}'
+          ```
+
+          Key parameter facts (tutorial §5.1): never set `--data-parallel-start-rank` on node 0;
+          `--data-parallel-rpc-port` must match on all nodes; `--max-num-seqs` x
+          `--data-parallel-size` should cover the real concurrency when benchmarking;
+          `--no-enable-prefix-caching` disables prefix caching — remove it to enable;
+          `--block-size 128` (change to 32 for the experimental 4k prefix-cache hit support).
+      - title: "Functional verification"
+        content: |-
+          ```bash
+          curl http://<node0_ip>:8000/v1/chat/completions \
+              -H "Content-Type: application/json" \
+              -d '{
+                  "model": "dsv4",
+                  "messages": [
+                      {"role": "user", "content": "Who are you?"}
+                  ],
+                  "max_tokens": 256,
+                  "temperature": 0
+              }'
+          ```
+
+          Expected: HTTP 200 OK with a `choices` field (tutorial §6).
+  - npu: Atlas 800I A3
+    precision: W4A8
+    deployment: "Multi-Node"
+    case: "A3 with DSpark (0813-w4a8)"
+    tags: [a3-multi]
+    strategy: multi_node_dp
+    steps:
+      - title: "Switch to the 0813-w4a8 checkpoint with DSpark"
+        content: |-
+          The official `DeepSeek-V4-Pro-0813-w4a8` checkpoint supports DSpark without a separate
+          draft-model path. Keep the DP2/TP16 topology; relative to scenario 0, change the serve
+          path to `your_model_path` pointing at the 0813-w4a8 checkpoint, `--block-size 32`,
+          `--max-num-seqs 16`, the speculative config, and the env set below
+          (tutorial §5.1 "A3 series with DSpark"). DSpark `num_speculative_tokens` must match on
+          all ranks. `VLLM_PREFIX_CACHE_RETENTION_INTERVAL` (4096) requires prefix caching to stay
+          enabled — remove `--no-enable-prefix-caching` for this scenario; the retention value must
+          be a non-negative multiple of `--block-size`:
+
+          ```bash
+          # env deltas vs scenario 0:
+          export HCCL_BUFFSIZE=1024
+          export VLLM_ENGINE_READY_TIMEOUT_S=7200
+          export HCCL_CONNECT_TIMEOUT=7200
+          export ASCEND_CONNECT_TIMEOUT=10000
+          export ASCEND_TRANSFER_TIMEOUT=10000
+          export VLLM_RPC_TIMEOUT=1800000
+          export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib/
+          # prefix caching must stay enabled for VLLM_PREFIX_CACHE_RETENTION_INTERVAL:
+          # (remove --no-enable-prefix-caching if present)
+          export VLLM_PREFIX_CACHE_RETENTION_INTERVAL=4096
+
+          vllm serve your_model_path \
+            --host 0.0.0.0 \
+            --port 8000 \
+            --data-parallel-address $node0_ip \
+            --data-parallel-rpc-port 13399 \
+            --data-parallel-size 2 \
+            --data-parallel-size-local 1 \
+            --tensor-parallel-size 16 \
+            --enable-expert-parallel \
+            --served-model-name dsv4 \
+            --max-model-len 135000 \
+            --max-num-batched-tokens 4096 \
+            --max-num-seqs 16 \
+            --gpu-memory-utilization 0.9 \
+            --block-size 32 \
+            --tokenizer-mode deepseek_v4 \
+            --tool-call-parser deepseek_v4 \
+            --enable-auto-tool-choice \
+            --reasoning-parser deepseek_v4 \
+            --model-loader-extra-config='{"enable_multithread_load": true, "num_threads": 128}' \
+            --quantization ascend \
+            --speculative-config '{"num_speculative_tokens": 5,"method": "dspark","enforce_eager": true}' \
+            --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY"}' \
+            --additional-config '
+              {"ascend_compilation_config":{
+                  "enable_npugraph_ex":true,
+                  "enable_static_kernel":false
+                  },
+              "enable_cpu_binding": true,
+              "enable_flashcomm1": true,
+              "multistream_overlap_shared_expert":true}'
+          ```
+  - npu: Atlas 800I A3
+    precision: W4A8
+    deployment: "Multi-Node PD Separation"
+    case: "PD Disaggregation 1P1D, 2P+2D nodes (MooncakeHybrid)"
+    tags: [a3-pd]
+    strategy: pd_cluster
+    steps:
+      - title: "Topology and launcher"
+        content: |-
+          1P1D PD separation with Mooncake: prefill pool = 2 nodes with one prefill DP rank each
+          (TP16), decode pool = 2 nodes with 8 decode DP ranks each (TP2) (tutorial §5.2.1).
+          Deploy `launch_online_dp.py` (tutorial §5.2.1 publishes the script and its parameters)
+          and per-role `run_dp_template.sh` templates on each node:
+
+          ```bash
+          # Prefill node 0
+          python launch_online_dp.py --dp-size 2 --tp-size 16 --dp-size-local 1 --dp-rank-start 0 --dp-address xx.xx.xx.1 --dp-rpc-port 12321 --vllm-start-port 7100
+          # Prefill node 1
+          python launch_online_dp.py --dp-size 2 --tp-size 16 --dp-size-local 1 --dp-rank-start 1 --dp-address xx.xx.xx.1 --dp-rpc-port 12321 --vllm-start-port 7100
+          # Decode node 0
+          python launch_online_dp.py --dp-size 16 --tp-size 2 --dp-size-local 8 --dp-rank-start 0 --dp-address xx.xx.xx.3 --dp-rpc-port 12321 --vllm-start-port 7100
+          # Decode node 1
+          python launch_online_dp.py --dp-size 16 --tp-size 2 --dp-size-local 8 --dp-rank-start 8 --dp-address xx.xx.xx.3 --dp-rpc-port 12321 --vllm-start-port 7100
+          ```
+      - title: "Per-role key configuration (from tutorial §5.2.1 templates)"
+        content: |-
+          Key-point summary from the tutorial §5.2.1 MooncakeHybrid templates (not a
+          standalone executable command; full orchestration templates per the linked
+          tutorial section):
+
+          - Prefill: `VLLM_RPC_TIMEOUT=3600000`, `VLLM_EXECUTE_MODEL_TIMEOUT_SECONDS=30000`,
+            `HCCL_EXEC_TIMEOUT=204`, `HCCL_CONNECT_TIMEOUT=120`, `HCCL_BUFFSIZE=1024`,
+            `--max-model-len 131072 --max-num-batched-tokens 4096 --max-num-seqs 16
+            --gpu-memory-utilization 0.92 --block-size 128 --enforce-eager
+            --no-disable-hybrid-kv-cache-manager`,
+            `--additional-config '{"enable_cpu_binding":true,"enable_dsa_cp":true,
+            "enable_fused_mc2":1,"enable_flashcomm1":true}'`, Mooncake
+            `MooncakeHybridConnector` kv_producer (kv_port 30200, engine_id 1, prefill dp2/tp16,
+            decode dp16/tp2).
+          - Decode: `TASK_QUEUE_ENABLE=1`, `VLLM_RPC_TIMEOUT=3600000`, `HCCL_EXEC_TIMEOUT=2000`,
+            `HCCL_CONNECT_TIMEOUT=1200`, `HCCL_BUFFSIZE=1024`, `--max-num-batched-tokens 120
+            --max-num-seqs 60 --gpu-memory-utilization 0.9
+            --no-disable-hybrid-kv-cache-manager`, kv_consumer (kv_port 30800,
+            engine_id 8), `--additional-config` with
+            `"scheduler_config":{"recompute_scheduler_enable":true}`.
+          - `--no-disable-hybrid-kv-cache-manager` is required for DeepSeek-V4 KV Pool
+            deployments; omitting it may OOM at startup (tutorial key parameters).
+      - title: "Proxy verification"
+        content: |-
+          After full startup, send the §6 request through the proxy port on the prefill master
+          node; see [Prefill-Decode Disaggregation (Deepseek)](https://docs.vllm.ai/projects/ascend/en/v0.23.0/tutorials/features/pd_disaggregation_mooncake_multi_node.html)
+          for the proxy verification method (tutorial §5.2.1). The versioned path is pinned deliberately to avoid drift on `latest`.
+
+evaluation:
+  accuracy:
+    content: |-
+      ### Using AISBench
+
+      Refer to [Using AISBench](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/evaluation/using_ais_bench.html) for details.
+      Reference results (tutorial §7 — all 4 published rows):
+
+      | dataset | version | metric | mode | vllm-api-general-chat | note |
+      | ----- | ----- | ----- | ----- | ----- | ----- |
+      | GPQA | - | accuracy | gen | 91.41 | 0831 official W4A8 weight with DSpark enabled |
+      | GPQA | - | accuracy | gen | 89.90 | 2 Atlas 800 A3 (128GB × 8) |
+      | GSM8K | - | accuracy | gen | 96.21 | 2 Atlas 800 A3 (128GB × 8) |
+      | GSM8K | - | accuracy | gen | 97.54 | 950PR&950DT Products, w4a4c8 |
+
+performance:
+  accuracy: |-
+    See evaluation.accuracy for the tutorial §7 reference table (run-to-run sampling
+    fluctuation averaged when evaluated multiple times).
+  benchmark: |-
+    AISBench performance evaluation: [Using AISBench](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/evaluation/using_ais_bench.html#execute-performance-evaluation)
+    (tutorial §8.1). vLLM benchmark: refer to [vllm benchmark](https://docs.vllm.ai/en/latest/benchmarking/)
+    (tutorial §8.2). On the pinned v0.23.0rc1-a3 image the entry point is
+    `vllm bench serve` (the `vllm.benchmarks.benchmark_serving` module path is not available).
+
+tuning: |-
+  Scenario overview (tutorial §9.1, A3 1P1D reference):
+
+  | Scenario | Deployment | Total NPUs | Weights | Notes |
+  | --- | --- | --- | --- | --- |
+  | Short Sequence / High Throughput | 1P1D (2P+2D A3) | 64 | 0813-w4a8 | Prefill DP4/TP8 with 16 seqs; Decode DP16/TP2 with 8 seqs; FUSED_MC2 on prefill |
+  | Long Context (~1M Input, Reference) | 1P1D (2P+2D A3) | 64 | 0813-w4a8 | DP2/TP16 both sides, 2 seqs, decode batched tokens 16; FUSED_MC2 off (memory) |
+
+  `--max-model-len 1048576` is the total prompt+generation budget. W4A4C8 (950 products) keeps
+  routed experts at W4A4 MXFP4, attention/shared experts at W8A8 MXFP8, and gates/compressor/
+  indexer/MTP unquantized; C8 = FP8 KV cache on 950 products (tutorial §10).
+
+  General tuning: [Public Performance Tuning Documentation](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/performance_and_debug/optimization_and_tuning.html)
+  and [Feature Matrix](https://docs.vllm.ai/projects/ascend/en/latest/user_guide/support_matrix/feature_matrix.html).
+
+faq: |-
+  For common environment, installation, and general parameter issues, refer to the
+  [Public FAQs](https://docs.vllm.ai/projects/ascend/en/latest/faqs.html) (tutorial §10).
+
+  - **Q: How do the W4A4C8 ultra-low-bit quantized weights preserve accuracy?**
+
+    A: Mixed-precision strategy via msmodelslim — routed experts W4A4 MXFP4; attention linears
+    and shared experts W8A8 MXFP8; router gates, compressor projections, indexer projections and
+    MTP layers kept in high precision. MXFP4/MXFP8 microscaling formats use 32-element blocks
+    with per-block symmetric min-max scales. C8 is a dynamic FP8 KV-cache quantization on
+    950PR/950DT products (attention KV per 64-element tile to E4M3 with E8M0 scales, RoPE part
+    in BF16; indexer Q/K rotated by a Hadamard matrix then per-token FP8), controlled only by
+    the serving configuration (tutorial §10).
+
+references:
+  - title: "Official tutorial"
+    url: "https://docs.vllm.ai/projects/ascend/en/v0.23.0/tutorials/models/DeepSeek-V4-Pro.html"
+  - title: "Model weights W4A8-MTP (ModelScope)"
+    url: "https://www.modelscope.cn/models/Eco-Tech/DeepSeek-V4-Pro-w4a8-mtp"
+  - title: "msmodelslim W4A4C8 quantization yaml"
+    url: "https://gitcode.com/Ascend/msmodelslim/blob/master/lab_practice/deepseek_v4/deepseek_v4_pro_w4a4c8.yaml"
