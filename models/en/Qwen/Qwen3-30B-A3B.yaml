@@ -5,7 +5,7 @@ meta:
   description: "A Mixture-of-Experts (MoE) model in the Qwen3 series, featuring 30.5B total parameters with 3.3B activated per token. The sparse MoE architecture enables efficient training and inference, delivering strong performance across reasoning, instruction-following, and agent capabilities while maintaining lower computational cost."
   date_added: 2026-07-07
   performance_headline: "Single-node deployment on Atlas 800 A2/A3 with BF16 and W8A8 precision"
-  date_updated: 2026-08-17
+  date_updated: 2026-11-18
   difficulty: intermediate
   related_recipes:
     - "Qwen/Qwen3.6-27B"
@@ -24,13 +24,10 @@ model:
   modality: text
   base_args:
     - "--trust-remote-code"
-    - "--enable-expert-parallel"
-    - "--quantization"
-    - "ascend"
-    - "--distributed_executor_backend"
+    - "--distributed-executor-backend"
     - "mp"
   base_env:
-    HCCL_BUFFSIZE: "512"
+    HCCL_BUFFSIZE: "1024"
     OMP_PROC_BIND: "false"
     OMP_NUM_THREADS: "1"
     PYTORCH_NPU_ALLOC_CONF: "expandable_segments:True"
@@ -54,7 +51,7 @@ features:
   spec_decoding:
     label: "Eagle3 Spec Decoding"
     description: "Eagle3 speculative decoding — replace your_eagle3_model_path with your draft model path"
-    args: ["--speculative-config", '{"method": "eagle3", "model": "your_eagle3_model_path", "draft_tensor_parallel_size": 1, "num_speculative_tokens": 3}']
+    args: ["--speculative-config", '{"method": "eagle3", "model": "your_eagle3_model_path", "num_speculative_tokens": 3}']
   compilation_config:
     label: "Compilation Config"
     description: "Full ACL graph execution in decode (--compilation-config cudagraph_mode=FULL_DECODE_ONLY)"
@@ -72,12 +69,17 @@ features:
     label: "FlashComm1"
     description: "FlashComm communication optimization (via --additional-config)"
     args: ["--additional-config", '{"enable_flashcomm1": true, "weight_nz_mode": 2}']
+    flag_when_false: "--additional-config '{\"weight_nz_mode\": 2}'"
 
 opt_in_features:
   - prefix_caching
+  - spec_decoding
+  - async_scheduling
+  - flashcomm1
 
 variants:
   default:
+    model_id: "Eco-Tech/Qwen3-30B-A3B-w8a8"
     precision: W8A8
     vram_minimum_gb: 37
     description: "W8A8 quantized weights on Atlas 800 A2/A3"
@@ -108,7 +110,7 @@ strategy_overrides: {}
 
 dependencies:
   - note: "Eagle3 draft model for speculative decoding (replace your_eagle3_model_path)"
-    command: "pip install modelscope && modelscope download --model AngelSlim/Qwen3-a3B_eagle3"
+    command: "pip install -U huggingface_hub && hf download AngelSlim/Qwen3-a3B_eagle3 --local-dir your_eagle3_model_path"
 
 guide: ""
 performance_model_names:
@@ -131,6 +133,8 @@ config_params:
     description: "Fraction of NPU memory available for the KV cache"
 
 overview: |-
+  > For main-branch validation, use the current nightly-main image (nightly-main-a3 for A3) and record the image digest and both vLLM and vLLM-Ascend commits. The v0.23.0rc1 commands below remain historical release examples; they do not establish validation of current main.
+
   Qwen3-30B-A3B is a Mixture-of-Experts (MoE) model in the Qwen3 series, featuring 30.5B total parameters with 3.3B activated per token. The sparse MoE architecture enables efficient training and inference, delivering strong performance across reasoning, instruction-following, and agent capabilities while maintaining lower computational cost compared to dense models of similar capability.
 weight_download:
 - weight_version: BF16
@@ -147,7 +151,7 @@ weight_download:
     command: |-
       ```bash
       pip install -U huggingface_hub
-      huggingface-cli download Qwen/Qwen3-30B-A3B
+      hf download Qwen/Qwen3-30B-A3B
       ```
   - source: Modelers
     url: ''
@@ -204,7 +208,7 @@ weight_download:
     url: https://huggingface.co/AngelSlim/Qwen3-a3B_eagle3
     command: |-
       ```bash
-      huggingface-cli download AngelSlim/Qwen3-a3B_eagle3
+      hf download AngelSlim/Qwen3-a3B_eagle3
       ```
   - source: ModelScope
     url: ''
@@ -256,7 +260,7 @@ env_setup:
         **Docker Pull:**
 
         ```bash
-        docker pull quay.io/ascend/vllm-ascend:v0.23.0rc1
+        docker pull quay.io/ascend/vllm-ascend:v0.23.0rc1-a3
         ```
 
         **Docker Run:**
@@ -422,14 +426,14 @@ env_setup:
 
       > **Note**: If deploying a multi-node environment, set up the environment on each node.
 
-      For more details, please refer to the [Installation Guide](https://docs.vllm.ai/projects/ascend/en/latest/installation.html).
+      For more details, please refer to the [Installation Guide](https://docs.vllm.ai/projects/ascend/en/latest/getting_started/installation.html).
 scenarios:
-
 - npu: Atlas 800I A3
   precision: W8A8
   deployment: Single-Node
   case: Single Node Multi Card
-  tags: [a3-single]
+  tags:
+  - a3-single
   strategy: single_node_A3
   steps:
   - title: Start the server
@@ -457,14 +461,13 @@ scenarios:
           --tensor-parallel-size 4 \
           --enable-expert-parallel \
           --quantization ascend \
-          --distributed_executor_backend "mp" \
+          --distributed-executor-backend "mp" \
           {{prefix_caching}} \
-          {{async_scheduling}} \
-          {{compilation_config}} \
+            {{compilation_config}} \
           {{flashcomm1}} \
           --gpu-memory-utilization {{gpu_memory_utilization}} \
-          --port 8000 \
-          {{spec_decoding}}
+          {{spec_decoding}} \
+          --port 8000
       ```
 
       > - `ASCEND_RT_VISIBLE_DEVICES`: must be set to the NPU chip IDs allocated to your environment (e.g., `0,1,2,3` for 4 chips).
@@ -479,12 +482,21 @@ scenarios:
       - [Additional Configuration](https://docs.vllm.ai/projects/ascend/en/latest/user_guide/configuration/additional_config.html) — `--additional-config` format and options
   - title: Service Verification
     content: |-
-      After the service is started, verify it is running by sending a prompt. Refer to the verification section below for a usage example.
+      Check readiness and send a real inference request; a model listing alone does not verify inference.
+
+      ```bash
+      curl --fail-with-body --silent --show-error http://<server_ip>:<port>/health
+      curl --fail-with-body --silent --show-error http://<server_ip>:<port>/v1/models
+      curl --fail-with-body --silent --show-error http://<server_ip>:<port>/v1/chat/completions \
+          -H 'Content-Type: application/json' \
+          -d '{"model":"qwen3","messages":[{"role":"user","content":"Explain tensor parallelism briefly."}],"temperature":0,"max_completion_tokens":256,"chat_template_kwargs":{"enable_thinking":false}}'
+      ```
 - npu: Atlas 800I A2
   precision: W8A8
   deployment: Single-Node
   case: Single Node Multi Card (A2)
-  tags: [a2-single]
+  tags:
+  - a2-single
   strategy: single_node_A2
   steps:
   - title: Start the server
@@ -511,14 +523,13 @@ scenarios:
           --tensor-parallel-size 4 \
           --enable-expert-parallel \
           --quantization ascend \
-          --distributed_executor_backend "mp" \
+          --distributed-executor-backend "mp" \
           {{prefix_caching}} \
-          {{async_scheduling}} \
-          {{compilation_config}} \
+            {{compilation_config}} \
           {{flashcomm1}} \
           --gpu-memory-utilization {{gpu_memory_utilization}} \
-          --port 8000 \
-          {{spec_decoding}}
+          {{spec_decoding}} \
+          --port 8000
       ```
 
       > - `ASCEND_RT_VISIBLE_DEVICES`: must be set to the NPU chip IDs allocated to your environment (e.g., `0,1,2,3` for 4 chips).
@@ -533,16 +544,27 @@ scenarios:
       - [Additional Configuration](https://docs.vllm.ai/projects/ascend/en/latest/user_guide/configuration/additional_config.html) — `--additional-config` format and options
   - title: Service Verification
     content: |-
-      After the service is started, verify it is running by sending a prompt. Refer to the verification section below for a usage example.
+      Check readiness and send a real inference request; a model listing alone does not verify inference.
+
+      ```bash
+      curl --fail-with-body --silent --show-error http://<server_ip>:<port>/health
+      curl --fail-with-body --silent --show-error http://<server_ip>:<port>/v1/models
+      curl --fail-with-body --silent --show-error http://<server_ip>:<port>/v1/chat/completions \
+          -H 'Content-Type: application/json' \
+          -d '{"model":"qwen3","messages":[{"role":"user","content":"Explain tensor parallelism briefly."}],"temperature":0,"max_completion_tokens":256,"chat_template_kwargs":{"enable_thinking":false}}'
+      ```
 - npu: Atlas 800I A2
   precision: bf16
   deployment: Multi-Node
   case: 2-node
-  tags: [multi-node-dp]
+  tags:
+  - multi-node-dp
   strategy: multi_node_dp
   test_id: qwen30b-dp-2n2c
   npu_per_node: 2
-  aisbench: [accuracy, performance]
+  aisbench:
+  - accuracy
+  - performance
   scripts:
     api-0:
       language: bash
@@ -600,7 +622,7 @@ scenarios:
     service-check:
       language: bash
       content: |-
-        response=$(curl --fail --silent --show-error \
+        response=$(curl --fail-with-body --silent --show-error \
           "http://${API_NODE_0_IP}:7100/v1/completions" \
           -H 'Content-Type: application/json' \
           -d '{"model":"qwen3","prompt":"The future of AI is","max_tokens":50,"temperature":0}')
@@ -618,20 +640,17 @@ scenarios:
       export ASCEND_RT_VISIBLE_DEVICES="${ASCEND_RT_VISIBLE_DEVICES:-0,1}"
       ```
   - title: Start API node 0
-    content: |-
-      {{script:api-0}}
+    content: '{{script:api-0}}'
   - title: Start Headless node 0
-    content: |-
-      {{script:headless-0}}
+    content: '{{script:headless-0}}'
   - title: Verify the service
-    content: |-
-      {{script:service-check}}
-
+    content: '{{script:service-check}}'
 - npu: Atlas 300I DUO
   precision: W8A8
   deployment: Single-Node
   case: 300I DUO (TP2)
-  tags: [310p-single]
+  tags:
+  - 310p-single
   strategy: single_node_310p
   steps:
   - title: Start the server
@@ -647,12 +666,12 @@ scenarios:
           --port 8000 \
           --tensor-parallel-size 2 \
           --max-num-seqs 32 \
-          --served_model_name qwen3 \
+          --served-model-name qwen3 \
           --dtype float16 \
           --quantization ascend \
           --max-model-len 16384 \
-          --additional-config '{"ascend_compilation_config": {"fuse_norm_quant": false,"enable_npu_graph_ex":false}}' \
-          {{compilation_config}} \
+          --additional-config '{"ascend_compilation_config": {"fuse_norm_quant": false,"enable_npugraph_ex":false}}' \
+          --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY", "cudagraph_capture_sizes": [1,32]}' \
           {{prefix_caching}}
       ```
 
@@ -662,14 +681,213 @@ scenarios:
       > - `--max-num-seqs` limits concurrent active requests to reduce KV cache and graph capture pressure.
   - title: Service Verification
     content: |-
-      After the service is started, verify it is running by sending a prompt. Refer to the verification section below for a usage example.
+      Check readiness and send a real inference request; a model listing alone does not verify inference.
+
+      ```bash
+      curl --fail-with-body --silent --show-error http://<server_ip>:<port>/health
+      curl --fail-with-body --silent --show-error http://<server_ip>:<port>/v1/models
+      curl --fail-with-body --silent --show-error http://<server_ip>:<port>/v1/chat/completions \
+          -H 'Content-Type: application/json' \
+          -d '{"model":"qwen3","messages":[{"role":"user","content":"Explain tensor parallelism briefly."}],"temperature":0,"max_completion_tokens":256,"chat_template_kwargs":{"enable_thinking":false}}'
+      ```
+- npu: Atlas 800I A3
+  precision: bf16
+  deployment: Single-Node
+  case: BF16 Multi Card
+  tags:
+  - a3-single
+  strategy: single_node_A3
+  steps:
+  - title: Start the server
+    content: |-
+      Use the Qwen/Qwen3-30B-A3B BF16 checkpoint without the quantization flag.
+
+      ```bash
+      export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3
+      export HCCL_OP_EXPANSION_MODE="AIV"  # not needed on A2
+      export HCCL_BUFFSIZE=1024
+      export OMP_PROC_BIND=false
+      export OMP_NUM_THREADS=1
+      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+
+      vllm serve your_model_path \
+          --served-model-name qwen3 \
+          --trust-remote-code \
+          --max-num-seqs {{max_num_seqs}} \
+          --max-model-len {{max_model_len}} \
+          --max-num-batched-tokens 16384 \
+          --tensor-parallel-size 4 \
+          --enable-expert-parallel \
+          --distributed-executor-backend "mp" \
+          {{prefix_caching}} \
+            {{compilation_config}} \
+          {{flashcomm1}} \
+          --gpu-memory-utilization {{gpu_memory_utilization}} \
+          {{spec_decoding}} \
+          --port 8000
+      ```
+  - title: Service Verification
+    content: |-
+      Check readiness and send a real inference request; a model listing alone does not verify inference.
+
+      ```bash
+      curl --fail-with-body --silent --show-error http://<server_ip>:<port>/health
+      curl --fail-with-body --silent --show-error http://<server_ip>:<port>/v1/models
+      curl --fail-with-body --silent --show-error http://<server_ip>:<port>/v1/chat/completions \
+          -H 'Content-Type: application/json' \
+          -d '{"model":"qwen3","messages":[{"role":"user","content":"Explain tensor parallelism briefly."}],"temperature":0,"max_completion_tokens":256,"chat_template_kwargs":{"enable_thinking":false}}'
+      ```
+- npu: Atlas 800I A3
+  precision: W8A8
+  deployment: Single-Node
+  case: Low Latency
+  tags:
+  - a3-single
+  strategy: single_node_A3
+  steps:
+  - title: Start the server
+    content: |-
+      Tuning configuration migrated from the official tutorial. Eagle3 is optional; download the draft checkpoint and replace its path before enabling it.
+
+      ```bash
+      export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3
+      export HCCL_OP_EXPANSION_MODE="AIV"
+      export HCCL_BUFFSIZE=1024
+      export OMP_PROC_BIND=false
+      export OMP_NUM_THREADS=1
+      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+
+      vllm serve your_model_path \
+          --served-model-name qwen3 \
+          --trust-remote-code \
+          --max-num-seqs 100 \
+          --max-model-len 37364 \
+          --max-num-batched-tokens 16384 \
+          --tensor-parallel-size 4 \
+          --enable-expert-parallel \
+          --distributed-executor-backend "mp" \
+          {{prefix_caching}} \
+            --quantization ascend \
+          {{compilation_config}} \
+          {{flashcomm1}} \
+          --gpu-memory-utilization 0.95 \
+          {{spec_decoding}} \
+          --port 8000
+      ```
+  - title: Service Verification
+    content: |-
+      Check readiness and send a real inference request; a model listing alone does not verify inference.
+
+      ```bash
+      curl --fail-with-body --silent --show-error http://<server_ip>:<port>/health
+      curl --fail-with-body --silent --show-error http://<server_ip>:<port>/v1/models
+      curl --fail-with-body --silent --show-error http://<server_ip>:<port>/v1/chat/completions \
+          -H 'Content-Type: application/json' \
+          -d '{"model":"qwen3","messages":[{"role":"user","content":"Explain tensor parallelism briefly."}],"temperature":0,"max_completion_tokens":256,"chat_template_kwargs":{"enable_thinking":false}}'
+      ```
+- npu: Atlas 800I A3
+  precision: W8A8
+  deployment: Single-Node
+  case: High Throughput
+  tags:
+  - a3-single
+  strategy: single_node_A3
+  steps:
+  - title: Start the server
+    content: |-
+      Tuning configuration migrated from the official tutorial. Eagle3 is optional; download the draft checkpoint and replace its path before enabling it.
+
+      ```bash
+      export ASCEND_RT_VISIBLE_DEVICES=0
+      export HCCL_OP_EXPANSION_MODE="AIV"
+      export HCCL_BUFFSIZE=1024
+      export OMP_PROC_BIND=false
+      export OMP_NUM_THREADS=1
+      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+
+      vllm serve your_model_path \
+          --served-model-name qwen3 \
+          --trust-remote-code \
+          --max-num-seqs 100 \
+          --max-model-len 37364 \
+          --max-num-batched-tokens 16384 \
+          --tensor-parallel-size 1 \
+          --distributed-executor-backend "mp" \
+          {{prefix_caching}} \
+            --quantization ascend \
+          {{compilation_config}} \
+          {{flashcomm1}} \
+          --gpu-memory-utilization 0.95 \
+          {{spec_decoding}} \
+          --port 8000
+      ```
+  - title: Service Verification
+    content: |-
+      Check readiness and send a real inference request; a model listing alone does not verify inference.
+
+      ```bash
+      curl --fail-with-body --silent --show-error http://<server_ip>:<port>/health
+      curl --fail-with-body --silent --show-error http://<server_ip>:<port>/v1/models
+      curl --fail-with-body --silent --show-error http://<server_ip>:<port>/v1/chat/completions \
+          -H 'Content-Type: application/json' \
+          -d '{"model":"qwen3","messages":[{"role":"user","content":"Explain tensor parallelism briefly."}],"temperature":0,"max_completion_tokens":256,"chat_template_kwargs":{"enable_thinking":false}}'
+      ```
+- npu: Atlas 800I A3
+  precision: W8A8
+  deployment: Single-Node
+  case: Long Context
+  tags:
+  - a3-single
+  strategy: single_node_A3
+  steps:
+  - title: Start the server
+    content: |-
+      Tuning configuration migrated from the official tutorial. Eagle3 is optional; download the draft checkpoint and replace its path before enabling it.
+
+      ```bash
+      export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3
+      export HCCL_OP_EXPANSION_MODE="AIV"
+      export HCCL_BUFFSIZE=1024
+      export OMP_PROC_BIND=false
+      export OMP_NUM_THREADS=1
+      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+
+      vllm serve your_model_path \
+          --served-model-name qwen3 \
+          --trust-remote-code \
+          --max-num-seqs 14 \
+          --max-model-len 131072 \
+          --max-num-batched-tokens 16384 \
+          --tensor-parallel-size 4 \
+          --enable-expert-parallel \
+          --distributed-executor-backend "mp" \
+          {{prefix_caching}} \
+            --quantization ascend \
+          {{compilation_config}} \
+          {{flashcomm1}} \
+          --gpu-memory-utilization 0.95 \
+          --port 8000 \
+          {{spec_decoding}} \
+          --hf-overrides '{"rope_parameters": {"rope_type":"yarn","factor":4,"original_max_position_embeddings":32768}}'
+      ```
+  - title: Service Verification
+    content: |-
+      Check readiness and send a real inference request; a model listing alone does not verify inference.
+
+      ```bash
+      curl --fail-with-body --silent --show-error http://<server_ip>:<port>/health
+      curl --fail-with-body --silent --show-error http://<server_ip>:<port>/v1/models
+      curl --fail-with-body --silent --show-error http://<server_ip>:<port>/v1/chat/completions \
+          -H 'Content-Type: application/json' \
+          -d '{"model":"qwen3","messages":[{"role":"user","content":"Explain tensor parallelism briefly."}],"temperature":0,"max_completion_tokens":256,"chat_template_kwargs":{"enable_thinking":false}}'
+      ```
 verification: |-
   After the service is started, the model can be invoked by sending a prompt.
 
   **Chat Completions API:**
 
   ```shell
-  curl http://localhost:<port>/v1/chat/completions \
+  curl http://<server_ip>:<port>/v1/chat/completions \
       -H "Content-Type: application/json" \
       -d '{
           "model": "qwen3",
@@ -852,11 +1070,16 @@ performance:
     | ------------- | --------------------- | ------ |
     | GSM8K         | accuracy (4-shot CoT) | 92.87% |
     | GPQA-Diamond  | accuracy (0-shot CoT) | 60.10% |
+    | LiveCodeBench | pass@1 (0-shot)       | 60.05% |
     | AIME 2024     | accuracy (0-shot)     | 76.67% |
+
+    > These are historical tutorial results on v0.22.1rc, not measurements from a new main-branch run.
   benchmark: |-
     ### Recommended Configurations
 
-    > **Note**: The following configurations are validated in specific test environments and are for reference only. The optimal configuration depends on factors such as maximum input/output length, prefix cache hit rate, precision requirements, and deployment machine ratios. It is recommended to refer to Section 9.2 for tuning based on actual conditions.
+    Select the corresponding scenario above to generate the launch command. Eagle3 is optional and requires the draft checkpoint.
+
+    > **Note**: The following configurations are validated in specific test environments and are for reference only. The optimal configuration depends on factors such as maximum input/output length, prefix cache hit rate, precision requirements, and deployment machine ratios. Refer to the Tuning section below for tuning guidance.
 
     #### Table 1: Scenario Overview
 
@@ -876,36 +1099,10 @@ performance:
     | Low Latency     | 2 (A3) | 4   | 37364         | 100          | Off       | On  | -            |
     | Long Context    | 2 (A3) | 4   | 131072        | 14           | Off       | On  | YaRN         |
 
-    > For detailed parameter descriptions, please refer to the deployment examples in Section 5.
+    > For launch parameters, select the corresponding deployment scenario above.
 
     **Low Latency Configuration:**
 
-    ```shell
-    export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3
-    export HCCL_OP_EXPANSION_MODE="AIV"
-    export HCCL_BUFFSIZE=1024
-    export OMP_PROC_BIND=false
-    export OMP_NUM_THREADS=1
-    export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
-
-    vllm serve your_model_path \
-        --served-model-name qwen3 \
-        --trust-remote-code \
-        --max-num-seqs {{max_num_seqs}} \
-        --max-model-len 37364 \
-        --max-num-batched-tokens 16384 \
-        --tensor-parallel-size 4 \
-        --enable-expert-parallel \
-        --distributed_executor_backend "mp" \
-        {{prefix_caching}} \
-        {{async_scheduling}} \
-        --quantization ascend \
-        {{compilation_config}} \
-        {{flashcomm1}} \
-        --gpu-memory-utilization {{gpu_memory_utilization}} \
-        --port 8000 \
-        --speculative-config '{"method": "eagle3","model": "your_eagle3_model_path", "num_speculative_tokens": 3}'
-    ```
 
     Example AISBench settings for this configuration:
 
@@ -915,31 +1112,6 @@ performance:
 
     **High Throughput Configuration:**
 
-    ```shell
-    export ASCEND_RT_VISIBLE_DEVICES=0
-    export HCCL_OP_EXPANSION_MODE="AIV"
-    export HCCL_BUFFSIZE=1024
-    export OMP_PROC_BIND=false
-    export OMP_NUM_THREADS=1
-    export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
-
-    vllm serve your_model_path \
-        --served-model-name qwen3 \
-        --trust-remote-code \
-        --max-num-seqs {{max_num_seqs}} \
-        --max-model-len 37364 \
-        --max-num-batched-tokens 16384 \
-        --tensor-parallel-size 1 \
-        --distributed_executor_backend "mp" \
-        {{prefix_caching}} \
-        {{async_scheduling}} \
-        --quantization ascend \
-        {{compilation_config}} \
-        --additional-config '{"weight_nz_mode": 2}' \
-        --gpu-memory-utilization {{gpu_memory_utilization}} \
-        --port 8000 \
-        --speculative-config '{"method": "eagle3","model": "your_eagle3_model_path", "num_speculative_tokens": 3}'
-    ```
 
     Example AISBench settings for this configuration:
 
@@ -948,33 +1120,6 @@ performance:
     - Input/Output length: 2048/2048 or 3500/1500
 
     **Long Context Configuration:**
-    ```shell
-    export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3
-    export HCCL_OP_EXPANSION_MODE="AIV"
-    export HCCL_BUFFSIZE=1024
-    export OMP_PROC_BIND=false
-    export OMP_NUM_THREADS=1
-    export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
-
-    vllm serve your_model_path \
-        --served-model-name qwen3 \
-        --trust-remote-code \
-        --max-num-seqs 14 \
-        --max-model-len 131072 \
-        --max-num-batched-tokens 16384 \
-        --tensor-parallel-size 4 \
-        --enable-expert-parallel \
-        --distributed_executor_backend "mp" \
-        {{prefix_caching}} \
-        {{async_scheduling}} \
-        --quantization ascend \
-        {{compilation_config}} \
-        {{flashcomm1}} \
-        --gpu-memory-utilization {{gpu_memory_utilization}} \
-        --port 8000 \
-        --speculative-config '{"method": "eagle3","model": "your_eagle3_model_path", "num_speculative_tokens": 3}' \
-        --hf-overrides '{"rope_parameters": {"rope_type":"yarn","factor":4,"original_max_position_embeddings":32768}}'
-    ```
 
     Example AISBench settings for this configuration:
 

@@ -93,6 +93,42 @@ targets:
       precision: W8A8
       deployment: Single-Node
       case: Single Node Multi Card
+  - id: qwen3-30b-a3b-a3-bf16-multi-card
+    recipe: models/en/Qwen/Qwen3-30B-A3B.yaml
+    mode: single-node
+    runner: linux-aarch64-a3-800i-recipes-fed-16
+    selector:
+      npu: Atlas 800I A3
+      precision: bf16
+      deployment: Single-Node
+      case: BF16 Multi Card
+  - id: qwen3-30b-a3b-a3-low-latency
+    recipe: models/en/Qwen/Qwen3-30B-A3B.yaml
+    mode: single-node
+    runner: linux-aarch64-a3-800i-recipes-fed-16
+    selector:
+      npu: Atlas 800I A3
+      precision: W8A8
+      deployment: Single-Node
+      case: Low Latency
+  - id: qwen3-30b-a3b-a3-high-throughput
+    recipe: models/en/Qwen/Qwen3-30B-A3B.yaml
+    mode: single-node
+    runner: linux-aarch64-a3-800i-recipes-fed-16
+    selector:
+      npu: Atlas 800I A3
+      precision: W8A8
+      deployment: Single-Node
+      case: High Throughput
+  - id: qwen3-30b-a3b-a3-long-context
+    recipe: models/en/Qwen/Qwen3-30B-A3B.yaml
+    mode: single-node
+    runner: linux-aarch64-a3-800i-recipes-fed-16
+    selector:
+      npu: Atlas 800I A3
+      precision: W8A8
+      deployment: Single-Node
+      case: Long Context
   - id: qwen35-27b-qwen36-27b-a5-mxfp8-bf16-single-node-multi-card
     recipe: models/en/Qwen/Qwen3.5-27B-Qwen3.6-27B.yaml
     mode: single-node
