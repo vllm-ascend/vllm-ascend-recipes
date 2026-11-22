@@ -61,3 +61,7 @@ aliases:
     cache_dir: Qwen/Qwen3-Omni-30B-A3B-Thinking
   - model_id: Qwen/Qwen3-Coder-30B-A3B-Instruct
     cache_dir: Qwen3-Coder-30B-A3B-Instruct-w8a8
+
+  - model_id: MiniMaxAI/MiniMax-M2.7
+    cache_dir:
+      atlas_800_a3: vllm-ascend/MiniMax-M2.7-w8a8-QuaRot
