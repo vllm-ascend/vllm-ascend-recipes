@@ -1,0 +1,384 @@
+meta:
+  title: Hy3-preview
+  slug: hy3-preview
+  provider: tencent
+  description: >-
+    昇腾 A3 单机 BF16 TP16、EP 和 MTP 的实测 Docker 与 Serve 命令见[部署指南](#scenarios)。
+  date_added: 2026-10-20
+  difficulty: advanced
+  hardware:
+    atlas_800_a3: verified
+model:
+  model_id: tencent/Hy3-preview
+  architecture: moe
+  parameter_count: 295B
+  active_parameters: 21B
+  context_length: 262144
+  modality: text
+  base_args:
+    - --served-model-name
+    - hy3-preview
+    - --tensor-parallel-size
+    - "16"
+    - --speculative-config.method
+    - mtp
+    - --speculative-config.num_speculative_tokens
+    - "1"
+    - --speculative-config.enforce_eager
+    - "true"
+    - --enable-expert-parallel
+    - --enable-ep-weight-filter
+    - --tool-call-parser
+    - hy_v3
+    - --reasoning-parser
+    - hy_v3
+    - --enable-auto-tool-choice
+    - --max-model-len
+    - "32768"
+    - --max-num-seqs
+    - "8"
+    - --host
+    - 127.0.0.1
+    - --port
+    - "8000"
+  base_env:
+    HCCL_OP_EXPANSION_MODE: AIV
+    VLLM_USE_RUST_FRONTEND: "0"
+  docker_image:
+    atlas_800_a3: quay.io/ascend/vllm-ascend:v0.30.0-a3-openeuler
+  install:
+    pip: false
+    docker:
+      command: docker pull quay.io/ascend/vllm-ascend:v0.30.0-a3-openeuler
+      note: 使用 release 镜像，按部署指南中的两个终端分别操作。
+variants:
+  default:
+    precision: bf16
+    description: BF16 权重，采用 TP16、EP 和 MTP 单草稿 token。
+    vram_minimum_gb: 718
+compatible_strategies:
+  - single_node_A3
+hardware_overrides: {}
+strategy_overrides: {}
+guide: ""
+overview: |-
+  Hy3-preview 是腾讯的稀疏 MoE 模型，可用于推理、代码生成和工具调用。模型共有 295B 参数，每次激活 21B，MTP 层有 3.8B 参数。
+
+  本文在一台配有 16 个逻辑设备的 A3 上验证 BF16 权重，采用 TP16、专家并行和 1 个 MTP 草稿 token，服务上限为 32,768 token。镜像版本为 vLLM Ascend v0.30.0。该版本的官方文档将部署说明指向历史教程。
+weight_download:
+  - weight_version: BF16
+    sources:
+      - source: ModelScope
+        url: https://modelscope.cn/models/Tencent-Hunyuan/Hy3-preview
+        command: |-
+          ```bash
+          CHECKPOINT=/models/tencent/Hy3-preview
+          REVISION=bc124022a73e3556246dd5c15ffc2da8250225f7
+          mkdir -p /models/tencent &&
+          GIT_LFS_SKIP_SMUDGE=1 git clone --no-checkout \
+            https://www.modelscope.cn/Tencent-Hunyuan/Hy3-preview.git "$CHECKPOINT" &&
+          git -C "$CHECKPOINT" lfs install --local &&
+          GIT_LFS_SKIP_SMUDGE=1 git -C "$CHECKPOINT" checkout --detach "$REVISION" &&
+          git -C "$CHECKPOINT" lfs pull origin &&
+          git -C "$CHECKPOINT" lfs fsck --objects HEAD
+          ```
+prerequisites:
+  - title: MTP 与 ACLGraph
+    content: 先前实测中，MTP 草稿阶段的完整解码图捕获失败。部署命令让草稿阶段以 eager 模式执行，主模型继续使用 ACLGraph。
+  - title: 镜像验证记录
+    content: 实测镜像摘要为
+      `sha256:0b8bf5b484d49c667ceab717347eb3a8695388429aebd9084b79fa0f57a545c0`。主机使用昇腾驱动
+      26.2.rc1，容器使用 CANN 9.2.1。
+  - title: 权重验证记录
+    content: 实测权重来自 ModelScope `Tencent-Hunyuan/Hy3-preview`，提交为
+      `bc124022a73e3556246dd5c15ffc2da8250225f7`。已对索引、tokenizer、配置和全部 112
+      个权重分片执行 SHA-256 校验。
+  - title: 主机准备
+    content: 使用一台 Atlas A3，准备 16 个可见的 64 GB 逻辑设备。先确认驱动、CANN、HCCL 与容器相容。
+  - title: 下载固定修订的 BF16 权重
+    content: |-
+      在 A3 宿主机执行，需安装 Git 和 Git LFS。准备空的目标目录，/models 下预留约 1.2 TB 给 LFS 缓存及工作副本。若检出后 LFS 下载中断，可重新执行最后两条命令。
+
+      ```bash
+      CHECKPOINT=/models/tencent/Hy3-preview
+      REVISION=bc124022a73e3556246dd5c15ffc2da8250225f7
+      mkdir -p /models/tencent &&
+      GIT_LFS_SKIP_SMUDGE=1 git clone --no-checkout \
+        https://www.modelscope.cn/Tencent-Hunyuan/Hy3-preview.git "$CHECKPOINT" &&
+      git -C "$CHECKPOINT" lfs install --local &&
+      GIT_LFS_SKIP_SMUDGE=1 git -C "$CHECKPOINT" checkout --detach "$REVISION" &&
+      git -C "$CHECKPOINT" lfs pull origin &&
+      git -C "$CHECKPOINT" lfs fsck --objects HEAD
+      ```
+  - title: 在 A3 宿主机准备 AISBench 和 GSM8K-lite
+    content: |-
+      在第二个 A3 宿主机终端执行。确保 `/models` 可写，且可访问 GitHub、PyPI 和 ModelScope。Linux arm64 release 镜像提供 CPU Torch。本步骤安装 [AISBench](https://github.com/AISBench/benchmark/tree/e968d1bd7f48404bd913b95560f33938072336fa)，准备固定修订 `622a6f3dba062a8e5fe057254c5f02f702d0f39e` 的 [GSM8K-lite](https://modelscope.cn/datasets/vllm-ascend/gsm8k-lite)，并校验两个 JSONL 文件与 32 道计分题。
+
+      ```bash
+      (
+        set -euo pipefail
+        IMAGE=quay.io/ascend/vllm-ascend:v0.30.0-a3-openeuler
+        BENCH=/models/tools/hy3-recipe/aisbench
+        COMMIT=e968d1bd7f48404bd913b95560f33938072336fa
+        ARCHIVE="benchmark-$COMMIT.tar.gz"
+        mkdir -p "$BENCH"
+        cd "$BENCH"
+        curl -fSL --retry 2 --connect-timeout 10 --max-time 180 \
+          "https://codeload.github.com/AISBench/benchmark/tar.gz/$COMMIT" -o "$ARCHIVE"
+        printf '%s  %s\n' 93715c21b94c3ba86d9f660dc3cfdf25be670dc2b7aca035750ca832a26e3680 \
+          "$ARCHIVE" | sha256sum --check --strict
+        tar -xzf "$ARCHIVE" --no-same-owner --no-same-permissions
+        docker run --rm -i -v /models:/models -w "$BENCH" \
+          "$IMAGE" bash -s -- "$COMMIT" <<'BASH'
+      set -euo pipefail
+      test "$(uname -m)" = aarch64
+      SOURCE="$PWD/benchmark-$1"
+      VENV="$PWD/venv-v030"
+      python3 -m venv --system-site-packages "$VENV"
+      printf '%s\n' 'torch==2.10.0+cpu' 'datasets==3.6.0' 'mmengine-lite==0.10.7' > aisbench-v030.constraints.txt
+      "$VENV/bin/python" -m pip --disable-pip-version-check --timeout 30 --retries 2 install \
+        --constraint aisbench-v030.constraints.txt -e "$SOURCE" -r "$SOURCE/requirements/api.txt"
+      "$VENV/bin/python" - <<'PY'
+      from importlib.metadata import distributions, version
+      from pathlib import Path
+      from modelscope.hub.snapshot_download import dataset_snapshot_download
+      assert version("ais_bench_benchmark") == "3.1.0"
+      assert version("torch") == "2.10.0+cpu"
+      assert not any(
+          (item.metadata["Name"] or "").lower().startswith(("cuda-", "nvidia-"))
+          for item in distributions()
+      )
+      dataset_id = "vllm-ascend/gsm8k-lite"
+      revision = "622a6f3dba062a8e5fe057254c5f02f702d0f39e"
+      splits = ["test.jsonl", "train.jsonl"]
+      target = str(Path("gsm8k-lite").resolve())
+      dataset_snapshot_download(dataset_id, revision=revision, allow_patterns=splits, local_dir=target)
+      PY
+      for split in train test; do
+        printf '%s  %s\n' 6b1b25e3c772d87e36c01839e3b91e910793caae412785024700e2c270176bb9 \
+          "gsm8k-lite/$split.jsonl" | sha256sum --check --strict
+      done
+      test "$(wc -l < gsm8k-lite/test.jsonl)" -eq 32
+      "$VENV/bin/ais_bench" --help >/dev/null
+      BASH
+      )
+      ```
+env_setup:
+  container:
+    A3:
+      content: >-
+        在 A3 宿主机执行。确保 16 个设备可见、8000 端口空闲，且已校验的 BF16 权重位于
+        `/models/tencent/Hy3-preview`。Docker 通过 release 镜像的默认入口打开 shell。
+
+
+        ```bash
+
+        IMAGE=quay.io/ascend/vllm-ascend:v0.30.0-a3-openeuler
+
+        CHECKPOINT=/models/tencent/Hy3-preview
+
+        CONTAINER_NAME=${HY3_CONTAINER_NAME:-hy3-preview-a3-release}
+
+        test -s "$CHECKPOINT/config.json" &&
+
+        docker run --rm -it --name "$CONTAINER_NAME" --net=host --ipc=host \
+          --device /dev/davinci0 --device /dev/davinci1 --device /dev/davinci2 --device /dev/davinci3 \
+          --device /dev/davinci4 --device /dev/davinci5 --device /dev/davinci6 --device /dev/davinci7 \
+          --device /dev/davinci8 --device /dev/davinci9 --device /dev/davinci10 --device /dev/davinci11 \
+          --device /dev/davinci12 --device /dev/davinci13 --device /dev/davinci14 --device /dev/davinci15 \
+          --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc \
+          -v /usr/local/Ascend/driver:/usr/local/Ascend/driver \
+          -v /usr/local/dcmi:/usr/local/dcmi \
+          -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+          -v /etc/ascend_install.info:/etc/ascend_install.info \
+          -v /models:/models -v "$CHECKPOINT:$CHECKPOINT:ro" -w /models \
+          "$IMAGE" bash
+        ```
+scenarios:
+  - npu: Atlas 800I A3
+    precision: BF16
+    deployment: 单节点
+    case: TP16 EP MTP
+    tags:
+      - a3-single
+    strategy: single_node_A3
+    steps:
+      - title: 在 A3 宿主机终端进入 release 容器
+        content: >-
+          在 A3 宿主机执行。确保 16 个设备可见、8000 端口空闲，且已校验的 BF16 权重位于
+          `/models/tencent/Hy3-preview`。Docker 通过 release 镜像的默认入口打开 shell。
+
+
+          ```bash
+
+          IMAGE=quay.io/ascend/vllm-ascend:v0.30.0-a3-openeuler
+
+          CHECKPOINT=/models/tencent/Hy3-preview
+
+          CONTAINER_NAME=${HY3_CONTAINER_NAME:-hy3-preview-a3-release}
+
+          test -s "$CHECKPOINT/config.json" &&
+
+          docker run --rm -it --name "$CONTAINER_NAME" --net=host --ipc=host \
+            --device /dev/davinci0 --device /dev/davinci1 --device /dev/davinci2 --device /dev/davinci3 \
+            --device /dev/davinci4 --device /dev/davinci5 --device /dev/davinci6 --device /dev/davinci7 \
+            --device /dev/davinci8 --device /dev/davinci9 --device /dev/davinci10 --device /dev/davinci11 \
+            --device /dev/davinci12 --device /dev/davinci13 --device /dev/davinci14 --device /dev/davinci15 \
+            --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc \
+            -v /usr/local/Ascend/driver:/usr/local/Ascend/driver \
+            -v /usr/local/dcmi:/usr/local/dcmi \
+            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+            -v /etc/ascend_install.info:/etc/ascend_install.info \
+            -v /models:/models -v "$CHECKPOINT:$CHECKPOINT:ro" -w /models \
+            "$IMAGE" bash
+          ```
+      - title: 在容器终端启动服务
+        content: |-
+          在 release 容器内执行。服务监听本机地址，等待启动完成的日志。
+
+          ```bash
+          export VLLM_USE_RUST_FRONTEND=0
+          export HCCL_OP_EXPANSION_MODE=AIV
+          vllm serve tencent/Hy3-preview \
+            --served-model-name hy3-preview \
+            --tensor-parallel-size 16 \
+            --speculative-config.method mtp \
+            --speculative-config.num_speculative_tokens 1 \
+            --speculative-config.enforce_eager true \
+            --enable-expert-parallel \
+            --enable-ep-weight-filter \
+            --tool-call-parser hy_v3 \
+            --reasoning-parser hy_v3 \
+            --enable-auto-tool-choice \
+            --max-model-len 32768 \
+            --max-num-seqs 8 \
+            --host 127.0.0.1 \
+            --port 8000
+          ```
+      - title: 在第二个 A3 宿主机终端检查就绪并执行推理
+        content: |-
+          保持服务运行。服务就绪后，在同一 A3 宿主机的第二个终端执行。模型列表应包含 `hy3-preview`，关闭思考的请求应返回 `Hi`。
+
+          ```python
+          from urllib.request import ProxyHandler, Request, build_opener, install_opener, urlopen
+          import json
+
+          install_opener(build_opener(ProxyHandler({})))
+          api = "http://127.0.0.1:8000/v1/"
+          with urlopen(api + "models", timeout=15) as response:
+              models = json.load(response)
+          assert any(item["id"] == "hy3-preview" for item in models["data"]), models
+          print(json.dumps(models, ensure_ascii=False))
+
+          payload = b'{"model":"hy3-preview","max_tokens":16,"temperature":0,"messages":[{"role":"user","content":"Say hi in one word."}],"top_p":1,"chat_template_kwargs":{"reasoning_effort":"no_think"}}'
+          endpoint = "/".join(("chat", "completions"))
+          request = Request(api + endpoint, data=payload, headers={"Content-Type": "application/json"})
+          with urlopen(request, timeout=120) as response:
+              result = json.load(response)
+          assert result["model"] == "hy3-preview", result
+          assert (result["choices"][0]["message"].get("content") or "").strip(), result
+          print(json.dumps(result, ensure_ascii=False, indent=2))
+          ```
+      - title: 评测 GSM8K-lite 精度
+        content: |-
+          完成上一步后，保持服务运行并在第二个 A3 宿主机终端执行。先将 `HY3_EVIDENCE_DIR` 设置并导出为 `/models` 下全新的绝对目录。评测包含 32 道计分题，采用 4-shot 聊天提示、batch size 8、temperature 0.6，生成上限为 4096 token。
+
+          ```bash
+          IMAGE=quay.io/ascend/vllm-ascend:v0.30.0-a3-openeuler
+          BENCH=/models/tools/hy3-recipe/aisbench
+          COMMIT=e968d1bd7f48404bd913b95560f33938072336fa
+          SOURCE="$BENCH/benchmark-$COMMIT"
+          VENV="$BENCH/venv-v030"
+          OUT=${HY3_EVIDENCE_DIR:-}
+          [[ "$OUT" == /models/* ]] &&
+          mkdir -p "$OUT" &&
+          printf '%s  %s\n' 6b1b25e3c772d87e36c01839e3b91e910793caae412785024700e2c270176bb9 \
+            "$BENCH/gsm8k-lite/test.jsonl" | sha256sum --check --strict &&
+          test "$(wc -l < "$BENCH/gsm8k-lite/test.jsonl")" -eq 32 &&
+          cat > "$OUT/08-gsm8k-lite.py" <<PY &&
+          from mmengine.config import read_base
+          with read_base():
+              from ais_bench.benchmark.configs.datasets.gsm8k.gsm8k_gen_4_shot_cot_chat_prompt import gsm8k_datasets as datasets
+              from ais_bench.benchmark.configs.models.vllm_api.vllm_api_general_chat import models
+          datasets[0]["path"] = "$BENCH/gsm8k-lite"
+          models[0]["model"] = "hy3-preview"
+          models[0]["host_ip"] = "127.0.0.1"
+          models[0]["host_port"] = 8000
+          models[0]["batch_size"] = 8
+          models[0]["max_out_len"] = 4096
+          models[0]["trust_remote_code"] = True
+          models[0]["generation_kwargs"]["temperature"] = 0.6
+          work_dir = "$OUT/08-aisbench-results"
+          PY
+          docker run --rm --net=host -v /models:/models -w "$SOURCE" \
+            -e NO_PROXY=127.0.0.1,localhost -e no_proxy=127.0.0.1,localhost \
+            "$IMAGE" "$VENV/bin/ais_bench" "$OUT/08-gsm8k-lite.py" --debug --dump-eval-details
+          ```
+      - title: 执行轻量在线性能评测
+        content: >-
+          在同一宿主机执行。先将 `HY3_EVIDENCE_DIR` 设置并导出为 `/models` 下全新的绝对目录。 [vLLM
+          Benchmark](https://docs.vllm.ai/en/latest/benchmarking/) 对 1024、4096 和
+          16384 token 三档输入各发送 4 个请求，输出 128 token，并发为 1，随机种子为 0。命令为每档保存逐请求 JSON。
+
+
+          ```bash
+
+          IMAGE=quay.io/ascend/vllm-ascend:v0.30.0-a3-openeuler
+
+          OUT=${HY3_EVIDENCE_DIR:-}
+
+          RESULTS="$OUT/07-vllm-bench"
+
+          [[ "$OUT" == /models/* ]] &&
+
+          mkdir -p "$RESULTS" &&
+
+          (
+            for input_length in 1024 4096 16384; do
+              docker run --rm --net=host -v /models:/models -w /models "$IMAGE" \
+                vllm bench serve \
+                  --backend openai-chat --base-url http://127.0.0.1:8000 \
+                  --endpoint /v1/chat/completions --model /models/tencent/Hy3-preview \
+                  --served-model-name hy3-preview --dataset-name random \
+                  --random-input-len "$input_length" --random-output-len 128 \
+                  --num-prompts 4 --request-rate inf --max-concurrency 1 \
+                  --temperature 0 --top-p 1 --seed 0 \
+                  --save-result --save-detailed --result-dir "$RESULTS" \
+                  --result-filename "random-$input_length.json" || exit $?
+            done
+          )
+
+          ```
+verification: 实机通过问候、独立推理字段、自动工具调用及 MTP 草稿与接受计数的检查。
+performance:
+  accuracy: 2026 年 11 月 21 日 A3 首测 GSM8K-lite 答对 32/32。2026 年 11 月 22 日复测中，32/32
+    条请求返回，答对 31/32，准确率 96.875%。两轮温度均为 0.6。
+    [官方用例](https://github.com/vllm-project/vllm-ascend/blob/128f35ed1461ecb34bc8b87583a67a66bc4bd1d6/tests/e2e/cases/models/configs/Hunyuan/Hy3-preview.yaml)
+    给出 93.07 参考值和 10 个百分点容差。历史教程同时列出 GSM8K 和 C-Eval 参考值。
+  benchmark: 输入配置 1024、4096、16384 token，每档 4/4 请求成功，输出为 128 token。
+references:
+  - title: 固定版本教程基线
+    url: https://github.com/vllm-project/vllm-ascend/blob/5cb98caaadeff42b5b62b996e34bb2aaa29d20fd/docs/source/tutorials/models/Hy3-preview.md
+  - title: 当前上游教程与支持状态
+    url: https://docs.vllm.ai/projects/ascend/en/v0.30.0/tutorials/models/Hy3-preview.html
+  - title: 官方模型卡
+    url: https://huggingface.co/tencent/Hy3-preview
+  - title: 公开镜像仓库
+    url: https://quay.io/repository/ascend/vllm-ascend?tab=tags
+features:
+  spec_decoding:
+    label: MTP
+    args:
+      - --speculative-config.method
+      - mtp
+      - --speculative-config.num_speculative_tokens
+      - "1"
+      - --speculative-config.enforce_eager
+      - "true"
+  expert_parallel:
+    label: EP
+    args:
+      - --enable-expert-parallel
+tuning: 实测服务上限为 32768 token，最多 8 个并发序列。MTP 预测 1 个 token。保留 EP 权重过滤和两个 hy_v3
+  解析器。公式 `ceil((295 + 3.8) × 2 × 1.2) = 718 GB` 用于估算 BF16 权重显存，包含独立的 3.8B MTP
+  层，KV 缓存和运行时显存另计。
