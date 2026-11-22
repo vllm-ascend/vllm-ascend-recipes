@@ -61,3 +61,11 @@ aliases:
     cache_dir: Qwen/Qwen3-Omni-30B-A3B-Thinking
   - model_id: Qwen/Qwen3-Coder-30B-A3B-Instruct
     cache_dir: Qwen3-Coder-30B-A3B-Instruct-w8a8
+
+  - model_id: OpenGVLab/InternVL3_5-38B
+    cache_dir:
+      atlas_800_a3: Eco-Tech/InternVL3_5-38B-w8a8
+
+  - model_id: OpenGVLab/InternVL3_5-241B-A28B
+    cache_dir:
+      atlas_800_a3: Eco-Tech/InternVL3_5-241B-A28B-w8a8
