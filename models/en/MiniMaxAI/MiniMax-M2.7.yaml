@@ -75,7 +75,7 @@ prerequisites:
       from pathlib import Path
       import subprocess
       import sys
-      from urllib.parse import urlencode
+      from urllib.parse import urlencode, urlunsplit
 
       root = Path(sys.argv[1])
       main_files = [
@@ -110,9 +110,8 @@ prerequisites:
               local = target / name
               if not local.is_file():
                   local.parent.mkdir(parents=True, exist_ok=True)
-                  url = f"https://www.modelscope.cn/api/v1/models/{repo}/repo?" + urlencode(
-                      {"Revision": "master", "FilePath": name}
-                  )
+                  query = urlencode({"Revision": "master", "FilePath": name})
+                  url = urlunsplit(("https", "www.modelscope.cn", f"/api/v1/models/{repo}/repo", query, ""))
                   part = local.with_name(local.name + ".part")
                   subprocess.run(
                       ["curl", "-fLSs", "--retry", "3", "-C", "-", "-o", str(part), url], check=True
@@ -788,7 +787,7 @@ scenarios:
             python3 -c 'import json,sys; data=json.load(sys.stdin); print(json.dumps(data)); assert any(m["id"] == "MiniMax-M2.7" for m in data["data"])'
           response=$(curl --noproxy '*' --fail-with-body --silent --show-error --connect-timeout 5 --max-time 120 http://127.0.0.1:8000/v1/chat/completions \
             -H 'Content-Type: application/json' \
-            -d '{"model":"MiniMax-M2.7","max_tokens":512,"temperature":0,"messages":[{"role":"user","content":"Say hi in one word."}]}')
+            -d '{"model":"MiniMax-M2.7","max_tokens":1024,"temperature":0,"repetition_penalty":1.15,"messages":[{"role":"user","content":"Say hi in one word."}]}')
           python3 -c 'import json,sys; r=json.load(sys.stdin); print(json.dumps(r, ensure_ascii=False, indent=2)); assert r["model"] == "MiniMax-M2.7"; c=(r["choices"][0]["message"].get("content") or "").strip(); assert not c.startswith("<think>") or "</think>" in c; assert c.rsplit("</think>",1)[-1].strip().casefold().strip(".!") in {"hello","hi"}' <<<"$response"
           check_request_count 1
 
@@ -809,7 +808,7 @@ references:
   - title: Public image registry
     url: https://quay.io/repository/ascend/vllm-ascend?tab=tags
   - title: Upstream MiniMax metadata (230B / 10B)
-    url: https://github.com/vllm-project/recipes/blob/9882c1c7994c78093a85f35f3534f691a698785c/models/MiniMaxAI/MiniMax-M2.7.yaml
+    url: https://github.com/vllm-project/vllm/blob/0e3c8dbdae9d55149b0fba4e6c1014b4b08c9c73/recipes/models/MiniMaxAI/MiniMax-M2.7.yaml
   - title: W8A8 QuaRot config
     url: https://modelscope.cn/models/vllm-ascend/MiniMax-M2.7-w8a8-QuaRot/files
   - title: EAGLE3
