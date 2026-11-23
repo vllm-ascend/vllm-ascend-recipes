@@ -260,9 +260,10 @@ scenarios:
           # A3 release image inference
           curl --noproxy '*' -fsS --connect-timeout 5 --max-time 15 http://127.0.0.1:2002/health -w 'Health HTTP %{http_code}\n' &&
           curl --noproxy '*' -fsS --connect-timeout 5 --max-time 15 http://127.0.0.1:2002/v1/models -w '\nModels HTTP %{http_code}\n' &&
+          image_uri=$(printf 'file:%s' '///models/evidence/internvl-release-retest/tiger.jpeg') &&
           curl --noproxy '*' --fail-with-body --silent --show-error --connect-timeout 5 --max-time 120 \
             http://127.0.0.1:2002/v1/chat/completions -H 'Content-Type: application/json' \
-            --data-binary '{"model":"internvl3_5","temperature":0,"max_tokens":64,"messages":[{"role":"user","content":[{"type":"image_url","image_url":{"url":"file:///models/evidence/internvl-release-retest/tiger.jpeg"}},{"type":"text","text":"What animal is shown in the image, and what is it doing?"}]}]}' \
+            --data-binary '{"model":"internvl3_5","temperature":0,"max_tokens":64,"messages":[{"role":"user","content":[{"type":"image_url","image_url":{"url":"'"$image_uri"'"}},{"type":"text","text":"What animal is shown in the image, and what is it doing?"}]}]}' \
             --write-out "\nImage request HTTP %{http_code}\n"
           ```
       - title: 运行 AISBench GSM8K 小样本
