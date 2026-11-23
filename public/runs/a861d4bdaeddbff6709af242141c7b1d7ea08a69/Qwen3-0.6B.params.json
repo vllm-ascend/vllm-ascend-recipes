@@ -1,0 +1,83 @@
+{
+  "verification_scope": "single-node API smoke; not accuracy or full feature coverage",
+  "recipe_path": "models/en/Qwen/Qwen3-0.6B.yaml",
+  "model_id": "Qwen/Qwen3-0.6B",
+  "hw_key": "mixed",
+  "head_sha": "a861d4bdaeddbff6709af242141c7b1d7ea08a69",
+  "workflow_run_id": "44663737682",
+  "trigger_type": "pr",
+  "image": "mixed; see hardware_runs",
+  "started_at": "2026-11-20T02:51:31Z",
+  "scenarios": [
+    {
+      "index": 0,
+      "npu": "Atlas 800I A2",
+      "precision": "BF16",
+      "deployment": "Single-Node",
+      "case": "TP1",
+      "serve_cmd": "export ASCEND_RT_VISIBLE_DEVICES=0\nMODEL_PATH=/root/.cache/modelscope/hub/models/Qwen/Qwen3-0.6B\nif [[ -r /weights/Qwen3-0.6B/config.json ]]; then MODEL_PATH=/weights/Qwen3-0.6B; fi\nvllm serve \"$MODEL_PATH\" --served-model-name qwen3 --dtype bfloat16 --host 127.0.0.1 --port 8000 --tensor-parallel-size 1",
+      "verification_status": "pass",
+      "verification_reason": "Task API response validated"
+    },
+    {
+      "index": 0,
+      "npu": "Atlas 800I A3",
+      "precision": "BF16",
+      "deployment": "Single-Node",
+      "case": "TP1",
+      "serve_cmd": "export ASCEND_RT_VISIBLE_DEVICES=0\nMODEL_PATH=/root/.cache/modelscope/hub/models/Qwen/Qwen3-0.6B\nif [[ -r /weights/Qwen3-0.6B/config.json ]]; then MODEL_PATH=/weights/Qwen3-0.6B; fi\nvllm serve \"$MODEL_PATH\" --served-model-name qwen3 --dtype bfloat16 --host 127.0.0.1 --port 8000 --tensor-parallel-size 1",
+      "verification_status": "pass",
+      "verification_reason": "Task API response validated"
+    }
+  ],
+  "hardware_runs": [
+    {
+      "verification_scope": "single-node API smoke; not accuracy or full feature coverage",
+      "recipe_path": "models/en/Qwen/Qwen3-0.6B.yaml",
+      "model_id": "Qwen/Qwen3-0.6B",
+      "hw_key": "atlas_800_a2",
+      "head_sha": "a861d4bdaeddbff6709af242141c7b1d7ea08a69",
+      "workflow_run_id": "44663737682",
+      "trigger_type": "pr",
+      "image": "quay.nju.edu.cn/ascend/vllm-ascend:nightly-main",
+      "started_at": "2026-11-20T02:51:31Z",
+      "scenarios": [
+        {
+          "index": 0,
+          "npu": "Atlas 800I A2",
+          "precision": "BF16",
+          "deployment": "Single-Node",
+          "case": "TP1",
+          "serve_cmd": "export ASCEND_RT_VISIBLE_DEVICES=0\nMODEL_PATH=/root/.cache/modelscope/hub/models/Qwen/Qwen3-0.6B\nif [[ -r /weights/Qwen3-0.6B/config.json ]]; then MODEL_PATH=/weights/Qwen3-0.6B; fi\nvllm serve \"$MODEL_PATH\" --served-model-name qwen3 --dtype bfloat16 --host 127.0.0.1 --port 8000 --tensor-parallel-size 1",
+          "verification_status": "pass",
+          "verification_reason": "Task API response validated"
+        }
+      ],
+      "status": "pass"
+    },
+    {
+      "verification_scope": "single-node API smoke; not accuracy or full feature coverage",
+      "recipe_path": "models/en/Qwen/Qwen3-0.6B.yaml",
+      "model_id": "Qwen/Qwen3-0.6B",
+      "hw_key": "atlas_800_a3",
+      "head_sha": "a861d4bdaeddbff6709af242141c7b1d7ea08a69",
+      "workflow_run_id": "44663737682",
+      "trigger_type": "pr",
+      "image": "quay.nju.edu.cn/ascend/vllm-ascend:nightly-main-a3",
+      "started_at": "2026-11-20T02:51:31Z",
+      "scenarios": [
+        {
+          "index": 0,
+          "npu": "Atlas 800I A3",
+          "precision": "BF16",
+          "deployment": "Single-Node",
+          "case": "TP1",
+          "serve_cmd": "export ASCEND_RT_VISIBLE_DEVICES=0\nMODEL_PATH=/root/.cache/modelscope/hub/models/Qwen/Qwen3-0.6B\nif [[ -r /weights/Qwen3-0.6B/config.json ]]; then MODEL_PATH=/weights/Qwen3-0.6B; fi\nvllm serve \"$MODEL_PATH\" --served-model-name qwen3 --dtype bfloat16 --host 127.0.0.1 --port 8000 --tensor-parallel-size 1",
+          "verification_status": "pass",
+          "verification_reason": "Task API response validated"
+        }
+      ],
+      "status": "pass"
+    }
+  ]
+}
