@@ -571,7 +571,15 @@ SCRIPT_HEREDOC
     if [[ -f "$AIS_CFG" ]]; then
       sed -i "s|path=\".*\"|path=\"${CACHE_PATH}\"|" "$AIS_CFG"
       sed -E -i "s|host_port[[:space:]]*=[[:space:]]*[0-9]+|host_port=${SERVER_PORT}|" "$AIS_CFG"
-      log_info "  Patched ais_bench model config (path + port): $AIS_CFG"
+      # AISBench loads its own tokenizer, independently of vllm serve.
+      ais_trust_remote_code=False
+      if [[ "$MODEL_ID" == "Tencent-Hunyuan/Hunyuan-A13B-Instruct" ]]; then
+        ais_trust_remote_code=True
+      fi
+      sed -E -i \
+        "s#^([[:space:]]*trust_remote_code[[:space:]]*=[[:space:]]*)(True|False)#\1${ais_trust_remote_code}#" \
+        "$AIS_CFG"
+      log_info "  Patched ais_bench model config (path, port, trust_remote_code=$ais_trust_remote_code): $AIS_CFG"
     else
       log_error "  AISBench model config not found: $AIS_CFG"
     fi
