@@ -11,12 +11,12 @@ meta:
   performance_headline: "单台 Atlas 800I A3(64G x 16)W8A8 TP16 133K 服务(qwen3_5_mtp);单台 16-NPU A3 主机 1P1D PD 分离(W4A8)"
   hardware:
     atlas_800_a3: verified   # 教程 §5.1/§5.4 载官方 1 台 A3(64G x 16)部署;第一方 serving 复验已于 2026-10-29/30 完成(单机/单机 PD/跨机 PD 三形态):单台 Atlas 800T A3 主机(8 卡 x 2 die=16 设备,64G HBM/卡,TP16)——单机、单机 PD、跨机 PD 均已验证,见 PR 说明
-    atlas_800_a2: experimental   # 教程 §5.2/§5.6 载 A2 部署;无第一方 A2 实测——A2 腿会 skip(见 PR 说明)
-    ascend_950dt: experimental   # 教程 §5.1/§5.5 载 950DT 部署;无 950DT 资源(见 PR 说明)。注意:教程 §5.5 要求 W4A8C8 路径使用含 #19017 修复的 v0.30.0 MRv1 构建——使用前核实镜像已包含
+    atlas_800_a2: experimental   # 教程 §5.2 载 A2 MP 部署(§5.6 A2 PD 仅存于 2026-10 修订版,在线已移除);无第一方 A2 实测——A2 场景会被跳过(见 PR 说明)
+    ascend_950dt: experimental   # 无 950DT 资源(见 PR 说明)。950DT 场景逐字保留自 2026-10 修订版(§5.1 950DT 页签/§5.5,在线教程已移除);§5.5 要求 W4A8C8 路径使用含 #19017 修复的 v0.30.0 MRv1 构建——使用前核实镜像已包含
 
 model:
-  min_vllm_version: "v0.17.0rc1"   # tutorial §1 support floor (950DT tiers from v0.23.0rc1)
-  model_id: "Eco-Tech/Qwen3.5-397B-A17B-w8a8-mtp"   # org 依仓内 cache 别名惯例;下载 org 为 Eco-Tech(见 weight_download)
+  min_vllm_version: "v0.17.0rc1"   # 教程 §1 支持下限(950DT 档位自 v0.23.0rc1;950DT W4A8C8 另需含 #19017 修复的 v0.30.0 MRv1 构建)
+  model_id: "Eco-Tech/Qwen3.5-397B-A17B-w8a8-mtp"   # 真实下载 org 为 Eco-Tech(ModelScope),与 Qwen3-VL/DeepSeek-V2-Lite 先例一致(见 weight_download)
   architecture: moe
   parameter_count: "397B"
   active_parameters: "17B"
@@ -47,7 +47,7 @@ features:
   spec_decoding:
     label: "Qwen3.5 MTP 投机解码"
     description: "W8A8/W4A8 checkpoint 自带 MTP draft,经投机方法消费,3 个投机 token(教程 §5.1/§9.1)。PD 部署中 Prefill 与 Decode 的方法与 token 数必须一致(教程 §5.4)。方法名:当前镜像接受 `mtp`(教程写法 `qwen3_5_mtp` 在 nightly 上有 deprecation warning 并映射为 `mtp`;v0.30.0 release 镜像请用教程拼写)。"
-    args: ["--speculative-config", '{"method": "mtp", "num_speculative_tokens": 3, "enforce_eager": true}']
+    args: ["--speculative-config", '{"method": "qwen3_5_mtp", "num_speculative_tokens": 3, "enforce_eager": true}']   # nightly 用 `mtp` 拼写(有 deprecation 映射;见描述)
   tool_calling:
     label: "Function Calling(教程 §6.1)"
     description: "追加到 `vllm serve` 命令(PD 部署中 Prefill 与 Decode 都加,加完重启): --enable-auto-tool-choice --tool-call-parser qwen3_coder --reasoning-parser qwen3。用携带工具定义的 chat 请求验证;服务进程只解析工具调用,不执行工具(教程 §6.1)。"
@@ -59,12 +59,12 @@ features:
       VLLM_ASCEND_ENABLE_FLASHCOMM1: "1"
   prefix_caching:
     label: "前缀缓存"
-    description: "教程全部部署示例均启用(§5.1/§5.4/§9.1)。混合 KV 缓存管理器将 block size 调大时,短前缀可能不被缓存(教程 §5.1 注)。"
+    description: "教程 A3 单机与 PD 示例启用(§5.1/§5.4);A2 MP 示例关闭(§5.2)。混合 KV 缓存管理器将 block size 调大时,短前缀可能不被缓存(教程 §5.1 注)。"
     args: ["--enable-prefix-caching"]
     flag_when_false: "--no-enable-prefix-caching"
   async_scheduling:
     label: "异步调度"
-    description: "见教程 950DT 单机示例;A3 上为可选(教程 §5.1)。下方 A3 单机场景未启用。"
+    description: "见教程 2026-10 修订版的 950DT 单机示例(在线已移除);A3 上为可选(该旗标见于 §5.4 PD 脚本)。下方 A3 单机场景未启用。"
     args: ["--async-scheduling"]
 
 compatible_strategies:
@@ -78,14 +78,13 @@ performance_model_names:
   - "Qwen3.5-397B-A17B-w4a8"
 
 overview: |-
-  Qwen3.5-397B-A17B 是 Qwen3.5 家族旗舰:397B 参数 MoE,激活 17B,线性注意力(Mamba 式)层
-  与全注意力层混合。教程发布六种部署拓扑:单台 Atlas 800I A3(64 GB x 16)W8A8 TP16 133K
-  上下文;单台 950DT 产品(96 GB x 8)W4A4-MXFP4;两台 Atlas 800I A2(64 GB x 8)MP;单台
-  16-NPU A3 主机 1P1D PD 分离(W4A8 checkpoint,Prefill TP8 占 0-7 号卡,Decode TP4/DP2 占
-  8-15 号卡,MooncakeConnectorV1+标准 Pull proxy);950DT 产品跨机 W4A8C8 PD;A2 PD。
-  精度参考:W8A8 于 vLLM-Ascend v0.30.0,AISBench GPQA 88(§7.1)。全部量化 checkpoint 自带
-  MTP draft,经 qwen3_5_mtp 投机方法以 3 token 服务(§9.1)。
-
+  教程发布三种部署拓扑:单台 Atlas 800I A3(64 GB x 16)W8A8 TP16 133K 上下文(§5.1);两台
+  Atlas 800I A2(64 GB x 8)MP(§5.2);单台 16-NPU A3 主机 1P1D PD 分离(W4A8 checkpoint,
+  §5.4,Prefill TP8 占 0-7 号卡,Decode TP4/DP2 占 8-15 号卡,MooncakeConnectorV1+标准
+  Pull proxy)。教程 2026-10 修订版另载三节:单台 950DT 产品(96 GB x 8)W4A4-MXFP4、950DT
+  产品跨机 W4A8C8 PD、A2 PD——这三节现行在线教程已不含,下方场景按展示性参考逐字保留。
+  精度参考:W8A8 于 vLLM-Ascend v0.30.0,AISBench GPQA 88(§7.1)。教程部署示例所用的量化
+  checkpoint 自带 MTP draft,经 qwen3_5_mtp 投机方法以 3 token 服务(§9.1)。
 weight_download:
   - weight_version: W8A8-MTP
     sources:
@@ -208,8 +207,8 @@ scenarios:
           sysctl -w kernel.numa_balancing=0 2>/dev/null || true
           sysctl kernel.sched_migration_cost_ns=50000 2>/dev/null || true
 
-            # 注(第一方偏差):下方 enable_fused_mc2=1 偏离教程 §9.1(=2)——本栈 TP16 下 MegaMoe 路径
-            # 拒绝 dummy-run token 数;根因待查。
+            # 注(第一方):按 §5.4 PD 取值 enable_fused_mc2=2 时,本栈 TP16 下 MegaMoe 路径拒绝
+            # dummy-run token 数;故保留教程 §5.1 单机取值 1(根因待查)。
           vllm serve your_model_path \
             --host 0.0.0.0 \
             --port 8000 \
@@ -456,17 +455,105 @@ scenarios:
     tags: [a2-single, multi-node-dp]   # 2 节点 MP
     strategy: multi_node_dp
     steps:
-      - title: "两节点 MP 服务(展示性参考)"
+      - title: "拓扑与变量"
         content: |-
-          W8A8 需 2 台 Atlas 800I A2(64 GB x 8),各 TP8,32K 上下文(教程 §5.2)。节点 0 跑
-          主 `vllm serve`:`--data-parallel-size 2 --data-parallel-size-local 1
-          --tensor-parallel-size 8 --api-server-count 2 --data-parallel-rpc-port 13389`;
-          节点 1 加 `--headless --data-parallel-start-rank 1 --data-parallel-address
-          $node0_ip`,环境变量同(`HCCL_IF_IP`/`GLOO_SOCKET_IFNAME`/`HCCL_SOCKET_IFNAME` 绑定
-          服务网卡、`HCCL_BUFFSIZE=1024`),外加 `--additional-config
-          '{"enable_cpu_binding":true, "multistream_overlap_shared_expert": true}'`(教程
-          §5.2)。节点 0 永远不要设 `--data-parallel-start-rank`;`--data-parallel-rpc-port`
-          全节点一致。
+          W8A8 部署于 2 台 Atlas 800I A2(64 GB x 8),各 TP8,32K 上下文(教程 §5.2)。将
+          `nic_name`、`local_ip`(该节点绑定在 `nic_name` 上的服务 IP)替换为真实值;节点 1
+          还需替换 `node0_ip`。
+      - title: "启动节点 0(API 主节点)"
+        content: |-
+          ```shell
+          #!/bin/sh
+
+          # Get these values through ifconfig.
+          # nic_name is the network interface name corresponding to local_ip.
+          nic_name="xxxx"
+          local_ip="xxxx"
+          export IP_ADDRESS="${local_ip}"
+          export NETWORK_CARD_NAME="${nic_name}"
+
+          export VLLM_USE_MODELSCOPE=True
+          export HCCL_BUFFSIZE=1024
+          export HCCL_IF_IP=$local_ip
+          export HCCL_SOCKET_IFNAME=$nic_name
+          export GLOO_SOCKET_IFNAME=$nic_name
+
+          # Ensure the model path matches the directory recorded during download
+          vllm serve your_model_path \
+            --host 0.0.0.0 \
+            --port 8000 \
+            --data-parallel-size 2 \
+            --api-server-count 2 \
+            --data-parallel-size-local 1 \
+            --data-parallel-address $local_ip \
+            --data-parallel-rpc-port 13389 \
+            --seed 1024 \
+            --served-model-name qwen3.5 \
+            --tensor-parallel-size 8 \
+            --enable-expert-parallel \
+            --max-num-seqs 16 \
+            --max-model-len 32768 \
+            --max-num-batched-tokens 4096 \
+            --trust-remote-code \
+            --gpu-memory-utilization 0.90 \
+            --no-enable-prefix-caching \
+            --quantization ascend \
+            --speculative-config '{"method": "qwen3_5_mtp", "num_speculative_tokens": 3}' \
+            --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY"}' \
+            --additional-config '{"enable_cpu_binding":true, "multistream_overlap_shared_expert": true}'
+          ```
+      - title: "启动节点 1(headless 工作节点)"
+        content: |-
+          ```shell
+          #!/bin/sh
+
+          # Get these values through ifconfig.
+          # nic_name is the network interface name corresponding to local_ip.
+          nic_name="xxxx"
+          local_ip="xxxx"
+          export IP_ADDRESS="${local_ip}"
+          export NETWORK_CARD_NAME="${nic_name}"
+
+          export VLLM_USE_MODELSCOPE=True
+          export HCCL_BUFFSIZE=1024
+          export HCCL_IF_IP=$local_ip
+          export HCCL_SOCKET_IFNAME=$nic_name
+          export GLOO_SOCKET_IFNAME=$nic_name
+
+          # The value of node0_ip must be consistent with local_ip on node 0.
+          node0_ip="xxxx"
+
+          # Ensure the model path matches the directory recorded during download
+          vllm serve your_model_path \
+            --host 0.0.0.0 \
+            --port 8000 \
+            --headless \
+            --data-parallel-size 2 \
+            --data-parallel-size-local 1 \
+            --data-parallel-start-rank 1 \
+            --data-parallel-address $node0_ip \
+            --data-parallel-rpc-port 13389 \
+            --seed 1024 \
+            --tensor-parallel-size 8 \
+            --served-model-name qwen3.5 \
+            --max-num-seqs 16 \
+            --max-model-len 32768 \
+            --max-num-batched-tokens 4096 \
+            --enable-expert-parallel \
+            --trust-remote-code \
+            --gpu-memory-utilization 0.90 \
+            --no-enable-prefix-caching \
+            --quantization ascend \
+            --speculative-config '{"method": "qwen3_5_mtp", "num_speculative_tokens": 3}' \
+            --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY"}' \
+            --additional-config '{"enable_cpu_binding":true, "multistream_overlap_shared_expert": true}'
+          ```
+      - title: "注记"
+        content: |-
+          - 节点 0 永远不要设 `--data-parallel-start-rank`;`--data-parallel-rpc-port` 全节点
+            一致。
+          - 若节点 1 无法加入服务或 HCCL 初始化超时,核对各节点网卡名、IP 与 RPC 端口一致性
+            (教程 §5.2)。
 
   - npu: Ascend 950DT
     precision: W4A4
@@ -475,13 +562,52 @@ scenarios:
     tags: [a5-single]
     strategy: single_node
     steps:
-      - title: "950DT 单机服务(展示性参考)"
+      - title: "启动服务(展示性参考)"
         content: |-
-          w4a4-mxfp4 checkpoint 于单台 950DT 产品(96 GB x 8)TP8、133K 上下文服务(教程 §5.1
-          950DT tab)。950DT 脚本与 A3 tab 不同:`--tensor-parallel-size 8`、
-          `--max-num-batched-tokens 8192`、`HCCL_BUFFSIZE=400`、`HCCL_INTRA_ROCE_ENABLE=0`、
-          `VLLM_ASCEND_ENABLE_PREFETCH_MLP=1`,其 speculative-config 无 `enforce_eager`,并加
-          `--distributed-executor-backend mp`。逐字命令见教程 §5.1 950DT tab。
+          ```shell
+          #!/bin/sh
+
+          # Load model from ModelScope to speed up download.
+          export VLLM_USE_MODELSCOPE=True
+          export HCCL_BUFFSIZE=400
+          export HCCL_INTRA_ROCE_ENABLE=0
+          export HCCL_OP_EXPANSION_MODE="AIV"
+          export VLLM_ASCEND_ENABLE_PREFETCH_MLP=1
+          export VLLM_USE_V2_MODEL_RUNNER=0
+
+          # Ensure the model path matches the directory recorded during download
+          MODEL_PATH="your_model_path"   # e.g. Eco-Tech/Qwen3.5-397B-A17B-w4a4-mxfp4 (ModelScope)
+          vllm serve "${MODEL_PATH}" \
+            --host 0.0.0.0 \
+            --port 8000 \
+            --distributed-executor-backend mp \
+            --data-parallel-size 1 \
+            --tensor-parallel-size 8 \
+            --enable-expert-parallel \
+            --seed 1024 \
+            --quantization ascend \
+            --served-model-name qwen3.5 \
+            --max-num-seqs 128 \
+            --max-model-len 133000 \
+            --max-num-batched-tokens 8192 \
+            --trust-remote-code \
+            --enable-prefix-caching \
+            --gpu-memory-utilization 0.90 \
+            --async-scheduling \
+            --speculative-config '{"method": "qwen3_5_mtp", "num_speculative_tokens": 3}' \
+            --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY"}' \
+            --additional-config '{"enable_cpu_binding": true, "enable_fused_mc2": 1, "enable_flashcomm1": true}'
+          ```
+      - title: "来源与注记"
+        content: |-
+          - 展示性参考;无第一方 950DT 实测(见 PR 说明)。现行在线教程已不含 950DT 部署章节;
+            本脚本逐字保留自教程 2026-10 修订版(§5.1 "950DT Products" 页签)。
+          - 该修订版在此脚本中固定为 Model Runner V1(`VLLM_USE_V2_MODEL_RUNNER=0`)。在仅含
+            V2 的镜像上(如现行 `nightly-main-a3`)需删除该行。
+          - W4A4-MXFP4 与 A3 页签差异:`--tensor-parallel-size 8`、
+            `--max-num-batched-tokens 8192`、`HCCL_BUFFSIZE=400`、`HCCL_INTRA_ROCE_ENABLE=0`、
+            `VLLM_ASCEND_ENABLE_PREFETCH_MLP=1`、`--async-scheduling`,speculative-config 无
+            `enforce_eager`,并加 `--distributed-executor-backend mp`。
 
   - npu: Ascend 950DT
     precision: W4A8C8
@@ -490,12 +616,235 @@ scenarios:
     tags: [a5-single, pd-multinode]
     strategy: pd_cluster
     steps:
-      - title: "950DT PD 部署(展示性参考)"
+      - title: "拓扑"
         content: |-
-          w4a8c8-mxfp checkpoint 于 950DT 产品跨机 PD(教程 §5.5):Prefill 节点 TP8/DP1、
-          Decode 节点每节点 TP4/DP2,`--kv-cache-dtype mxfp8` 与 Mooncake 工作流;逐节点脚本、
-          C8 精度与兼容性要求(§5.5.4)与 proxy 验证见教程 §5.5。该档位官方验证证据需维护者
-          提供 950DT 运行通道。
+          性能导向的 1P1D:两台 8-NPU 950DT 主机,W4A8C8-MXFP checkpoint,
+          `--kv-cache-dtype mxfp8`,经 `MooncakeConnectorV2` + 标准 Pull proxy(教程 2026-10
+          修订版 §5.5;该节现行在线教程已不含——见末步来源注记)。Prefill eager;Decode 用
+          `FULL_DECODE_ONLY` + NPU graph 扩展 + recompute 调度器。
+      - title: "Prefill 节点(run_p.sh,端口 30060,Mooncake 55220)"
+        content: |-
+          ```shell
+          #!/usr/bin/env bash
+          set -euo pipefail
+
+          unset ftp_proxy
+          unset https_proxy
+          unset http_proxy
+
+          nic_name="<P_HIGH_SPEED_SERVICE_NIC>"
+          local_ip="<P_HIGH_SPEED_SERVICE_IP>"
+          MODEL_PATH="<LOCAL_W4A8C8_MODEL_PATH>"
+
+          export VLLM_EXECUTE_MODEL_TIMEOUT_SECONDS=30000
+
+          export IP_ADDRESS="${local_ip}"
+          export NETWORK_CARD_NAME="${nic_name}"
+          export HCCL_IF_IP="${local_ip}"
+          export GLOO_SOCKET_IFNAME="${nic_name}"
+          export HCCL_SOCKET_IFNAME="${nic_name}"
+
+          export HCCL_BUFFSIZE=1024
+          export HCCL_OP_EXPANSION_MODE=AIV
+          export VLLM_USE_V2_MODEL_RUNNER=0
+          export VLLM_USE_FASTOKENS=1
+          export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
+          export LD_LIBRARY_PATH="/usr/local/Ascend/ascend-toolkit/latest/python/site-packages/mooncake:${LD_LIBRARY_PATH:-}"
+
+          vllm serve "${MODEL_PATH}" \
+            --host "${local_ip}" \
+            --port 30060 \
+            --data-parallel-size 1 \
+            --data-parallel-size-local 1 \
+            --tensor-parallel-size 8 \
+            --enable-expert-parallel \
+            --seed 1024 \
+            --served-model-name qwen3.5 \
+            --max-model-len 133120 \
+            --max-num-batched-tokens 20480 \
+            --max-num-seqs 64 \
+            --enforce-eager \
+            --trust-remote-code \
+            --allowed-local-media-path / \
+            --gpu-memory-utilization 0.90 \
+            --quantization ascend \
+            --kv-cache-dtype mxfp8 \
+            --enable-prefix-caching \
+            --async-scheduling \
+            --mm-processor-cache-gb 0 \
+            --mm-encoder-tp-mode data \
+            --distributed-executor-backend mp \
+            --no-disable-hybrid-kv-cache-manager \
+            --speculative-config '{"method":"qwen3_5_mtp","num_speculative_tokens":3,"enforce_eager":true}' \
+            --additional-config '{
+              "enable_flashcomm1": true,
+              "ascend_compilation_config": {
+                "enable_npugraph_ex": false,
+                "enable_static_kernel": false
+              },
+              "weight_nz_mode": 1,
+              "enable_cpu_binding": true,
+              "enable_fused_mc2": 0,
+              "enable_prefill_mc2": false,
+              "enable_shared_expert_dp": true,
+              "multistream_overlap_shared_expert": false,
+              "scheduler_config": {
+                "recompute_scheduler_enable": false
+              }
+            }' \
+            --kv-transfer-config '{
+              "kv_connector": "MooncakeConnectorV2",
+              "kv_buffer_device": "npu",
+              "kv_role": "kv_producer",
+              "kv_port": "55220",
+              "engine_id": "0",
+              "kv_connector_extra_config": {
+                "ascend_local_comm_res_path": "/etc/hixlep",
+                "prefill": {
+                  "dp_size": 1,
+                  "tp_size": 8
+                },
+                "decode": {
+                  "dp_size": 2,
+                  "tp_size": 4
+                }
+              }
+            }'
+          ```
+      - title: "Decode 节点(run_d.sh,端口 30050,DP RPC 6884,Mooncake 56010)"
+        content: |-
+          单个启动器拉起两个本地 DP 引擎,各 TP4——不要启动两份。
+
+          ```shell
+          #!/usr/bin/env bash
+          set -euo pipefail
+
+          unset ftp_proxy
+          unset https_proxy
+          unset http_proxy
+
+          nic_name="<D_HIGH_SPEED_SERVICE_NIC>"
+          local_ip="<D_HIGH_SPEED_SERVICE_IP>"
+          MODEL_PATH="<LOCAL_W4A8C8_MODEL_PATH>"
+
+          export VLLM_EXECUTE_MODEL_TIMEOUT_SECONDS=30000
+
+          export IP_ADDRESS="${local_ip}"
+          export NETWORK_CARD_NAME="${nic_name}"
+          export HCCL_IF_IP="${local_ip}"
+          export GLOO_SOCKET_IFNAME="${nic_name}"
+          export HCCL_SOCKET_IFNAME="${nic_name}"
+
+          export HCCL_BUFFSIZE=1024
+          export HCCL_OP_EXPANSION_MODE=AIV
+          export VLLM_USE_V2_MODEL_RUNNER=0
+          export VLLM_USE_FASTOKENS=1
+          export VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS=0
+          export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
+          export LD_LIBRARY_PATH="/usr/local/Ascend/ascend-toolkit/latest/python/site-packages/mooncake:${LD_LIBRARY_PATH:-}"
+
+          vllm serve "${MODEL_PATH}" \
+            --host "${local_ip}" \
+            --port 30050 \
+            --data-parallel-size 2 \
+            --data-parallel-size-local 2 \
+            --data-parallel-address "${local_ip}" \
+            --data-parallel-rpc-port 6884 \
+            --api-server-count 1 \
+            --tensor-parallel-size 4 \
+            --enable-expert-parallel \
+            --seed 1024 \
+            --served-model-name qwen3.5 \
+            --max-model-len 133120 \
+            --max-num-batched-tokens 300 \
+            --max-num-seqs 100 \
+            --trust-remote-code \
+            --allowed-local-media-path / \
+            --gpu-memory-utilization 0.90 \
+            --quantization ascend \
+            --kv-cache-dtype mxfp8 \
+            --enable-prefix-caching \
+            --async-scheduling \
+            --mm-processor-cache-gb 0 \
+            --mm-encoder-tp-mode data \
+            --distributed-executor-backend mp \
+            --no-disable-hybrid-kv-cache-manager \
+            --speculative-config '{"method":"qwen3_5_mtp","num_speculative_tokens":3,"enforce_eager":true}' \
+            --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY"}' \
+            --additional-config '{
+              "enable_flashcomm1": true,
+              "ascend_compilation_config": {
+                "enable_npugraph_ex": true,
+                "enable_static_kernel": false
+              },
+              "weight_nz_mode": 1,
+              "enable_cpu_binding": true,
+              "enable_fused_mc2": 0,
+              "enable_prefill_mc2": false,
+              "enable_shared_expert_dp": true,
+              "multistream_overlap_shared_expert": false,
+              "scheduler_config": {
+                "recompute_scheduler_enable": true
+              }
+            }' \
+            --kv-transfer-config '{
+              "kv_connector": "MooncakeConnectorV2",
+              "kv_buffer_device": "npu",
+              "kv_role": "kv_consumer",
+              "kv_port": "56010",
+              "engine_id": "2",
+              "kv_connector_extra_config": {
+                "ascend_local_comm_res_path": "/etc/hixlep",
+                "prefill": {
+                  "dp_size": 1,
+                  "tp_size": 8
+                },
+                "decode": {
+                  "dp_size": 2,
+                  "tp_size": 4
+                }
+              }
+            }'
+          ```
+      - title: "代理(Prefill 主机)"
+        content: |-
+          两端服务就绪后启动标准 Pull proxy;Decode 后端是 HTTP 端口 30050,不是 DP RPC 端口
+          6884。在含 `load_balance_proxy_server_example.py` 的目录运行(即对应 vLLM-Ascend
+          修订版的 `examples/disaggregated_prefill_v1/`);客户端请求发往
+          `http://<P_HIGH_SPEED_SERVICE_IP>:8000`。
+
+          ```shell
+          unset ftp_proxy
+          unset https_proxy
+          unset http_proxy
+
+          PREFILL_HOST="<P_HIGH_SPEED_SERVICE_IP>"
+          DECODE_HOST="<D_HIGH_SPEED_SERVICE_IP>"
+
+          python3 load_balance_proxy_server_example.py \
+            --prefiller-hosts "${PREFILL_HOST}" \
+            --prefiller-ports 30060 \
+            --decoder-hosts "${DECODE_HOST}" \
+            --decoder-ports 30050 \
+            --host "${PREFILL_HOST}" \
+            --port 8000
+          ```
+      - title: "C8 精度与兼容性要求(来源)"
+        content: |-
+          - C8 KV cache 是本性能方案的一部分:P/D 两侧保持相同的兼容 W4A8C8 checkpoint 修订、
+            tokenizer、chat template、量化元数据与 `--kv-cache-dtype mxfp8`;两侧 MTP 设置
+            一致。
+          - 本 case 目标构建=含 MXFP8 KV-scale 修复 #19017 的 v0.30.0 MRv1 构建(已合入
+            `releases/v0.30.0` 为 `14c6c3f43`)或等价已验证修复——使用前核实镜像已包含。这也
+            是上述脚本固定为 Model Runner V1(`VLLM_USE_V2_MODEL_RUNNER=0`)的原因;连接器拓扑必须
+            保持 P DP1/TP8、D DP2/TP4。在仅含 V2 的镜像上,去掉该固定即偏离存档 §5.5.4 要求——
+            使用前自行确认镜像含等效修复。
+          - 两台主机各自挂载自己的 HIXL 通信资源到 `/etc/hixlep`;不得复用他机 endpoint 资源。
+          - 使用 `MooncakeConnectorV2` + 标准 Pull proxy;两侧启用 prefix caching 与 async
+            scheduling;`enable_fused_mc2=0` / `enable_prefill_mc2=false` 复现本用例;
+            `enable_shared_expert_dp` 与 `enable_flashcomm1` 需要专家并行及匹配的 CANN/软件栈。
+          - 展示性参考;无第一方 950DT 实测(见 PR 说明)。逐字保留自教程 2026-10 修订版
+            (§5.5),现行在线教程已不含该节。
 
   - npu: Atlas 800I A2
     precision: W8A8
@@ -504,11 +853,169 @@ scenarios:
     tags: [a2-single, pd-multinode]
     strategy: pd_cluster
     steps:
-      - title: "A2 PD 部署(展示性参考)"
+      - title: "拓扑与启动参数"
         content: |-
-          Atlas 800I A2 上的 PD(教程 §5.6):W4A8 checkpoint,Prefill TP8/DP1 与 Decode
-          TP8/DP1 分别位于不同 A2 节点,MooncakeConnectorV1 与标准 Pull proxy;逐节点脚本见
-          教程 §5.6。
+          1P1D 于 2 台 Atlas 800I A2(64 GB x 8),W4A8 checkpoint,`MooncakeConnectorV1` +
+          标准 Pull proxy(教程 2026-10 修订版 §5.6;该节现行在线教程已不含——见末步来源
+          注记)。启动脚本取七个位置参数:可见卡号、HTTP 端口、全局 DP 并行度、DP rank、
+          DP 主节点地址、DP RPC 端口、TP 并行度。Prefill 只读第 1-3 与第 7 位;Decode 全用
+          (其第 5 位为 Decode 主机服务 IP)。两侧用 DP1/TP8 以匹配固定 KV 拓扑。
+
+          ```shell
+          # On P:
+          bash run_p.sh 0,1,2,3,4,5,6,7 30060 1 0 "<P_SERVICE_IP>" 6884 8
+          # On D:
+          bash run_d.sh 0,1,2,3,4,5,6,7 30050 1 0 "<D_SERVICE_IP>" 6884 8
+          ```
+      - title: "Prefill 节点脚本(run_p.sh)"
+        content: |-
+          ```shell
+          #!/usr/bin/env bash
+          set -euo pipefail
+
+          unset ftp_proxy
+          unset https_proxy
+          unset http_proxy
+
+          export VLLM_EXECUTE_MODEL_TIMEOUT_SECONDS=30000
+
+          # Get these values through ifconfig.
+          # nic_name is the network interface name corresponding to local_ip.
+          nic_name="<NETWORK_INTERFACE>"
+          local_ip="<PREFILL_NODE_IP>"
+          export IP_ADDRESS="${local_ip}"
+          export NETWORK_CARD_NAME="${nic_name}"
+
+          export HCCL_IF_IP="${local_ip}"
+          export GLOO_SOCKET_IFNAME="${nic_name}"
+          export HCCL_SOCKET_IFNAME="${nic_name}"
+
+          export HCCL_BUFFSIZE=1024
+          export HCCL_OP_EXPANSION_MODE=AIV
+          export VLLM_USE_V2_MODEL_RUNNER=0
+          export VLLM_USE_FASTOKENS=1
+          export ASCEND_RT_VISIBLE_DEVICES="$1"
+          export LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libjemalloc.so.2
+
+          vllm serve your_model_path \
+            --host "${local_ip}" \
+            --port "$2" \
+            --data-parallel-size "$3" \
+            --data-parallel-size-local 1 \
+            --tensor-parallel-size "$7" \
+            --enable-expert-parallel \
+            --seed 1024 \
+            --served-model-name qwen3.5 \
+            --max-model-len 133120 \
+            --max-num-batched-tokens 16384 \
+            --max-num-seqs 64 \
+            --enforce-eager \
+            --trust-remote-code \
+            --allowed-local-media-path / \
+            --gpu-memory-utilization 0.90 \
+            --quantization ascend \
+            --enable-prefix-caching \
+            --async-scheduling \
+            --mm-processor-cache-gb 0 \
+            --mm-encoder-tp-mode data \
+            --distributed-executor-backend mp \
+            --no-disable-hybrid-kv-cache-manager \
+            --speculative-config '{"method":"qwen3_5_mtp","num_speculative_tokens":3}' \
+            --additional-config '{"enable_flashcomm1":true,"ascend_compilation_config":{"enable_npugraph_ex":false,"enable_static_kernel":false}, "weight_nz_mode":1, "enable_shared_expert_dp":true,"scheduler_config":{"recompute_scheduler_enable":false}}' \
+            --kv-transfer-config '{"kv_connector":"MooncakeConnectorV1","kv_buffer_device":"npu","kv_role":"kv_producer","kv_port":"55220","engine_id":"0","kv_connector_extra_config":{"prefill":{"dp_size":1,"tp_size":8},"decode":{"dp_size":1,"tp_size":8}}}'
+          ```
+      - title: "Decode 节点脚本(run_d.sh)"
+        content: |-
+          ```shell
+          #!/usr/bin/env bash
+          set -euo pipefail
+          unset ftp_proxy
+          unset https_proxy
+          unset http_proxy
+
+          export VLLM_EXECUTE_MODEL_TIMEOUT_SECONDS=30000
+
+          # Get these values through ifconfig.
+          # nic_name is the network interface name corresponding to local_ip.
+          nic_name="<NETWORK_INTERFACE>"
+          local_ip="<DECODE_NODE_IP>"
+          export IP_ADDRESS="${local_ip}"
+          export NETWORK_CARD_NAME="${nic_name}"
+
+          export HCCL_IF_IP="${local_ip}"
+          export GLOO_SOCKET_IFNAME="${nic_name}"
+          export HCCL_SOCKET_IFNAME="${nic_name}"
+
+          export HCCL_BUFFSIZE=1024
+          export HCCL_OP_EXPANSION_MODE=AIV
+
+          export VLLM_USE_V2_MODEL_RUNNER=0
+          export VLLM_USE_FASTOKENS=1
+          export VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS=0
+          export ASCEND_RT_VISIBLE_DEVICES="$1"
+          export LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libjemalloc.so.2
+
+          vllm serve your_model_path \
+            --host "${local_ip}" \
+            --port "$2" \
+            --data-parallel-size "$3" \
+            --data-parallel-size-local 1 \
+            --data-parallel-rank "$4" \
+            --data-parallel-address "$5" \
+            --data-parallel-rpc-port "$6" \
+            --tensor-parallel-size "$7" \
+            --enable-expert-parallel \
+            --seed 1024 \
+            --served-model-name qwen3.5 \
+            --max-model-len 133120 \
+            --max-num-batched-tokens 300 \
+            --max-num-seqs 200 \
+            --trust-remote-code \
+            --allowed-local-media-path / \
+            --gpu-memory-utilization 0.90 \
+            --quantization ascend \
+            --enable-prefix-caching \
+            --async-scheduling \
+            --mm-processor-cache-gb 0 \
+            --mm-encoder-tp-mode data \
+            --distributed-executor-backend mp \
+            --no-disable-hybrid-kv-cache-manager \
+            --speculative-config '{"method":"qwen3_5_mtp","num_speculative_tokens":3}' \
+            --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY"}' \
+            --additional-config '{"ascend_compilation_config":{"enable_npugraph_ex":true,"enable_static_kernel":false}, "weight_nz_mode":1, "enable_shared_expert_dp":false, "scheduler_config":{"recompute_scheduler_enable":true}}' \
+            --kv-transfer-config '{"kv_connector":"MooncakeConnectorV1","kv_buffer_device":"npu","kv_role":"kv_consumer","kv_port":"56010","engine_id":"2","kv_connector_extra_config":{"prefill":{"dp_size":1,"tp_size":8},"decode":{"dp_size":1,"tp_size":8}}}'
+          ```
+      - title: "代理(Prefill 主节点)"
+        content: |-
+          两端服务就绪后启动标准 Pull proxy;使用位置参数 2 传入的 HTTP 端口(Decode 后端是
+          HTTP 端口 30050,不是 DP RPC 端口 6884)。在含 `load_balance_proxy_server_example.py`
+          的目录运行;客户端请求发往 `http://<PREFILL_NODE_IP>:8000`。
+
+          ```shell
+          unset ftp_proxy
+          unset https_proxy
+          unset http_proxy
+
+          PREFILL_HOST="<PREFILL_NODE_IP>"
+          DECODE_HOST="<DECODE_NODE_IP>"
+
+          python3 load_balance_proxy_server_example.py \
+            --prefiller-hosts "${PREFILL_HOST}" \
+            --prefiller-ports 30060 \
+            --decoder-hosts "${DECODE_HOST}" \
+            --decoder-ports 30050 \
+            --host "${PREFILL_HOST}" \
+            --port 8000
+          ```
+      - title: "来源与注记"
+        content: |-
+          - 展示性参考;无第一方 A2 PD 实测(见 PR 说明)。逐字保留自教程 2026-10 修订版
+            (§5.6),现行在线教程已不含该节。
+          - 该修订版在两侧节点固定为 Model Runner V1(`VLLM_USE_V2_MODEL_RUNNER=0`)。在仅含 V2
+            的镜像上,两侧都需删除该行。
+          - 若 Decode 节点初始化失败,核对 `--tensor-parallel-size` 为 8、
+            `--data-parallel-size-local` 与全局 Decode DP 并行度一致、
+            `kv_connector_extra_config.decode.dp_size` 与全局 Decode DP 并行度一致。
 
 evaluation:
   accuracy:
@@ -565,7 +1072,7 @@ performance:
     8 req/s,单次运行):A3 单机 W8A8 TP16——64/64 成功,输出吞吐 1537.83 tok/s,平均 TPOT
     26.94 ms;A3 PD 1P1D(单机)经代理——64/64 成功,1525.76 tok/s,平均 TPOT 25.49 ms;
     2 主机跨机 PD——64/64 成功,1191.91 tok/s,平均 TPOT 23.20 ms。功能级单次运行,非性能
-    结论。日志中峰值吞吐低于均值为该压测构建的采样窗口假象(根因待查),如实记录。
+    结论。日志中峰值与均值的吞吐差为该压测构建的采样窗口假象(根因待查),如实记录。
 
     第一方精度(2026-10-29/30):AISBench GPQA diamond 87.88(教程参考值 88;本次与参考设置
     存在三处差异——W4A8 checkpoint、nightly v0.32.0、2 主机 PD 路径)。lm_eval gsm8k 经
@@ -591,8 +1098,8 @@ tuning: |-
   (PD Prefill 用 eager);`enable_fused_mc2`(`1` dispatch-FFN-combine,`2` CANN MegaMoe——
   A3 PD 性能用例为 `2`);MoE 序列并行经 `enable_flashcomm1=true`;共享专家 DP 经
   `enable_shared_expert_dp=true`;共享专家 overlap 经 `multistream_overlap_shared_expert=true`
-  (MP 示例);重算调度器用于 PD Decode(嵌套于 `scheduler_config`);CPU binding 用于
-  单机/MP/PD 脚本。
+  (MP 示例);重算调度器用于 PD Decode(嵌套于 `scheduler_config`);CPU binding 用于单机/MP/A3 PD/950DT PD 脚本(A2 PD
+  脚本无)。
 
 faq: |-
   常见环境、安装与通用参数问题参见[公共 FAQs](https://docs.vllm.ai/projects/ascend/en/latest/faqs.html)(教程 §10)。
@@ -632,8 +1139,9 @@ faq: |-
     (教程 FAQ Q6)
 
     答:检查两节点使用相同 C8 checkpoint revision 与 `--kv-cache-dtype mxfp8`,拓扑与
-    connector 设置符合 §5.5、约束符合 §5.5.4;检查 checkpoint 加载与 KV 传输日志。修正
-    环境或配置后重启两服务,先用短请求验证再跑完整精度评测。早期预发布版 K/V scale
+    connector 设置符合 §5.5、约束符合 §5.5.4(2026-10 修订版,在线已移除);检查
+    checkpoint 加载与 KV 传输日志。修正环境或配置后重启两服务,先用短请求验证再
+    跑完整精度评测。早期预发布版 K/V scale
     问题已由 [#19017](https://github.com/vllm-project/vllm-ascend/pull/19017) 修复,
     含于 v0.30.0。
 

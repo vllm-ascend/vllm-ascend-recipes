@@ -11,11 +11,11 @@ meta:
   performance_headline: "Single-node Atlas 800I A3 (64G x 16) W8A8 TP16 133K serving with qwen3_5_mtp; 1P1D PD disaggregation on one 16-NPU A3 host (W4A8)"
   hardware:
     atlas_800_a3: verified   # tutorial §5.1/§5.4 publish official deployment on 1x A3 (64G x 16); first-party serving re-runs completed 2026-10-29/30: one Atlas 800T A3 host (8 cards x 2 die = 16 devices, 64G HBM per card, TP16) — single-node, single-host PD, and cross-host PD all verified; see PR description
-    atlas_800_a2: experimental   # tutorial §5.2/§5.6 publish A2 deployment; no first-party A2 run — expect A2-leg skips (see PR description)
-    ascend_950dt: experimental   # tutorial §5.1/§5.5 publish 950DT deployment; no 950DT resource available (see PR description). Note: tutorial §5.5 requires a v0.30.0 MRv1 build containing #19017 for the W4A8C8 path — verify the image carries it before use
+    atlas_800_a2: experimental   # tutorial §5.2 publishes A2 MP deployment (§5.6 A2 PD exists only in the 2026-10 revision, since removed from the online tutorial); no first-party A2 run — expect A2-leg skips (see PR description)
+    ascend_950dt: experimental   # no 950DT resource (see PR description). 950DT scenarios preserved verbatim from the 2026-10 revision (§5.1 950DT tab / §5.5, since removed from the online tutorial); §5.5 requires a v0.30.0 MRv1 build containing #19017 for the W4A8C8 path — verify the image carries it before use
 
 model:
-  min_vllm_version: "v0.17.0rc1"   # tutorial §1 support floor (950DT tiers from v0.23.0rc1; 950DT W4A8C8 additionally needs the #19017 fix in a v0.30.0 MRv1 build)
+  min_vllm_version: "v0.17.0rc1"   # tutorial §1 support floor (950DT tiers from v0.23.0rc1; 950DT W4A8C8 also needs the #19017 fix in a v0.30.0 MRv1 build)
   model_id: "Eco-Tech/Qwen3.5-397B-A17B-w8a8-mtp"   # real download org (ModelScope), matching Qwen3-VL/DeepSeek-V2-Lite precedent
   architecture: moe
   parameter_count: "397B"
@@ -60,12 +60,12 @@ features:
       VLLM_ASCEND_ENABLE_FLASHCOMM1: "1"
   prefix_caching:
     label: "Prefix Caching"
-    description: "Enabled in all tutorial deployment examples (§5.1/§5.4/§9.1). Short prefixes may not be cached when the hybrid KV cache manager adjusts the block size to a large value (tutorial §5.1 note)."
+    description: "Enabled in the tutorial A3 single-node and PD examples (§5.1/§5.4); the A2 MP example disables it (§5.2). Short prefixes may not be cached when the hybrid KV cache manager adjusts the block size to a large value (tutorial §5.1 note)."
     args: ["--enable-prefix-caching"]
     flag_when_false: "--no-enable-prefix-caching"
   async_scheduling:
     label: "Asynchronous Scheduling"
-    description: "Present in the tutorial 950DT single-node example; optional on A3 (tutorial §5.1). Not enabled in the A3 single-node scenario below."
+    description: "Present in the 950DT single-node example of the 2026-10 revision (since removed from the online tutorial); optional on A3 (the flag appears in the §5.4 PD scripts). Not enabled in the A3 single-node scenario below."
     args: ["--async-scheduling"]
 
 compatible_strategies:
@@ -79,17 +79,17 @@ performance_model_names:
   - "Qwen3.5-397B-A17B-w4a8"
 
 overview: |-
-  Qwen3.5-397B-A17B is the flagship of the Qwen3.5 family: a 397B-parameter MoE with 17B
-  activated parameters that mixes linear-attention (Mamba-style) layers with full attention.
-  The tutorial publishes deployment for six topologies: single-node W8A8 on one Atlas 800I A3
-  (64 GB x 16) with TP16 and a 133K context; single-node W4A4-MXFP4 on one 950DT product
-  (96 GB x 8); two-node MP on Atlas 800I A2 (64 GB x 8 each); 1P1D PD disaggregation on a
-  single 16-NPU A3 host with the W4A8 checkpoint (Prefill TP8 on devices 0-7, Decode TP4/DP2
-  on devices 8-15, MooncakeConnectorV1 with the standard Pull proxy); W4A8C8 PD across 950DT
-  products; and PD on A2. Reference accuracy for W8A8 on vLLM-Ascend v0.30.0: AISBench GPQA 88
-  (§7.1). All quantized checkpoints ship an MTP draft served through the qwen3_5_mtp
-  speculative method with 3 tokens (§9.1).
-
+  The tutorial publishes three deployment topologies: single-node W8A8 on one Atlas 800I A3
+  (64 GB x 16) with TP16 and a 133K context (§5.1); two-node MP on Atlas 800I A2 (64 GB x 8
+  each) (§5.2); and 1P1D PD disaggregation on a single 16-NPU A3 host with the W4A8 checkpoint
+  (§5.4, Prefill TP8 on devices 0-7, Decode TP4/DP2 on devices 8-15, MooncakeConnectorV1 with
+  the standard Pull proxy). The 2026-10 revision of the tutorial also documented
+  single-node W4A4-MXFP4 on one 950DT product (96 GB x 8), W4A8C8 PD across 950DT products,
+  and PD on A2; those sections are not present in the current online tutorial, and the
+  scenarios below preserve them verbatim as display-only references. Reference accuracy for
+  W8A8 on vLLM-Ascend v0.30.0: AISBench GPQA 88 (§7.1). The quantized checkpoints used in the
+  tutorial deployment examples ship an MTP draft served through the qwen3_5_mtp speculative
+  method with 3 tokens (§9.1).
 weight_download:
   - weight_version: W8A8-MTP
     sources:
@@ -217,8 +217,9 @@ scenarios:
           sysctl -w kernel.numa_balancing=0 2>/dev/null || true
           sysctl kernel.sched_migration_cost_ns=50000 2>/dev/null || true
 
-            # NOTE (first-party deviation): enable_fused_mc2=1 below deviates from tutorial §9.1 (=2) —
-            # the MegaMoe path rejected the dummy-run token count at TP16 on this stack; root cause pending.
+            # NOTE (first-party): with the §5.4 PD value enable_fused_mc2=2, the MegaMoe path
+            # rejected the dummy-run token count at TP16 on this stack; the tutorial §5.1
+            # single-node value 1 is kept (root cause pending).
           vllm serve your_model_path \
             --host 0.0.0.0 \
             --port 8000 \
@@ -475,18 +476,105 @@ scenarios:
     tags: [a2-single, multi-node-dp]   # 2-node MP
     strategy: multi_node_dp
     steps:
-      - title: "Two-node MP serving (display-only reference)"
+      - title: "Topology and variables"
         content: |-
-          W8A8 requires 2 Atlas 800I A2 (64 GB x 8) nodes with TP8 each and a 32K context
-          (tutorial §5.2). Node 0 runs the master `vllm serve` with
-          `--data-parallel-size 2 --data-parallel-size-local 1 --tensor-parallel-size 8
-          --api-server-count 2 --data-parallel-rpc-port 13389`; node 1 adds `--headless
-          --data-parallel-start-rank 1 --data-parallel-address $node0_ip` with the same env
-          set (`HCCL_IF_IP`/`GLOO_SOCKET_IFNAME`/`HCCL_SOCKET_IFNAME` bound to the service
-          NIC, `HCCL_BUFFSIZE=1024`) plus
-          `--additional-config '{"enable_cpu_binding":true, "multistream_overlap_shared_expert": true}'`
-          (tutorial §5.2). `--data-parallel-start-rank` must never be set on node 0, and the
-          `--data-parallel-rpc-port` must match on all nodes.
+          W8A8 deploys on 2 Atlas 800I A2 (64 GB x 8) nodes with TP8 each and a 32K context
+          (tutorial §5.2). Replace `nic_name`, `local_ip` — the service IP assigned to
+          `nic_name` on that node — and, on node 1 only, `node0_ip` with real values.
+      - title: "Start node 0 (API master)"
+        content: |-
+          ```shell
+          #!/bin/sh
+
+          # Get these values through ifconfig.
+          # nic_name is the network interface name corresponding to local_ip.
+          nic_name="xxxx"
+          local_ip="xxxx"
+          export IP_ADDRESS="${local_ip}"
+          export NETWORK_CARD_NAME="${nic_name}"
+
+          export VLLM_USE_MODELSCOPE=True
+          export HCCL_BUFFSIZE=1024
+          export HCCL_IF_IP=$local_ip
+          export HCCL_SOCKET_IFNAME=$nic_name
+          export GLOO_SOCKET_IFNAME=$nic_name
+
+          # Ensure the model path matches the directory recorded during download
+          vllm serve your_model_path \
+            --host 0.0.0.0 \
+            --port 8000 \
+            --data-parallel-size 2 \
+            --api-server-count 2 \
+            --data-parallel-size-local 1 \
+            --data-parallel-address $local_ip \
+            --data-parallel-rpc-port 13389 \
+            --seed 1024 \
+            --served-model-name qwen3.5 \
+            --tensor-parallel-size 8 \
+            --enable-expert-parallel \
+            --max-num-seqs 16 \
+            --max-model-len 32768 \
+            --max-num-batched-tokens 4096 \
+            --trust-remote-code \
+            --gpu-memory-utilization 0.90 \
+            --no-enable-prefix-caching \
+            --quantization ascend \
+            --speculative-config '{"method": "qwen3_5_mtp", "num_speculative_tokens": 3}' \
+            --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY"}' \
+            --additional-config '{"enable_cpu_binding":true, "multistream_overlap_shared_expert": true}'
+          ```
+      - title: "Start node 1 (headless worker)"
+        content: |-
+          ```shell
+          #!/bin/sh
+
+          # Get these values through ifconfig.
+          # nic_name is the network interface name corresponding to local_ip.
+          nic_name="xxxx"
+          local_ip="xxxx"
+          export IP_ADDRESS="${local_ip}"
+          export NETWORK_CARD_NAME="${nic_name}"
+
+          export VLLM_USE_MODELSCOPE=True
+          export HCCL_BUFFSIZE=1024
+          export HCCL_IF_IP=$local_ip
+          export HCCL_SOCKET_IFNAME=$nic_name
+          export GLOO_SOCKET_IFNAME=$nic_name
+
+          # The value of node0_ip must be consistent with local_ip on node 0.
+          node0_ip="xxxx"
+
+          # Ensure the model path matches the directory recorded during download
+          vllm serve your_model_path \
+            --host 0.0.0.0 \
+            --port 8000 \
+            --headless \
+            --data-parallel-size 2 \
+            --data-parallel-size-local 1 \
+            --data-parallel-start-rank 1 \
+            --data-parallel-address $node0_ip \
+            --data-parallel-rpc-port 13389 \
+            --seed 1024 \
+            --tensor-parallel-size 8 \
+            --served-model-name qwen3.5 \
+            --max-num-seqs 16 \
+            --max-model-len 32768 \
+            --max-num-batched-tokens 4096 \
+            --enable-expert-parallel \
+            --trust-remote-code \
+            --gpu-memory-utilization 0.90 \
+            --no-enable-prefix-caching \
+            --quantization ascend \
+            --speculative-config '{"method": "qwen3_5_mtp", "num_speculative_tokens": 3}' \
+            --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY"}' \
+            --additional-config '{"enable_cpu_binding":true, "multistream_overlap_shared_expert": true}'
+          ```
+      - title: "Notes"
+        content: |-
+          - Node 0 must never set `--data-parallel-start-rank`; `--data-parallel-rpc-port`
+            must match on all nodes.
+          - If node 1 cannot join the service or HCCL initialization times out, verify the
+            NIC names, IP addresses and RPC port consistency across nodes (tutorial §5.2).
 
   - npu: Ascend 950DT
     precision: W4A4
@@ -495,15 +583,55 @@ scenarios:
     tags: [a5-single]
     strategy: single_node
     steps:
-      - title: "950DT single-node serving (display-only reference)"
+      - title: "Start the server (display-only reference)"
         content: |-
-          The w4a4-mxfp4 checkpoint serves on one 950DT product (96 GB x 8) with TP8 and a
-          133K context (tutorial §5.1 950DT tab). The 950DT script differs from the A3 tab:
-          `--tensor-parallel-size 8`, `--max-num-batched-tokens 8192`, `HCCL_BUFFSIZE=400`,
-          `HCCL_INTRA_ROCE_ENABLE=0`, `VLLM_ASCEND_ENABLE_PREFETCH_MLP=1`, and its
-          speculative-config carries no `enforce_eager`; it also adds
-          `--distributed-executor-backend mp`. See tutorial §5.1 950DT tab for the verbatim
-          command.
+          ```shell
+          #!/bin/sh
+
+          # Load model from ModelScope to speed up download.
+          export VLLM_USE_MODELSCOPE=True
+          export HCCL_BUFFSIZE=400
+          export HCCL_INTRA_ROCE_ENABLE=0
+          export HCCL_OP_EXPANSION_MODE="AIV"
+          export VLLM_ASCEND_ENABLE_PREFETCH_MLP=1
+          export VLLM_USE_V2_MODEL_RUNNER=0
+
+          # Ensure the model path matches the directory recorded during download
+          MODEL_PATH="your_model_path"   # e.g. Eco-Tech/Qwen3.5-397B-A17B-w4a4-mxfp4 (ModelScope)
+          vllm serve "${MODEL_PATH}" \
+            --host 0.0.0.0 \
+            --port 8000 \
+            --distributed-executor-backend mp \
+            --data-parallel-size 1 \
+            --tensor-parallel-size 8 \
+            --enable-expert-parallel \
+            --seed 1024 \
+            --quantization ascend \
+            --served-model-name qwen3.5 \
+            --max-num-seqs 128 \
+            --max-model-len 133000 \
+            --max-num-batched-tokens 8192 \
+            --trust-remote-code \
+            --enable-prefix-caching \
+            --gpu-memory-utilization 0.90 \
+            --async-scheduling \
+            --speculative-config '{"method": "qwen3_5_mtp", "num_speculative_tokens": 3}' \
+            --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY"}' \
+            --additional-config '{"enable_cpu_binding": true, "enable_fused_mc2": 1, "enable_flashcomm1": true}'
+          ```
+      - title: "Provenance and notes"
+        content: |-
+          - Display-only reference; no first-party 950DT run (see PR description). The current
+            online tutorial no longer contains the 950DT deployment sections; this script is
+            preserved verbatim from the 2026-10 revision of the tutorial (§5.1 "950DT Products"
+            tab).
+          - That revision pins Model Runner V1 (`VLLM_USE_V2_MODEL_RUNNER=0`) in this script.
+            On images that ship V2 only — as the current `nightly-main-a3` does — remove that
+            line.
+          - W4A4-MXFP4 differs from the A3 tab: `--tensor-parallel-size 8`,
+            `--max-num-batched-tokens 8192`, `HCCL_BUFFSIZE=400`, `HCCL_INTRA_ROCE_ENABLE=0`,
+            `VLLM_ASCEND_ENABLE_PREFETCH_MLP=1`, `--async-scheduling`, a speculative-config
+            without `enforce_eager`, and `--distributed-executor-backend mp`.
 
   - npu: Ascend 950DT
     precision: W4A8C8
@@ -512,14 +640,241 @@ scenarios:
     tags: [a5-single, pd-multinode]
     strategy: pd_cluster
     steps:
-      - title: "950DT PD deployment (display-only reference)"
+      - title: "Topology"
         content: |-
-          The w4a8c8-mxfp checkpoint serves PD across 950DT products (tutorial §5.5):
-          Prefill nodes with TP8/DP1 and Decode nodes with TP4/DP2 per node, using
-          `--kv-cache-dtype mxfp8` and the Mooncake workflow; see tutorial §5.5 for the
-          per-node scripts, the C8 accuracy and compatibility requirements (§5.5.4), and the
-          proxy verification. A maintainer-provided 950DT run channel would be needed for
-          official verification evidence of this tier.
+          Performance-oriented 1P1D on two 8-NPU 950DT hosts with the W4A8C8-MXFP checkpoint
+          and `--kv-cache-dtype mxfp8`, via `MooncakeConnectorV2` plus the standard Pull proxy
+          (2026-10 tutorial revision §5.5; the section is not present in the current online
+          tutorial — see the provenance note in the last step). Prefill runs eager; Decode uses
+          `FULL_DECODE_ONLY` with NPU graph extensions and the recompute scheduler.
+      - title: "Prefill node (run_p.sh, port 30060, Mooncake 55220)"
+        content: |-
+          ```shell
+          #!/usr/bin/env bash
+          set -euo pipefail
+
+          unset ftp_proxy
+          unset https_proxy
+          unset http_proxy
+
+          nic_name="<P_HIGH_SPEED_SERVICE_NIC>"
+          local_ip="<P_HIGH_SPEED_SERVICE_IP>"
+          MODEL_PATH="<LOCAL_W4A8C8_MODEL_PATH>"
+
+          export VLLM_EXECUTE_MODEL_TIMEOUT_SECONDS=30000
+
+          export IP_ADDRESS="${local_ip}"
+          export NETWORK_CARD_NAME="${nic_name}"
+          export HCCL_IF_IP="${local_ip}"
+          export GLOO_SOCKET_IFNAME="${nic_name}"
+          export HCCL_SOCKET_IFNAME="${nic_name}"
+
+          export HCCL_BUFFSIZE=1024
+          export HCCL_OP_EXPANSION_MODE=AIV
+          export VLLM_USE_V2_MODEL_RUNNER=0
+          export VLLM_USE_FASTOKENS=1
+          export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
+          export LD_LIBRARY_PATH="/usr/local/Ascend/ascend-toolkit/latest/python/site-packages/mooncake:${LD_LIBRARY_PATH:-}"
+
+          vllm serve "${MODEL_PATH}" \
+            --host "${local_ip}" \
+            --port 30060 \
+            --data-parallel-size 1 \
+            --data-parallel-size-local 1 \
+            --tensor-parallel-size 8 \
+            --enable-expert-parallel \
+            --seed 1024 \
+            --served-model-name qwen3.5 \
+            --max-model-len 133120 \
+            --max-num-batched-tokens 20480 \
+            --max-num-seqs 64 \
+            --enforce-eager \
+            --trust-remote-code \
+            --allowed-local-media-path / \
+            --gpu-memory-utilization 0.90 \
+            --quantization ascend \
+            --kv-cache-dtype mxfp8 \
+            --enable-prefix-caching \
+            --async-scheduling \
+            --mm-processor-cache-gb 0 \
+            --mm-encoder-tp-mode data \
+            --distributed-executor-backend mp \
+            --no-disable-hybrid-kv-cache-manager \
+            --speculative-config '{"method":"qwen3_5_mtp","num_speculative_tokens":3,"enforce_eager":true}' \
+            --additional-config '{
+              "enable_flashcomm1": true,
+              "ascend_compilation_config": {
+                "enable_npugraph_ex": false,
+                "enable_static_kernel": false
+              },
+              "weight_nz_mode": 1,
+              "enable_cpu_binding": true,
+              "enable_fused_mc2": 0,
+              "enable_prefill_mc2": false,
+              "enable_shared_expert_dp": true,
+              "multistream_overlap_shared_expert": false,
+              "scheduler_config": {
+                "recompute_scheduler_enable": false
+              }
+            }' \
+            --kv-transfer-config '{
+              "kv_connector": "MooncakeConnectorV2",
+              "kv_buffer_device": "npu",
+              "kv_role": "kv_producer",
+              "kv_port": "55220",
+              "engine_id": "0",
+              "kv_connector_extra_config": {
+                "ascend_local_comm_res_path": "/etc/hixlep",
+                "prefill": {
+                  "dp_size": 1,
+                  "tp_size": 8
+                },
+                "decode": {
+                  "dp_size": 2,
+                  "tp_size": 4
+                }
+              }
+            }'
+          ```
+      - title: "Decode node (run_d.sh, port 30050, DP RPC 6884, Mooncake 56010)"
+        content: |-
+          A single launcher starts two local DP engines, each TP4 — do not start two copies.
+
+          ```shell
+          #!/usr/bin/env bash
+          set -euo pipefail
+
+          unset ftp_proxy
+          unset https_proxy
+          unset http_proxy
+
+          nic_name="<D_HIGH_SPEED_SERVICE_NIC>"
+          local_ip="<D_HIGH_SPEED_SERVICE_IP>"
+          MODEL_PATH="<LOCAL_W4A8C8_MODEL_PATH>"
+
+          export VLLM_EXECUTE_MODEL_TIMEOUT_SECONDS=30000
+
+          export IP_ADDRESS="${local_ip}"
+          export NETWORK_CARD_NAME="${nic_name}"
+          export HCCL_IF_IP="${local_ip}"
+          export GLOO_SOCKET_IFNAME="${nic_name}"
+          export HCCL_SOCKET_IFNAME="${nic_name}"
+
+          export HCCL_BUFFSIZE=1024
+          export HCCL_OP_EXPANSION_MODE=AIV
+          export VLLM_USE_V2_MODEL_RUNNER=0
+          export VLLM_USE_FASTOKENS=1
+          export VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS=0
+          export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
+          export LD_LIBRARY_PATH="/usr/local/Ascend/ascend-toolkit/latest/python/site-packages/mooncake:${LD_LIBRARY_PATH:-}"
+
+          vllm serve "${MODEL_PATH}" \
+            --host "${local_ip}" \
+            --port 30050 \
+            --data-parallel-size 2 \
+            --data-parallel-size-local 2 \
+            --data-parallel-address "${local_ip}" \
+            --data-parallel-rpc-port 6884 \
+            --api-server-count 1 \
+            --tensor-parallel-size 4 \
+            --enable-expert-parallel \
+            --seed 1024 \
+            --served-model-name qwen3.5 \
+            --max-model-len 133120 \
+            --max-num-batched-tokens 300 \
+            --max-num-seqs 100 \
+            --trust-remote-code \
+            --allowed-local-media-path / \
+            --gpu-memory-utilization 0.90 \
+            --quantization ascend \
+            --kv-cache-dtype mxfp8 \
+            --enable-prefix-caching \
+            --async-scheduling \
+            --mm-processor-cache-gb 0 \
+            --mm-encoder-tp-mode data \
+            --distributed-executor-backend mp \
+            --no-disable-hybrid-kv-cache-manager \
+            --speculative-config '{"method":"qwen3_5_mtp","num_speculative_tokens":3,"enforce_eager":true}' \
+            --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY"}' \
+            --additional-config '{
+              "enable_flashcomm1": true,
+              "ascend_compilation_config": {
+                "enable_npugraph_ex": true,
+                "enable_static_kernel": false
+              },
+              "weight_nz_mode": 1,
+              "enable_cpu_binding": true,
+              "enable_fused_mc2": 0,
+              "enable_prefill_mc2": false,
+              "enable_shared_expert_dp": true,
+              "multistream_overlap_shared_expert": false,
+              "scheduler_config": {
+                "recompute_scheduler_enable": true
+              }
+            }' \
+            --kv-transfer-config '{
+              "kv_connector": "MooncakeConnectorV2",
+              "kv_buffer_device": "npu",
+              "kv_role": "kv_consumer",
+              "kv_port": "56010",
+              "engine_id": "2",
+              "kv_connector_extra_config": {
+                "ascend_local_comm_res_path": "/etc/hixlep",
+                "prefill": {
+                  "dp_size": 1,
+                  "tp_size": 8
+                },
+                "decode": {
+                  "dp_size": 2,
+                  "tp_size": 4
+                }
+              }
+            }'
+          ```
+      - title: "Proxy (on the Prefill host)"
+        content: |-
+          Start the standard Pull proxy after both services report ready; the Decode backend is
+          HTTP port 30050, not the DP RPC port 6884. Run from the directory containing
+          `load_balance_proxy_server_example.py` (e.g. `examples/disaggregated_prefill_v1/` in
+          the matching vLLM-Ascend revision); send client requests to
+          `http://<P_HIGH_SPEED_SERVICE_IP>:8000`.
+
+          ```shell
+          unset ftp_proxy
+          unset https_proxy
+          unset http_proxy
+
+          PREFILL_HOST="<P_HIGH_SPEED_SERVICE_IP>"
+          DECODE_HOST="<D_HIGH_SPEED_SERVICE_IP>"
+
+          python3 load_balance_proxy_server_example.py \
+            --prefiller-hosts "${PREFILL_HOST}" \
+            --prefiller-ports 30060 \
+            --decoder-hosts "${DECODE_HOST}" \
+            --decoder-ports 30050 \
+            --host "${PREFILL_HOST}" \
+            --port 8000
+          ```
+      - title: "C8 accuracy and compatibility requirements (provenance)"
+        content: |-
+          - C8 KV cache is part of this performance recipe: keep the same compatible W4A8C8
+            checkpoint revision, tokenizer, chat template, quantization metadata and
+            `--kv-cache-dtype mxfp8` on P and D; keep MTP settings identical on both.
+          - This case targets a v0.30.0 MRv1 build containing the MXFP8 KV-scale fix #19017
+            (merged into `releases/v0.30.0` as `14c6c3f43`) or an equivalent verified fix —
+            verify the image carries it before use. That build context is also why the scripts
+            above pin Model Runner V1 (`VLLM_USE_V2_MODEL_RUNNER=0`); the connector topology
+            must stay DP1/TP8 (P) and DP2/TP4 (D). On V2-only images, dropping that pin departs
+            from the archived §5.5.4 requirement — confirm an equivalent fix yourself.
+          - Both hosts need their own HIXL communication resources mounted at `/etc/hixlep`;
+            do not reuse another host's endpoint resources.
+          - Use `MooncakeConnectorV2` with the standard Pull proxy; prefix caching and async
+            scheduling are enabled on both nodes; `enable_fused_mc2=0` /
+            `enable_prefill_mc2=false` reproduce this case; `enable_shared_expert_dp` and
+            `enable_flashcomm1` require expert parallelism and a matching CANN/software stack.
+          - Display-only reference; no first-party 950DT run (see PR description). Preserved
+            verbatim from the 2026-10 revision of the tutorial (§5.5), which the current
+            online tutorial no longer includes.
 
   - npu: Atlas 800I A2
     precision: W8A8
@@ -528,11 +883,173 @@ scenarios:
     tags: [a2-single, pd-multinode]
     strategy: pd_cluster
     steps:
-      - title: "A2 PD deployment (display-only reference)"
+      - title: "Topology and launcher"
         content: |-
-          PD on Atlas 800I A2 (tutorial §5.6): Prefill TP8/DP1 and Decode TP8/DP1 on separate
-          A2 nodes with the W4A8 checkpoint, MooncakeConnectorV1 and the standard Pull proxy;
-          see tutorial §5.6 for the per-node scripts.
+          1P1D on 2 Atlas 800I A2 (64 GB x 8) nodes with the W4A8 checkpoint and
+          `MooncakeConnectorV1` plus the standard Pull proxy (2026-10 tutorial revision §5.6;
+          the section is not present in the current online tutorial — see the provenance note
+          in the last step). The launcher scripts take seven positional arguments: visible
+          devices, HTTP port, global DP size, DP rank, DP master address, DP RPC port and TP
+          size. Prefill reads positions 1-3 and 7; Decode uses all seven (its argument 5 is the
+          Decode host's service IP). Use DP1/TP8 on both sides to match the fixed KV topology.
+
+          ```shell
+          # On P:
+          bash run_p.sh 0,1,2,3,4,5,6,7 30060 1 0 "<P_SERVICE_IP>" 6884 8
+          # On D:
+          bash run_d.sh 0,1,2,3,4,5,6,7 30050 1 0 "<D_SERVICE_IP>" 6884 8
+          ```
+      - title: "Prefill node script (run_p.sh)"
+        content: |-
+          ```shell
+          #!/usr/bin/env bash
+          set -euo pipefail
+
+          unset ftp_proxy
+          unset https_proxy
+          unset http_proxy
+
+          export VLLM_EXECUTE_MODEL_TIMEOUT_SECONDS=30000
+
+          # Get these values through ifconfig.
+          # nic_name is the network interface name corresponding to local_ip.
+          nic_name="<NETWORK_INTERFACE>"
+          local_ip="<PREFILL_NODE_IP>"
+          export IP_ADDRESS="${local_ip}"
+          export NETWORK_CARD_NAME="${nic_name}"
+
+          export HCCL_IF_IP="${local_ip}"
+          export GLOO_SOCKET_IFNAME="${nic_name}"
+          export HCCL_SOCKET_IFNAME="${nic_name}"
+
+          export HCCL_BUFFSIZE=1024
+          export HCCL_OP_EXPANSION_MODE=AIV
+          export VLLM_USE_V2_MODEL_RUNNER=0
+          export VLLM_USE_FASTOKENS=1
+          export ASCEND_RT_VISIBLE_DEVICES="$1"
+          export LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libjemalloc.so.2
+
+          vllm serve your_model_path \
+            --host "${local_ip}" \
+            --port "$2" \
+            --data-parallel-size "$3" \
+            --data-parallel-size-local 1 \
+            --tensor-parallel-size "$7" \
+            --enable-expert-parallel \
+            --seed 1024 \
+            --served-model-name qwen3.5 \
+            --max-model-len 133120 \
+            --max-num-batched-tokens 16384 \
+            --max-num-seqs 64 \
+            --enforce-eager \
+            --trust-remote-code \
+            --allowed-local-media-path / \
+            --gpu-memory-utilization 0.90 \
+            --quantization ascend \
+            --enable-prefix-caching \
+            --async-scheduling \
+            --mm-processor-cache-gb 0 \
+            --mm-encoder-tp-mode data \
+            --distributed-executor-backend mp \
+            --no-disable-hybrid-kv-cache-manager \
+            --speculative-config '{"method":"qwen3_5_mtp","num_speculative_tokens":3}' \
+            --additional-config '{"enable_flashcomm1":true,"ascend_compilation_config":{"enable_npugraph_ex":false,"enable_static_kernel":false}, "weight_nz_mode":1, "enable_shared_expert_dp":true,"scheduler_config":{"recompute_scheduler_enable":false}}' \
+            --kv-transfer-config '{"kv_connector":"MooncakeConnectorV1","kv_buffer_device":"npu","kv_role":"kv_producer","kv_port":"55220","engine_id":"0","kv_connector_extra_config":{"prefill":{"dp_size":1,"tp_size":8},"decode":{"dp_size":1,"tp_size":8}}}'
+          ```
+      - title: "Decode node script (run_d.sh)"
+        content: |-
+          ```shell
+          #!/usr/bin/env bash
+          set -euo pipefail
+          unset ftp_proxy
+          unset https_proxy
+          unset http_proxy
+
+          export VLLM_EXECUTE_MODEL_TIMEOUT_SECONDS=30000
+
+          # Get these values through ifconfig.
+          # nic_name is the network interface name corresponding to local_ip.
+          nic_name="<NETWORK_INTERFACE>"
+          local_ip="<DECODE_NODE_IP>"
+          export IP_ADDRESS="${local_ip}"
+          export NETWORK_CARD_NAME="${nic_name}"
+
+          export HCCL_IF_IP="${local_ip}"
+          export GLOO_SOCKET_IFNAME="${nic_name}"
+          export HCCL_SOCKET_IFNAME="${nic_name}"
+
+          export HCCL_BUFFSIZE=1024
+          export HCCL_OP_EXPANSION_MODE=AIV
+
+          export VLLM_USE_V2_MODEL_RUNNER=0
+          export VLLM_USE_FASTOKENS=1
+          export VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS=0
+          export ASCEND_RT_VISIBLE_DEVICES="$1"
+          export LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libjemalloc.so.2
+
+          vllm serve your_model_path \
+            --host "${local_ip}" \
+            --port "$2" \
+            --data-parallel-size "$3" \
+            --data-parallel-size-local 1 \
+            --data-parallel-rank "$4" \
+            --data-parallel-address "$5" \
+            --data-parallel-rpc-port "$6" \
+            --tensor-parallel-size "$7" \
+            --enable-expert-parallel \
+            --seed 1024 \
+            --served-model-name qwen3.5 \
+            --max-model-len 133120 \
+            --max-num-batched-tokens 300 \
+            --max-num-seqs 200 \
+            --trust-remote-code \
+            --allowed-local-media-path / \
+            --gpu-memory-utilization 0.90 \
+            --quantization ascend \
+            --enable-prefix-caching \
+            --async-scheduling \
+            --mm-processor-cache-gb 0 \
+            --mm-encoder-tp-mode data \
+            --distributed-executor-backend mp \
+            --no-disable-hybrid-kv-cache-manager \
+            --speculative-config '{"method":"qwen3_5_mtp","num_speculative_tokens":3}' \
+            --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY"}' \
+            --additional-config '{"ascend_compilation_config":{"enable_npugraph_ex":true,"enable_static_kernel":false}, "weight_nz_mode":1, "enable_shared_expert_dp":false, "scheduler_config":{"recompute_scheduler_enable":true}}' \
+            --kv-transfer-config '{"kv_connector":"MooncakeConnectorV1","kv_buffer_device":"npu","kv_role":"kv_consumer","kv_port":"56010","engine_id":"2","kv_connector_extra_config":{"prefill":{"dp_size":1,"tp_size":8},"decode":{"dp_size":1,"tp_size":8}}}'
+          ```
+      - title: "Proxy (on the Prefill master)"
+        content: |-
+          Start the standard Pull proxy after both services report ready; use the HTTP ports
+          passed as argument 2 (Decode backend is HTTP port 30050, not the DP RPC port 6884).
+          Run from the directory containing `load_balance_proxy_server_example.py`; send client
+          requests to `http://<PREFILL_NODE_IP>:8000`.
+
+          ```shell
+          unset ftp_proxy
+          unset https_proxy
+          unset http_proxy
+
+          PREFILL_HOST="<PREFILL_NODE_IP>"
+          DECODE_HOST="<DECODE_NODE_IP>"
+
+          python3 load_balance_proxy_server_example.py \
+            --prefiller-hosts "${PREFILL_HOST}" \
+            --prefiller-ports 30060 \
+            --decoder-hosts "${DECODE_HOST}" \
+            --decoder-ports 30050 \
+            --host "${PREFILL_HOST}" \
+            --port 8000
+          ```
+      - title: "Provenance and notes"
+        content: |-
+          - Display-only reference; no first-party A2 PD run (see PR description). Preserved
+            verbatim from the 2026-10 revision of the tutorial (§5.6), which the current online
+            tutorial no longer includes.
+          - That revision pins Model Runner V1 (`VLLM_USE_V2_MODEL_RUNNER=0`) on both nodes.
+            On images that ship V2 only, remove that line on both sides.
+          - If the Decode node fails to initialize, check `--tensor-parallel-size` is 8,
+            `--data-parallel-size-local` matches the global Decode DP size, and
+            `kv_connector_extra_config.decode.dp_size` matches the global Decode DP size.
 
 evaluation:
   accuracy:
@@ -622,7 +1139,8 @@ tuning: |-
   uses `2`); MoE sequence parallelism via `enable_flashcomm1=true`; shared expert DP via
   `enable_shared_expert_dp=true`; shared expert overlap via
   `multistream_overlap_shared_expert=true` (MP example); recompute scheduler on PD Decode
-  (nested under `scheduler_config`); CPU binding on single-node/MP/PD scripts.
+  (nested under `scheduler_config`); CPU binding on the single-node/MP/A3-PD/950DT-PD
+  scripts (not the A2 PD scripts).
 
 
 faq: |-
@@ -671,8 +1189,9 @@ faq: |-
 
     A: Check that both nodes use the same C8 checkpoint revision and `--kv-cache-dtype
     mxfp8`, with the topology and connector settings in §5.5 and the requirements in
-    §5.5.4. Inspect checkpoint-loading and KV-transfer logs. After correcting the
-    environment or configuration, restart both services and verify short requests before
+    §5.5.4 of the 2026-10 revision (since removed from the online tutorial). Inspect
+    checkpoint-loading and KV-transfer logs. After correcting the environment or
+    configuration, restart both services and verify short requests before
     running the full accuracy evaluation. Earlier prerelease K/V-scale issues were fixed by
     [#19017](https://github.com/vllm-project/vllm-ascend/pull/19017), included in v0.30.0.
 
