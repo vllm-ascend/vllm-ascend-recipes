@@ -1,0 +1,8 @@
+{
+  "recipe_path": "models/en/Tencent/Hunyuan-A13B-Instruct.yaml",
+  "hw_key": "atlas_800_a3",
+  "image": "quay.nju.edu.cn/ascend/vllm-ascend:v0.23.0-a3",
+  "scenarios": [],
+  "missing_reason": "selected hardware job did not provide results",
+  "head_sha": "43da97dadb4f2d0e1adfc9d37708e5816d5dbacf"
+}

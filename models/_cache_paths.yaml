@@ -1,6 +1,6 @@
 # models/_cache_paths.yaml
 #
-# Maps a recipe's `model.model_id` to the W8A8 weight directory that ships
+# Maps a recipe's `model.model_id` to the weight directory that ships
 # baked into the runner image under /root/.cache/modelscope/hub/models/.
 # The directory is searched under multiple candidate prefixes (see
 # CACHE_PREFIXES in scripts/verify-recipe.sh); this file only carries the
@@ -51,8 +51,15 @@ aliases:
 
   - model_id: PaddlePaddle/PaddleOCR-VL
     cache_dir: PaddlePaddle/PaddleOCR-VL
+
+  - model_id: Qwen/Qwen3-ASR-1.7B
+    cache_dir: Qwen/Qwen3-ASR-1.7B
   - model_id: moonshotai/Kimi-K2.6
     cache_dir: Kimi-K2.6-W4A8
 
+  - model_id: Qwen/Qwen3-Omni-30B-A3B-Thinking
+    cache_dir: Qwen/Qwen3-Omni-30B-A3B-Thinking
+  - model_id: Qwen/Qwen3-Coder-30B-A3B-Instruct
+    cache_dir: Qwen3-Coder-30B-A3B-Instruct-w8a8
   - model_id: Eco-Tech/Kimi-K3-w4a8
     cache_dir: Kimi-K3-w4a8

@@ -179,7 +179,7 @@ class VerificationPlanTests(unittest.TestCase):
         item["steps"][0]["content"] = "```bash\nvllm serve your_model_path --tensor-parallel-size 16\n```"
         path = self.recipe(scenarios=[item])
         jobs = build_plan(self.root, "pr", changed_files=[path])["include"]
-        self.assertEqual(jobs[0]["runner"], "linux-aarch64-a3-800i-16-cn12-001")
+        self.assertEqual(jobs[0]["runner"], "linux-aarch64-a3-800i-recipes-fed-16")
 
     def test_env_setup_device_count_selects_the_small_fitting_runner(self):
         path = self.recipe(scenarios=[scenario("Atlas 800I A2")])

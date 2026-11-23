@@ -1,0 +1,43 @@
+{
+  "verification_scope": "single-node API smoke; not accuracy or full feature coverage",
+  "recipe_path": "models/en/Qwen/Qwen3-Coder-30B-A3B-Instruct.yaml",
+  "model_id": "Qwen/Qwen3-Coder-30B-A3B-Instruct",
+  "hw_key": "atlas_800_a3",
+  "head_sha": "72522a49844474b597610ec8007f5161e66ac139",
+  "workflow_run_id": "44662576405",
+  "trigger_type": "pr",
+  "image": "quay.nju.edu.cn/ascend/vllm-ascend:v0.30.0-a3-openeuler",
+  "started_at": "2026-11-20T02:41:18Z",
+  "scenarios": [
+    {
+      "index": 0,
+      "npu": "Atlas 800I A3",
+      "precision": "W8A8",
+      "deployment": "Single-Node",
+      "case": "High Throughput",
+      "serve_cmd": "export ASCEND_RT_VISIBLE_DEVICES=0\nexport HCCL_OP_EXPANSION_MODE=\"AIV\"\nexport HCCL_BUFFSIZE=1024\nexport OMP_PROC_BIND=false\nexport OMP_NUM_THREADS=1\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\n\nvllm serve /root/.cache/modelscope/hub/models/Eco-Tech/Qwen3-Coder-30B-A3B-Instruct-w8a8 \\\n    --served-model-name qwen3-coder \\\n    --trust-remote-code \\\n    --max-num-seqs 100 \\\n    --max-model-len 37364 \\\n    --max-num-batched-tokens 16384 \\\n    --tensor-parallel-size 1 \\\n    --distributed_executor_backend \"mp\" \\\n    --no-enable-prefix-caching \\\n    --async-scheduling \\\n    --quantization ascend \\\n    --compilation-config '{\"cudagraph_mode\": \"FULL_DECODE_ONLY\"}' \\\n    --additional-config '{\"weight_nz_mode\": 2}' \\\n    --gpu-memory-utilization 0.95 \\\n    --port 8000 \\",
+      "verification_status": "pass",
+      "verification_reason": "Task API response validated"
+    },
+    {
+      "index": 1,
+      "npu": "Atlas 800I A3",
+      "precision": "W8A8",
+      "deployment": "Single-Node",
+      "case": "Low Latency",
+      "serve_cmd": "export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3\nexport HCCL_OP_EXPANSION_MODE=\"AIV\"\nexport HCCL_BUFFSIZE=1024\nexport OMP_PROC_BIND=false\nexport OMP_NUM_THREADS=1\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\n\nvllm serve /root/.cache/modelscope/hub/models/Eco-Tech/Qwen3-Coder-30B-A3B-Instruct-w8a8 \\\n    --served-model-name qwen3-coder \\\n    --trust-remote-code \\\n    --max-num-seqs 100 \\\n    --max-model-len 37364 \\\n    --max-num-batched-tokens 16384 \\\n    --tensor-parallel-size 4 \\\n    --enable-expert-parallel \\\n    --distributed_executor_backend \"mp\" \\\n    --no-enable-prefix-caching \\\n    --async-scheduling \\\n    --quantization ascend \\\n    --compilation-config '{\"cudagraph_mode\": \"FULL_DECODE_ONLY\"}' \\\n    --additional-config '{\"enable_flashcomm1\": true, \"weight_nz_mode\": 2}' \\\n    --gpu-memory-utilization 0.95 \\\n    --port 8000 \\",
+      "verification_status": "pass",
+      "verification_reason": "Task API response validated"
+    },
+    {
+      "index": 2,
+      "npu": "Atlas 800I A3",
+      "precision": "W8A8",
+      "deployment": "Single-Node",
+      "case": "Long Context",
+      "serve_cmd": "export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3\nexport HCCL_OP_EXPANSION_MODE=\"AIV\"\nexport HCCL_BUFFSIZE=1024\nexport OMP_PROC_BIND=false\nexport OMP_NUM_THREADS=1\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\n\nvllm serve /root/.cache/modelscope/hub/models/Eco-Tech/Qwen3-Coder-30B-A3B-Instruct-w8a8 \\\n    --served-model-name qwen3-coder \\\n    --trust-remote-code \\\n    --max-num-seqs 14 \\\n    --max-model-len 131072 \\\n    --max-num-batched-tokens 16384 \\\n    --tensor-parallel-size 4 \\\n    --enable-expert-parallel \\\n    --distributed_executor_backend \"mp\" \\\n    --no-enable-prefix-caching \\\n    --async-scheduling \\\n    --quantization ascend \\\n    --compilation-config '{\"cudagraph_mode\": \"FULL_DECODE_ONLY\"}' \\\n    --additional-config '{\"enable_flashcomm1\": true, \"weight_nz_mode\": 2}' \\\n    --gpu-memory-utilization 0.95 \\\n    --port 8000 \\",
+      "verification_status": "pass",
+      "verification_reason": "Task API response validated"
+    }
+  ]
+}

@@ -248,6 +248,217 @@ def test_default_smoke_still_checks_chat_content(monkeypatch):
     assert requests == ["http://127.0.0.1:8000/v1/chat/completions"]
 
 
+# --- cURL verification / vllm bench serve (recipes site snippets) ------------
+
+
+def test_curl_command_matches_site_snippet():
+    assert exe.curl_command("http://127.0.0.1:8100", "Eco-Tech/model-w8a8") == (
+        "curl http://127.0.0.1:8100/v1/chat/completions \\\n"
+        '  -H "Content-Type: application/json" \\\n'
+        "  -d '{\n"
+        '    "model": "Eco-Tech/model-w8a8",\n'
+        '    "messages": [{"role": "user", "content": "Hello"}],\n'
+        '    "max_tokens": 32\n'
+        "  }'"
+    )
+
+
+def _curl_run(monkeypatch, calls, stdout="{}", stderr="", returncode=0):
+    """Stub subprocess.run so verify_service's curl call is captured, not run."""
+
+    def run(argv, **kwargs):
+        calls.append(argv)
+        proc = type("Proc", (), {})()
+        proc.stdout, proc.stderr, proc.returncode = stdout, stderr, returncode
+        return proc
+
+    monkeypatch.setattr(exe.subprocess, "run", run)
+
+
+def test_verify_service_runs_the_page_curl_and_reports_the_response(monkeypatch, capsys):
+    calls = []
+    body = json.dumps({"choices": [{"message": {"content": "Hello!"}}]})
+    _curl_run(monkeypatch, calls, stdout=body)
+
+    exe.verify_service("http://127.0.0.1:8100", "Eco-Tech/model-w8a8")
+
+    argv = calls[0]
+    assert argv[:2] == ["curl", "http://127.0.0.1:8100/v1/chat/completions"]
+    assert argv[2:4] == ["-H", "Content-Type: application/json"]
+    assert argv[4] == "-d"
+    assert json.loads(argv[5]) == {
+        "model": "Eco-Tech/model-w8a8",
+        "messages": [{"role": "user", "content": "Hello"}],
+        "max_tokens": 32,
+    }
+    out = capsys.readouterr().out
+    # The page snippet is echoed, and the real response is now reported.
+    assert "curl http://127.0.0.1:8100/v1/chat/completions \\" in out
+    assert '"content": "Hello!"' in out
+
+
+@pytest.mark.parametrize("resp", [{}, {"choices": []}, {"choices": [{"message": {"content": ""}}]}])
+def test_verify_service_rejects_empty_content(monkeypatch, resp):
+    _curl_run(monkeypatch, [], stdout=json.dumps(resp))
+    with pytest.raises(exe.ComboFailure):
+        exe.verify_service("http://127.0.0.1:8100", "model")
+
+
+def test_verify_service_prints_the_full_response(monkeypatch, capsys):
+    # The whole body reaches the job log; it used to be cut at 400 characters.
+    body = json.dumps({"pad": "x" * 1000, "choices": [{"message": {"content": "Hello!"}}]})
+    _curl_run(monkeypatch, [], stdout=body)
+    exe.verify_service("http://127.0.0.1:8100", "model")
+    assert body in capsys.readouterr().out
+
+
+def test_verify_service_fails_on_non_zero_curl_exit(monkeypatch):
+    _curl_run(monkeypatch, [], stderr="curl: (7) Failed to connect", returncode=7)
+    with pytest.raises(exe.ComboFailure, match="exit 7"):
+        exe.verify_service("http://127.0.0.1:8100", "model")
+
+
+def test_curl_command_rerank_uses_the_yaml_endpoint():
+    cmd = exe.curl_command("http://127.0.0.1:8100", "Qwen/Qwen3-VL-Reranker-2B", "rerank")
+    assert cmd.startswith("curl http://127.0.0.1:8100/v1/rerank \\\n")
+    assert "/v1/chat/completions" not in cmd
+    # The -d body is the recipe YAML's rerank request (query + two documents).
+    body = cmd.split("  -d '", 1)[1].removesuffix("'")
+    assert json.loads(body) == exe.rerank_request("Qwen/Qwen3-VL-Reranker-2B")
+
+
+def test_curl_argv_rerank_matches_the_yaml():
+    argv = exe.curl_argv("http://127.0.0.1:8100", "Qwen/Qwen3-VL-Reranker-2B", "rerank")
+    assert argv[:2] == ["curl", "http://127.0.0.1:8100/v1/rerank"]
+    assert argv[2:4] == ["-H", "Content-Type: application/json"]
+    assert json.loads(argv[5]) == exe.rerank_request("Qwen/Qwen3-VL-Reranker-2B")
+
+
+def test_verify_service_rerank_validates_relevance_scores(monkeypatch, capsys):
+    calls = []
+    body = json.dumps({"results": [
+        {"index": 0, "relevance_score": 0.72},
+        {"index": 1, "relevance_score": 0.19},
+    ]})
+    _curl_run(monkeypatch, calls, stdout=body)
+
+    exe.verify_service("http://127.0.0.1:8100", "served-id", "rerank")
+
+    assert calls[0][1] == "http://127.0.0.1:8100/v1/rerank"
+    assert json.loads(calls[0][5])["query"] == "What is the capital of China?"
+    out = capsys.readouterr().out
+    assert "curl http://127.0.0.1:8100/v1/rerank \\" in out
+    assert '"relevance_score": 0.72' in out
+
+
+def test_verify_service_rerank_rejects_reversed_scores(monkeypatch):
+    body = json.dumps({"results": [
+        {"index": 0, "relevance_score": 0.1},
+        {"index": 1, "relevance_score": 0.9},
+    ]})
+    _curl_run(monkeypatch, [], stdout=body)
+    with pytest.raises(exe.ComboFailure, match="did not score higher"):
+        exe.verify_service("http://127.0.0.1:8100", "model", "rerank")
+
+
+def test_bench_command_matches_site_snippet():
+    assert exe.bench_command("http://127.0.0.1:8100", "Eco-Tech/model-w8a8") == [
+        "vllm", "bench", "serve",
+        "--model", "Eco-Tech/model-w8a8",
+        "--host", "127.0.0.1",
+        "--port", "8100",
+        "--dataset-name", "random",
+        "--random-input-len", "1024",
+        "--random-output-len", "1024",
+        "--num-prompts", "100",
+        "--max-concurrency", "32",
+    ]
+
+
+def test_bench_command_rerank_matches_the_yaml():
+    assert exe.bench_command("http://127.0.0.1:8100", "Qwen/Qwen3-VL-Reranker-2B", "rerank") == [
+        "vllm", "bench", "serve",
+        "--model", "Qwen/Qwen3-VL-Reranker-2B",
+        "--host", "127.0.0.1",
+        "--port", "8100",
+        "--backend", "vllm-rerank",
+        "--dataset-name", "random-rerank",
+        "--endpoint", "/v1/rerank",
+        "--random-input", "200",
+        "--num-prompts", "100",
+        "--max-concurrency", "32",
+    ]
+
+
+def test_run_bench_rerank_dispatches_to_the_rerank_backend(tmp_path, monkeypatch):
+    seen = []
+
+    class Proc:
+        returncode = 0
+        stdout = "Output token throughput (tok/s): 42\n"
+        stderr = ""
+
+    monkeypatch.setattr(exe.subprocess, "run", lambda argv, **kwargs: seen.append(argv) or Proc())
+    result = exe.run_bench("http://127.0.0.1:8100", "model", tmp_path, "rerank")
+    argv = seen[0]
+    assert argv[argv.index("--backend") + 1] == "vllm-rerank"
+    assert argv[argv.index("--dataset-name") + 1] == "random-rerank"
+    assert result["metrics"]["Output token throughput (tok/s)"] == 42.0
+
+
+def test_parse_bench_metrics_reads_the_result_table():
+    text = (
+        "============ Serving Benchmark Result ============\n"
+        "Successful requests:                     100\n"
+        "Benchmark duration (s):                  22.35\n"
+        "Request throughput (req/s):              4.47\n"
+        "Output token throughput (tok/s):         4578.75\n"
+        "---------------Time to First Token----------------\n"
+        "Mean TTFT (ms):                          71.23\n"
+        "Device: NPU\n"
+    )
+    metrics = exe.parse_bench_metrics(text)
+    assert metrics["Successful requests"] == 100.0
+    assert metrics["Output token throughput (tok/s)"] == 4578.75
+    assert metrics["Mean TTFT (ms)"] == 71.23
+    assert "Device" not in metrics
+
+
+def _fake_bench(monkeypatch, returncode=0, stdout="", stderr=""):
+    class Proc:
+        pass
+
+    proc = Proc()
+    proc.returncode = returncode
+    proc.stdout = stdout
+    proc.stderr = stderr
+    monkeypatch.setattr(exe.subprocess, "run", lambda *args, **kwargs: proc)
+
+
+def test_run_bench_writes_log_and_returns_metrics(tmp_path, monkeypatch, capsys):
+    _fake_bench(monkeypatch, stdout="Output token throughput (tok/s):         4578.75\n")
+    result = exe.run_bench("http://127.0.0.1:8100", "model", tmp_path)
+    assert result["metrics"]["Output token throughput (tok/s)"] == 4578.75
+    assert "Output token throughput" in (tmp_path / "bench.log").read_text(encoding="utf-8")
+    out = capsys.readouterr().out
+    assert "--max-concurrency 32" in out
+    # The full raw output is echoed to the job log, not just the parsed metrics.
+    assert "[bench] raw output:" in out
+    assert "Output token throughput (tok/s):         4578.75" in out
+
+
+@pytest.mark.parametrize(
+    "returncode,stdout",
+    [(1, "Output token throughput (tok/s): 1\n"), (0, "no table here\n")],
+)
+def test_run_bench_failures_mark_the_combo_red(tmp_path, monkeypatch, returncode, stdout):
+    _fake_bench(monkeypatch, returncode=returncode, stdout=stdout, stderr="boom")
+    with pytest.raises(exe.ComboFailure):
+        exe.run_bench("http://127.0.0.1:8100", "model", tmp_path)
+    # The raw output is kept for the artifacts even on failure.
+    assert (tmp_path / "bench.log").exists()
+
+
 @pytest.mark.parametrize("required,expected", [(True, 1), (False, 0)])
 def test_required_combo_skip_is_not_a_passing_check(tmp_path, monkeypatch, required, expected):
     meta = {"combo_id": "reranker", "hf_id": "Qwen/Qwen3-VL-Reranker-2B", "hardware": "ascend_910c",
@@ -261,3 +472,98 @@ def test_required_combo_skip_is_not_a_passing_check(tmp_path, monkeypatch, requi
     assert exe.run_combo(combo_dir, tmp_path / "results") == expected
     result = json.loads((tmp_path / "results/reranker/result.json").read_text(encoding="utf-8"))
     assert result["status"] == "skip"
+
+
+# --- run_combo wiring (verify -> smoke -> bench -> teardown) ----------------
+
+
+class _FakeProc:
+    pid = 4242
+
+    def poll(self):
+        return None
+
+
+def _combo_meta(tmp_path, **over):
+    meta = {
+        "combo_id": "a3-chat", "hf_id": "org/model", "hardware": "ascend_910c",
+        "variant": "default", "features_resolved": {}, "image": "registry/image:1",
+        "strategy": "single_node_tp", "deploy_type": "single_node", "required_npu": 1,
+        "port": 8100, "source_url": "https://recipes.vllm.ai", "required": False,
+        "smoke_test": "chat", "bench": True, "model_id": "org/model",
+        "draft_model": None, "hub": "modelscope", "env": {},
+        "argv": ["vllm", "serve", "org/model"], "readiness_timeout_s": 60,
+    }
+    meta.update(over)
+    combo_dir = tmp_path / "combo"
+    combo_dir.mkdir(parents=True, exist_ok=True)
+    (combo_dir / "meta.json").write_text(json.dumps(meta), encoding="utf-8")
+    (combo_dir / "run.sh").write_text("exec vllm serve org/model\n", encoding="utf-8")
+    return combo_dir, meta
+
+
+def _stub_run_combo(monkeypatch, calls):
+    monkeypatch.setattr(exe, "precheck", lambda meta: None)
+    monkeypatch.setattr(exe, "start_bg", lambda *args, **kwargs: _FakeProc())
+    monkeypatch.setattr(exe, "wait_ready", lambda *args, **kwargs: [{"id": "served-id"}])
+    monkeypatch.setattr(exe, "verify_service", lambda url, model, kind: calls.append(("verify", url, model)))
+    monkeypatch.setattr(exe, "smoke", lambda url, model, kind: calls.append(("smoke", model, kind)))
+    monkeypatch.setattr(
+        exe, "run_bench",
+        lambda url, model, out, kind: calls.append(("bench", model)) or {"seconds": 1.0, "metrics": {}},
+    )
+    monkeypatch.setattr(exe, "teardown", lambda procs, out: calls.append(("teardown", len(procs))))
+
+
+def test_run_combo_runs_verify_smoke_and_bench(tmp_path, monkeypatch):
+    combo_dir, _ = _combo_meta(tmp_path)
+    calls = []
+    _stub_run_combo(monkeypatch, calls)
+
+    assert exe.run_combo(combo_dir, tmp_path / "results") == 0
+    # The id /v1/models reports feeds every request: the localized run.sh served
+    # the on-disk path, so the hub id must not leak into the checks.
+    assert calls == [
+        ("verify", "http://127.0.0.1:8100", "served-id"),
+        ("smoke", "served-id", "chat"),
+        ("bench", "served-id"),
+        ("teardown", 1),
+    ]
+    result = json.loads((tmp_path / "results/a3-chat/result.json").read_text(encoding="utf-8"))
+    assert result["status"] == "pass"
+    assert result["verify_seconds"] is not None
+    assert result["bench"] == {"seconds": 1.0, "metrics": {}}
+
+
+def test_run_combo_runs_verify_and_bench_for_rerank(tmp_path, monkeypatch):
+    # Rerank now has its own cURL + bench snippets (from the recipe YAML), so it
+    # follows the same verify -> smoke -> bench flow as chat.
+    combo_dir, _ = _combo_meta(tmp_path, smoke_test="rerank", bench=True)
+    calls = []
+    _stub_run_combo(monkeypatch, calls)
+
+    assert exe.run_combo(combo_dir, tmp_path / "results") == 0
+    assert calls == [
+        ("verify", "http://127.0.0.1:8100", "served-id"),
+        ("smoke", "served-id", "rerank"),
+        ("bench", "served-id"),
+        ("teardown", 1),
+    ]
+    result = json.loads((tmp_path / "results/a3-chat/result.json").read_text(encoding="utf-8"))
+    assert result["status"] == "pass"
+    assert result["bench"] == {"seconds": 1.0, "metrics": {}}
+
+
+def test_run_combo_rerank_can_still_opt_out_of_bench(tmp_path, monkeypatch):
+    combo_dir, _ = _combo_meta(tmp_path, smoke_test="rerank", bench=False)
+    calls = []
+    _stub_run_combo(monkeypatch, calls)
+
+    assert exe.run_combo(combo_dir, tmp_path / "results") == 0
+    assert calls == [
+        ("verify", "http://127.0.0.1:8100", "served-id"),
+        ("smoke", "served-id", "rerank"),
+        ("teardown", 1),
+    ]
+    result = json.loads((tmp_path / "results/a3-chat/result.json").read_text(encoding="utf-8"))
+    assert result["bench"] is None

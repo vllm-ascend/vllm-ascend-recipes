@@ -19,10 +19,22 @@
       "slug": "GLM-5"
     },
     {
+      "slug": "Hunyuan-A13B-Instruct"
+    },
+    {
       "slug": "Kimi-K2.6"
     },
     {
       "slug": "PaddleOCR-VL"
+    },
+    {
+      "slug": "Qwen3-0.6B"
+    },
+    {
+      "slug": "Qwen3-1.7B"
+    },
+    {
+      "slug": "Qwen3-14B"
     },
     {
       "slug": "Qwen3-235B-A22B"
@@ -31,13 +43,28 @@
       "slug": "Qwen3-30B-A3B"
     },
     {
+      "slug": "Qwen3-32B"
+    },
+    {
+      "slug": "Qwen3-4B"
+    },
+    {
+      "slug": "Qwen3-8B"
+    },
+    {
       "slug": "Qwen3-ASR-1.7B"
+    },
+    {
+      "slug": "Qwen3-Coder-30B-A3B-Instruct"
     },
     {
       "slug": "Qwen3-Embedding-0.6B"
     },
     {
       "slug": "Qwen3-Next-80B-A3B-Instruct"
+    },
+    {
+      "slug": "Qwen3-Omni-30B-A3B-Thinking"
     },
     {
       "slug": "Qwen3-Reranker"
@@ -61,7 +88,19 @@
       "slug": "Qwen3.5-27B-Qwen3.6-27B"
     },
     {
+      "slug": "Qwen3.5-27B"
+    },
+    {
+      "slug": "Qwen3.5-397B-A17B"
+    },
+    {
+      "slug": "Qwen3.6-27B"
+    },
+    {
       "slug": "Qwen3.6-35B-A3B"
+    },
+    {
+      "slug": "Qwen3.8-Flash-Next"
     },
     {
       "slug": "template2_non_pd"

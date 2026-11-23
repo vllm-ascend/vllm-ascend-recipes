@@ -1,0 +1,246 @@
+{
+  "meta.title": {
+    "en": "Qwen3-Omni-30B-A3B-Thinking",
+    "zh": "Qwen3-Omni-30B-A3B-Thinking"
+  },
+  "meta.description": {
+    "en": "A 30.5B-parameter omni-modal Mixture-of-Experts model (3.3B activated per token) that accepts text, images, audio, and video and returns text with chain-of-thought reasoning.",
+    "zh": "30.5B 总参、3.3B 激活的全模态 MoE 模型，支持文本、图像、音频、视频输入，输出文本并带思维链推理。"
+  },
+  "meta.performance_headline": {
+    "en": "Single-node BF16 deployment on Atlas 800I A3 for high throughput, low latency, and 128K long context",
+    "zh": "Atlas 800I A3 单节点 BF16 部署，覆盖高吞吐、低时延与 128K 长上下文场景"
+  },
+  "model.install.docker.note": {
+    "en": "Official Ascend image; full device/driver mounts are covered in env_setup.container.",
+    "zh": "昇腾官方镜像；完整设备与驱动挂载见 env_setup.container。"
+  },
+  "features.expert_parallel.description": {
+    "en": "MoE expert parallelism across the TP ranks (scenarios that use TP4)",
+    "zh": "MoE 专家并行，适用于 TP4 场景"
+  },
+  "features.compilation_config.description": {
+    "en": "Full ACL graph execution in decode (--compilation-config cudagraph_mode=FULL_DECODE_ONLY)",
+    "zh": "Decode 阶段使用完整 ACL 图（--compilation-config cudagraph_mode=FULL_DECODE_ONLY）"
+  },
+  "features.async_scheduling.description": {
+    "en": "Asynchronous scheduling to overlap CPU scheduling with NPU computation",
+    "zh": "异步调度，重叠 CPU 调度与 NPU 计算"
+  },
+  "features.prefix_caching.description": {
+    "en": "KV-cache prefix caching (disabled by default in the validated scenarios)",
+    "zh": "KV Cache 前缀缓存（验证场景默认关闭）"
+  },
+  "features.spec_decoding.description": {
+    "en": "Optional Eagle3 speculative decoding; replace your_eagle3_model_path with the downloaded draft model path",
+    "zh": "可选的 Eagle3 投机解码；请将 your_eagle3_model_path 替换为已下载的草稿模型路径"
+  },
+  "variants.default.description": {
+    "en": "Official BF16 checkpoint; the default and CI-verifiable configuration on Atlas 800I A3",
+    "zh": "官方 BF16 权重，Atlas 800I A3 上的默认配置，也是 CI 可验证的配置"
+  },
+  "variants.w8a8.description": {
+    "en": "Optional W8A8 weights quantized locally from the official BF16 checkpoint with msmodelslim",
+    "zh": "可选的 W8A8 权重，由官方 BF16 权重经 msmodelslim 本地量化得到"
+  },
+  "dependencies[0].note": {
+    "en": "Optional Eagle3 draft model for speculative decoding (replace your_eagle3_model_path)",
+    "zh": "可选的 Eagle3 投机解码草稿模型（请替换 your_eagle3_model_path）"
+  },
+  "config_params.max_model_len.description": {
+    "en": "Maximum context length (input + output tokens)",
+    "zh": "最大上下文长度（输入与输出 token 之和）"
+  },
+  "config_params.max_num_seqs.description": {
+    "en": "Maximum number of concurrent sequences",
+    "zh": "最大并发序列数"
+  },
+  "config_params.gpu_memory_utilization.description": {
+    "en": "Fraction of NPU memory available for the KV cache",
+    "zh": "可用于 KV Cache 的 NPU 显存比例"
+  },
+  "overview": {
+    "en": "Qwen3-Omni-30B-A3B-Thinking is the thinker variant of Qwen3-Omni: a native end-to-end omni-modal Mixture-of-Experts model with 30.5B total parameters and 3.3B activated per token. It accepts text, images, audio, and video, produces text output, and exposes chain-of-thought reasoning. This recipe covers the three single-node scenarios from the upstream tutorial: high throughput (TP2), low latency (TP4 with expert parallelism), and long context (TP4 with 131072 tokens and YaRN). All validated scenarios use the public official BF16 checkpoint and require no local weight conversion.",
+    "zh": "Qwen3-Omni-30B-A3B-Thinking 是 Qwen3-Omni 的 thinker 版本：原生端到端全模态 MoE 模型，总参 30.5B、每 token 激活 3.3B。它支持文本、图像、音频、视频输入，输出文本并带思维链推理。本 recipe 覆盖上游教程的三个单节点场景：高吞吐（TP2）、低时延（TP4 + 专家并行）与 131072 tokens 长上下文（TP4 + YaRN）。所有验证场景均使用公开的官方 BF16 权重，无需本地转换权重。"
+  },
+  "weight_download[0].weight_version": {
+    "en": "BF16",
+    "zh": "BF16"
+  },
+  "weight_download[1].weight_version": {
+    "en": "W8A8 (quantized locally with msmodelslim)",
+    "zh": "W8A8（使用 msmodelslim 本地量化）"
+  },
+  "weight_download[2].weight_version": {
+    "en": "Eagle3 Draft Model (optional)",
+    "zh": "Eagle3 草稿模型（可选）"
+  },
+  "quantization.content": {
+    "en": "No public W8A8 checkpoint is published for this model; the validated W8A8 weights were produced from the official BF16 checkpoint with **msmodelslim**. The quantized checkpoint keeps the following hybrid layout:\n\n- **Embedding layer**: BF16 (not quantized)\n- **Q/K normalization** (`q_norm`, `k_norm`): BF16\n- **Attention projections** (`q/k/v/o_proj`): static W8A8 with per-tensor scales; biases remain BF16\n- **MoE routing gate** (`mlp.gate`): BF16\n- **MoE expert projections** (`gate/up/down_proj`): dynamic W8A8\n\nFollow the [Quantization Guide](https://docs.vllm.ai/projects/ascend/en/latest/user_guide/feature_guide/quantization.html) and keep the generated directory layout unchanged so that `--quantization ascend` can load it.",
+    "zh": "该模型没有公开的 W8A8 权重，本 recipe 验证的 W8A8 权重由官方 BF16 权重经 **msmodelslim** 量化得到，保持以下混合布局：\n\n- **Embedding 层**：BF16，不量化\n- **Q/K 归一化**（`q_norm`、`k_norm`）：BF16\n- **Attention 投影**（`q/k/v/o_proj`）：静态 W8A8，per-tensor scale，bias 保持 BF16\n- **MoE 路由 gate**（`mlp.gate`）：BF16\n- **MoE 专家投影**（`gate/up/down_proj`）：动态 W8A8\n\n请按[量化指南](https://docs.vllm.ai/projects/ascend/en/latest/user_guide/feature_guide/quantization.html)操作，并保持生成目录结构不变，以便 `--quantization ascend` 加载。"
+  },
+  "prerequisites[0].title": {
+    "en": "Model Weight",
+    "zh": "模型权重"
+  },
+  "prerequisites[0].content": {
+    "en": "| Model | Hardware Requirement | Download |\n| --- | --- | --- |\n| Qwen3-Omni-30B-A3B-Thinking (BF16) | Atlas 800I A3 (64GB, 1~2 cards) | [Download](https://www.modelscope.cn/models/Qwen/Qwen3-Omni-30B-A3B-Thinking) |\n| Qwen3-Omni-30B-A3B-Thinking-W8A8 | Atlas 800I A3 (64GB, 1~2 cards) | Quantize locally with msmodelslim |\n| Eagle3 Draft Model (optional) | Atlas 800I A3 | [Download](https://www.modelscope.cn/models/AngelSlim/Qwen3-a3B_eagle3) |\n\nThe card counts are recommendations. Keep the weights in a shared directory visible to the container.",
+    "zh": "| 模型 | 硬件要求 | 下载 |\n| --- | --- | --- |\n| Qwen3-Omni-30B-A3B-Thinking（BF16） | Atlas 800I A3（64GB，1~2 卡） | [下载](https://www.modelscope.cn/models/Qwen/Qwen3-Omni-30B-A3B-Thinking) |\n| Qwen3-Omni-30B-A3B-Thinking-W8A8 | Atlas 800I A3（64GB，1~2 卡） | 使用 msmodelslim 本地量化 |\n| Eagle3 草稿模型（可选） | Atlas 800I A3 | [下载](https://www.modelscope.cn/models/AngelSlim/Qwen3-a3B_eagle3) |\n\n卡数为推荐值。请将权重放在容器可访问的共享目录。"
+  },
+  "prerequisites[1].title": {
+    "en": "Driver and Firmware",
+    "zh": "驱动与固件"
+  },
+  "prerequisites[1].content": {
+    "en": "Install the Ascend driver and firmware on the host before starting the container, and install the matching Ascend HDK toolkit inside the container. Refer to the [Ascend HDK installation guide](https://www.hiascend.com/document) for supported versions.",
+    "zh": "启动容器前需在宿主机安装昇腾驱动与固件，并在容器内安装匹配的 Ascend HDK 工具包。版本请参考 [Ascend HDK 安装文档](https://www.hiascend.com/document)。"
+  },
+  "env_setup.container.A3.content": {
+    "en": "Use the official vLLM-Ascend all-in-one image validated for this recipe.\n\n**Docker Pull:**\n\n```bash\ndocker pull quay.io/ascend/vllm-ascend:v0.30.0-a3-openeuler\n```\n\n**Docker Run:**\n\n```bash\nexport IMAGE=quay.io/ascend/vllm-ascend:v0.30.0-a3-openeuler\n\ndocker run \\\n    --name vllm-ascend-env \\\n    --shm-size=128g \\\n    --net=host \\\n    --privileged=true \\\n    --device /dev/davinci0 \\\n    --device /dev/davinci1 \\\n    --device /dev/davinci2 \\\n    --device /dev/davinci3 \\\n    --device /dev/davinci_manager \\\n    --device /dev/devmm_svm \\\n    --device /dev/hisi_hdc \\\n    -v /usr/local/Ascend/driver:/usr/local/Ascend/driver \\\n    -v /usr/local/dcmi:/usr/local/dcmi \\\n    -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \\\n    -v /etc/ascend_install.info:/etc/ascend_install.info \\\n    -v /models:/models \\\n    -it -d $IMAGE bash\n```\n\n> **Note**: Atlas 800I A3 has 8 NPUs with a dual-die design (16 chips). This recipe uses at most 4 chips (`/dev/davinci0` to `/dev/davinci3`). Add more device mounts to expose the remaining chips.",
+    "zh": "使用本 recipe 验证过的 vLLM-Ascend 官方一体化镜像。\n\n**拉取镜像：**\n\n```bash\ndocker pull quay.io/ascend/vllm-ascend:v0.30.0-a3-openeuler\n```\n\n**启动容器：**\n\n```bash\nexport IMAGE=quay.io/ascend/vllm-ascend:v0.30.0-a3-openeuler\n\ndocker run \\\n    --name vllm-ascend-env \\\n    --shm-size=128g \\\n    --net=host \\\n    --privileged=true \\\n    --device /dev/davinci0 \\\n    --device /dev/davinci1 \\\n    --device /dev/davinci2 \\\n    --device /dev/davinci3 \\\n    --device /dev/davinci_manager \\\n    --device /dev/devmm_svm \\\n    --device /dev/hisi_hdc \\\n    -v /usr/local/Ascend/driver:/usr/local/Ascend/driver \\\n    -v /usr/local/dcmi:/usr/local/dcmi \\\n    -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \\\n    -v /etc/ascend_install.info:/etc/ascend_install.info \\\n    -v /models:/models \\\n    -it -d $IMAGE bash\n```\n\n> **说明**：Atlas 800I A3 有 8 个 NPU、双 die 设计，共 16 个芯片。本 recipe 最多使用 4 个芯片（`/dev/davinci0` 至 `/dev/davinci3`），如需暴露其余芯片可继续添加 `--device`。"
+  },
+  "scenarios[0].deployment": {
+    "en": "Single-Node",
+    "zh": "Single-Node"
+  },
+  "scenarios[0].case": {
+    "en": "High Throughput",
+    "zh": "High Throughput"
+  },
+  "scenarios[0].steps[0].title": {
+    "en": "Start the server",
+    "zh": "启动服务"
+  },
+  "scenarios[0].steps[0].content": {
+    "en": "Two-chip tensor-parallel deployment (TP2) maximizes aggregate throughput for many concurrent requests while keeping the official BF16 weights resident across two chips.\n\n```bash\nexport ASCEND_RT_VISIBLE_DEVICES=0,1\nexport HCCL_OP_EXPANSION_MODE=\"AIV\"\nexport HCCL_BUFFSIZE=1024\nexport OMP_PROC_BIND=false\nexport OMP_NUM_THREADS=1\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\n\nvllm serve your_model_path \\\n    --served-model-name qwen3-omni \\\n    --trust-remote-code \\\n    --max-num-seqs {{max_num_seqs}} \\\n    --max-model-len {{max_model_len}} \\\n    --max-num-batched-tokens 16384 \\\n    --tensor-parallel-size 2 \\\n    --distributed_executor_backend \"mp\" \\\n    {{prefix_caching}} \\\n    {{async_scheduling}} \\\n    {{compilation_config}} \\\n    --additional-config '{\"enable_flashcomm1\": false}' \\\n    --gpu-memory-utilization {{gpu_memory_utilization}} \\\n    --port 8000 \\\n    {{spec_decoding}}\n```\n\n> - No `--quantization` flag is needed: the official BF16 checkpoint is loaded as floating-point weights.\n> - Prefix caching is disabled in the validated configuration.\n> - Omni multimodal inputs are processed by the same OpenAI-compatible endpoint; no extra server flag is needed.",
+    "zh": "两芯片张量并行（TP2）部署可在保持官方 BF16 权重常驻的同时最大化并发请求的聚合吞吐。\n\n```bash\nexport ASCEND_RT_VISIBLE_DEVICES=0,1\nexport HCCL_OP_EXPANSION_MODE=\"AIV\"\nexport HCCL_BUFFSIZE=1024\nexport OMP_PROC_BIND=false\nexport OMP_NUM_THREADS=1\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\n\nvllm serve your_model_path \\\n    --served-model-name qwen3-omni \\\n    --trust-remote-code \\\n    --max-num-seqs {{max_num_seqs}} \\\n    --max-model-len {{max_model_len}} \\\n    --max-num-batched-tokens 16384 \\\n    --tensor-parallel-size 2 \\\n    --distributed_executor_backend \"mp\" \\\n    {{prefix_caching}} \\\n    {{async_scheduling}} \\\n    {{compilation_config}} \\\n    --additional-config '{\"enable_flashcomm1\": false}' \\\n    --gpu-memory-utilization {{gpu_memory_utilization}} \\\n    --port 8000 \\\n    {{spec_decoding}}\n```\n\n> - 无需 `--quantization` 参数：官方 BF16 权重会按浮点权重加载。\n> - 验证配置默认关闭前缀缓存。\n> - 全模态输入复用同一个 OpenAI 兼容接口，无需额外服务端参数。"
+  },
+  "scenarios[0].steps[1].title": {
+    "en": "Verify the service",
+    "zh": "验证服务"
+  },
+  "scenarios[0].steps[1].content": {
+    "en": "```bash\ncurl http://localhost:<port>/v1/chat/completions \\\n    -H \"Content-Type: application/json\" \\\n    -d '{\n        \"model\": \"qwen3-omni\",\n        \"messages\": [\n            {\"role\": \"user\", \"content\": \"Reply with exactly one word: OK\"}\n        ],\n        \"temperature\": 0,\n        \"max_tokens\": 64\n    }'\n```\n\nExpected result: HTTP 200 with a non-empty `choices` array.\n\nFor multimodal input, send an `image_url`, `input_audio`, or `video_url` content part in the same message. A validated example combined one image, one audio clip, and one video clip in a single request and received a coherent description.",
+    "zh": "```bash\ncurl http://localhost:<port>/v1/chat/completions \\\n    -H \"Content-Type: application/json\" \\\n    -d '{\n        \"model\": \"qwen3-omni\",\n        \"messages\": [\n            {\"role\": \"user\", \"content\": \"Reply with exactly one word: OK\"}\n        ],\n        \"temperature\": 0,\n        \"max_tokens\": 64\n    }'\n```\n\n预期结果：HTTP 200，`choices` 非空。\n\n全模态输入可在同一 message 中传入 `image_url`、`input_audio` 或 `video_url` 内容块。已验证在单次请求中同时提交一张图片、一段音频和一段视频，模型能给出连贯描述。"
+  },
+  "scenarios[0].steps[2].title": {
+    "en": "Benchmark",
+    "zh": "性能基准"
+  },
+  "scenarios[0].steps[2].content": {
+    "en": "```bash\nvllm bench serve \\\n    --model your_model_path \\\n    --served-model-name qwen3-omni \\\n    --host 127.0.0.1 \\\n    --port 8000 \\\n    --dataset-name random \\\n    --random-input-len 200 \\\n    --random-output-len 512 \\\n    --num-prompts 200 \\\n    --max-concurrency 32 \\\n    --seed 1234 \\\n    --ignore-eos \\\n    --save-result \\\n    --result-dir ./\n```\n\nMeasured on Atlas 800I A3 with the v0.30.0 image and the official BF16 checkpoint: 200/200 successful requests, 960.72 output tok/s, mean TTFT 293.05 ms, mean TPOT 30.60 ms.",
+    "zh": "```bash\nvllm bench serve \\\n    --model your_model_path \\\n    --served-model-name qwen3-omni \\\n    --host 127.0.0.1 \\\n    --port 8000 \\\n    --dataset-name random \\\n    --random-input-len 200 \\\n    --random-output-len 512 \\\n    --num-prompts 200 \\\n    --max-concurrency 32 \\\n    --seed 1234 \\\n    --ignore-eos \\\n    --save-result \\\n    --result-dir ./\n```\n\nAtlas 800I A3 + v0.30.0 镜像 + 官方 BF16 权重实测：200/200 成功，输出吞吐 960.72 tok/s，平均 TTFT 293.05 ms，平均 TPOT 30.60 ms。"
+  },
+  "scenarios[1].deployment": {
+    "en": "Single-Node",
+    "zh": "Single-Node"
+  },
+  "scenarios[1].case": {
+    "en": "Low Latency",
+    "zh": "Low Latency"
+  },
+  "scenarios[1].steps[0].title": {
+    "en": "Start the server",
+    "zh": "启动服务"
+  },
+  "scenarios[1].steps[0].content": {
+    "en": "Four-chip tensor parallelism with expert parallelism reduces per-token latency. FlashComm1 is disabled for this model, matching the upstream tutorial.\n\n```bash\nexport ASCEND_RT_VISIBLE_DEVICES=0,1,2,3\nexport HCCL_OP_EXPANSION_MODE=\"AIV\"\nexport HCCL_BUFFSIZE=1024\nexport OMP_PROC_BIND=false\nexport OMP_NUM_THREADS=1\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\n\nvllm serve your_model_path \\\n    --served-model-name qwen3-omni \\\n    --trust-remote-code \\\n    --max-num-seqs {{max_num_seqs}} \\\n    --max-model-len {{max_model_len}} \\\n    --max-num-batched-tokens 16384 \\\n    --tensor-parallel-size 4 \\\n    --enable-expert-parallel \\\n    --distributed_executor_backend \"mp\" \\\n    {{prefix_caching}} \\\n    {{async_scheduling}} \\\n    {{compilation_config}} \\\n    --additional-config '{\"enable_flashcomm1\": false}' \\\n    --gpu-memory-utilization {{gpu_memory_utilization}} \\\n    --port 8000 \\\n    {{spec_decoding}}\n```\n\n> - Assign four chips to `ASCEND_RT_VISIBLE_DEVICES`; TP4 maps one rank to each chip.\n> - `--enable-expert-parallel` distributes the MoE experts across the four ranks.",
+    "zh": "四芯片张量并行并开启专家并行，可降低单 token 时延。该模型按上游教程关闭 FlashComm1。\n\n```bash\nexport ASCEND_RT_VISIBLE_DEVICES=0,1,2,3\nexport HCCL_OP_EXPANSION_MODE=\"AIV\"\nexport HCCL_BUFFSIZE=1024\nexport OMP_PROC_BIND=false\nexport OMP_NUM_THREADS=1\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\n\nvllm serve your_model_path \\\n    --served-model-name qwen3-omni \\\n    --trust-remote-code \\\n    --max-num-seqs {{max_num_seqs}} \\\n    --max-model-len {{max_model_len}} \\\n    --max-num-batched-tokens 16384 \\\n    --tensor-parallel-size 4 \\\n    --enable-expert-parallel \\\n    --distributed_executor_backend \"mp\" \\\n    {{prefix_caching}} \\\n    {{async_scheduling}} \\\n    {{compilation_config}} \\\n    --additional-config '{\"enable_flashcomm1\": false}' \\\n    --gpu-memory-utilization {{gpu_memory_utilization}} \\\n    --port 8000 \\\n    {{spec_decoding}}\n```\n\n> - `ASCEND_RT_VISIBLE_DEVICES` 需指定 4 个芯片，TP4 会为每个芯片分配一个 rank。\n> - `--enable-expert-parallel` 将 MoE 专家分布到 4 个 rank。"
+  },
+  "scenarios[1].steps[1].title": {
+    "en": "Verify the service",
+    "zh": "验证服务"
+  },
+  "scenarios[1].steps[1].content": {
+    "en": "```bash\ncurl http://localhost:<port>/v1/chat/completions \\\n    -H \"Content-Type: application/json\" \\\n    -d '{\n        \"model\": \"qwen3-omni\",\n        \"messages\": [\n            {\"role\": \"user\", \"content\": \"Describe the color red in one short sentence.\"}\n        ],\n        \"temperature\": 0,\n        \"max_tokens\": 128\n    }'\n```\n\nExpected result: HTTP 200 with a non-empty `choices` array.",
+    "zh": "```bash\ncurl http://localhost:<port>/v1/chat/completions \\\n    -H \"Content-Type: application/json\" \\\n    -d '{\n        \"model\": \"qwen3-omni\",\n        \"messages\": [\n            {\"role\": \"user\", \"content\": \"Describe the color red in one short sentence.\"}\n        ],\n        \"temperature\": 0,\n        \"max_tokens\": 128\n    }'\n```\n\n预期结果：HTTP 200，`choices` 非空。"
+  },
+  "scenarios[1].steps[2].title": {
+    "en": "Benchmark",
+    "zh": "性能基准"
+  },
+  "scenarios[1].steps[2].content": {
+    "en": "```bash\nvllm bench serve \\\n    --model your_model_path \\\n    --served-model-name qwen3-omni \\\n    --host 127.0.0.1 \\\n    --port 8000 \\\n    --dataset-name random \\\n    --random-input-len 200 \\\n    --random-output-len 128 \\\n    --num-prompts 200 \\\n    --request-rate 1 \\\n    --seed 1234 \\\n    --ignore-eos \\\n    --save-result \\\n    --result-dir ./\n```\n\nMeasured on Atlas 800I A3 with the v0.30.0 image and the official BF16 checkpoint: 200/200 successful requests, 126.89 output tok/s, mean TTFT 168.74 ms, mean TPOT 15.92 ms.",
+    "zh": "```bash\nvllm bench serve \\\n    --model your_model_path \\\n    --served-model-name qwen3-omni \\\n    --host 127.0.0.1 \\\n    --port 8000 \\\n    --dataset-name random \\\n    --random-input-len 200 \\\n    --random-output-len 128 \\\n    --num-prompts 200 \\\n    --request-rate 1 \\\n    --seed 1234 \\\n    --ignore-eos \\\n    --save-result \\\n    --result-dir ./\n```\n\nAtlas 800I A3 + v0.30.0 镜像 + 官方 BF16 权重实测：200/200 成功，输出吞吐 126.89 tok/s，平均 TTFT 168.74 ms，平均 TPOT 15.92 ms。"
+  },
+  "scenarios[2].deployment": {
+    "en": "Single-Node",
+    "zh": "Single-Node"
+  },
+  "scenarios[2].case": {
+    "en": "Long Context",
+    "zh": "Long Context"
+  },
+  "scenarios[2].steps[0].title": {
+    "en": "Start the server",
+    "zh": "启动服务"
+  },
+  "scenarios[2].steps[0].content": {
+    "en": "The long-context scenario keeps TP4 with expert parallelism, raises the context limit to 131072 tokens with YaRN, and lowers `--max-num-seqs` to 14. vLLM-Ascend v0.30.0 validates `max_position_embeddings` strictly, so `VLLM_ALLOW_LONG_MAX_MODEL_LEN=1` is required when the requested length exceeds the checkpoint value.\n\n```bash\nexport ASCEND_RT_VISIBLE_DEVICES=0,1,2,3\nexport HCCL_OP_EXPANSION_MODE=\"AIV\"\nexport HCCL_BUFFSIZE=1024\nexport OMP_PROC_BIND=false\nexport OMP_NUM_THREADS=1\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\nexport VLLM_ALLOW_LONG_MAX_MODEL_LEN=1\n\nvllm serve your_model_path \\\n    --served-model-name qwen3-omni \\\n    --trust-remote-code \\\n    --max-num-seqs 14 \\\n    --max-model-len 131072 \\\n    --max-num-batched-tokens 16384 \\\n    --tensor-parallel-size 4 \\\n    --enable-expert-parallel \\\n    --distributed_executor_backend \"mp\" \\\n    {{prefix_caching}} \\\n    {{async_scheduling}} \\\n    {{compilation_config}} \\\n    --additional-config '{\"enable_flashcomm1\": false}' \\\n    --gpu-memory-utilization {{gpu_memory_utilization}} \\\n    --port 8000 \\\n    --hf-overrides '{\"rope_parameters\": {\"rope_type\": \"yarn\", \"factor\": 2, \"original_max_position_embeddings\": 65536}}' \\\n    {{spec_decoding}}\n```\n\n> - `VLLM_ALLOW_LONG_MAX_MODEL_LEN=1` is needed because the checkpoint declares 65536 positions while the scenario requests 131072.\n> - Reduce `--max-num-seqs` further if the KV cache approaches the NPU memory limit.",
+    "zh": "长上下文场景保持 TP4 与专家并行，通过 YaRN 将上下文提升到 131072 tokens，并把 `--max-num-seqs` 降到 14。vLLM-Ascend v0.30.0 会严格校验 `max_position_embeddings`，当请求长度超过 checkpoint 声明值时需要设置 `VLLM_ALLOW_LONG_MAX_MODEL_LEN=1`。\n\n```bash\nexport ASCEND_RT_VISIBLE_DEVICES=0,1,2,3\nexport HCCL_OP_EXPANSION_MODE=\"AIV\"\nexport HCCL_BUFFSIZE=1024\nexport OMP_PROC_BIND=false\nexport OMP_NUM_THREADS=1\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\nexport VLLM_ALLOW_LONG_MAX_MODEL_LEN=1\n\nvllm serve your_model_path \\\n    --served-model-name qwen3-omni \\\n    --trust-remote-code \\\n    --max-num-seqs 14 \\\n    --max-model-len 131072 \\\n    --max-num-batched-tokens 16384 \\\n    --tensor-parallel-size 4 \\\n    --enable-expert-parallel \\\n    --distributed_executor_backend \"mp\" \\\n    {{prefix_caching}} \\\n    {{async_scheduling}} \\\n    {{compilation_config}} \\\n    --additional-config '{\"enable_flashcomm1\": false}' \\\n    --gpu-memory-utilization {{gpu_memory_utilization}} \\\n    --port 8000 \\\n    --hf-overrides '{\"rope_parameters\": {\"rope_type\": \"yarn\", \"factor\": 2, \"original_max_position_embeddings\": 65536}}' \\\n    {{spec_decoding}}\n```\n\n> - checkpoint 声明 65536 个位置，而场景请求 131072，因此需要 `VLLM_ALLOW_LONG_MAX_MODEL_LEN=1`。\n> - KV Cache 接近 NPU 显存上限时，可继续降低 `--max-num-seqs`。"
+  },
+  "scenarios[2].steps[1].title": {
+    "en": "Verify the service",
+    "zh": "验证服务"
+  },
+  "scenarios[2].steps[1].content": {
+    "en": "Send a prompt longer than 65536 tokens and check that the response is coherent and does not time out.\n\n```bash\ncurl http://localhost:<port>/v1/chat/completions \\\n    -H \"Content-Type: application/json\" \\\n    -d '{\n        \"model\": \"qwen3-omni\",\n        \"messages\": [\n            {\"role\": \"user\", \"content\": \"Summarize the main idea of the text above in one sentence.\"}\n        ],\n        \"temperature\": 0,\n        \"max_tokens\": 128\n    }'\n```\n\nExpected result: HTTP 200 with a non-empty `choices` array.",
+    "zh": "发送超过 65536 tokens 的请求，确认返回内容正常、无超时。\n\n```bash\ncurl http://localhost:<port>/v1/chat/completions \\\n    -H \"Content-Type: application/json\" \\\n    -d '{\n        \"model\": \"qwen3-omni\",\n        \"messages\": [\n            {\"role\": \"user\", \"content\": \"Summarize the main idea of the text above in one sentence.\"}\n        ],\n        \"temperature\": 0,\n        \"max_tokens\": 128\n    }'\n```\n\n预期结果：HTTP 200，`choices` 非空。"
+  },
+  "scenarios[2].steps[2].title": {
+    "en": "Benchmark",
+    "zh": "性能基准"
+  },
+  "scenarios[2].steps[2].content": {
+    "en": "```bash\nvllm bench serve \\\n    --model your_model_path \\\n    --served-model-name qwen3-omni \\\n    --host 127.0.0.1 \\\n    --port 8000 \\\n    --dataset-name random \\\n    --random-input-len 8192 \\\n    --random-output-len 256 \\\n    --num-prompts 20 \\\n    --max-concurrency 4 \\\n    --seed 1234 \\\n    --ignore-eos \\\n    --save-result \\\n    --result-dir ./\n```\n\nThe benchmark above completed 20/20 requests with 201.30 output tok/s, mean TTFT 864.92 ms, and mean TPOT 16.54 ms. A single 70,025-token request returned the correct animal name (`fox`) in 5.93 s, with no error or timeout.",
+    "zh": "```bash\nvllm bench serve \\\n    --model your_model_path \\\n    --served-model-name qwen3-omni \\\n    --host 127.0.0.1 \\\n    --port 8000 \\\n    --dataset-name random \\\n    --random-input-len 8192 \\\n    --random-output-len 256 \\\n    --num-prompts 20 \\\n    --max-concurrency 4 \\\n    --seed 1234 \\\n    --ignore-eos \\\n    --save-result \\\n    --result-dir ./\n```\n\n上述基准 20/20 请求成功，输出吞吐 201.30 tok/s，平均 TTFT 864.92 ms，平均 TPOT 16.54 ms。单条 70025 tokens 请求在 5.93 s 内返回正确动物名称（`fox`），无报错、无超时。"
+  },
+  "verification": {
+    "en": "After the service is started, send a chat request. Replace `<port>` with the port from the `vllm serve` command.\n\n```bash\ncurl http://localhost:<port>/v1/chat/completions \\\n    -H \"Content-Type: application/json\" \\\n    -d '{\n        \"model\": \"qwen3-omni\",\n        \"messages\": [\n            {\"role\": \"user\", \"content\": \"Give me a short introduction to large language models.\"}\n        ],\n        \"temperature\": 0.6,\n        \"top_p\": 0.95,\n        \"max_tokens\": 512\n    }'\n```\n\nExpected result: HTTP 200 with a JSON body containing a non-empty `choices` field.",
+    "zh": "服务启动后发送对话请求，`<port>` 替换为 `vllm serve` 中使用的端口。\n\n```bash\ncurl http://localhost:<port>/v1/chat/completions \\\n    -H \"Content-Type: application/json\" \\\n    -d '{\n        \"model\": \"qwen3-omni\",\n        \"messages\": [\n            {\"role\": \"user\", \"content\": \"Give me a short introduction to large language models.\"}\n        ],\n        \"temperature\": 0.6,\n        \"top_p\": 0.95,\n        \"max_tokens\": 512\n    }'\n```\n\n预期结果：HTTP 200，返回 JSON 中的 `choices` 非空。"
+  },
+  "evaluation.accuracy.content": {
+    "en": "### Using EvalScope\n\nEvalScope supports OpenAI-compatible endpoints and the OmniBench dataset:\n\n```bash\npython3 -m venv /root/eval-venv\n/root/eval-venv/bin/pip install -U \"numpy>=2.0\" evalscope\n/root/eval-venv/bin/evalscope eval \\\n    --model qwen3-omni \\\n    --api-url http://127.0.0.1:8000/v1 \\\n    --api-key EMPTY \\\n    --eval-type openai_api \\\n    --datasets omni_bench gsm8k bbh \\\n    --dataset-args '{\"omni_bench\": {\"extra_params\": {\"use_image\": true, \"use_audio\": false}}}' \\\n    --limit 100 \\\n    --eval-batch-size 4 \\\n    --generation-config '{\"max_tokens\": 10000, \"temperature\": 0.6}'\n```\n\n**Accuracy results (Atlas 800I A3, vLLM-Ascend v0.30.0, W8A8, 100 samples per dataset):**\n\n| Dataset | Metric | Score |\n| --- | --- | --- |\n| OmniBench (image) | accuracy | 49.00% |\n| GSM8K | accuracy | 99.00% |\n| BBH | accuracy | not completed |\n\nThe two completed datasets match the upstream tutorial reference (v0.22.1rc, W8A8):\nOmniBench 0.44 and GSM8K 0.98. BBH was not completed because EvalScope expands\n--limit 100 to 100 samples per BBH subtask (2700 total), which exceeded the\nvalidation time budget; the tutorial reference is 0.9148.",
+    "zh": "### 使用 EvalScope\n\nEvalScope 支持 OpenAI 兼容接口与 OmniBench 数据集：\n\n```bash\npython3 -m venv /root/eval-venv\n/root/eval-venv/bin/pip install -U \"numpy>=2.0\" evalscope\n/root/eval-venv/bin/evalscope eval \\\n    --model qwen3-omni \\\n    --api-url http://127.0.0.1:8000/v1 \\\n    --api-key EMPTY \\\n    --eval-type openai_api \\\n    --datasets omni_bench gsm8k bbh \\\n    --dataset-args '{\"omni_bench\": {\"extra_params\": {\"use_image\": true, \"use_audio\": false}}}' \\\n    --limit 100 \\\n    --eval-batch-size 4 \\\n    --generation-config '{\"max_tokens\": 10000, \"temperature\": 0.6}'\n```\n\n**精度结果（Atlas 800I A3，vLLM-Ascend v0.30.0，W8A8，每个数据集 100 题）：**\n\n| 数据集 | 指标 | 分数 |\n| --- | --- | --- |\n| OmniBench（图像） | accuracy | 49.00% |\n| GSM8K | accuracy | 99.00% |\n| BBH | accuracy | 未完成 |\n\n已完成的两项与上游教程参考值（v0.22.1rc，W8A8）一致：OmniBench 0.44、GSM8K 0.98。\nBBH 未完成：EvalScope 会把 --limit 100 展开为每个 BBH 子任务 100 题（共 2700 题），\n超出本次验证时间预算；教程参考值为 0.9148。"
+  },
+  "performance.accuracy": {
+    "en": "### Using EvalScope\n\nSee the evaluation section for the command. The accuracy table below is an optional W8A8 reference measured against the TP1 W8A8 service. The default BF16 configuration was validated functionally and for performance in this cycle; its accuracy was not re-measured.",
+    "zh": "### 使用 EvalScope\n\n命令见评测章节。下方精度数据为可选的 W8A8 参考结果，基于 TP1 W8A8 服务测得；默认 BF16 配置本次完成了功能与性能验证，未重新评测精度。"
+  },
+  "performance.benchmark": {
+    "en": "### Measured Results\n\nAll numbers below were collected on one Atlas 800I A3 node (16 chips available; at most 4 used) with `quay.io/ascend/vllm-ascend:v0.30.0-a3-openeuler`.\n\n| Scenario | TP | Requests | Concurrency | Output tok/s | Mean TTFT (ms) | Mean TPOT (ms) |\n| --- | --- | --- | --- | --- | --- | --- |\n| High Throughput | 2 | 200/200 | 32 | 960.72 | 293.05 | 30.60 |\n| Low Latency | 4 | 200/200 | 1 QPS | 126.89 | 168.74 | 15.92 |\n| Long Context | 4 | 20/20 | 4 | 201.30 | 864.92 | 16.54 |\n\nBenchmark shapes: 200 input / 512 output tokens at concurrency 32 for high throughput; 200 input / 128 output tokens at 1 request per second for low latency; 8192 input / 256 output tokens at concurrency 4 for long context, plus a 70,025-token functional request. All numbers use the official BF16 checkpoint.\n\n### Scenario Overview\n\n| Scenario | Deployment Mode | Total NPUs | Weight Version | Key Considerations |\n| --- | --- | --- | --- | --- |\n| High Throughput | Single-Node (TP2) | 2 (A3) | BF16 | Two-chip TP keeps the official weights resident while maximizing concurrent request processing |\n| Low Latency | Single-Node (TP4) | 2 (A3) | BF16 | Multi-chip TP with expert parallelism reduces per-token latency |\n| Long Context | Single-Node (TP4) | 2 (A3) | BF16 | Fewer concurrent sequences leave room for a 131072-token context |\n\n> On Atlas 800I A3 each NPU contains two dies (chips), so TP4 uses 4 chips = 2 NPUs.",
+    "zh": "### 实测结果\n\n以下数据均在单台 Atlas 800I A3（共 16 芯片，最多使用 4 芯片）与 `quay.io/ascend/vllm-ascend:v0.30.0-a3-openeuler` 镜像上采集。\n\n| 场景 | TP | 请求数 | 并发 | 输出吞吐（tok/s） | 平均 TTFT（ms） | 平均 TPOT（ms） |\n| --- | --- | --- | --- | --- | --- | --- |\n| 高吞吐 | 2 | 200/200 | 32 | 960.72 | 293.05 | 30.60 |\n| 低时延 | 4 | 200/200 | 1 QPS | 126.89 | 168.74 | 15.92 |\n| 长上下文 | 4 | 20/20 | 4 | 201.30 | 864.92 | 16.54 |\n\n基准形状：高吞吐为 200 输入 / 512 输出、并发 32；低时延为 200 输入 / 128 输出、每秒 1 请求；长上下文为 8192 输入 / 256 输出、并发 4，并额外用 70025 tokens 单请求做功能验证。以上数据均使用官方 BF16 权重。\n\n### 场景概览\n\n| 场景 | 部署方式 | NPU 总数 | 权重版本 | 关键考量 |\n| --- | --- | --- | --- | --- |\n| 高吞吐 | 单节点（TP2） | 2（A3） | BF16 | 两芯片 TP 保持官方权重常驻，并最大化并发请求处理能力 |\n| 低时延 | 单节点（TP4） | 2（A3） | BF16 | 多芯片 TP + 专家并行降低单 token 时延 |\n| 长上下文 | 单节点（TP4） | 2（A3） | BF16 | 降低并发序列数为 131072 tokens 上下文预留空间 |\n\n> Atlas 800I A3 每个 NPU 包含两个 die（芯片），因此 TP4 使用 4 个芯片，即 2 个 NPU。"
+  },
+  "tuning": {
+    "en": "### Tuning Guidelines\n\n- Increase `--max-num-seqs` for throughput until NPU memory or the scheduler becomes the bottleneck.\n- Decrease `--max-num-seqs` and `--max-model-len` when multimodal requests time out.\n- Prefix caching is disabled in the validated scenarios; enable it for workloads with repeated media or prompt prefixes and measure the hit rate first.\n- Refer to the [Performance Tuning Guide](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/performance_and_debug/optimization_and_tuning.html) for additional options.",
+    "zh": "### 调优建议\n\n- 逐步提高 `--max-num-seqs` 直到 NPU 显存或调度成为瓶颈。\n- 全模态请求超时时，降低 `--max-num-seqs` 与 `--max-model-len`。\n- 验证场景关闭前缀缓存；对于重复媒体或提示前缀的业务，可开启并先评估命中率。\n- 更多选项见[性能调优文档](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/performance_and_debug/optimization_and_tuning.html)。"
+  },
+  "faq": {
+    "en": "**Why is `VLLM_ALLOW_LONG_MAX_MODEL_LEN=1` required?** The checkpoint declares 65536 positions. vLLM-Ascend v0.30.0 refuses to start with a larger `--max-model-len` unless this variable is set. The long-context scenario uses it together with the YaRN overrides.\n\n**Is a public W8A8 checkpoint available?** No. Quantize the official BF16 checkpoint with msmodelslim; the resulting directory can be loaded with `--quantization ascend`. W8A8 is an optional path for memory-constrained deployments and is not part of the CI-verified scenarios.\n\n**Which precision does CI verify?** BF16. All three scenarios load the public official BF16 checkpoint and need no local weight conversion.\n\n**Is Eagle3 speculative decoding supported?** Yes. The optional draft model is exposed as an off-by-default `spec_decoding` feature and was functionally validated on Atlas 800I A3 at TP1 (4/4 HTTP 200 responses, no ERROR/Traceback in the logs). Replace `your_eagle3_model_path` with the local draft-model directory before enabling it. The performance tables above remain the non-Eagle3 baseline.\n\n**Does the Thinking variant return reasoning content?** Yes. The server returns the reasoning trace in the response message; set `max_tokens` high enough to cover both the reasoning and the final answer.",
+    "zh": "**为什么需要 `VLLM_ALLOW_LONG_MAX_MODEL_LEN=1`？** checkpoint 声明 65536 个位置，vLLM-Ascend v0.30.0 在 `--max-model-len` 更大时会拒绝启动。长上下文场景需同时设置该变量与 YaRN 覆盖项。\n\n**是否有公开的 W8A8 权重？** 没有。请使用 msmodelslim 对官方 BF16 权重量化，生成的目录可直接通过 `--quantization ascend` 加载。W8A8 是面向显存受限部署的可选路径，不属于 CI 验证场景。\n\n**CI 验证哪种精度？** BF16。三个场景均加载公开的官方 BF16 权重，无需本地转换权重。\n\n**是否支持 Eagle3 投机推理？** 支持。可选的草稿模型通过默认关闭的 `spec_decoding` 特性提供，已在 Atlas 800I A3 的 TP1 上完成功能验证（4/4 HTTP 200，日志无 ERROR/Traceback）。启用前请将 `your_eagle3_model_path` 替换为本地草稿模型目录。上方性能表仍为非 Eagle3 基线。\n\n**Thinking 版本会返回推理内容吗？** 会。响应 message 中包含推理轨迹，`max_tokens` 需同时覆盖推理与最终答案。"
+  },
+  "references[0].title": {
+    "en": "vLLM-Ascend Tutorial (historical v0.23.0)",
+    "zh": "vLLM-Ascend 教程（v0.23.0 历史版本）"
+  },
+  "references[1].title": {
+    "en": "ModelScope Model Download (BF16)",
+    "zh": "ModelScope 模型下载（BF16）"
+  },
+  "references[2].title": {
+    "en": "msmodelslim Quantization Toolkit",
+    "zh": "msmodelslim 量化工具"
+  },
+  "references[3].title": {
+    "en": "vLLM-Ascend Additional Configuration",
+    "zh": "vLLM-Ascend 附加配置"
+  },
+  "references[4].title": {
+    "en": "Eagle3 Draft Model",
+    "zh": "Eagle3 草稿模型"
+  },
+  "references[5].title": {
+    "en": "vLLM-Ascend GitHub",
+    "zh": "vLLM-Ascend GitHub"
+  }
+}
