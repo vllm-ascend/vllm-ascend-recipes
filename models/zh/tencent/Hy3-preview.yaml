@@ -124,7 +124,7 @@ prerequisites:
         mkdir -p "$BENCH"
         cd "$BENCH"
         curl -fSL --retry 2 --connect-timeout 10 --max-time 180 \
-          "https://codeload.github.com/AISBench/benchmark/tar.gz/$COMMIT" -o "$ARCHIVE"
+          "https://codeload.github.com/AISBench/benchmark/tar.gz/e968d1bd7f48404bd913b95560f33938072336fa" -o "$ARCHIVE"
         printf '%s  %s\n' 93715c21b94c3ba86d9f660dc3cfdf25be670dc2b7aca035750ca832a26e3680 \
           "$ARCHIVE" | sha256sum --check --strict
         tar -xzf "$ARCHIVE" --no-same-owner --no-same-permissions
