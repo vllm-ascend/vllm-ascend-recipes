@@ -57,11 +57,13 @@ aliases:
   - model_id: moonshotai/Kimi-K2.6
     cache_dir: Kimi-K2.6-W4A8
 
+  - model_id: tencent/Hy3-preview
+    cache_dir:
+      atlas_800_a3: tencent/Hy3-preview
+
   - model_id: Qwen/Qwen3-Omni-30B-A3B-Thinking
     cache_dir: Qwen/Qwen3-Omni-30B-A3B-Thinking
   - model_id: Qwen/Qwen3-Coder-30B-A3B-Instruct
     cache_dir: Qwen3-Coder-30B-A3B-Instruct-w8a8
-
-  - model_id: tencent/Hy3-preview
-    cache_dir:
-      atlas_800_a3: tencent/Hy3-preview
+  - model_id: Qwen/Qwen3-VL-Embedding-2B
+    cache_dir: Qwen/Qwen3-VL-Embedding-2B
