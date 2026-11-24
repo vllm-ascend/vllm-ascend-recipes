@@ -1,8 +1,8 @@
 meta:
-  title: Qwen3-32B
-  slug: qwen3-32b
+  title: Qwen3 Dense
+  slug: qwen3-dense
   provider: Qwen
-  description: Single-node Ascend inference recipes for Qwen3-32B.
+  description: Single-node Ascend deployment for Qwen3 Dense 0.6B, 1.7B, 4B, 8B, 14B and 32B.
   date_added: '2026-11-19'
   difficulty: intermediate
   hardware:
@@ -10,9 +10,9 @@ meta:
     atlas_800_a3: experimental
     atlas_300i_duo: experimental
 model:
-  model_id: Qwen/Qwen3-32B
+  model_id: Qwen/Qwen3-0.6B
   architecture: dense
-  parameter_count: 32B
+  parameter_count: 0.6B / 1.7B / 4B / 8B / 14B / 32B
   active_parameters: null
   context_length: 40960
   modality: text
@@ -26,9 +26,98 @@ compatible_strategies:
 - single_node_A2
 - single_node_A3
 - single_node_310p
-overview: Qwen3-32B is a dense model for text generation with a native context window of 40,960 tokens.
+overview: |-
+  Select hardware and precision, then select the model size and TP configuration. All six checkpoints share this deployment guide. The default scenario uses Qwen3-0.6B BF16 on one chip.
+
+  The legacy Dense W4A8 linear scheme was removed in [vLLM Ascend #13713](https://github.com/vllm-project/vllm-ascend/pull/13713). W8A8SC-310 remains a separate Atlas 300I DUO deployment option.
 weight_download:
-- weight_version: BF16
+- weight_version: Qwen3-0.6B BF16
+  sources:
+  - source: HuggingFace
+    url: https://huggingface.co/Qwen/Qwen3-0.6B
+    command: |-
+      ```bash
+      hf download Qwen/Qwen3-0.6B --local-dir "$MODEL_DIR/Qwen3-0.6B"
+      ```
+  - source: ModelScope
+    url: https://www.modelscope.cn/models/Qwen/Qwen3-0.6B
+    command: |-
+      ```bash
+      modelscope download --model Qwen/Qwen3-0.6B --local_dir "$MODEL_DIR/Qwen3-0.6B"
+      ```
+- weight_version: Qwen3-1.7B BF16
+  sources:
+  - source: HuggingFace
+    url: https://huggingface.co/Qwen/Qwen3-1.7B
+    command: |-
+      ```bash
+      hf download Qwen/Qwen3-1.7B --local-dir "$MODEL_DIR/Qwen3-1.7B"
+      ```
+  - source: ModelScope
+    url: https://www.modelscope.cn/models/Qwen/Qwen3-1.7B
+    command: |-
+      ```bash
+      modelscope download --model Qwen/Qwen3-1.7B --local_dir "$MODEL_DIR/Qwen3-1.7B"
+      ```
+- weight_version: Qwen3-4B BF16
+  sources:
+  - source: HuggingFace
+    url: https://huggingface.co/Qwen/Qwen3-4B
+    command: |-
+      ```bash
+      hf download Qwen/Qwen3-4B --local-dir "$MODEL_DIR/Qwen3-4B"
+      ```
+  - source: ModelScope
+    url: https://www.modelscope.cn/models/Qwen/Qwen3-4B
+    command: |-
+      ```bash
+      modelscope download --model Qwen/Qwen3-4B --local_dir "$MODEL_DIR/Qwen3-4B"
+      ```
+- weight_version: Qwen3-8B BF16
+  sources:
+  - source: HuggingFace
+    url: https://huggingface.co/Qwen/Qwen3-8B
+    command: |-
+      ```bash
+      hf download Qwen/Qwen3-8B --local-dir "$MODEL_DIR/Qwen3-8B"
+      ```
+  - source: ModelScope
+    url: https://www.modelscope.cn/models/Qwen/Qwen3-8B
+    command: |-
+      ```bash
+      modelscope download --model Qwen/Qwen3-8B --local_dir "$MODEL_DIR/Qwen3-8B"
+      ```
+- weight_version: Qwen3-8B W8A8SC-310
+  sources:
+  - source: ModelScope
+    url: https://www.modelscope.cn/models/Eco-Tech/Qwen3-8B-w8a8sc-310-vllm
+    command: |-
+      ```bash
+      modelscope download --model Eco-Tech/Qwen3-8B-w8a8sc-310-vllm --local_dir "$MODEL_DIR/Qwen3-8B-w8a8sc-310-vllm"
+      ```
+- weight_version: Qwen3-14B BF16
+  sources:
+  - source: HuggingFace
+    url: https://huggingface.co/Qwen/Qwen3-14B
+    command: |-
+      ```bash
+      hf download Qwen/Qwen3-14B --local-dir "$MODEL_DIR/Qwen3-14B"
+      ```
+  - source: ModelScope
+    url: https://www.modelscope.cn/models/Qwen/Qwen3-14B
+    command: |-
+      ```bash
+      modelscope download --model Qwen/Qwen3-14B --local_dir "$MODEL_DIR/Qwen3-14B"
+      ```
+- weight_version: Qwen3-14B W8A8SC-310
+  sources:
+  - source: ModelScope
+    url: https://www.modelscope.cn/models/Eco-Tech/Qwen3-14B-w8a8sc-310-vllm
+    command: |-
+      ```bash
+      modelscope download --model Eco-Tech/Qwen3-14B-w8a8sc-310-vllm --local_dir "$MODEL_DIR/Qwen3-14B-w8a8sc-310-vllm"
+      ```
+- weight_version: Qwen3-32B BF16
   sources:
   - source: HuggingFace
     url: https://huggingface.co/Qwen/Qwen3-32B
@@ -42,7 +131,7 @@ weight_download:
       ```bash
       modelscope download --model Qwen/Qwen3-32B --local_dir "$MODEL_DIR/Qwen3-32B"
       ```
-- weight_version: W8A8
+- weight_version: Qwen3-32B W8A8
   sources:
   - source: ModelScope
     url: https://www.modelscope.cn/models/vllm-ascend/Qwen3-32B-W8A8
@@ -50,7 +139,7 @@ weight_download:
       ```bash
       modelscope download --model vllm-ascend/Qwen3-32B-W8A8 --local_dir "$MODEL_DIR/Qwen3-32B-W8A8"
       ```
-- weight_version: W4A4
+- weight_version: Qwen3-32B W4A4
   sources:
   - source: ModelScope
     url: https://www.modelscope.cn/models/vllm-ascend/Qwen3-32B-W4A4
@@ -58,7 +147,7 @@ weight_download:
       ```bash
       modelscope download --model vllm-ascend/Qwen3-32B-W4A4 --local_dir "$MODEL_DIR/Qwen3-32B-W4A4"
       ```
-- weight_version: W8A8SC-310
+- weight_version: Qwen3-32B W8A8SC-310
   sources:
   - source: ModelScope
     url: https://www.modelscope.cn/models/Eco-Tech/Qwen3-32B-w8a8sc-310-vllm
@@ -68,22 +157,21 @@ weight_download:
       ```
 prerequisites:
 - title: Weights and devices
-  content: Set `MODEL_DIR` to the host weight parent directory in the same shell before running the download command. The
-    container mounts it at `/weights`. Install the CLI for the selected source and check available chips with `npu-smi info`.
-    Docker defaults to the largest listed TP configuration. Set `NPU_COUNT` to the selected TP size to map only the chips
-    you need.
+  content: Set MODEL_DIR to the parent directory of downloaded checkpoints. Set NPU_COUNT to the selected scenario
+    TP size before starting Docker. It defaults to one chip. A2 and 310P support up to four mapped devices here,
+    and A3 supports up to eight.
 env_setup:
   pip:
-    content: See the [installation guide](https://docs.vllm.ai/projects/ascend/en/latest/installation.html) for source installation
-      and driver compatibility. Replace `/weights` with the weight directory when running outside Docker.
-      For a 310P source installation, uninstall `triton-ascend` and `triton` if they were installed as dependencies.
+    content: See the [installation guide](https://docs.vllm.ai/projects/ascend/en/latest/installation.html) for
+      source installation and driver compatibility. Replace `/weights` with the weight directory when running outside
+      Docker. For a 310P source installation, uninstall `triton-ascend` and `triton` if they were installed as dependencies.
   container:
     A2:
       content: |-
         ```bash
         IMAGE=quay.io/ascend/vllm-ascend:nightly-main
         MODEL_DIR="${MODEL_DIR:?Set MODEL_DIR to the absolute parent directory of the downloaded weights}"
-        NPU_COUNT="${NPU_COUNT:-4}"
+        NPU_COUNT="${NPU_COUNT:-1}"
         device_flags=(
           --device /dev/davinci0
           --device /dev/davinci1
@@ -106,7 +194,7 @@ env_setup:
         ```bash
         IMAGE=quay.io/ascend/vllm-ascend:nightly-main-a3
         MODEL_DIR="${MODEL_DIR:?Set MODEL_DIR to the absolute parent directory of the downloaded weights}"
-        NPU_COUNT="${NPU_COUNT:-8}"
+        NPU_COUNT="${NPU_COUNT:-1}"
         device_flags=(
           --device /dev/davinci0
           --device /dev/davinci1
@@ -133,7 +221,7 @@ env_setup:
         ```bash
         IMAGE=quay.io/ascend/vllm-ascend:nightly-main-310p
         MODEL_DIR="${MODEL_DIR:?Set MODEL_DIR to the absolute parent directory of the downloaded weights}"
-        NPU_COUNT="${NPU_COUNT:-4}"
+        NPU_COUNT="${NPU_COUNT:-1}"
         device_flags=(
           --device /dev/davinci0
           --device /dev/davinci1
@@ -155,9 +243,9 @@ scenarios:
 - npu: Atlas 800I A2
   precision: BF16
   deployment: Single-Node
-  case: TP2
+  case: Qwen3-0.6B / TP1
   strategy: single_node_A2
-  npu_per_node: 2
+  npu_per_node: 1
   steps:
   - title: Start the server
     content: |-
@@ -166,10 +254,10 @@ scenarios:
       The default service port is `8000`.
 
       ```bash
-      export ASCEND_RT_VISIBLE_DEVICES=0,1
-      MODEL_PATH=Qwen/Qwen3-32B
-      if [[ -r /weights/Qwen3-32B/config.json ]]; then MODEL_PATH=/weights/Qwen3-32B; fi
-      vllm serve "$MODEL_PATH" --served-model-name qwen3 --dtype bfloat16 --host 127.0.0.1 --port 8000 --tensor-parallel-size 2 --distributed-executor-backend mp
+      export ASCEND_RT_VISIBLE_DEVICES=0
+      MODEL_PATH=Qwen/Qwen3-0.6B
+      if [[ -r /weights/Qwen3-0.6B/config.json ]]; then MODEL_PATH=/weights/Qwen3-0.6B; fi
+      vllm serve "$MODEL_PATH" --served-model-name qwen3 --dtype bfloat16 --host 127.0.0.1 --port 8000 --tensor-parallel-size 1
       ```
   - title: Check readiness
     content: |-
@@ -188,10 +276,481 @@ scenarios:
         -H 'Content-Type: application/json' \
         -d '{"model":"qwen3","messages":[{"role":"user","content":"What is the capital of France?"}],"temperature":0.6,"top_p":0.95,"top_k":20,"max_tokens":64,"chat_template_kwargs":{"enable_thinking":false}}'
       ```
+  checkpoint_model_id: Qwen/Qwen3-0.6B
 - npu: Atlas 800I A3
   precision: BF16
   deployment: Single-Node
-  case: TP2
+  case: Qwen3-0.6B / TP1
+  strategy: single_node_A3
+  npu_per_node: 1
+  steps:
+  - title: Start the server
+    content: |-
+      Use the original BF16 weights. This adapts the official Qwen3 quick start with tensor parallelism sized for this checkpoint.
+
+      The default service port is `8000`.
+
+      ```bash
+      export ASCEND_RT_VISIBLE_DEVICES=0
+      MODEL_PATH=Qwen/Qwen3-0.6B
+      if [[ -r /weights/Qwen3-0.6B/config.json ]]; then MODEL_PATH=/weights/Qwen3-0.6B; fi
+      vllm serve "$MODEL_PATH" --served-model-name qwen3 --dtype bfloat16 --host 127.0.0.1 --port 8000 --tensor-parallel-size 1
+      ```
+  - title: Check readiness
+    content: |-
+      After startup, use `127.0.0.1` for `<server_ip>` and the selected port. The model list should include `qwen3`.
+
+      ```bash
+      curl -sS --fail-with-body http://<server_ip>:<port>/health
+      curl -sS --fail-with-body http://<server_ip>:<port>/v1/models
+      ```
+  - title: Send an inference request
+    content: |-
+      Expect HTTP 200 and nonempty `choices[0].message.content`.
+
+      ```bash
+      curl -sS --fail-with-body http://<server_ip>:<port>/v1/chat/completions \
+        -H 'Content-Type: application/json' \
+        -d '{"model":"qwen3","messages":[{"role":"user","content":"What is the capital of France?"}],"temperature":0.6,"top_p":0.95,"top_k":20,"max_tokens":64,"chat_template_kwargs":{"enable_thinking":false}}'
+      ```
+  checkpoint_model_id: Qwen/Qwen3-0.6B
+- npu: Atlas 800I A2
+  precision: BF16
+  deployment: Single-Node
+  case: Qwen3-1.7B / TP1
+  strategy: single_node_A2
+  npu_per_node: 1
+  steps:
+  - title: Start the server
+    content: |-
+      Use the original BF16 weights. This adapts the official Qwen3 quick start with tensor parallelism sized for this checkpoint.
+
+      The default service port is `8000`.
+
+      ```bash
+      export ASCEND_RT_VISIBLE_DEVICES=0
+      MODEL_PATH=Qwen/Qwen3-1.7B
+      if [[ -r /weights/Qwen3-1.7B/config.json ]]; then MODEL_PATH=/weights/Qwen3-1.7B; fi
+      vllm serve "$MODEL_PATH" --served-model-name qwen3 --dtype bfloat16 --host 127.0.0.1 --port 8000 --tensor-parallel-size 1
+      ```
+  - title: Check readiness
+    content: |-
+      After startup, use `127.0.0.1` for `<server_ip>` and the selected port. The model list should include `qwen3`.
+
+      ```bash
+      curl -sS --fail-with-body http://<server_ip>:<port>/health
+      curl -sS --fail-with-body http://<server_ip>:<port>/v1/models
+      ```
+  - title: Send an inference request
+    content: |-
+      Expect HTTP 200 and nonempty `choices[0].message.content`.
+
+      ```bash
+      curl -sS --fail-with-body http://<server_ip>:<port>/v1/chat/completions \
+        -H 'Content-Type: application/json' \
+        -d '{"model":"qwen3","messages":[{"role":"user","content":"What is the capital of France?"}],"temperature":0.6,"top_p":0.95,"top_k":20,"max_tokens":64,"chat_template_kwargs":{"enable_thinking":false}}'
+      ```
+  checkpoint_model_id: Qwen/Qwen3-1.7B
+- npu: Atlas 800I A3
+  precision: BF16
+  deployment: Single-Node
+  case: Qwen3-1.7B / TP1
+  strategy: single_node_A3
+  npu_per_node: 1
+  steps:
+  - title: Start the server
+    content: |-
+      Use the original BF16 weights. This adapts the official Qwen3 quick start with tensor parallelism sized for this checkpoint.
+
+      The default service port is `8000`.
+
+      ```bash
+      export ASCEND_RT_VISIBLE_DEVICES=0
+      MODEL_PATH=Qwen/Qwen3-1.7B
+      if [[ -r /weights/Qwen3-1.7B/config.json ]]; then MODEL_PATH=/weights/Qwen3-1.7B; fi
+      vllm serve "$MODEL_PATH" --served-model-name qwen3 --dtype bfloat16 --host 127.0.0.1 --port 8000 --tensor-parallel-size 1
+      ```
+  - title: Check readiness
+    content: |-
+      After startup, use `127.0.0.1` for `<server_ip>` and the selected port. The model list should include `qwen3`.
+
+      ```bash
+      curl -sS --fail-with-body http://<server_ip>:<port>/health
+      curl -sS --fail-with-body http://<server_ip>:<port>/v1/models
+      ```
+  - title: Send an inference request
+    content: |-
+      Expect HTTP 200 and nonempty `choices[0].message.content`.
+
+      ```bash
+      curl -sS --fail-with-body http://<server_ip>:<port>/v1/chat/completions \
+        -H 'Content-Type: application/json' \
+        -d '{"model":"qwen3","messages":[{"role":"user","content":"What is the capital of France?"}],"temperature":0.6,"top_p":0.95,"top_k":20,"max_tokens":64,"chat_template_kwargs":{"enable_thinking":false}}'
+      ```
+  checkpoint_model_id: Qwen/Qwen3-1.7B
+- npu: Atlas 800I A2
+  precision: BF16
+  deployment: Single-Node
+  case: Qwen3-4B / TP1
+  strategy: single_node_A2
+  npu_per_node: 1
+  steps:
+  - title: Start the server
+    content: |-
+      Use the original BF16 weights. This adapts the official Qwen3 quick start with tensor parallelism sized for this checkpoint.
+
+      The default service port is `8000`.
+
+      ```bash
+      export ASCEND_RT_VISIBLE_DEVICES=0
+      MODEL_PATH=Qwen/Qwen3-4B
+      if [[ -r /weights/Qwen3-4B/config.json ]]; then MODEL_PATH=/weights/Qwen3-4B; fi
+      vllm serve "$MODEL_PATH" --served-model-name qwen3 --dtype bfloat16 --host 127.0.0.1 --port 8000 --tensor-parallel-size 1
+      ```
+  - title: Check readiness
+    content: |-
+      After startup, use `127.0.0.1` for `<server_ip>` and the selected port. The model list should include `qwen3`.
+
+      ```bash
+      curl -sS --fail-with-body http://<server_ip>:<port>/health
+      curl -sS --fail-with-body http://<server_ip>:<port>/v1/models
+      ```
+  - title: Send an inference request
+    content: |-
+      Expect HTTP 200 and nonempty `choices[0].message.content`.
+
+      ```bash
+      curl -sS --fail-with-body http://<server_ip>:<port>/v1/chat/completions \
+        -H 'Content-Type: application/json' \
+        -d '{"model":"qwen3","messages":[{"role":"user","content":"What is the capital of France?"}],"temperature":0.6,"top_p":0.95,"top_k":20,"max_tokens":64,"chat_template_kwargs":{"enable_thinking":false}}'
+      ```
+  checkpoint_model_id: Qwen/Qwen3-4B
+- npu: Atlas 800I A3
+  precision: BF16
+  deployment: Single-Node
+  case: Qwen3-4B / TP1
+  strategy: single_node_A3
+  npu_per_node: 1
+  steps:
+  - title: Start the server
+    content: |-
+      Use the original BF16 weights. This adapts the official Qwen3 quick start with tensor parallelism sized for this checkpoint.
+
+      The default service port is `8000`.
+
+      ```bash
+      export ASCEND_RT_VISIBLE_DEVICES=0
+      MODEL_PATH=Qwen/Qwen3-4B
+      if [[ -r /weights/Qwen3-4B/config.json ]]; then MODEL_PATH=/weights/Qwen3-4B; fi
+      vllm serve "$MODEL_PATH" --served-model-name qwen3 --dtype bfloat16 --host 127.0.0.1 --port 8000 --tensor-parallel-size 1
+      ```
+  - title: Check readiness
+    content: |-
+      After startup, use `127.0.0.1` for `<server_ip>` and the selected port. The model list should include `qwen3`.
+
+      ```bash
+      curl -sS --fail-with-body http://<server_ip>:<port>/health
+      curl -sS --fail-with-body http://<server_ip>:<port>/v1/models
+      ```
+  - title: Send an inference request
+    content: |-
+      Expect HTTP 200 and nonempty `choices[0].message.content`.
+
+      ```bash
+      curl -sS --fail-with-body http://<server_ip>:<port>/v1/chat/completions \
+        -H 'Content-Type: application/json' \
+        -d '{"model":"qwen3","messages":[{"role":"user","content":"What is the capital of France?"}],"temperature":0.6,"top_p":0.95,"top_k":20,"max_tokens":64,"chat_template_kwargs":{"enable_thinking":false}}'
+      ```
+  checkpoint_model_id: Qwen/Qwen3-4B
+- npu: Atlas 800I A2
+  precision: BF16
+  deployment: Single-Node
+  case: Qwen3-8B / TP1
+  strategy: single_node_A2
+  npu_per_node: 1
+  steps:
+  - title: Start the server
+    content: |-
+      Use the original BF16 weights. This adapts the official Qwen3 quick start with tensor parallelism sized for this checkpoint.
+
+      The default service port is `8000`.
+
+      ```bash
+      export ASCEND_RT_VISIBLE_DEVICES=0
+      MODEL_PATH=Qwen/Qwen3-8B
+      if [[ -r /weights/Qwen3-8B/config.json ]]; then MODEL_PATH=/weights/Qwen3-8B; fi
+      vllm serve "$MODEL_PATH" --served-model-name qwen3 --dtype bfloat16 --host 127.0.0.1 --port 8000 --tensor-parallel-size 1
+      ```
+  - title: Check readiness
+    content: |-
+      After startup, use `127.0.0.1` for `<server_ip>` and the selected port. The model list should include `qwen3`.
+
+      ```bash
+      curl -sS --fail-with-body http://<server_ip>:<port>/health
+      curl -sS --fail-with-body http://<server_ip>:<port>/v1/models
+      ```
+  - title: Send an inference request
+    content: |-
+      Expect HTTP 200 and nonempty `choices[0].message.content`.
+
+      ```bash
+      curl -sS --fail-with-body http://<server_ip>:<port>/v1/chat/completions \
+        -H 'Content-Type: application/json' \
+        -d '{"model":"qwen3","messages":[{"role":"user","content":"What is the capital of France?"}],"temperature":0.6,"top_p":0.95,"top_k":20,"max_tokens":64,"chat_template_kwargs":{"enable_thinking":false}}'
+      ```
+  checkpoint_model_id: Qwen/Qwen3-8B
+- npu: Atlas 800I A3
+  precision: BF16
+  deployment: Single-Node
+  case: Qwen3-8B / TP1
+  strategy: single_node_A3
+  npu_per_node: 1
+  steps:
+  - title: Start the server
+    content: |-
+      Use the original BF16 weights. This adapts the official Qwen3 quick start with tensor parallelism sized for this checkpoint.
+
+      The default service port is `8000`.
+
+      ```bash
+      export ASCEND_RT_VISIBLE_DEVICES=0
+      MODEL_PATH=Qwen/Qwen3-8B
+      if [[ -r /weights/Qwen3-8B/config.json ]]; then MODEL_PATH=/weights/Qwen3-8B; fi
+      vllm serve "$MODEL_PATH" --served-model-name qwen3 --dtype bfloat16 --host 127.0.0.1 --port 8000 --tensor-parallel-size 1
+      ```
+  - title: Check readiness
+    content: |-
+      After startup, use `127.0.0.1` for `<server_ip>` and the selected port. The model list should include `qwen3`.
+
+      ```bash
+      curl -sS --fail-with-body http://<server_ip>:<port>/health
+      curl -sS --fail-with-body http://<server_ip>:<port>/v1/models
+      ```
+  - title: Send an inference request
+    content: |-
+      Expect HTTP 200 and nonempty `choices[0].message.content`.
+
+      ```bash
+      curl -sS --fail-with-body http://<server_ip>:<port>/v1/chat/completions \
+        -H 'Content-Type: application/json' \
+        -d '{"model":"qwen3","messages":[{"role":"user","content":"What is the capital of France?"}],"temperature":0.6,"top_p":0.95,"top_k":20,"max_tokens":64,"chat_template_kwargs":{"enable_thinking":false}}'
+      ```
+  checkpoint_model_id: Qwen/Qwen3-8B
+- npu: Atlas 300I DUO
+  precision: W8A8SC-310
+  deployment: Single-Node
+  case: Qwen3-8B / TP1
+  strategy: single_node_310p
+  npu_per_node: 1
+  steps:
+  - title: Start the server
+    content: |-
+      Use the shard directory for the selected TP size. The 310P profile uses FP16, preserves the tutorial's graph capture sizes, and disables prefix caching and npugraph_ex.
+
+      The default service port is `8080`.
+
+      ```bash
+      export ASCEND_RT_VISIBLE_DEVICES=0
+
+      vllm serve /weights/Qwen3-8B-w8a8sc-310-vllm/TP1/Qwen3-8B-w8a8sc-310-vllm-tp1 \
+          --host 127.0.0.1 \
+          --port 8080 \
+          --tensor-parallel-size 1 \
+          --gpu-memory-utilization 0.90 \
+          --max-num-seqs 32 \
+          --served-model-name qwen3 \
+          --dtype float16 \
+          --additional-config '{"ascend_compilation_config": {"enable_npugraph_ex":false}}' \
+          --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY", "cudagraph_capture_sizes": [1,2,4,8,16,32]}' \
+          --quantization ascend \
+          --max-model-len 20480 \
+          --no-enable-prefix-caching \
+          --load-format sharded_state
+      ```
+  - title: Check readiness
+    content: |-
+      After startup, use `127.0.0.1` for `<server_ip>` and the selected port. The model list should include `qwen3`.
+
+      ```bash
+      curl -sS --fail-with-body http://<server_ip>:<port>/health
+      curl -sS --fail-with-body http://<server_ip>:<port>/v1/models
+      ```
+  - title: Send an inference request
+    content: |-
+      Expect HTTP 200 and nonempty `choices[0].message.content`.
+
+      ```bash
+      curl -sS --fail-with-body http://<server_ip>:<port>/v1/chat/completions \
+        -H 'Content-Type: application/json' \
+        -d '{"model":"qwen3","messages":[{"role":"user","content":"What is the capital of France?"}],"temperature":0.6,"top_p":0.95,"top_k":20,"max_tokens":64,"chat_template_kwargs":{"enable_thinking":false}}'
+      ```
+  checkpoint_subdir: TP1/Qwen3-8B-w8a8sc-310-vllm-tp1
+  checkpoint_model_id: Eco-Tech/Qwen3-8B-w8a8sc-310-vllm
+- npu: Atlas 800I A2
+  precision: BF16
+  deployment: Single-Node
+  case: Qwen3-14B / TP1
+  strategy: single_node_A2
+  npu_per_node: 1
+  steps:
+  - title: Start the server
+    content: |-
+      Use the original BF16 weights. This adapts the official Qwen3 quick start with tensor parallelism sized for this checkpoint.
+
+      The default service port is `8000`.
+
+      ```bash
+      export ASCEND_RT_VISIBLE_DEVICES=0
+      MODEL_PATH=Qwen/Qwen3-14B
+      if [[ -r /weights/Qwen3-14B/config.json ]]; then MODEL_PATH=/weights/Qwen3-14B; fi
+      vllm serve "$MODEL_PATH" --served-model-name qwen3 --dtype bfloat16 --host 127.0.0.1 --port 8000 --tensor-parallel-size 1
+      ```
+  - title: Check readiness
+    content: |-
+      After startup, use `127.0.0.1` for `<server_ip>` and the selected port. The model list should include `qwen3`.
+
+      ```bash
+      curl -sS --fail-with-body http://<server_ip>:<port>/health
+      curl -sS --fail-with-body http://<server_ip>:<port>/v1/models
+      ```
+  - title: Send an inference request
+    content: |-
+      Expect HTTP 200 and nonempty `choices[0].message.content`.
+
+      ```bash
+      curl -sS --fail-with-body http://<server_ip>:<port>/v1/chat/completions \
+        -H 'Content-Type: application/json' \
+        -d '{"model":"qwen3","messages":[{"role":"user","content":"What is the capital of France?"}],"temperature":0.6,"top_p":0.95,"top_k":20,"max_tokens":64,"chat_template_kwargs":{"enable_thinking":false}}'
+      ```
+  checkpoint_model_id: Qwen/Qwen3-14B
+- npu: Atlas 800I A3
+  precision: BF16
+  deployment: Single-Node
+  case: Qwen3-14B / TP1
+  strategy: single_node_A3
+  npu_per_node: 1
+  steps:
+  - title: Start the server
+    content: |-
+      Use the original BF16 weights. This adapts the official Qwen3 quick start with tensor parallelism sized for this checkpoint.
+
+      The default service port is `8000`.
+
+      ```bash
+      export ASCEND_RT_VISIBLE_DEVICES=0
+      MODEL_PATH=Qwen/Qwen3-14B
+      if [[ -r /weights/Qwen3-14B/config.json ]]; then MODEL_PATH=/weights/Qwen3-14B; fi
+      vllm serve "$MODEL_PATH" --served-model-name qwen3 --dtype bfloat16 --host 127.0.0.1 --port 8000 --tensor-parallel-size 1
+      ```
+  - title: Check readiness
+    content: |-
+      After startup, use `127.0.0.1` for `<server_ip>` and the selected port. The model list should include `qwen3`.
+
+      ```bash
+      curl -sS --fail-with-body http://<server_ip>:<port>/health
+      curl -sS --fail-with-body http://<server_ip>:<port>/v1/models
+      ```
+  - title: Send an inference request
+    content: |-
+      Expect HTTP 200 and nonempty `choices[0].message.content`.
+
+      ```bash
+      curl -sS --fail-with-body http://<server_ip>:<port>/v1/chat/completions \
+        -H 'Content-Type: application/json' \
+        -d '{"model":"qwen3","messages":[{"role":"user","content":"What is the capital of France?"}],"temperature":0.6,"top_p":0.95,"top_k":20,"max_tokens":64,"chat_template_kwargs":{"enable_thinking":false}}'
+      ```
+  checkpoint_model_id: Qwen/Qwen3-14B
+- npu: Atlas 300I DUO
+  precision: W8A8SC-310
+  deployment: Single-Node
+  case: Qwen3-14B / TP1
+  strategy: single_node_310p
+  npu_per_node: 1
+  steps:
+  - title: Start the server
+    content: |-
+      Use the shard directory for the selected TP size. The 310P profile uses FP16, preserves the tutorial's graph capture sizes, and disables prefix caching and npugraph_ex.
+
+      The default service port is `8080`.
+
+      ```bash
+      export ASCEND_RT_VISIBLE_DEVICES=0
+
+      vllm serve /weights/Qwen3-14B-w8a8sc-310-vllm/TP1/Qwen3-14B-w8a8sc-310-vllm-tp1 \
+          --host 127.0.0.1 \
+          --port 8080 \
+          --tensor-parallel-size 1 \
+          --gpu-memory-utilization 0.90 \
+          --max-num-seqs 16 \
+          --served-model-name qwen3 \
+          --dtype float16 \
+          --additional-config '{"ascend_compilation_config": {"enable_npugraph_ex":false}}' \
+          --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY", "cudagraph_capture_sizes": [1,2,4,8,16]}' \
+          --quantization ascend \
+          --max-model-len 20480 \
+          --no-enable-prefix-caching \
+          --load-format sharded_state
+      ```
+  - title: Check readiness
+    content: |-
+      After startup, use `127.0.0.1` for `<server_ip>` and the selected port. The model list should include `qwen3`.
+
+      ```bash
+      curl -sS --fail-with-body http://<server_ip>:<port>/health
+      curl -sS --fail-with-body http://<server_ip>:<port>/v1/models
+      ```
+  - title: Send an inference request
+    content: |-
+      Expect HTTP 200 and nonempty `choices[0].message.content`.
+
+      ```bash
+      curl -sS --fail-with-body http://<server_ip>:<port>/v1/chat/completions \
+        -H 'Content-Type: application/json' \
+        -d '{"model":"qwen3","messages":[{"role":"user","content":"What is the capital of France?"}],"temperature":0.6,"top_p":0.95,"top_k":20,"max_tokens":64,"chat_template_kwargs":{"enable_thinking":false}}'
+      ```
+  checkpoint_subdir: TP1/Qwen3-14B-w8a8sc-310-vllm-tp1
+  checkpoint_model_id: Eco-Tech/Qwen3-14B-w8a8sc-310-vllm
+- npu: Atlas 800I A2
+  precision: BF16
+  deployment: Single-Node
+  case: Qwen3-32B / TP2
+  strategy: single_node_A2
+  npu_per_node: 2
+  steps:
+  - title: Start the server
+    content: |-
+      Use the original BF16 weights. This adapts the official Qwen3 quick start with tensor parallelism sized for this checkpoint.
+
+      The default service port is `8000`.
+
+      ```bash
+      export ASCEND_RT_VISIBLE_DEVICES=0,1
+      MODEL_PATH=Qwen/Qwen3-32B
+      if [[ -r /weights/Qwen3-32B/config.json ]]; then MODEL_PATH=/weights/Qwen3-32B; fi
+      vllm serve "$MODEL_PATH" --served-model-name qwen3 --dtype bfloat16 --host 127.0.0.1 --port 8000 --tensor-parallel-size 2 --distributed-executor-backend mp
+      ```
+  - title: Check readiness
+    content: |-
+      After startup, use `127.0.0.1` for `<server_ip>` and the selected port. The model list should include `qwen3`.
+
+      ```bash
+      curl -sS --fail-with-body http://<server_ip>:<port>/health
+      curl -sS --fail-with-body http://<server_ip>:<port>/v1/models
+      ```
+  - title: Send an inference request
+    content: |-
+      Expect HTTP 200 and nonempty `choices[0].message.content`.
+
+      ```bash
+      curl -sS --fail-with-body http://<server_ip>:<port>/v1/chat/completions \
+        -H 'Content-Type: application/json' \
+        -d '{"model":"qwen3","messages":[{"role":"user","content":"What is the capital of France?"}],"temperature":0.6,"top_p":0.95,"top_k":20,"max_tokens":64,"chat_template_kwargs":{"enable_thinking":false}}'
+      ```
+  checkpoint_model_id: Qwen/Qwen3-32B
+- npu: Atlas 800I A3
+  precision: BF16
+  deployment: Single-Node
+  case: Qwen3-32B / TP2
   strategy: single_node_A3
   npu_per_node: 2
   steps:
@@ -224,11 +783,12 @@ scenarios:
         -H 'Content-Type: application/json' \
         -d '{"model":"qwen3","messages":[{"role":"user","content":"What is the capital of France?"}],"temperature":0.6,"top_p":0.95,"top_k":20,"max_tokens":64,"chat_template_kwargs":{"enable_thinking":false}}'
       ```
+  checkpoint_model_id: Qwen/Qwen3-32B
 - npu: Atlas 800I A2
   precision: W8A8
   checkpoint_model_id: vllm-ascend/Qwen3-32B-W8A8
   deployment: Single-Node
-  case: TP4
+  case: Qwen3-32B / TP4
   strategy: single_node_A2
   npu_per_node: 4
   steps:
@@ -276,7 +836,7 @@ scenarios:
   precision: W8A8
   checkpoint_model_id: vllm-ascend/Qwen3-32B-W8A8
   deployment: Single-Node
-  case: TP4
+  case: Qwen3-32B / TP4
   strategy: single_node_A3
   npu_per_node: 4
   steps:
@@ -324,7 +884,7 @@ scenarios:
   precision: W4A4
   checkpoint_model_id: vllm-ascend/Qwen3-32B-W4A4
   deployment: Single-Node
-  case: TP2
+  case: Qwen3-32B / TP2
   strategy: single_node_A2
   npu_per_node: 2
   steps:
@@ -374,7 +934,7 @@ scenarios:
   precision: W4A4
   checkpoint_model_id: vllm-ascend/Qwen3-32B-W4A4
   deployment: Single-Node
-  case: TP2
+  case: Qwen3-32B / TP2
   strategy: single_node_A3
   npu_per_node: 2
   steps:
@@ -424,7 +984,7 @@ scenarios:
   precision: W8A8
   checkpoint_model_id: vllm-ascend/Qwen3-32B-W8A8
   deployment: Single-Node
-  case: High Throughput
+  case: Qwen3-32B / High Throughput
   strategy: single_node_A3
   npu_per_node: 4
   steps:
@@ -476,7 +1036,7 @@ scenarios:
   precision: W8A8
   checkpoint_model_id: vllm-ascend/Qwen3-32B-W8A8
   deployment: Single-Node
-  case: Long Context
+  case: Qwen3-32B / Long Context
   strategy: single_node_A3
   npu_per_node: 4
   steps:
@@ -529,7 +1089,7 @@ scenarios:
   precision: W8A8
   checkpoint_model_id: vllm-ascend/Qwen3-32B-W8A8
   deployment: Single-Node
-  case: Low Latency
+  case: Qwen3-32B / Low Latency
   strategy: single_node_A3
   npu_per_node: 8
   steps:
@@ -580,7 +1140,7 @@ scenarios:
 - npu: Atlas 300I DUO
   precision: W8A8SC-310
   deployment: Single-Node
-  case: TP4
+  case: Qwen3-32B / TP4
   strategy: single_node_310p
   npu_per_node: 4
   steps:
@@ -625,6 +1185,8 @@ scenarios:
         -H 'Content-Type: application/json' \
         -d '{"model":"qwen3","messages":[{"role":"user","content":"What is the capital of France?"}],"temperature":0.6,"top_p":0.95,"top_k":20,"max_tokens":64,"chat_template_kwargs":{"enable_thinking":false}}'
       ```
+  checkpoint_subdir: TP4/Qwen3-32B-w8a8sc-310-vllm-tp4
+  checkpoint_model_id: Eco-Tech/Qwen3-32B-w8a8sc-310-vllm
 evaluation:
   accuracy:
     content: |-
@@ -648,7 +1210,19 @@ references:
 - title: vLLM Ascend Qwen3 Dense tutorial
   url: https://github.com/vllm-project/vllm-ascend/blob/03f69b977b088680686af6198cc52ab2a5bae542/docs/source/tutorials/models/Qwen3-Dense.md
 - title: Official Qwen3 model card
-  url: https://huggingface.co/Qwen/Qwen3-32B
+  url: https://huggingface.co/Qwen/Qwen3-0.6B
 - title: vLLM Ascend quick start
   url: https://docs.vllm.ai/projects/ascend/en/latest/getting_started/quick_start.html
+- title: Official Qwen3 model card
+  url: https://huggingface.co/Qwen/Qwen3-1.7B
+- title: Official Qwen3 model card
+  url: https://huggingface.co/Qwen/Qwen3-4B
+- title: Official Qwen3 model card
+  url: https://huggingface.co/Qwen/Qwen3-8B
+- title: Official Qwen3 model card
+  url: https://huggingface.co/Qwen/Qwen3-14B
+- title: Official Qwen3 model card
+  url: https://huggingface.co/Qwen/Qwen3-32B
 guide: ''
+scenario_selector_labels:
+  case: Model / Configuration

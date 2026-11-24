@@ -340,7 +340,8 @@ class RecipeParserTests(unittest.TestCase):
         self.assertIn("--served-model-name model", command)
 
     def test_qwen3_32b_checkpoints_are_resolved_per_scenario(self):
-        recipe = yaml.safe_load((ROOT / "models/en/Qwen/Qwen3-32B.yaml").read_text(encoding="utf-8"))
+        recipe = yaml.safe_load((ROOT / "models/en/Qwen/Qwen3-Dense.yaml").read_text(encoding="utf-8"))
+        recipe["scenarios"] = [s for s in recipe["scenarios"] if s["case"].startswith("Qwen3-32B /")]
         hardware = "atlas_800_a3"
         w8a8_id = "vllm-ascend/Qwen3-32B-W8A8"
         w4a4_id = "vllm-ascend/Qwen3-32B-W4A4"
@@ -348,14 +349,14 @@ class RecipeParserTests(unittest.TestCase):
         model_id = recipe["model"]["model_id"]
 
         result = self.parse(recipe["scenarios"], hardware=hardware, model_id=model_id,
-                            staged_checkpoints=[w8a8_id])
+                            staged_checkpoints=[w8a8_id, "Qwen/Qwen3-32B"])
         self.assertEqual(result["action"], "verify")
         by_precision = {}
         for item in result["scenarios"]:
             by_precision.setdefault(item["precision"], []).append(item)
         bf16, = by_precision["BF16"]
         w4a4, = by_precision["W4A4"]
-        self.assertIn("MODEL_PATH=" + shlex.quote(bf16["cache_path"]), bf16["serve_cmd"])
+        self.assertIn("vllm serve " + shlex.quote(bf16["cache_path"]), bf16["serve_cmd"])
         self.assertEqual(bf16["skip_reason"], "")
         self.assertIn(w4a4_id, w4a4["skip_reason"])
 
@@ -376,6 +377,25 @@ class RecipeParserTests(unittest.TestCase):
         runnable, = [item for item in result["scenarios"] if not item["skip_reason"]]
         self.assertEqual(runnable["precision"], "W4A4")
         self.assertTrue(Path(runnable["cache_path"]).as_posix().endswith("/" + w4a4_id))
+
+    def test_dense_family_keeps_checkpoint_identity_and_310p_shards(self):
+        recipe = yaml.safe_load((ROOT / "models/en/Qwen/Qwen3-Dense.yaml").read_text(encoding="utf-8"))
+        self.assertEqual(len(recipe["scenarios"]), 22)
+        checkpoints = ["Qwen/Qwen3-0.6B", "Qwen/Qwen3-14B"]
+        result = self.parse(recipe["scenarios"], hardware="atlas_800_a3",
+                            missing_weights=True, staged_checkpoints=checkpoints)
+        runnable = [s for s in result["scenarios"] if not s["skip_reason"]]
+        self.assertEqual(len(runnable), 2)
+        for item, checkpoint in zip(runnable, checkpoints):
+            self.assertIn(checkpoint, item["cache_path"].replace(chr(92), "/"))
+            self.assertIn("vllm serve " + shlex.quote(item["cache_path"]), item["serve_cmd"])
+        shard = "Eco-Tech/Qwen3-14B-w8a8sc-310-vllm/TP1/Qwen3-14B-w8a8sc-310-vllm-tp1"
+        sharded = [dict(s, npu="Atlas 800I A3") for s in recipe["scenarios"] if s.get("checkpoint_subdir")]
+        result = self.parse(sharded, hardware="atlas_800_a3",
+                            missing_weights=True, staged_checkpoints=[shard])
+        runnable, = [s for s in result["scenarios"] if not s["skip_reason"]]
+        self.assertTrue(runnable["cache_path"].replace(chr(92), "/").endswith(shard))
+        self.assertIn("vllm serve " + shlex.quote(runnable["cache_path"]), runnable["serve_cmd"])
 
     def test_log_example_does_not_hide_later_global_request(self):
         verification = "```bash\nINFO: Server ready\n```\n```bash\ncurl http://<node_ip>:<port>/v1/embeddings\n```"

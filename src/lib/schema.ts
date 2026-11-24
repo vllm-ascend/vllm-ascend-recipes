@@ -150,6 +150,11 @@ export const scenarioSchema = z
       .string()
       .regex(/^[\w][\w.-]*\/[\w][\w.-]*$/)
       .optional(),
+    checkpoint_subdir: z
+      .string()
+      .regex(/^[\w-]+(?:\/[\w.-]+)*$/)
+      .refine((path) => !path.split('/').includes('..'))
+      .optional(),
     aisbench: z.array(aisbenchTestSchema).optional(),
     scripts: z.record(z.string(), scenarioScriptSchema).optional(),
     steps: z.array(scenarioStepSchema),

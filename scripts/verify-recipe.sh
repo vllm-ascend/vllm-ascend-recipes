@@ -150,13 +150,13 @@ except Exception as e:
 CACHE_DIR_BY_MODEL = {a['model_id']: a['cache_dir'] for a in aliases}
 
 
-def resolve_cache(model_id, *, require_config=False):
+def resolve_cache(model_id, *, require_config=False, subdir=""):
     cache_dir = CACHE_DIR_BY_MODEL.get(model_id, model_id)
     if isinstance(cache_dir, dict):
         cache_dir = cache_dir.get(hw_key, cache_dir.get('default'))
     if cache_dir is not None:
         for prefix in CACHE_PREFIXES:
-            candidate = os.path.join(CACHE_BASE, prefix, cache_dir)
+            candidate = os.path.join(CACHE_BASE, prefix, cache_dir, subdir) if subdir else os.path.join(CACHE_BASE, prefix, cache_dir)
             if not os.path.isdir(candidate):
                 continue
             if (require_config or model_id not in CACHE_DIR_BY_MODEL) and not os.path.isfile(
@@ -203,7 +203,7 @@ for s in scenarios:
         scenario_model_id = s.get('checkpoint_model_id')
         skip_reason = ''
         if scenario_model_id:
-            cache_path, _ = resolve_cache(scenario_model_id, require_config=True)
+            cache_path, _ = resolve_cache(scenario_model_id, require_config=True, subdir=s.get('checkpoint_subdir', ''))
             if cache_path:
                 bash_content, replacements = re.subn(
                     r'(\bvllm\s+serve\s+)\S+',
