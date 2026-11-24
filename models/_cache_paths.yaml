@@ -52,6 +52,10 @@ aliases:
   - model_id: PaddlePaddle/PaddleOCR-VL
     cache_dir: PaddlePaddle/PaddleOCR-VL
 
+  - model_id: MiniMaxAI/MiniMax-M2.7
+    cache_dir:
+      atlas_800_a3: vllm-ascend/MiniMax-M2.7-w8a8-QuaRot
+
   - model_id: Qwen/Qwen3-ASR-1.7B
     cache_dir: Qwen/Qwen3-ASR-1.7B
   - model_id: moonshotai/Kimi-K2.6
@@ -61,7 +65,5 @@ aliases:
     cache_dir: Qwen/Qwen3-Omni-30B-A3B-Thinking
   - model_id: Qwen/Qwen3-Coder-30B-A3B-Instruct
     cache_dir: Qwen3-Coder-30B-A3B-Instruct-w8a8
-
-  - model_id: MiniMaxAI/MiniMax-M2.7
-    cache_dir:
-      atlas_800_a3: vllm-ascend/MiniMax-M2.7-w8a8-QuaRot
+  - model_id: Qwen/Qwen3-VL-Embedding-2B
+    cache_dir: Qwen/Qwen3-VL-Embedding-2B

@@ -256,9 +256,9 @@ for s in scenarios:
                               and '--runner pooling' not in serve_cmd,
         })
 
-# Find minimum vllm version
-min_ver = data.get('model', {}).get('min_vllm_version', '')
-model_id = data.get('model', {}).get('model_id', '')
+model = data.get('model', {})
+min_ver = model.get('min_vllm_version', '')
+model_id = model.get('model_id', '')
 
 result = {
     'action': 'verify',
@@ -268,6 +268,7 @@ result = {
     'pip_setup': pip_content,
     'container_setup': container_content,
     'cache_path': CACHE_PATH,
+    'aisbench_trust_remote_code': '--trust-remote-code' in (model.get('base_args') or []),
     'scenarios': commands,
 }
 print(json.dumps(result))
@@ -566,12 +567,17 @@ SCRIPT_HEREDOC
   BENCHMARK_CHAT=$(echo "$RECIPE_INFO" | $PYTHON -c 'import sys,json; print(int(json.load(sys.stdin)["scenarios"][int(sys.argv[1])].get("benchmark_chat", False)))' "$idx")
   if [[ "$TASK_VERIFIED" -eq 1 && "$BENCHMARK_CHAT" -eq 1 ]] && command -v ais_bench &>/dev/null; then
     log_info "  Running aisbench performance evaluation..."
-    # Patch the installed model config to set model path and port
+    # Patch the installed model config with the recipe's settings.
     AIS_CFG=$("$PYTHON" -c 'from importlib.util import find_spec; from pathlib import Path; print((Path(find_spec("ais_bench.benchmark").origin).parent / "configs/models/vllm_api/vllm_api_stream_chat.py").as_posix())')
     if [[ -f "$AIS_CFG" ]]; then
       sed -i "s|path=\".*\"|path=\"${CACHE_PATH}\"|" "$AIS_CFG"
       sed -E -i "s|host_port[[:space:]]*=[[:space:]]*[0-9]+|host_port=${SERVER_PORT}|" "$AIS_CFG"
-      log_info "  Patched ais_bench model config (path + port): $AIS_CFG"
+      # The recipe's explicit opt-in also applies to AISBench's tokenizer.
+      ais_trust_remote_code=$("$PYTHON" -c 'import json, sys; print(json.load(sys.stdin)["aisbench_trust_remote_code"])' <<< "$RECIPE_INFO")
+      sed -E -i \
+        "s#^([[:space:]]*trust_remote_code[[:space:]]*=[[:space:]]*)(True|False)#\1${ais_trust_remote_code}#" \
+        "$AIS_CFG"
+      log_info "  Patched ais_bench model config (path, port, trust_remote_code=$ais_trust_remote_code): $AIS_CFG"
     else
       log_error "  AISBench model config not found: $AIS_CFG"
     fi

@@ -1,0 +1,23 @@
+{
+  "verification_scope": "single-node API smoke; not accuracy or full feature coverage",
+  "recipe_path": "models/en/Tencent/Hunyuan-A13B-Instruct.yaml",
+  "model_id": "Tencent-Hunyuan/Hunyuan-A13B-Instruct",
+  "hw_key": "atlas_800_a3",
+  "head_sha": "415be64de8bbb752787bf9096b7d082547f79993",
+  "workflow_run_id": "45403612802",
+  "trigger_type": "pr",
+  "image": "quay.nju.edu.cn/ascend/vllm-ascend:v0.23.0-a3",
+  "started_at": "2026-11-24T13:27:17Z",
+  "scenarios": [
+    {
+      "index": 0,
+      "npu": "Atlas A3",
+      "precision": "bf16",
+      "deployment": "Single-Node",
+      "case": "Single Node TP4 (A3)",
+      "serve_cmd": "export HCCL_INTRA_ROCE_ENABLE=1\nexport ASCEND_RT_VISIBLE_DEVICES=0,1,2,3\nexport MODEL_PATH=/root/.cache/modelscope/hub/models/Tencent-Hunyuan/Hunyuan-A13B-Instruct\n\nvllm serve ${MODEL_PATH} \\\n    --trust-remote-code \\\n    --host 0.0.0.0 \\\n    --port 8000 \\\n    --served-model-name Hunyuan \\\n    --tensor-parallel-size 4 \\\n    --max-model-len 32768 \\\n    --gpu-memory-utilization 0.9",
+      "verification_status": "pass",
+      "verification_reason": "Task API response validated"
+    }
+  ]
+}

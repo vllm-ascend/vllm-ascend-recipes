@@ -22,7 +22,19 @@
       "slug": "Hunyuan-A13B-Instruct"
     },
     {
+      "slug": "Hy3-preview"
+    },
+    {
+      "slug": "InternVL3_5-241B-A28B"
+    },
+    {
+      "slug": "InternVL3_5-38B"
+    },
+    {
       "slug": "Kimi-K2.6"
+    },
+    {
+      "slug": "MiniMax-M2.7"
     },
     {
       "slug": "PaddleOCR-VL"
