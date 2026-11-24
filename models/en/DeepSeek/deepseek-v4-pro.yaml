@@ -74,6 +74,13 @@ compatible_strategies:
   - multi_node_dp
   - pd_cluster
 
+strategy_overrides:
+  pd_cluster:
+    prefill:
+      nodes: 2
+    decode:
+      nodes: 2
+
 guide: ""
 performance_model_names:
   - "DeepSeek-V4-Pro-w4a8-mtp"
@@ -376,44 +383,180 @@ scenarios:
     steps:
       - title: "Topology and launcher"
         content: |-
-          1P1D PD separation with Mooncake: prefill pool = 2 nodes with one prefill DP rank each
-          (TP16), decode pool = 2 nodes with 8 decode DP ranks each (TP2) (tutorial §5.2.1).
-          Deploy `launch_online_dp.py` (tutorial §5.2.1 publishes the script and its parameters)
-          and per-role `run_dp_template.sh` templates on each node:
+          Official A3 W4A8-MTP 1P1D PD separation with Mooncake: prefill pool = 2 nodes with
+          one prefill DP rank each (TP16), decode pool = 2 nodes with 8 decode DP ranks each
+          (TP2). This gives Prefill DP2/TP16 (local DP1 per node) and Decode DP16/TP2
+          (local DP8 per node) (tutorial §5.2.1). Deploy `launch_online_dp.py` (tutorial §5.2.1
+          publishes the script and its parameters) and per-role `run_dp_template.sh` templates
+          on each node:
 
           ```bash
           # Prefill node 0
           python launch_online_dp.py --dp-size 2 --tp-size 16 --dp-size-local 1 --dp-rank-start 0 --dp-address xx.xx.xx.1 --dp-rpc-port 12321 --vllm-start-port 7100
+
           # Prefill node 1
           python launch_online_dp.py --dp-size 2 --tp-size 16 --dp-size-local 1 --dp-rank-start 1 --dp-address xx.xx.xx.1 --dp-rpc-port 12321 --vllm-start-port 7100
+
           # Decode node 0
           python launch_online_dp.py --dp-size 16 --tp-size 2 --dp-size-local 8 --dp-rank-start 0 --dp-address xx.xx.xx.3 --dp-rpc-port 12321 --vllm-start-port 7100
+
           # Decode node 1
           python launch_online_dp.py --dp-size 16 --tp-size 2 --dp-size-local 8 --dp-rank-start 8 --dp-address xx.xx.xx.3 --dp-rpc-port 12321 --vllm-start-port 7100
           ```
-      - title: "Per-role key configuration (from tutorial §5.2.1 templates)"
+      - title: "Prefill run_dp_template.sh (A3 W4A8-MTP)"
         content: |-
-          Key-point summary from the tutorial §5.2.1 MooncakeHybrid templates (not a
-          standalone executable command; full orchestration templates per the linked
-          tutorial section):
+          Complete `run_dp_template.sh` for both Prefill nodes (tutorial §5.2.1). Set
+          `local_ip` to the IP address of the current node. The official tutorial includes
+          `--attention_config.indexer_kv_dtype int8`, but this recipe pins `v0.23.0rc1-a3`,
+          which rejects that argument at startup, so it is omitted here. All other template
+          values are preserved. This PD configuration has not been validated end-to-end:
 
-          - Prefill: `VLLM_RPC_TIMEOUT=3600000`, `VLLM_EXECUTE_MODEL_TIMEOUT_SECONDS=30000`,
-            `HCCL_EXEC_TIMEOUT=204`, `HCCL_CONNECT_TIMEOUT=120`, `HCCL_BUFFSIZE=1024`,
-            `--max-model-len 131072 --max-num-batched-tokens 4096 --max-num-seqs 16
-            --gpu-memory-utilization 0.92 --block-size 128 --enforce-eager
-            --no-disable-hybrid-kv-cache-manager`,
-            `--additional-config '{"enable_cpu_binding":true,"enable_dsa_cp":true,
-            "enable_fused_mc2":1,"enable_flashcomm1":true}'`, Mooncake
-            `MooncakeHybridConnector` kv_producer (kv_port 30200, engine_id 1, prefill dp2/tp16,
-            decode dp16/tp2).
-          - Decode: `TASK_QUEUE_ENABLE=1`, `VLLM_RPC_TIMEOUT=3600000`, `HCCL_EXEC_TIMEOUT=2000`,
-            `HCCL_CONNECT_TIMEOUT=1200`, `HCCL_BUFFSIZE=1024`, `--max-num-batched-tokens 120
-            --max-num-seqs 60 --gpu-memory-utilization 0.9
-            --no-disable-hybrid-kv-cache-manager`, kv_consumer (kv_port 30800,
-            engine_id 8), `--additional-config` with
-            `"scheduler_config":{"recompute_scheduler_enable":true}`.
-          - `--no-disable-hybrid-kv-cache-manager` is required for DeepSeek-V4 KV Pool
-            deployments; omitting it may OOM at startup (tutorial key parameters).
+          ```bash
+          nic_name="xxxx" # change to your own nic name
+          local_ip=xx.xx.xx.x # use the IP of the current Prefill node
+
+          export HCCL_OP_EXPANSION_MODE="AIV"
+          export HCCL_IF_IP=$local_ip
+          export GLOO_SOCKET_IFNAME=$nic_name
+          export TP_SOCKET_IFNAME=$nic_name
+          export HCCL_SOCKET_IFNAME=$nic_name
+          export VLLM_RPC_TIMEOUT=3600000
+          export VLLM_EXECUTE_MODEL_TIMEOUT_SECONDS=30000
+          export HCCL_EXEC_TIMEOUT=204
+          export HCCL_CONNECT_TIMEOUT=120
+          export OMP_PROC_BIND=false
+          export OMP_NUM_THREADS=10
+          export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+          export HCCL_BUFFSIZE=1024
+          export TASK_QUEUE_ENABLE=1
+          export ASCEND_RT_VISIBLE_DEVICES=$1
+          # Ensure the model path matches the directory recorded during download
+          vllm serve /root/.cache/modelscope/hub/models/vllm-ascend/DeepSeek-V4-Pro-w4a8-mtp \
+              --host 0.0.0.0 \
+              --port $2 \
+              --data-parallel-address $5 \
+              --data-parallel-rpc-port $6 \
+              --data-parallel-size $3 \
+              --data-parallel-rank $4 \
+              --tensor-parallel-size $7 \
+              --enable-expert-parallel \
+              --seed 1024 \
+              --served-model-name dsv4 \
+              --max-model-len 131072 \
+              --max-num-batched-tokens 4096 \
+              --max-num-seqs 16 \
+              --gpu-memory-utilization 0.92 \
+              --block-size 128 \
+              --no-disable-hybrid-kv-cache-manager \
+              --tokenizer-mode deepseek_v4 \
+              --tool-call-parser deepseek_v4 \
+              --enable-auto-tool-choice \
+              --reasoning-parser deepseek_v4 \
+              --model-loader-extra-config='{"enable_multithread_load": true, "num_threads": 128}' \
+              --trust-remote-code \
+              --quantization ascend \
+              --enforce-eager \
+              --speculative-config '{"num_speculative_tokens": 1,"method": "mtp","enforce_eager": true}' \
+              --additional-config '{"enable_cpu_binding":true,"enable_dsa_cp":true,"enable_fused_mc2":1,"enable_flashcomm1":true}' \
+              --kv-transfer-config \
+              '{"kv_connector": "MooncakeHybridConnector",
+              "kv_role": "kv_producer",
+              "kv_port": "30200",
+              "engine_id": "1",
+              "kv_connector_extra_config": {
+                          "prefill": {
+                                  "dp_size": 2,
+                                  "tp_size": 16
+                          },
+                          "decode": {
+                                  "dp_size": 16,
+                                  "tp_size": 2
+                          }
+                  }
+              }'
+          ```
+      - title: "Decode run_dp_template.sh (A3 W4A8-MTP)"
+        content: |-
+          Complete `run_dp_template.sh` for both Decode nodes (tutorial §5.2.1). Set
+          `local_ip` to the IP address of the current node. Decode batch size 120 and sequence
+          count 60 are preserved. As in the Prefill template, the tutorial's
+          `--attention_config.indexer_kv_dtype int8` is omitted because the pinned
+          `v0.23.0rc1-a3` image rejects it. All other template values are preserved. This PD
+          configuration has not been validated end-to-end:
+
+          ```bash
+          nic_name="xxxx" # change to your own nic name
+          local_ip=xx.xx.xx.x # use the IP of the current Decode node
+
+          export HCCL_OP_EXPANSION_MODE="AIV"
+          export TASK_QUEUE_ENABLE=1
+          export VLLM_RPC_TIMEOUT=3600000
+          export VLLM_EXECUTE_MODEL_TIMEOUT_SECONDS=30000
+          export HCCL_EXEC_TIMEOUT=2000
+          export HCCL_CONNECT_TIMEOUT=1200
+          export HCCL_IF_IP=$local_ip
+          export GLOO_SOCKET_IFNAME=$nic_name
+          export TP_SOCKET_IFNAME=$nic_name
+          export HCCL_SOCKET_IFNAME=$nic_name
+          export OMP_PROC_BIND=false
+          export OMP_NUM_THREADS=10
+          export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+          export HCCL_BUFFSIZE=1024
+          export ASCEND_RT_VISIBLE_DEVICES=$1
+
+          # Ensure the model path matches the directory recorded during download
+          vllm serve /root/.cache/modelscope/hub/models/vllm-ascend/DeepSeek-V4-Pro-w4a8-mtp \
+              --host 0.0.0.0 \
+              --port $2 \
+              --data-parallel-address $5 \
+              --data-parallel-rpc-port $6 \
+              --data-parallel-size $3 \
+              --data-parallel-rank $4 \
+              --tensor-parallel-size $7 \
+              --enable-expert-parallel \
+              --seed 1024 \
+              --served-model-name dsv4 \
+              --max-model-len 131072 \
+              --max-num-batched-tokens 120 \
+              --max-num-seqs 60 \
+              --gpu-memory-utilization 0.9 \
+              --block-size 128 \
+              --no-enable-prefix-caching \
+              --no-disable-hybrid-kv-cache-manager \
+              --tokenizer-mode deepseek_v4 \
+              --tool-call-parser deepseek_v4 \
+              --enable-auto-tool-choice \
+              --reasoning-parser deepseek_v4 \
+              --model-loader-extra-config='{"enable_multithread_load": true, "num_threads": 128}' \
+              --trust-remote-code \
+              --quantization ascend \
+              --speculative-config '{"num_speculative_tokens": 1, "method":"mtp", "enforce_eager": true}' \
+              --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY"}' \
+              --additional-config '{
+                  "ascend_compilation_config":{
+                      "enable_npugraph_ex":true,
+                      "enable_static_kernel":false
+                  },
+              "enable_cpu_binding":true,
+              "scheduler_config":{"recompute_scheduler_enable":true}
+              }' \
+              --kv-transfer-config \
+              '{"kv_connector": "MooncakeHybridConnector",
+              "kv_role": "kv_consumer",
+              "kv_port": "30800",
+              "engine_id": "8",
+              "kv_connector_extra_config": {
+                          "prefill": {
+                                  "dp_size": 2,
+                                  "tp_size": 16
+                          },
+                          "decode": {
+                                  "dp_size": 16,
+                                  "tp_size": 2
+                          }
+                  }
+              }'
+          ```
       - title: "Proxy verification"
         content: |-
           After full startup, send the §6 request through the proxy port on the prefill master
