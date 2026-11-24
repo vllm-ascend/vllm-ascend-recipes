@@ -30,8 +30,8 @@ model:
     - "--tool-call-parser deepseek_v4"
     - "--enable-auto-tool-choice"
     - "--reasoning-parser deepseek_v4"
-    # NOTE: the tutorial template also carries `--attention_config.indexer_kv_dtype int8`,
-    # but the pinned image v0.23.0rc1-a3 rejects it at startup (pydantic unexpected keyword;
+    # NOTE: newer tutorials add `--attention_config.indexer_kv_dtype int8`, but the pinned
+    # image v0.23.0rc1-a3 rejects it at startup (pydantic unexpected keyword;
     # first-party run 2026-10-28). Omitted here — re-add only on a newer image.
     - "--model-loader-extra-config"
     - '{"enable_multithread_load": true, "num_threads": 128}'
@@ -406,10 +406,11 @@ scenarios:
       - title: "Prefill run_dp_template.sh (A3 W4A8-MTP)"
         content: |-
           Complete `run_dp_template.sh` for both Prefill nodes (tutorial §5.2.1). Set
-          `local_ip` to the IP address of the current node. The official tutorial includes
+          `local_ip` to the IP address of the current node. Newer tutorials add
           `--attention_config.indexer_kv_dtype int8`, but this recipe pins `v0.23.0rc1-a3`,
-          which rejects that argument at startup, so it is omitted here. All other template
-          values are preserved. This PD configuration has not been validated end-to-end:
+          which rejects that argument at startup, so it is omitted here. The model path
+          matches the ModelScope download directory, and the engine-ready timeout is set
+          to 7200 seconds for the 790G first load. This PD configuration has not been validated end-to-end:
 
           ```bash
           nic_name="xxxx" # change to your own nic name
@@ -429,9 +430,11 @@ scenarios:
           export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
           export HCCL_BUFFSIZE=1024
           export TASK_QUEUE_ENABLE=1
+          export VLLM_ENGINE_READY_TIMEOUT_S=7200 # 790G first load exceeds the default engine-ready timeout
+          export LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libjemalloc.so.2:$LD_PRELOAD
           export ASCEND_RT_VISIBLE_DEVICES=$1
           # Ensure the model path matches the directory recorded during download
-          vllm serve /root/.cache/modelscope/hub/models/vllm-ascend/DeepSeek-V4-Pro-w4a8-mtp \
+          vllm serve /root/.cache/modelscope/hub/models/Eco-Tech/DeepSeek-V4-Pro-w4a8-mtp \
               --host 0.0.0.0 \
               --port $2 \
               --data-parallel-address $5 \
@@ -452,6 +455,7 @@ scenarios:
               --tool-call-parser deepseek_v4 \
               --enable-auto-tool-choice \
               --reasoning-parser deepseek_v4 \
+              --safetensors-load-strategy 'prefetch' \
               --model-loader-extra-config='{"enable_multithread_load": true, "num_threads": 128}' \
               --trust-remote-code \
               --quantization ascend \
@@ -479,17 +483,20 @@ scenarios:
         content: |-
           Complete `run_dp_template.sh` for both Decode nodes (tutorial §5.2.1). Set
           `local_ip` to the IP address of the current node. Decode batch size 120 and sequence
-          count 60 are preserved. As in the Prefill template, the tutorial's
-          `--attention_config.indexer_kv_dtype int8` is omitted because the pinned
-          `v0.23.0rc1-a3` image rejects it. All other template values are preserved. This PD
-          configuration has not been validated end-to-end:
+          count 60 are preserved. As in the Prefill template, the newer
+          `--attention_config.indexer_kv_dtype int8` flag is omitted because the pinned
+          `v0.23.0rc1-a3` image rejects it. The model path matches the ModelScope download
+          directory, and the engine-ready timeout is set to 7200 seconds for the 790G first
+          load. This PD configuration has not been validated end-to-end:
 
           ```bash
           nic_name="xxxx" # change to your own nic name
           local_ip=xx.xx.xx.x # use the IP of the current Decode node
 
+          export LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libjemalloc.so.2:$LD_PRELOAD
           export HCCL_OP_EXPANSION_MODE="AIV"
           export TASK_QUEUE_ENABLE=1
+          export VLLM_ENGINE_READY_TIMEOUT_S=7200 # 790G first load exceeds the default engine-ready timeout
           export VLLM_RPC_TIMEOUT=3600000
           export VLLM_EXECUTE_MODEL_TIMEOUT_SECONDS=30000
           export HCCL_EXEC_TIMEOUT=2000
@@ -505,7 +512,7 @@ scenarios:
           export ASCEND_RT_VISIBLE_DEVICES=$1
 
           # Ensure the model path matches the directory recorded during download
-          vllm serve /root/.cache/modelscope/hub/models/vllm-ascend/DeepSeek-V4-Pro-w4a8-mtp \
+          vllm serve /root/.cache/modelscope/hub/models/Eco-Tech/DeepSeek-V4-Pro-w4a8-mtp \
               --host 0.0.0.0 \
               --port $2 \
               --data-parallel-address $5 \
@@ -519,10 +526,12 @@ scenarios:
               --max-model-len 131072 \
               --max-num-batched-tokens 120 \
               --max-num-seqs 60 \
+              --async-scheduling \
               --gpu-memory-utilization 0.9 \
               --block-size 128 \
               --no-enable-prefix-caching \
               --no-disable-hybrid-kv-cache-manager \
+              --safetensors-load-strategy 'prefetch' \
               --tokenizer-mode deepseek_v4 \
               --tool-call-parser deepseek_v4 \
               --enable-auto-tool-choice \
@@ -538,7 +547,7 @@ scenarios:
                       "enable_static_kernel":false
                   },
               "enable_cpu_binding":true,
-              "scheduler_config":{"recompute_scheduler_enable":true}
+              "recompute_scheduler_enable":true
               }' \
               --kv-transfer-config \
               '{"kv_connector": "MooncakeHybridConnector",

@@ -30,7 +30,7 @@ model:
     - "--tool-call-parser deepseek_v4"
     - "--enable-auto-tool-choice"
     - "--reasoning-parser deepseek_v4"
-    # 注意:教程模板另带 `--attention_config.indexer_kv_dtype int8`,但钉定镜像
+    # 注意:新版教程另带 `--attention_config.indexer_kv_dtype int8`,但钉定镜像
     # v0.23.0rc1-a3 启动时拒绝该参数(pydantic unexpected keyword;2026-10-28 第一方实测)。
     # 此处省略——仅在更新版本镜像上再启用。
     - "--model-loader-extra-config"
@@ -401,9 +401,9 @@ scenarios:
       - title: "Prefill run_dp_template.sh(A3 W4A8-MTP)"
         content: |-
           两个 Prefill 节点使用同一份完整 `run_dp_template.sh`(教程 §5.2.1),将
-          `local_ip` 改为当前节点 IP。官方模板含 `--attention_config.indexer_kv_dtype int8`,
-          但本配方钉定的 `v0.23.0rc1-a3` 会在启动时拒绝该参数,因此此处省略;其余模板值均保留。
-          本 PD 配置尚未完成端到端验证:
+          `local_ip` 改为当前节点 IP。新版教程新增了 `--attention_config.indexer_kv_dtype int8`,
+          但本配方钉定的 `v0.23.0rc1-a3` 会在启动时拒绝该参数,因此此处省略。模型路径与
+          ModelScope 下载目录一致,并将就绪超时设为 7200 秒以容纳 790G 权重首次加载。本 PD 配置尚未完成端到端验证:
 
           ```bash
           nic_name="xxxx" # change to your own nic name
@@ -423,9 +423,11 @@ scenarios:
           export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
           export HCCL_BUFFSIZE=1024
           export TASK_QUEUE_ENABLE=1
+          export VLLM_ENGINE_READY_TIMEOUT_S=7200 # 790G 权重首次加载超过默认就绪超时
+          export LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libjemalloc.so.2:$LD_PRELOAD
           export ASCEND_RT_VISIBLE_DEVICES=$1
           # Ensure the model path matches the directory recorded during download
-          vllm serve /root/.cache/modelscope/hub/models/vllm-ascend/DeepSeek-V4-Pro-w4a8-mtp \
+          vllm serve /root/.cache/modelscope/hub/models/Eco-Tech/DeepSeek-V4-Pro-w4a8-mtp \
               --host 0.0.0.0 \
               --port $2 \
               --data-parallel-address $5 \
@@ -446,6 +448,7 @@ scenarios:
               --tool-call-parser deepseek_v4 \
               --enable-auto-tool-choice \
               --reasoning-parser deepseek_v4 \
+              --safetensors-load-strategy 'prefetch' \
               --model-loader-extra-config='{"enable_multithread_load": true, "num_threads": 128}' \
               --trust-remote-code \
               --quantization ascend \
@@ -473,15 +476,18 @@ scenarios:
         content: |-
           两个 Decode 节点使用同一份完整 `run_dp_template.sh`(教程 §5.2.1),将
           `local_ip` 改为当前节点 IP。保留 Decode 的 batch size 120 与 sequence count 60。
-          与 Prefill 模板相同,官方模板的 `--attention_config.indexer_kv_dtype int8` 因钉定
-          `v0.23.0rc1-a3` 镜像会拒绝而省略;其余模板值均保留。本 PD 配置尚未完成端到端验证:
+          与 Prefill 模板相同,新版教程的 `--attention_config.indexer_kv_dtype int8` 因钉定
+          `v0.23.0rc1-a3` 镜像会拒绝而省略。模型路径与 ModelScope 下载目录一致,并将就绪超时
+          设为 7200 秒以容纳 790G 权重首次加载。本 PD 配置尚未完成端到端验证:
 
           ```bash
           nic_name="xxxx" # change to your own nic name
           local_ip=xx.xx.xx.x # use the IP of the current Decode node
 
+          export LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libjemalloc.so.2:$LD_PRELOAD
           export HCCL_OP_EXPANSION_MODE="AIV"
           export TASK_QUEUE_ENABLE=1
+          export VLLM_ENGINE_READY_TIMEOUT_S=7200 # 790G 权重首次加载超过默认就绪超时
           export VLLM_RPC_TIMEOUT=3600000
           export VLLM_EXECUTE_MODEL_TIMEOUT_SECONDS=30000
           export HCCL_EXEC_TIMEOUT=2000
@@ -497,7 +503,7 @@ scenarios:
           export ASCEND_RT_VISIBLE_DEVICES=$1
 
           # Ensure the model path matches the directory recorded during download
-          vllm serve /root/.cache/modelscope/hub/models/vllm-ascend/DeepSeek-V4-Pro-w4a8-mtp \
+          vllm serve /root/.cache/modelscope/hub/models/Eco-Tech/DeepSeek-V4-Pro-w4a8-mtp \
               --host 0.0.0.0 \
               --port $2 \
               --data-parallel-address $5 \
@@ -511,10 +517,12 @@ scenarios:
               --max-model-len 131072 \
               --max-num-batched-tokens 120 \
               --max-num-seqs 60 \
+              --async-scheduling \
               --gpu-memory-utilization 0.9 \
               --block-size 128 \
               --no-enable-prefix-caching \
               --no-disable-hybrid-kv-cache-manager \
+              --safetensors-load-strategy 'prefetch' \
               --tokenizer-mode deepseek_v4 \
               --tool-call-parser deepseek_v4 \
               --enable-auto-tool-choice \
@@ -530,7 +538,7 @@ scenarios:
                       "enable_static_kernel":false
                   },
               "enable_cpu_binding":true,
-              "scheduler_config":{"recompute_scheduler_enable":true}
+              "recompute_scheduler_enable":true
               }' \
               --kv-transfer-config \
               '{"kv_connector": "MooncakeHybridConnector",
