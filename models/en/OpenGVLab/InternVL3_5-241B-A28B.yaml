@@ -6,7 +6,7 @@ meta:
   date_added: 2026-10-20
   difficulty: advanced
   hardware:
-    atlas_800_a3: verified
+    atlas_800_a3: experimental
 model:
   model_id: OpenGVLab/InternVL3_5-241B-A28B
   architecture: moe
@@ -31,13 +31,12 @@ model:
     OMP_NUM_THREADS: "1"
     HCCL_BUFFSIZE: "1536"
   docker_image:
-    atlas_800_a3: quay.io/ascend/vllm-ascend@sha256:0b8bf5b484d49c667ceab717347eb3a8695388429aebd9084b79fa0f57a545c0
+    atlas_800_a3: quay.io/ascend/vllm-ascend:v0.23.0.post1-a3
   install:
     pip: false
     docker:
       command: docker pull
-        quay.io/ascend/vllm-ascend@sha256:0b8bf5b484d49c667ceab717347eb3a8695388429aebd9084b79fa0f57a545c0
-      note: quay.io/ascend/vllm-ascend:v0.30.0-a3-openeuler
+        quay.io/ascend/vllm-ascend:v0.23.0.post1-a3
 variants:
   default:
     precision: W8A8
@@ -193,8 +192,7 @@ env_setup:
 
         ```bash
         # A3 release container
-        # quay.io/ascend/vllm-ascend:v0.30.0-a3-openeuler
-        IMAGE=quay.io/ascend/vllm-ascend@sha256:0b8bf5b484d49c667ceab717347eb3a8695388429aebd9084b79fa0f57a545c0
+        IMAGE=quay.io/ascend/vllm-ascend:v0.23.0.post1-a3
         docker run --rm -it --name internvl241-release --net=host --ipc=host \
           --device /dev/davinci0 --device /dev/davinci1 --device /dev/davinci2 --device /dev/davinci3 \
           --device /dev/davinci4 --device /dev/davinci5 --device /dev/davinci6 --device /dev/davinci7 \

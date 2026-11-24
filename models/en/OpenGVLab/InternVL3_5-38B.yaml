@@ -6,7 +6,7 @@ meta:
   date_added: 2026-10-20
   difficulty: advanced
   hardware:
-    atlas_800_a3: verified
+    atlas_800_a3: experimental
 model:
   model_id: OpenGVLab/InternVL3_5-38B
   architecture: dense
@@ -28,17 +28,16 @@ model:
     OMP_NUM_THREADS: "1"
     HCCL_BUFFSIZE: "1536"
   docker_image:
-    atlas_800_a3: quay.io/ascend/vllm-ascend@sha256:0b8bf5b484d49c667ceab717347eb3a8695388429aebd9084b79fa0f57a545c0
+    atlas_800_a3: quay.io/ascend/vllm-ascend:v0.23.0.post1-a3
   install:
     pip: false
     docker:
       command: docker pull
-        quay.io/ascend/vllm-ascend@sha256:0b8bf5b484d49c667ceab717347eb3a8695388429aebd9084b79fa0f57a545c0
-      note: quay.io/ascend/vllm-ascend:v0.30.0-a3-openeuler
+        quay.io/ascend/vllm-ascend:v0.23.0.post1-a3
 variants:
   default:
     precision: W8A8
-    description: Tutorial checkpoint. A3 TP4 single-image smoke test passed.
+    description: W8A8 checkpoint for Atlas A3 with TP4.
     model_id: Eco-Tech/InternVL3_5-38B-w8a8
 compatible_strategies:
   - single_node_A3
@@ -190,8 +189,7 @@ env_setup:
 
         ```bash
         # A3 release container
-        # quay.io/ascend/vllm-ascend:v0.30.0-a3-openeuler
-        IMAGE=quay.io/ascend/vllm-ascend@sha256:0b8bf5b484d49c667ceab717347eb3a8695388429aebd9084b79fa0f57a545c0
+        IMAGE=quay.io/ascend/vllm-ascend:v0.23.0.post1-a3
         docker run --rm -it --name internvl38-release --net=host --ipc=host \
           --device /dev/davinci0 --device /dev/davinci1 --device /dev/davinci2 --device /dev/davinci3 \
           --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc \
