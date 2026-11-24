@@ -6,7 +6,7 @@ meta:
   date_added: 2026-10-20
   difficulty: advanced
   hardware:
-    atlas_800_a3: experimental
+    atlas_800_a3: verified
 model:
   model_id: OpenGVLab/InternVL3_5-241B-A28B
   architecture: moe
