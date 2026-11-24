@@ -6,7 +6,7 @@ meta:
   date_added: 2026-10-20
   difficulty: advanced
   hardware:
-    atlas_800_a3: verified
+    atlas_800_a3: experimental
 model:
   model_id: MiniMaxAI/MiniMax-M2.7
   architecture: moe
@@ -18,12 +18,11 @@ model:
     - --trust-remote-code
   base_env: {}
   docker_image:
-    atlas_800_a3: quay.io/ascend/vllm-ascend:v0.30.0-a3-openeuler
+    atlas_800_a3: quay.io/ascend/vllm-ascend:v0.23.0.post1-a3
   install:
     pip: false
     docker:
-      command: docker pull quay.io/ascend/vllm-ascend:v0.30.0-a3-openeuler
-      note: The A3 runs used the v0.30.0-a3-openeuler image.
+      command: docker pull quay.io/ascend/vllm-ascend:v0.23.0.post1-a3
 variants:
   default:
     precision: W8A8
@@ -63,7 +62,7 @@ prerequisites:
     content: For short prompts start with the single-node short-context configuration. Use the long-context configuration for 128K input tests. For 1P1D, prepare the weights and use the same release image on both hosts.
   - title: Prepare local checkpoints
     content: |-
-      On each serving host use Linux, Bash, curl and Python 3.11 or 3.12. Use a writable checkpoint root with at least 300 GB free. Set `WEIGHTS_ROOT` before running this block if you use a host directory other than `/models`; give that same root to the Guide container step. The [W8A8 main checkpoint](https://modelscope.cn/models/vllm-ascend/MiniMax-M2.7-w8a8-QuaRot) has 54 shards, and the [EAGLE3 draft checkpoint](https://modelscope.cn/models/Eco-Tech/MiniMax-M2.7-eagle-model-short) has one. The download endpoint uses ModelScope `master`, and the recorded ordered SHA-256 lists pin all 70 and 6 files respectively, including config and tokenizer files. Continue only after both lists match. The lists verify the contents of the 76 files. Availability of a complete immutable repository snapshot remains unverified. If the provider changes those bytes, stage the verified release files from an approved mirror and run the same check.
+      On each serving host use Linux, Bash, curl and Python 3.11 or 3.12. Use a writable checkpoint root with at least 300 GB free. Set `WEIGHTS_ROOT` before running this block if you use a host directory other than `/models`; give that same root to the Guide container step. The [W8A8 main checkpoint](https://modelscope.cn/models/vllm-ascend/MiniMax-M2.7-w8a8-QuaRot) has 54 shards, and the [EAGLE3 draft checkpoint](https://modelscope.cn/models/Eco-Tech/MiniMax-M2.7-eagle-model-short) has one. The download endpoint uses ModelScope `master`, and the recorded ordered SHA-256 lists pin all 70 and 6 files respectively, including config and tokenizer files. Continue only after both lists match. The checksum lists cover the contents of the 76 listed files. If the provider changes those bytes, stage the verified release files from an approved mirror and run the same check.
 
       ```bash
       (
@@ -236,17 +235,40 @@ prerequisites:
 env_setup:
   container:
     A3:
-      content: Select the scenario under Deployment Guide, then run its own step 1 on the host. Each fixed container command mounts the checkpoint root at /models.
-scenarios:
-  - test_id: minimax-long-1p1d
-    npu: Atlas 800I A3
-    precision: W8A8
-    deployment: Multi-Node PD Separation
-    case: long-1p1d
-    npu_per_node: 16
-    steps:
-      - title: 1. Configure and start the containers
-        content: >-
+      content: >-
+          ### Single node (short or long context)
+
+
+          Run on the A3 host. Set WEIGHTS_ROOT to the directory containing both
+          checkpoints if it differs from /models.
+
+
+          ```bash
+
+          export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0.post1-a3
+
+          export MINIMAX_CONTAINER=${MINIMAX_CONTAINER:-minimax-single-a3}
+
+          export WEIGHTS_ROOT=${WEIGHTS_ROOT:-/models}
+
+          devices=()
+
+          for id in {0..15}; do devices+=(--device "/dev/davinci$id"); done
+
+          docker run -d --name "$MINIMAX_CONTAINER" --network host --ipc host \
+            "${devices[@]}" --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc \
+            -v /usr/local/Ascend/driver:/usr/local/Ascend/driver:ro \
+            -v /usr/local/dcmi:/usr/local/dcmi:ro \
+            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi:ro \
+            -v /etc/ascend_install.info:/etc/ascend_install.info:ro \
+            -v /etc/hccn.conf:/etc/hccn.conf:ro \
+            -v "$WEIGHTS_ROOT:/models:ro" -w /models --entrypoint bash "$IMAGE" -lc 'exec sleep infinity'
+          ```
+
+
+          ### Two nodes (1P1D)
+
+
           Run both blocks on each A3 host. Enter the host IPs and the directory
           containing the local W8A8 and EAGLE3 checkpoints.
 
@@ -264,7 +286,7 @@ scenarios:
             export WEIGHTS_ROOT=${WEIGHTS_ROOT:-/models}
             export PD_ROLE PREFILL_NODE_0_IP DECODE_NODE_0_IP
             export GATEWAY_NODE_0_IP=$PREFILL_NODE_0_IP
-            export IMAGE=quay.io/ascend/vllm-ascend:v0.30.0-a3-openeuler
+            export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0.post1-a3
             export PD_OUT="/models/evidence/minimax-m27-w8a8-a3/release-pd-$(date -u +%Y%m%dT%H%M%SZ)-$PD_ROLE"
             export PD_CONTAINER="minimax-${PD_OUT##*/}"
             case "$PD_ROLE" in
@@ -311,6 +333,16 @@ scenarios:
             -e PREFILL_NODE_0_IP -e DECODE_NODE_0_IP -e GATEWAY_NODE_0_IP -e IFACE_NAME \
             "$IMAGE" -lc 'exec sleep infinity'
           ```
+scenarios:
+  - test_id: minimax-long-1p1d
+    npu: Atlas 800I A3
+    precision: W8A8
+    deployment: Multi-Node PD Separation
+    case: long-1p1d
+    npu_per_node: 16
+    steps:
+      - title: 1. Set up both hosts
+        content: In Environment Setup → Docker, run the two 1P1D blocks on each host. Continue in the same shell.
       - title: 2. Prepare the launcher
         content: |-
           Enter each container with the first block, then run the second block inside that container.
@@ -567,33 +599,8 @@ scenarios:
       - a3-single
     strategy: single_node_A3
     steps:
-      - title: 1. Start the release container
-        content: >-
-          Run on the A3 host. Set WEIGHTS_ROOT to the directory containing both
-          checkpoints if it differs from /models.
-
-
-          ```bash
-
-          export IMAGE=quay.io/ascend/vllm-ascend:v0.30.0-a3-openeuler
-
-          export MINIMAX_CONTAINER=${MINIMAX_CONTAINER:-minimax-single-a3}
-
-          export WEIGHTS_ROOT=${WEIGHTS_ROOT:-/models}
-
-          devices=()
-
-          for id in {0..15}; do devices+=(--device "/dev/davinci$id"); done
-
-          docker run -d --name "$MINIMAX_CONTAINER" --network host --ipc host \
-            "${devices[@]}" --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc \
-            -v /usr/local/Ascend/driver:/usr/local/Ascend/driver:ro \
-            -v /usr/local/dcmi:/usr/local/dcmi:ro \
-            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi:ro \
-            -v /etc/ascend_install.info:/etc/ascend_install.info:ro \
-            -v /etc/hccn.conf:/etc/hccn.conf:ro \
-            -v "$WEIGHTS_ROOT:/models:ro" -w /models --entrypoint bash "$IMAGE" -lc 'exec sleep infinity'
-          ```
+      - title: 1. Set up the host
+        content: In Environment Setup → Docker, run the single-node block on the A3 host. Continue in the same shell.
       - title: 2. Start MiniMax
         content: >-
           Enter the container and run the startup block there.
@@ -684,33 +691,8 @@ scenarios:
       - a3-single
     strategy: single_node_A3
     steps:
-      - title: 1. Start the release container
-        content: >-
-          Run on the A3 host. Set WEIGHTS_ROOT to the directory containing both
-          checkpoints if it differs from /models.
-
-
-          ```bash
-
-          export IMAGE=quay.io/ascend/vllm-ascend:v0.30.0-a3-openeuler
-
-          export MINIMAX_CONTAINER=${MINIMAX_CONTAINER:-minimax-single-a3}
-
-          export WEIGHTS_ROOT=${WEIGHTS_ROOT:-/models}
-
-          devices=()
-
-          for id in {0..15}; do devices+=(--device "/dev/davinci$id"); done
-
-          docker run -d --name "$MINIMAX_CONTAINER" --network host --ipc host \
-            "${devices[@]}" --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc \
-            -v /usr/local/Ascend/driver:/usr/local/Ascend/driver:ro \
-            -v /usr/local/dcmi:/usr/local/dcmi:ro \
-            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi:ro \
-            -v /etc/ascend_install.info:/etc/ascend_install.info:ro \
-            -v /etc/hccn.conf:/etc/hccn.conf:ro \
-            -v "$WEIGHTS_ROOT:/models:ro" -w /models --entrypoint bash "$IMAGE" -lc 'exec sleep infinity'
-          ```
+      - title: 1. Set up the host
+        content: In Environment Setup → Docker, run the single-node block on the A3 host. Continue in the same shell.
       - title: 2. Start MiniMax
         content: >-
           Enter the container and run the startup block there.

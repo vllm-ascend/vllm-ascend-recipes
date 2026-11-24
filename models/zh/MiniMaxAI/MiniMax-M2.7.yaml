@@ -6,7 +6,7 @@ meta:
   date_added: 2026-10-20
   difficulty: advanced
   hardware:
-    atlas_800_a3: verified
+    atlas_800_a3: experimental
 model:
   model_id: MiniMaxAI/MiniMax-M2.7
   architecture: moe
@@ -18,12 +18,11 @@ model:
     - --trust-remote-code
   base_env: {}
   docker_image:
-    atlas_800_a3: quay.io/ascend/vllm-ascend:v0.30.0-a3-openeuler
+    atlas_800_a3: quay.io/ascend/vllm-ascend:v0.23.0.post1-a3
   install:
     pip: false
     docker:
-      command: docker pull quay.io/ascend/vllm-ascend:v0.30.0-a3-openeuler
-      note: A3 实测使用 v0.30.0-a3-openeuler 镜像。
+      command: docker pull quay.io/ascend/vllm-ascend:v0.23.0.post1-a3
 variants:
   default:
     precision: W8A8
@@ -63,7 +62,7 @@ prerequisites:
     content: 短输入可先用单机短上下文配置。评测 128K 输入时选择单机长上下文配置。双机 1P1D 需要在两台宿主机上分别准备权重，并使用同一版本的镜像。
   - title: 准备本地权重
     content: |-
-      在每台服务宿主机上使用 Linux、Bash、curl 和 Python 3.11 或 3.12。使用有写权限、至少剩余 300 GB 的权重根目录。若宿主机权重根目录不同于 `/models`，先设置 `WEIGHTS_ROOT`，启动场景容器时也输入同一目录。[W8A8 主模型](https://modelscope.cn/models/vllm-ascend/MiniMax-M2.7-w8a8-QuaRot) 有 54 个分片，[EAGLE3 草稿模型](https://modelscope.cn/models/Eco-Tech/MiniMax-M2.7-eagle-model-short) 有 1 个分片。下载使用 ModelScope `master`，通过实测记录的排序 SHA-256 清单固定全部 70 和 6 个文件（含配置和分词器文件）。两份清单均匹配后再部署。清单校验的是 76 个文件的内容，整仓不可变快照的获取仍待验证。若提供方修改了文件，从获准的镜像获取已校验的 release 文件，再运行同一检查。
+      在每台服务宿主机上使用 Linux、Bash、curl 和 Python 3.11 或 3.12。使用有写权限、至少剩余 300 GB 的权重根目录。若宿主机权重根目录不同于 `/models`，先设置 `WEIGHTS_ROOT`，启动场景容器时也输入同一目录。[W8A8 主模型](https://modelscope.cn/models/vllm-ascend/MiniMax-M2.7-w8a8-QuaRot) 有 54 个分片，[EAGLE3 草稿模型](https://modelscope.cn/models/Eco-Tech/MiniMax-M2.7-eagle-model-short) 有 1 个分片。下载使用 ModelScope `master`，通过实测记录的排序 SHA-256 清单固定全部 70 和 6 个文件（含配置和分词器文件）。两份清单均匹配后再部署。校验范围为清单所列的 76 个文件。若提供方修改了文件，从获准的镜像获取已校验的 release 文件，再运行同一检查。
 
       ```bash
       (
@@ -236,17 +235,39 @@ prerequisites:
 env_setup:
   container:
     A3:
-      content: 在部署指南内选择对应场景，在宿主机执行该场景的第 1 步。固定容器命令把宿主机权重根目录挂载到容器的 /models。
-scenarios:
-  - test_id: minimax-long-1p1d
-    npu: Atlas 800I A3
-    precision: W8A8
-    deployment: 多节点 PD 分离
-    case: long-1p1d
-    npu_per_node: 16
-    steps:
-      - title: 1. 配置并启动容器
-        content: >-
+      content: >-
+          ### 单机（短上下文或长上下文）
+
+
+          在 A3 宿主机执行。如果权重放在其他位置，先把 WEIGHTS_ROOT 设为两个权重目录的共同父目录。
+
+
+          ```bash
+
+          export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0.post1-a3
+
+          export MINIMAX_CONTAINER=${MINIMAX_CONTAINER:-minimax-single-a3}
+
+          export WEIGHTS_ROOT=${WEIGHTS_ROOT:-/models}
+
+          devices=()
+
+          for id in {0..15}; do devices+=(--device "/dev/davinci$id"); done
+
+          docker run -d --name "$MINIMAX_CONTAINER" --network host --ipc host \
+            "${devices[@]}" --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc \
+            -v /usr/local/Ascend/driver:/usr/local/Ascend/driver:ro \
+            -v /usr/local/dcmi:/usr/local/dcmi:ro \
+            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi:ro \
+            -v /etc/ascend_install.info:/etc/ascend_install.info:ro \
+            -v /etc/hccn.conf:/etc/hccn.conf:ro \
+            -v "$WEIGHTS_ROOT:/models:ro" -w /models --entrypoint bash "$IMAGE" -lc 'exec sleep infinity'
+          ```
+
+
+          ### 双机（1P1D）
+
+
           两台 A3 宿主机依次执行两段。按提示填角色、主机 IP 和存放 W8A8、EAGLE3 权重的根目录。
 
 
@@ -263,7 +284,7 @@ scenarios:
             export WEIGHTS_ROOT=${WEIGHTS_ROOT:-/models}
             export PD_ROLE PREFILL_NODE_0_IP DECODE_NODE_0_IP
             export GATEWAY_NODE_0_IP=$PREFILL_NODE_0_IP
-            export IMAGE=quay.io/ascend/vllm-ascend:v0.30.0-a3-openeuler
+            export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0.post1-a3
             export PD_OUT="/models/evidence/minimax-m27-w8a8-a3/release-pd-$(date -u +%Y%m%dT%H%M%SZ)-$PD_ROLE"
             export PD_CONTAINER="minimax-${PD_OUT##*/}"
             case "$PD_ROLE" in
@@ -310,6 +331,16 @@ scenarios:
             -e PREFILL_NODE_0_IP -e DECODE_NODE_0_IP -e GATEWAY_NODE_0_IP -e IFACE_NAME \
             "$IMAGE" -lc 'exec sleep infinity'
           ```
+scenarios:
+  - test_id: minimax-long-1p1d
+    npu: Atlas 800I A3
+    precision: W8A8
+    deployment: 多节点 PD 分离
+    case: long-1p1d
+    npu_per_node: 16
+    steps:
+      - title: 1. 准备两台宿主机
+        content: 在两台宿主机分别执行「环境准备 → Docker」中双机小节的两段命令，然后在同一个终端继续。
       - title: 2. 准备双机启动器
         content: |-
           两台机器都先执行第一段进入容器，再在容器内执行第二段。
@@ -565,32 +596,8 @@ scenarios:
       - a3-single
     strategy: single_node_A3
     steps:
-      - title: 1. 启动 release 容器
-        content: >-
-          在 A3 宿主机执行。如果权重放在其他位置，先把 WEIGHTS_ROOT 设为两个权重目录的共同父目录。
-
-
-          ```bash
-
-          export IMAGE=quay.io/ascend/vllm-ascend:v0.30.0-a3-openeuler
-
-          export MINIMAX_CONTAINER=${MINIMAX_CONTAINER:-minimax-single-a3}
-
-          export WEIGHTS_ROOT=${WEIGHTS_ROOT:-/models}
-
-          devices=()
-
-          for id in {0..15}; do devices+=(--device "/dev/davinci$id"); done
-
-          docker run -d --name "$MINIMAX_CONTAINER" --network host --ipc host \
-            "${devices[@]}" --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc \
-            -v /usr/local/Ascend/driver:/usr/local/Ascend/driver:ro \
-            -v /usr/local/dcmi:/usr/local/dcmi:ro \
-            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi:ro \
-            -v /etc/ascend_install.info:/etc/ascend_install.info:ro \
-            -v /etc/hccn.conf:/etc/hccn.conf:ro \
-            -v "$WEIGHTS_ROOT:/models:ro" -w /models --entrypoint bash "$IMAGE" -lc 'exec sleep infinity'
-          ```
+      - title: 1. 准备宿主机
+        content: 在 A3 宿主机执行「环境准备 → Docker」中的单机命令，然后在同一个终端继续。
       - title: 2. 启动 MiniMax
         content: >-
           进入容器，在容器内执行启动命令。
@@ -681,32 +688,8 @@ scenarios:
       - a3-single
     strategy: single_node_A3
     steps:
-      - title: 1. 启动 release 容器
-        content: >-
-          在 A3 宿主机执行。如果权重放在其他位置，先把 WEIGHTS_ROOT 设为两个权重目录的共同父目录。
-
-
-          ```bash
-
-          export IMAGE=quay.io/ascend/vllm-ascend:v0.30.0-a3-openeuler
-
-          export MINIMAX_CONTAINER=${MINIMAX_CONTAINER:-minimax-single-a3}
-
-          export WEIGHTS_ROOT=${WEIGHTS_ROOT:-/models}
-
-          devices=()
-
-          for id in {0..15}; do devices+=(--device "/dev/davinci$id"); done
-
-          docker run -d --name "$MINIMAX_CONTAINER" --network host --ipc host \
-            "${devices[@]}" --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc \
-            -v /usr/local/Ascend/driver:/usr/local/Ascend/driver:ro \
-            -v /usr/local/dcmi:/usr/local/dcmi:ro \
-            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi:ro \
-            -v /etc/ascend_install.info:/etc/ascend_install.info:ro \
-            -v /etc/hccn.conf:/etc/hccn.conf:ro \
-            -v "$WEIGHTS_ROOT:/models:ro" -w /models --entrypoint bash "$IMAGE" -lc 'exec sleep infinity'
-          ```
+      - title: 1. 准备宿主机
+        content: 在 A3 宿主机执行「环境准备 → Docker」中的单机命令，然后在同一个终端继续。
       - title: 2. 启动 MiniMax
         content: >-
           进入容器，在容器内执行启动命令。
