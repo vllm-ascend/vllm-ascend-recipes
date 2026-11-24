@@ -1,0 +1,33 @@
+{
+  "verification_scope": "single-node API smoke; not accuracy or full feature coverage",
+  "recipe_path": "models/en/MiniMaxAI/MiniMax-M2.7.yaml",
+  "model_id": "MiniMaxAI/MiniMax-M2.7",
+  "hw_key": "atlas_800_a3",
+  "head_sha": "e098496d8662d72cb9ae810d646078fa3b92296a",
+  "workflow_run_id": "45047277478",
+  "trigger_type": "pr",
+  "image": "quay.nju.edu.cn/ascend/vllm-ascend:v0.30.0-a3-openeuler",
+  "started_at": "2026-11-22T17:03:31Z",
+  "scenarios": [
+    {
+      "index": 0,
+      "npu": "Atlas 800I A3",
+      "precision": "W8A8",
+      "deployment": "Single-Node",
+      "case": "Short Context TP4 DP4 EP",
+      "serve_cmd": "export HCCL_OP_EXPANSION_MODE=AIV\nexport HCCL_BUFFSIZE=1024\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\nexport OMP_NUM_THREADS=1\nexport TASK_QUEUE_ENABLE=1\nMODEL_PATH=/root/.cache/modelscope/hub/models/vllm-ascend/MiniMax-M2.7-w8a8-QuaRot\ncase \"$MODEL_PATH\" in\n  /*) ;;\n  *) MODEL_PATH=\"/models/$MODEL_PATH\" ;;\nesac\nvllm serve \"$MODEL_PATH\" \\\n  --served-model-name MiniMax-M2.7 \\\n  --host 127.0.0.1 \\\n  --port 8000 \\\n  --trust-remote-code \\\n  --quantization ascend \\\n  --compilation-config '{\"cudagraph_mode\":\"FULL_DECODE_ONLY\"}' \\\n  --async-scheduling \\\n  --additional-config '{\"enable_cpu_binding\":true,\"enable_fused_mc2\":1,\"enable_flashcomm1\":true,\"weight_nz_mode\":1}' \\\n  --enable-expert-parallel \\\n  --tensor-parallel-size 4 \\\n  --data-parallel-size 4 \\\n  --max-num-seqs 48 \\\n  --max-model-len 40690 \\\n  --max-num-batched-tokens 16384 \\\n  --gpu-memory-utilization 0.85 \\\n  --enable-auto-tool-choice \\\n  --tool-call-parser minimax_m2 \\\n  --reasoning-parser minimax_m2_append_think",
+      "verification_status": "pass",
+      "verification_reason": "Task API response validated"
+    },
+    {
+      "index": 1,
+      "npu": "Atlas 800I A3",
+      "precision": "W8A8",
+      "deployment": "Single-Node",
+      "case": "Long Context TP8 PCP2",
+      "serve_cmd": "export VLLM_USE_V2_MODEL_RUNNER=1\nexport HCCL_OP_EXPANSION_MODE=AIV\nexport HCCL_BUFFSIZE=1024\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\nexport OMP_NUM_THREADS=1\nexport TASK_QUEUE_ENABLE=1\nMODEL_PATH=/root/.cache/modelscope/hub/models/vllm-ascend/MiniMax-M2.7-w8a8-QuaRot\ncase \"$MODEL_PATH\" in\n  /*) ;;\n  *) MODEL_PATH=\"/models/$MODEL_PATH\" ;;\nesac\nvllm serve \"$MODEL_PATH\" \\\n  --served-model-name MiniMax-M2.7 \\\n  --host 127.0.0.1 \\\n  --port 8000 \\\n  --trust-remote-code \\\n  --quantization ascend \\\n  --compilation-config '{\"cudagraph_mode\":\"FULL_DECODE_ONLY\"}' \\\n  --async-scheduling \\\n  --additional-config '{\"enable_cpu_binding\":true,\"enable_fused_mc2\":1,\"enable_flashcomm1\":true,\"weight_nz_mode\":1}' \\\n  --enable-expert-parallel \\\n  --tensor-parallel-size 8 \\\n  --data-parallel-size 1 \\\n  --decode-context-parallel-size 1 \\\n  --prefill-context-parallel-size 2 \\\n  --cp-kv-cache-interleave-size 1 \\\n  --max-num-seqs 16 \\\n  --max-model-len 138000 \\\n  --max-num-batched-tokens 65536 \\\n  --gpu-memory-utilization 0.85 \\\n  --enable-auto-tool-choice \\\n  --tool-call-parser minimax_m2 \\\n  --reasoning-parser minimax_m2_append_think",
+      "verification_status": "fail",
+      "verification_reason": "Task response validation failed"
+    }
+  ]
+}
