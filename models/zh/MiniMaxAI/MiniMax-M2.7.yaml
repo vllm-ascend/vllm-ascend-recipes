@@ -6,7 +6,7 @@ meta:
   date_added: 2026-10-20
   difficulty: advanced
   hardware:
-    atlas_800_a3: experimental
+    atlas_800_a3: verified
 model:
   model_id: MiniMaxAI/MiniMax-M2.7
   architecture: moe
