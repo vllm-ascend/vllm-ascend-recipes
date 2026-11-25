@@ -45,11 +45,11 @@ model:
     HCCL_OP_EXPANSION_MODE: AIV
     VLLM_USE_RUST_FRONTEND: "0"
   docker_image:
-    atlas_800_a3: quay.io/ascend/vllm-ascend:v0.23.0.post1-a3
+    atlas_800_a3: quay.io/ascend/vllm-ascend:v0.30.0-a3-openeuler
   install:
     pip: false
     docker:
-      command: docker pull quay.io/ascend/vllm-ascend:v0.23.0.post1-a3
+      command: docker pull quay.io/ascend/vllm-ascend:v0.30.0-a3-openeuler
 variants:
   default:
     precision: bf16
@@ -116,7 +116,7 @@ prerequisites:
       ```bash
       (
         set -euo pipefail
-        IMAGE=quay.io/ascend/vllm-ascend:v0.23.0.post1-a3
+        IMAGE=quay.io/ascend/vllm-ascend:v0.30.0-a3-openeuler
         BENCH=/models/tools/hy3-recipe/aisbench
         COMMIT=e968d1bd7f48404bd913b95560f33938072336fa
         ARCHIVE="benchmark-$COMMIT.tar.gz"
@@ -132,7 +132,7 @@ prerequisites:
       set -euo pipefail
       test "$(uname -m)" = aarch64
       SOURCE="$PWD/benchmark-$1"
-      VENV="$PWD/venv-v023-post1"
+      VENV="$PWD/venv-v030"
       python3 -m venv --system-site-packages "$VENV"
       printf '%s\n' 'torch==2.10.0+cpu' 'datasets==3.6.0' 'mmengine-lite==0.10.7' > aisbench-v023-post1.constraints.txt
       "$VENV/bin/python" -m pip --disable-pip-version-check --timeout 30 --retries 2 install \
@@ -172,7 +172,7 @@ env_setup:
 
         ```bash
 
-        IMAGE=quay.io/ascend/vllm-ascend:v0.23.0.post1-a3
+        IMAGE=quay.io/ascend/vllm-ascend:v0.30.0-a3-openeuler
 
         CHECKPOINT=/models/tencent/Hy3-preview
 
@@ -210,7 +210,7 @@ scenarios:
 
           ```bash
 
-          IMAGE=quay.io/ascend/vllm-ascend:v0.23.0.post1-a3
+          IMAGE=quay.io/ascend/vllm-ascend:v0.30.0-a3-openeuler
 
           CHECKPOINT=/models/tencent/Hy3-preview
 
@@ -283,11 +283,11 @@ scenarios:
           完成上一步后，保持服务运行并在第二个 A3 宿主机终端执行。先将 `HY3_EVIDENCE_DIR` 设置并导出为 `/models` 下全新的绝对目录。评测包含 32 道计分题，采用 4-shot 聊天提示、batch size 8、temperature 0.6，生成上限为 4096 token。
 
           ```bash
-          IMAGE=quay.io/ascend/vllm-ascend:v0.23.0.post1-a3
+          IMAGE=quay.io/ascend/vllm-ascend:v0.30.0-a3-openeuler
           BENCH=/models/tools/hy3-recipe/aisbench
           COMMIT=e968d1bd7f48404bd913b95560f33938072336fa
           SOURCE="$BENCH/benchmark-$COMMIT"
-          VENV="$BENCH/venv-v023-post1"
+          VENV="$BENCH/venv-v030"
           OUT=${HY3_EVIDENCE_DIR:-}
           [[ "$OUT" == /models/* ]] &&
           mkdir -p "$OUT" &&
@@ -322,7 +322,7 @@ scenarios:
 
           ```bash
 
-          IMAGE=quay.io/ascend/vllm-ascend:v0.23.0.post1-a3
+          IMAGE=quay.io/ascend/vllm-ascend:v0.30.0-a3-openeuler
 
           OUT=${HY3_EVIDENCE_DIR:-}
 
