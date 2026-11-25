@@ -1,0 +1,504 @@
+# DeepSeek-V3.2 recipe (en) — source of truth: vllm-ascend v0.23.0 tutorial docs/source/tutorials/models/DeepSeek-V3.2.md
+# Section citations in comments refer to that tutorial. DeepSeek-V3.2 is a sparse-attention (DSA) model;
+# architecture follows DeepSeek-V3.1 with sparse attention for long-context efficiency (tutorial §1).
+meta:
+  title: "DeepSeek-V3.2"
+  slug: "deepseek-v3-2"
+  provider: "DeepSeek"
+  description: "Mixture-of-Experts model from DeepSeek that adopts DeepSeek Sparse Attention (DSA) on the DeepSeek-V3.1 architecture for long-context training and inference efficiency."
+  date_added: "2026-11-25"
+  difficulty: advanced
+  tasks:
+    - text
+  related_recipes:
+    - "deepseek-ai/DeepSeek-V4-Flash"
+  performance_headline: "1P1D on 4x Atlas 800 A3 (prefill DP2+TP16, decode DP8+TP4): 533 tps at 64k/3k, TPOT 32ms (AISBench, tutorial §8)"
+  hardware:
+    atlas_800_a3: verified   # tutorial §5.1/§8 publish official deployment & measured performance on A3 (repo convention per GLM-5/V4-Flash; first-party re-run recorded 2026-11-25 on the nightly image)
+    atlas_800_a2: experimental
+
+model:
+  model_id: "vllm-ascend/DeepSeek-V3.2-W8A8"
+  min_vllm_version: "v0.23.0rc1"   # aligned with the DeepSeek-family recipes (V2-Lite/V4-Flash); function call supported from v0.13.0rc1 (tutorial §9)
+  architecture: moe
+  parameter_count: "671B"           # source: HF model card (V3.2 keeps the V3.1-class parameter count; not stated in tutorial)
+  active_parameters: "37B"          # source: HF model card
+  context_length: 131072            # model native context per HF model card (128K); §5.1 validates an 8192 serving window, PD §5.3 up to 68000
+  modality: text
+  base_args:
+    - "--quantization ascend"       # §5.1: required for W8A8 quantized weights
+    - "--trust-remote-code"         # §5.1
+    - "--enable-expert-parallel"    # §5.1
+    - "--no-enable-prefix-caching"  # §5.1: prefix caching disabled in the validated baseline
+  base_env:
+    HCCL_OP_EXPANSION_MODE: "AIV"                      # §5.1
+    OMP_PROC_BIND: "false"                             # §5.1
+    OMP_NUM_THREADS: "10"                              # §5.1 (100 on A2 multi-node, §5.2)
+    VLLM_USE_V1: "1"                                   # §5.1: V1 scheduler; nightly images (vllm 0.33+) removed the V1 model runner — omit this var on nightly (verified 2026-11-25)
+    HCCL_BUFFSIZE: "200"                               # §5.1
+    VLLM_ASCEND_ENABLE_MLAPO: "1"                      # §5.1: MLAPO fusion operator
+    PYTORCH_NPU_ALLOC_CONF: "expandable_segments:True" # §5.1
+    VLLM_ASCEND_ENABLE_FLASHCOMM1: "1"                 # §5.1: FlashComm communication optimization
+  docker_image:
+    atlas_800_a3: "quay.io/ascend/vllm-ascend:v0.23.0rc1-a3"   # §4.1: -a3 suffix selects the Atlas A3 image
+    atlas_800_a2: "quay.io/ascend/vllm-ascend:v0.23.0rc1"      # §4.1: A2 image has no suffix
+  nightly_required: false
+  install:
+    pip: false
+    docker:
+      command: "docker run --rm --name vllm-ascend --shm-size=1g --net=host -it quay.io/ascend/vllm-ascend:v0.23.0rc1-a3 bash"
+      note: "Simplified form; run the full device-mount command in env_setup.container (tutorial §4.1) for real deployments."
+
+features:
+  expert_parallel:
+    description: "MoE expert parallelism across NPUs (tutorial §5.1)"
+    args: ["--enable-expert-parallel"]
+  spec_decoding:
+    label: "DeepSeek MTP Spec Decoding"
+    description: "deepseek_mtp speculative decoding with 3 tokens in the validated baselines (tutorial §5.1/§5.2); PD deployment uses 1 token on prefill and 2 on decode (§5.3)"
+    args: ["--speculative-config", '{"num_speculative_tokens": 3, "method": "deepseek_mtp"}']
+  flashcomm1:
+    label: "FlashComm1"
+    description: "FlashComm communication optimization, enabled in the validated baselines (tutorial §5.1/§5.2)"
+    env:
+      VLLM_ASCEND_ENABLE_FLASHCOMM1: "1"
+  mlapo:
+    label: "MLAPO"
+    description: "MLAPO fusion operator for decode, enabled in the validated baselines (tutorial §5.1/§5.2)"
+    env:
+      VLLM_ASCEND_ENABLE_MLAPO: "1"
+  prefix_caching:
+    label: "Prefix Caching"
+    description: "KV-cache prefix caching; disabled via --no-enable-prefix-caching in all validated baselines (tutorial §5.1/§5.2/§5.3)"
+    args: ["--enable-prefix-caching"]
+    flag_when_false: "--no-enable-prefix-caching"
+
+opt_in_features:
+  - prefix_caching
+
+variants:
+  default:
+    model_id: "vllm-ascend/DeepSeek-V3.2-W8A8"
+    precision: W8A8
+    vram_minimum_gb: 806   # estimator per docs/recipe-schema.md formula ceil(671 x 1 x 1.2) = 806 (671B INT8 ≈ 1 byte/param); not from tutorial — fits 1x Atlas 800 A3 (64G x 16) or 2x Atlas 800 A2 (tutorial §3.1)
+    description: "W8A8 quantized weights for single-node and multi-node DP deployments (tutorial §5.1/§5.2)"
+    supported_hardware: [atlas_800_a3, atlas_800_a2]
+  exp:
+    model_id: "vllm-ascend/DeepSeek-V3.2-Exp-W8A8"
+    precision: W8A8
+    vram_minimum_gb: 806
+    description: "Experimental W8A8 build listed alongside the stable one (tutorial §3.1)"
+    supported_hardware: [atlas_800_a3, atlas_800_a2]
+  pd_quarot:
+    model_id: "Eco-Tech/DeepSeek-V3.2-w8a8-mtp-QuaRot"
+    precision: W8A8
+    vram_minimum_gb: 806
+    description: "QuaRot MTP weights used by the tutorial §5.3 PD-disaggregation deployment"
+    supported_hardware: [atlas_800_a3]
+
+compatible_strategies:
+  - single_node_A3
+  - multi_node_dp
+  - pd_cluster
+
+guide: ""
+performance_model_names:
+  - "DeepSeek-V3.2-W8A8"
+
+overview: |-
+  DeepSeek-V3.2 is a sparse-attention Mixture-of-Experts model from DeepSeek; its architecture
+  follows DeepSeek-V3.1 with DeepSeek Sparse Attention (DSA) for long-context efficiency
+  (tutorial §1). This recipe covers the tutorial's three validated deployment tiers: single-node
+  on 1x Atlas 800 A3 (dp2 tp8, §5.1), two-node data-parallel on 2x Atlas 800 A3 (dp2 tp16, §5.2
+  — an A2 dual-node variant is also documented there), and 1P1D prefill-decode disaggregation on
+  4x Atlas 800 A3 (prefill DP2+TP16 on 2 nodes, decode DP8+TP4 on 2 nodes, MooncakeConnectorV1
+  KV transfer, §5.3). Reference performance on the PD deployment: 533 tok/s at 64k/3k with
+  TPOT 32 ms on A3-752T (§8). For DeepSeek-V3.2's Sparse Flash Attention (SFA) backend, Decode
+  Context Parallelism (DCP) must be enabled on both the prefill and decode sides, or on
+  neither (§5.3 warning).
+
+weight_download:
+  - weight_version: W8A8
+    sources:
+      - source: ModelScope   # tutorial §3.1
+        url: "https://www.modelscope.cn/models/vllm-ascend/DeepSeek-V3.2-W8A8"
+        command: |
+          pip install modelscope
+          modelscope download --model vllm-ascend/DeepSeek-V3.2-W8A8 --local_dir /root/.cache/
+  - weight_version: Exp W8A8
+    sources:
+      - source: ModelScope   # tutorial §3.1
+        url: "https://www.modelscope.cn/models/vllm-ascend/DeepSeek-V3.2-Exp-W8A8"
+        command: |
+          pip install modelscope
+          modelscope download --model vllm-ascend/DeepSeek-V3.2-Exp-W8A8 --local_dir /root/.cache/
+  - weight_version: W8A8 MTP QuaRot (PD deployment, tutorial §5.3)
+    sources:
+      - source: "Download source not provided by the tutorial; weights expected at /root/.cache/Eco-Tech/DeepSeek-V3.2-w8a8-mtp-QuaRot"
+        url: ""
+        command: |
+          # no download URL in the tutorial — obtain the QuaRot checkpoint and place it at
+          # /root/.cache/Eco-Tech/DeepSeek-V3.2-w8a8-mtp-QuaRot (verify the source before use)
+
+prerequisites:
+- title: Model Weight
+  content: |-
+    - `DeepSeek-V3.2-Exp-W8A8` (quantized): requires 1 Atlas 800 A3 (64G x 16) node or 2 Atlas 800
+      A2 (64G x 8) nodes. [Download](https://www.modelscope.cn/models/vllm-ascend/DeepSeek-V3.2-Exp-W8A8)
+    - `DeepSeek-V3.2-w8a8` (quantized): requires 1 Atlas 800 A3 (64G x 16) node or 2 Atlas 800 A2
+      (64G x 8) nodes. [Download](https://www.modelscope.cn/models/vllm-ascend/DeepSeek-V3.2-W8A8)
+
+    It is recommended to download the model weight to the shared directory of multiple nodes,
+    such as `/root/.cache/` (tutorial §3.1).
+
+- title: Verify Multi-node Communication (Optional)
+  content: |-
+    If you want to deploy a multi-node environment, verify multi-node communication per
+    [verify multi-node communication environment](https://docs.vllm.ai/projects/ascend/en/latest/installation.html#verify-multi-node-communication)
+    (tutorial §3.2).
+
+env_setup:
+  container:
+    A3:
+      content: |-
+        Use the official docker image (tutorial §4.1):
+
+        ```shell
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0rc1-a3
+
+        docker run --rm \
+            --name vllm-ascend \
+            --privileged=true \
+            --shm-size=1g \
+            --net=host \
+            --device /dev/davinci0 \
+            --device /dev/davinci1 \
+            --device /dev/davinci2 \
+            --device /dev/davinci3 \
+            --device /dev/davinci4 \
+            --device /dev/davinci5 \
+            --device /dev/davinci6 \
+            --device /dev/davinci7 \
+            --device /dev/davinci8 \
+            --device /dev/davinci9 \
+            --device /dev/davinci10 \
+            --device /dev/davinci11 \
+            --device /dev/davinci12 \
+            --device /dev/davinci13 \
+            --device /dev/davinci14 \
+            --device /dev/davinci15 \
+            --device /dev/davinci_manager \
+            --device /dev/devmm_svm \
+            --device /dev/hisi_hdc \
+            -v /usr/local/dcmi:/usr/local/dcmi \
+            -v /usr/local/Ascend/driver/tools/hccn_tool:/usr/local/Ascend/driver/tools/hccn_tool \
+            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+            -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \
+            -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
+            -v /etc/ascend_install.info:/etc/ascend_install.info \
+            -v /root/.cache:/root/.cache \
+            -it $IMAGE bash
+        ```
+    A2:
+      content: |-
+        The A2 image has no `-a3` suffix and exposes 8 devices (tutorial §4.1):
+
+        ```shell
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0rc1
+
+        docker run --rm \
+            --name vllm-ascend \
+            --privileged=true \
+            --shm-size=1g \
+            --net=host \
+            --device /dev/davinci0 \
+            --device /dev/davinci1 \
+            --device /dev/davinci2 \
+            --device /dev/davinci3 \
+            --device /dev/davinci4 \
+            --device /dev/davinci5 \
+            --device /dev/davinci6 \
+            --device /dev/davinci7 \
+            --device /dev/davinci_manager \
+            --device /dev/devmm_svm \
+            --device /dev/hisi_hdc \
+            -v /usr/local/dcmi:/usr/local/dcmi \
+            -v /usr/local/Ascend/driver/tools/hccn_tool:/usr/local/Ascend/driver/tools/hccn_tool \
+            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+            -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \
+            -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
+            -v /etc/ascend_install.info:/etc/ascend_install.info \
+            -v /root/.cache:/root/.cache \
+            -it $IMAGE bash
+        ```
+
+scenarios:
+  - npu: Atlas 800I A3   # hardware enum aligned with repo convention; tutorial wording: Atlas 800 A3
+    precision: W8A8
+    deployment: "Single-Node"
+    case: "Baseline serving"
+    tags: [a3-single]
+    strategy: single_node_A3
+    steps:
+      - title: "Start the server"
+        content: |-
+          The quantized `DeepSeek-V3.2-w8a8` deploys on 1 Atlas 800 A3 (64G x 16) (tutorial §5.1).
+          The tutorial assumes weights under `/root/.cache/`:
+
+          ```bash
+          export HCCL_OP_EXPANSION_MODE="AIV"
+          export OMP_PROC_BIND=false
+          export OMP_NUM_THREADS=10
+          export VLLM_USE_V1=1
+          export HCCL_BUFFSIZE=200
+          export VLLM_ASCEND_ENABLE_MLAPO=1
+          export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+          export VLLM_ASCEND_ENABLE_FLASHCOMM1=1
+
+          vllm serve your_model_path \
+          --host 0.0.0.0 \
+          --port 8000 \
+          --data-parallel-size 2 \
+          --tensor-parallel-size 8 \
+          --quantization ascend \
+          --seed 1024 \
+          --served-model-name deepseek_v3_2 \
+          --enable-expert-parallel \
+          --max-num-seqs 16 \
+          --max-model-len 8192 \
+          --max-num-batched-tokens 4096 \
+          --trust-remote-code \
+          --no-enable-prefix-caching \
+          --gpu-memory-utilization 0.92 \
+          --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY"}' \
+          --speculative-config '{"num_speculative_tokens": 3, "method": "deepseek_mtp"}'
+          ```
+
+          The server registers the model as `deepseek_v3_2` via `--served-model-name`.
+  - npu: Atlas 800I A3
+    precision: W8A8
+    deployment: "Multi-Node"
+    case: "Data Parallel on 2 nodes (dp2 tp16)"
+    tags: [a3-multi]
+    strategy: multi_node_dp
+    steps:
+      - title: "Start the server (node 0)"
+        content: |-
+          `DeepSeek-V3.2-w8a8` requires at least 2 Atlas 800 A2 (64G x 8) for multi-node; the A3
+          variant below uses dp2 tp16 across 2 nodes (tutorial §5.2). `node0_ip` must match the
+          master node's `local_ip`.
+
+          Shared env set (both nodes, tutorial §5.2): `HCCL_OP_EXPANSION_MODE="AIV"`,
+          `HCCL_IF_IP=$local_ip`, `GLOO_SOCKET_IFNAME=$nic_name`, `TP_SOCKET_IFNAME=$nic_name`,
+          `HCCL_SOCKET_IFNAME=$nic_name`, `OMP_PROC_BIND=false`, `OMP_NUM_THREADS=10`,
+          `VLLM_USE_V1=1`, `HCCL_BUFFSIZE=200`, `VLLM_ASCEND_ENABLE_MLAPO=1`,
+          `PYTORCH_NPU_ALLOC_CONF=expandable_segments:True`, `VLLM_ASCEND_ENABLE_FLASHCOMM1=1`.
+
+          Node 0 serve arguments: `--host 0.0.0.0 --port 8077 --data-parallel-size 2
+          --data-parallel-size-local 1 --data-parallel-address $node0_ip
+          --data-parallel-rpc-port 12890 --tensor-parallel-size 16 --quantization ascend
+          --seed 1024 --served-model-name deepseek_v3_2 --enable-expert-parallel
+          --max-num-seqs 16 --max-model-len 8192 --max-num-batched-tokens 4096
+          --trust-remote-code --no-enable-prefix-caching --gpu-memory-utilization 0.92
+          --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY"}' --speculative-config
+          '{"num_speculative_tokens": 3, "method": "deepseek_mtp"}'` over the weight path
+          `/root/.cache/modelscope/hub/models/vllm-ascend/DeepSeek-V3.2-W8A8`.
+
+          The complete node 0 / node 1 scripts are published verbatim in tutorial §5.2 — copy
+          them and set `local_ip`/`nic_name`/`node0_ip` per node. This recipe keeps the
+          multi-node serve commands out of band so cluster CI does not execute a two-node serve.
+      - title: "Start the server (node 1)"
+        content: |-
+          Node 1 adds `--headless` and `--data-parallel-start-rank 1`, with `--data-parallel-address`
+          pointing at node 0 (tutorial §5.2):
+
+          Node 1 differences vs node 0: add `--headless` and `--data-parallel-start-rank 1`, keeping
+          `--data-parallel-size-local 1` in place (both flags appear together in the tutorial's
+          node 1 block, §5.2), and point `--data-parallel-address` at `$node0_ip`. All other
+          arguments and the env set are identical (tutorial §5.2 node 1 block — copy verbatim).
+
+          The A2 variant of this deployment (2 nodes, dp2 tp8, rpc port 13389, `OMP_NUM_THREADS=100`,
+          `HCCL_CONNECT_TIMEOUT=120`, `HCCL_INTRA_PCIE_ENABLE=1`, `HCCL_INTRA_ROCE_ENABLE=0`,
+          cudagraph sizes [8,16,24,32,40,48]) follows the same structure — see tutorial §5.2 A2 tab.
+  - npu: Atlas 800I A3
+    precision: W8A8
+    deployment: "Multi-Node PD Separation"
+    case: "PD Separation"
+    tags: [pd-multinode]   # repo tag vocabulary (V4-Flash precedent)
+    strategy: pd_cluster
+    steps:
+      - title: "Prepare launcher scripts and weights"
+        content: |-
+          1P1D PD disaggregation for DeepSeek-V3.2 on 4x Atlas 800 A3 nodes: 2 prefill nodes
+          (dp2 tp16) and 2 decode nodes (dp8 tp4), with MooncakeConnectorV1 KV transfer
+          (tutorial §5.3). Weights: `Eco-Tech/DeepSeek-V3.2-w8a8-mtp-QuaRot` under
+          `/root/.cache/Eco-Tech/`. Deploy `launch_online_dp.py`
+          ([example](https://github.com/vllm-project/vllm-ascend/blob/main/examples/external_online_dp/launch_online_dp.py))
+          and `run_dp_template.sh` on each node, and the proxy on the prefill master node
+          (tutorial §5.3 lists all three scripts and full per-node env sets).
+          **Warning (tutorial §5.3):** enable Decode Context Parallelism on both prefill and
+          decode sides, or on neither — one-sided DCP causes known accuracy issues.
+      - title: "Per-role configuration summary"
+        content: |-
+          Key per-role facts from tutorial §5.3 (`run_dp_template.sh`):
+
+          - Prefill nodes: `HCCL_BUFFSIZE=256`, `num_speculative_tokens: 1`, `--enforce-eager`,
+            `--max-model-len 68000 --max-num-batched-tokens 32560 --max-num-seqs 64`,
+            `--gpu-memory-utilization 0.82`, `--additional-config '{"layer_sharding": ["q_b_proj",
+            "o_proj"], "enable_dsa_cp": true}'`, Mooncake `kv_role: kv_producer` (`kv_port` 30000),
+            kv extra config prefill dp2/tp16.
+          - Decode nodes: `HCCL_BUFFSIZE=256` + `TASK_QUEUE_ENABLE=1`, `num_speculative_tokens: 2`,
+            `--max-num-batched-tokens 12 --max-num-seqs 4 --gpu-memory-utilization 0.95` (the
+            batched-tokens value is the tutorial's own),
+            `--compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY",
+            "cudagraph_capture_sizes":[3, 6, 9, 12]}'`, `recompute_scheduler_enable: true`,
+            Mooncake `kv_role: kv_consumer` (`kv_port` 30100), kv extra config decode dp8/tp4.
+          - Common: `ASCEND_AGGREGATE_ENABLE=1`, `ASCEND_TRANSPORT_PRINT=1`, `ACL_OP_INIT_MODE=1`,
+            `ASCEND_A3_ENABLE=1`, `VLLM_MOONCAKE_ABORT_REQUEST_TIMEOUT=480`. Other
+            validated values carried by the scripts: `--seed 1024`, `--quantization ascend`,
+            `--profiler-config` (torch profiler on both roles), `ASCEND_RT_VISIBLE_DEVICES=$1`
+            (rank-to-device mapping), decode-side `--max-model-len 68000`.
+      - title: "Launch each node"
+        content: |-
+          ```bash
+          # p0
+          python launch_online_dp.py --dp-size 2 --tp-size 16 --dp-size-local 1 --dp-rank-start 0 --dp-address <prefill_node_0_ip> --dp-rpc-port 12890 --vllm-start-port 9100
+          # p1
+          python launch_online_dp.py --dp-size 2 --tp-size 16 --dp-size-local 1 --dp-rank-start 1 --dp-address <prefill_node_0_ip> --dp-rpc-port 12890 --vllm-start-port 9100
+          # d0
+          python launch_online_dp.py --dp-size 8 --tp-size 4 --dp-size-local 4 --dp-rank-start 0 --dp-address <decode_node_0_ip> --dp-rpc-port 12777 --vllm-start-port 9100
+          # d1
+          python launch_online_dp.py --dp-size 8 --tp-size 4 --dp-size-local 4 --dp-rank-start 4 --dp-address <decode_node_0_ip> --dp-rpc-port 12777 --vllm-start-port 9100
+          ```
+
+          Replace the placeholder IPs with your own node addresses.
+      - title: "Request forwarding"
+        content: |-
+          Run the proxy on the prefill master node (tutorial §5.3), using the repository example
+          [load_balance_proxy_server_example.py](https://github.com/vllm-project/vllm-ascend/blob/main/examples/disaggregated_prefill_v1/load_balance_proxy_server_example.py)
+          (or the `proxy.sh` flow from
+          `vllm-ascend/examples/disaggregated_prefill_v1/`):
+
+          ```bash
+          unset http_proxy
+          unset https_proxy
+
+          python load_balance_proxy_server_example.py \
+              --port 8000 \
+              --host <prefill_node_0_ip> \
+              --prefiller-hosts \
+              <prefill_node_0_ip> \
+              <prefill_node_1_ip> \
+              --prefiller-ports \
+              9100 \
+              9100 \
+              --decoder-hosts \
+              <decode_node_0_ip> \
+              <decode_node_0_ip> \
+              <decode_node_0_ip> \
+              <decode_node_0_ip> \
+              <decode_node_1_ip> \
+              <decode_node_1_ip> \
+              <decode_node_1_ip> \
+              <decode_node_1_ip> \
+              --decoder-ports \
+              9100 9101 9102 9103 \
+              9100 9101 9102 9103
+          ```
+
+verification: |-
+  Once your server is started, you can query the model with input prompts. `<node0_ip>` is the IP
+  of the node running the server (e.g., localhost); for PD-separated deployment, use the host IP
+  where the proxy script resides, and the proxy port (tutorial §6):
+
+  ```shell
+  curl http://<node0_ip>:<port>/v1/completions \
+      -H "Content-Type: application/json" \
+      -d '{
+          "model": "deepseek_v3_2",
+          "prompt": "The future of AI is",
+          "max_completion_tokens": 50,
+          "temperature": 0
+      }'
+  ```
+
+  Expected Result:
+
+  HTTP 200 with a `choices` field containing the generated text (tutorial §6 shows a sample
+  response body). Note: the `model` field must match the active tier's `--served-model-name` —
+  `deepseek_v3_2` for §5.1/§5.2, `deepseek_v3.2` for the PD proxy (the tutorial itself uses
+  both spellings).
+
+evaluation:
+  accuracy:
+    content: |-
+      ### Using AISBench
+
+      Refer to [Using AISBench](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/evaluation/using_ais_bench.html) for details; run and record your own results (tutorial §7 publishes no reference numbers).
+
+      ### Using lm-eval
+
+      Install lm-eval per [Using lm_eval](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/evaluation/using_lm_eval.html), then run (tutorial §7):
+
+      ```shell
+      lm_eval \
+      --model local-completions \
+      --model_args model=/root/.cache/Eco-Tech/DeepSeek-V3.2-w8a8-mtp-QuaRot,base_url=http://127.0.0.1:8000/v1/completions,tokenized_requests=False,trust_remote_code=True \
+      --tasks gsm8k \
+      --output_path ./
+      ```
+
+      Note: the command above keeps the tutorial's checkpoint-path `model` verbatim; when
+      evaluating against a running serve tier instead, use that tier's served name
+      (`deepseek_v3_2` for single/two-node, `deepseek_v3.2` behind the PD proxy).
+
+performance:
+  accuracy: |-
+    Tutorial §7 provides no published accuracy numbers for this model — run AISBench or lm-eval
+    as described in the evaluation section above and record your results.
+
+    First-party run (2026-11-25, `quay.io/ascend/vllm-ascend:nightly-main-a3`, vllm 0.33.0,
+    single-node Atlas 800T A3 dp2 tp8, AISBench gsm8k 1319 items, 4-shot CoT chat, batch 16,
+    max_out_len 4096): 95.98 (95.9818), zero task failures — self-consistency result, no
+    official reference published.
+  benchmark: |-
+    AISBench performance reference (tutorial §8):
+
+      - **Hardware**: A3-752T, 4 nodes
+      - **Deployment**: 1P1D, Prefill node: DP2+TP16, Decode node: DP8+TP4
+      - **Input/Output**: 64k/3k
+      - **Performance**: 533 tps, TPOT 32ms
+
+      vllm bench serve example (tutorial §8):
+
+      ```shell
+      export VLLM_USE_MODELSCOPE=True
+      vllm bench serve --model /root/.cache/Eco-Tech/DeepSeek-V3.2-w8a8-mtp-QuaRot --dataset-name random --random-input 200 --num-prompts 200 --request-rate 1 --save-result --result-dir ./
+      ```
+
+tuning: |-
+  Function call is supported from v0.13.0rc1 onwards; use the latest version. See the
+  [DeepSeek-V3.2 Usage Guide](https://docs.vllm.ai/projects/recipes/en/latest/DeepSeek/DeepSeek-V3_2.html#tool-calling-example)
+  (tutorial §9).
+
+  General tuning reference: [Public Performance Tuning Documentation](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/performance_and_debug/optimization_and_tuning.html)
+  and the [Feature Guide](https://docs.vllm.ai/projects/ascend/en/latest/user_guide/support_matrix/feature_matrix.html).
+
+faq: |-
+  For common environment, installation, and general parameter issues, refer to the
+  [Public FAQ](https://docs.vllm.ai/projects/ascend/en/latest/faqs.html). For PD-separation
+  deployment issues specifically, the tutorial also points to the Public FAQ (tutorial §5.3/§10).
+
+references:
+  - title: "Official tutorial"
+    url: "https://docs.vllm.ai/projects/ascend/en/v0.23.0/tutorials/models/DeepSeek-V3.2.html"
+  - title: "Model weights W8A8 (ModelScope)"
+    url: "https://www.modelscope.cn/models/vllm-ascend/DeepSeek-V3.2-W8A8"
+  - title: "PD Disaggregation Guide (Mooncake)"
+    url: "https://docs.vllm.ai/projects/ascend/en/v0.23.0/tutorials/features/pd_disaggregation_mooncake_multi_node.html"
+  - title: "Distributed DP Server With Large-Scale Expert Parallelism"
+    url: "https://docs.vllm.ai/projects/ascend/en/latest/user_guide/feature_guide/large_scale_ep.html"
+  - title: "PD launcher script"
+    url: "https://github.com/vllm-project/vllm-ascend/blob/main/examples/external_online_dp/launch_online_dp.py"
+  - title: "PD load-balance proxy example"
+    url: "https://github.com/vllm-project/vllm-ascend/blob/main/examples/disaggregated_prefill_v1/load_balance_proxy_server_example.py"

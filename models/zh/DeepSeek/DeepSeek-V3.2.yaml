@@ -1,0 +1,491 @@
+# DeepSeek-V3.2 recipe(zh)——事实源:vllm-ascend v0.23.0 教程 docs/source/tutorials/models/DeepSeek-V3.2.md
+# 注释中的章节号均指该教程。DeepSeek-V3.2 为稀疏注意力(DSA)模型;架构承自 DeepSeek-V3.1,
+# 以稀疏注意力提升长上下文训练与推理效率(教程 §1)。
+meta:
+  title: "DeepSeek-V3.2"
+  slug: "deepseek-v3-2"
+  provider: "DeepSeek"
+  description: "DeepSeek 推出的混合专家模型,在 DeepSeek-V3.1 架构上引入 DeepSeek 稀疏注意力(DSA),提升长上下文训练与推理效率。"
+  date_added: "2026-11-25"
+  difficulty: advanced
+  tasks:
+    - text
+  related_recipes:
+    - "deepseek-ai/DeepSeek-V4-Flash"
+  performance_headline: "4 台 Atlas 800 A3 上的 1P1D(prefill DP2+TP16,decode DP8+TP4):64k/3k 达 533 tps,TPOT 32ms(AISBench,教程 §8)"
+  hardware:
+    atlas_800_a3: verified   # 教程 §5.1/§8 载官方 A3 部署与性能实测(依 GLM-5/V4-Flash 等存量惯例;第一方复验 2026-11-25 已在 nightly 镜像完成)
+    atlas_800_a2: experimental
+
+model:
+  model_id: "vllm-ascend/DeepSeek-V3.2-W8A8"
+  min_vllm_version: "v0.23.0rc1"   # 对齐 DeepSeek 同族 recipe(V2-Lite/V4-Flash);函数调用自 v0.13.0rc1 起支持(教程 §9)
+  architecture: moe
+  parameter_count: "671B"           # 来源:HF model card(V3.2 保持 V3.1 级参数量;教程未载)
+  active_parameters: "37B"          # 来源:HF model card
+  context_length: 131072            # 模型原生上下文(HF model card,128K);§5.1 部署窗口 8192、PD §5.3 至 68000
+  modality: text
+  base_args:
+    - "--quantization ascend"       # §5.1:W8A8 量化权重必带
+    - "--trust-remote-code"         # §5.1
+    - "--enable-expert-parallel"    # §5.1
+    - "--no-enable-prefix-caching"  # §5.1:已验证基线关闭前缀缓存
+  base_env:
+    HCCL_OP_EXPANSION_MODE: "AIV"                      # §5.1
+    OMP_PROC_BIND: "false"                             # §5.1
+    OMP_NUM_THREADS: "10"                              # §5.1(A2 多机为 100,§5.2)
+    VLLM_USE_V1: "1"                                   # §5.1:V1 调度器;nightly 镜像(vllm 0.33+)已移除 V1 model runner——nightly 上须省略该变量(2026-11-25 实证)
+    HCCL_BUFFSIZE: "200"                               # §5.1
+    VLLM_ASCEND_ENABLE_MLAPO: "1"                      # §5.1:MLAPO 融合算子
+    PYTORCH_NPU_ALLOC_CONF: "expandable_segments:True" # §5.1
+    VLLM_ASCEND_ENABLE_FLASHCOMM1: "1"                 # §5.1:FlashComm 通信优化
+  docker_image:
+    atlas_800_a3: "quay.io/ascend/vllm-ascend:v0.23.0rc1-a3"   # §4.1:-a3 后缀选择 Atlas A3 镜像
+    atlas_800_a2: "quay.io/ascend/vllm-ascend:v0.23.0rc1"      # §4.1:A2 镜像无后缀
+  nightly_required: false
+  install:
+    pip: false
+    docker:
+      command: "docker run --rm --name vllm-ascend --shm-size=1g --net=host -it quay.io/ascend/vllm-ascend:v0.23.0rc1-a3 bash"
+      note: "精简示意;实际部署请使用 env_setup.container 中的完整设备挂载命令(教程 §4.1)。"
+
+features:
+  expert_parallel:
+    description: "MoE 专家并行(教程 §5.1)"
+    args: ["--enable-expert-parallel"]
+  spec_decoding:
+    label: "DeepSeek MTP 投机解码"
+    description: "deepseek_mtp 投机解码,已验证基线为 3 token(教程 §5.1/§5.2);PD 部署 prefill 用 1、decode 用 2(§5.3)"
+    args: ["--speculative-config", '{"num_speculative_tokens": 3, "method": "deepseek_mtp"}']
+  flashcomm1:
+    label: "FlashComm1"
+    description: "FlashComm 通信优化,已验证基线启用(教程 §5.1/§5.2)"
+    env:
+      VLLM_ASCEND_ENABLE_FLASHCOMM1: "1"
+  mlapo:
+    label: "MLAPO"
+    description: "MLAPO 融合算子,已验证基线启用(教程 §5.1/§5.2)"
+    env:
+      VLLM_ASCEND_ENABLE_MLAPO: "1"
+  prefix_caching:
+    label: "前缀缓存"
+    description: "KV 前缀缓存;全部已验证基线通过 --no-enable-prefix-caching 关闭(教程 §5.1/§5.2/§5.3)"
+    args: ["--enable-prefix-caching"]
+    flag_when_false: "--no-enable-prefix-caching"
+
+opt_in_features:
+  - prefix_caching
+
+variants:
+  default:
+    model_id: "vllm-ascend/DeepSeek-V3.2-W8A8"
+    precision: W8A8
+    vram_minimum_gb: 806   # 推导值,按 docs/recipe-schema.md 公式 ceil(671 × 1 × 1.2) = 806(671B INT8 ≈ 1 字节/参数);非教程数字——可容纳 1×Atlas 800 A3(64G x 16)或 2×A2(教程 §3.1)
+    description: "W8A8 量化权重,用于单机与多机 DP 部署(教程 §5.1/§5.2)"
+    supported_hardware: [atlas_800_a3, atlas_800_a2]
+  exp:
+    model_id: "vllm-ascend/DeepSeek-V3.2-Exp-W8A8"
+    precision: W8A8
+    vram_minimum_gb: 806
+    description: "与稳定版并列列出的实验版 W8A8(教程 §3.1)"
+    supported_hardware: [atlas_800_a3, atlas_800_a2]
+  pd_quarot:
+    model_id: "Eco-Tech/DeepSeek-V3.2-w8a8-mtp-QuaRot"
+    precision: W8A8
+    vram_minimum_gb: 806
+    description: "教程 §5.3 PD 分离部署所用的 QuaRot MTP 权重"
+    supported_hardware: [atlas_800_a3]
+
+compatible_strategies:
+  - single_node_A3
+  - multi_node_dp
+  - pd_cluster
+
+guide: ""
+performance_model_names:
+  - "DeepSeek-V3.2-W8A8"
+
+overview: |-
+  DeepSeek-V3.2 是 DeepSeek 推出的稀疏注意力混合专家模型;架构承自 DeepSeek-V3.1,
+  以 DeepSeek 稀疏注意力(DSA)提升长上下文效率(教程 §1)。本 recipe 覆盖教程的三个
+  已验证部署档位:单台 Atlas 800 A3(dp2 tp8,§5.1)、两台 Atlas 800 A3 数据并行
+  (dp2 tp16,§5.2——该节亦记载 A2 双节点变体)、以及 4 台 Atlas 800 A3 上的 1P1D
+  prefill-decode 分离(prefill DP2+TP16 两节点、decode DP8+TP4 两节点,
+  MooncakeConnectorV1 KV 传输,§5.3)。PD 部署参考性能:A3-752T 上 64k/3k 达
+  533 tps、TPOT 32ms(§8)。DeepSeek-V3.2 稀疏 Flash 注意力(SFA)后端在 PD 分离中
+  使用 DCP 时,必须在 prefill 与 decode 两侧同时启用或同时关闭(§5.3 警告)。
+
+weight_download:
+  - weight_version: W8A8
+    sources:
+      - source: ModelScope   # 教程 §3.1
+        url: "https://www.modelscope.cn/models/vllm-ascend/DeepSeek-V3.2-W8A8"
+        command: |
+          pip install modelscope
+          modelscope download --model vllm-ascend/DeepSeek-V3.2-W8A8 --local_dir /root/.cache/
+  - weight_version: Exp W8A8
+    sources:
+      - source: ModelScope   # 教程 §3.1
+        url: "https://www.modelscope.cn/models/vllm-ascend/DeepSeek-V3.2-Exp-W8A8"
+        command: |
+          pip install modelscope
+          modelscope download --model vllm-ascend/DeepSeek-V3.2-Exp-W8A8 --local_dir /root/.cache/
+  - weight_version: W8A8 MTP QuaRot(PD 部署,教程 §5.3)
+    sources:
+      - source: "教程未提供下载源;权重预期位于 /root/.cache/Eco-Tech/DeepSeek-V3.2-w8a8-mtp-QuaRot"
+        url: ""
+        command: |
+          # 教程未给出下载 URL——获取 QuaRot 检查点并放置于
+          # /root/.cache/Eco-Tech/DeepSeek-V3.2-w8a8-mtp-QuaRot(使用前先核实来源)
+
+prerequisites:
+- title: 模型权重
+  content: |-
+    - `DeepSeek-V3.2-Exp-W8A8`(量化版):需要 1 台 Atlas 800 A3(64G x 16)节点或 2 台
+      Atlas 800 A2(64G x 8)节点。[下载](https://www.modelscope.cn/models/vllm-ascend/DeepSeek-V3.2-Exp-W8A8)
+    - `DeepSeek-V3.2-w8a8`(量化版):需要 1 台 Atlas 800 A3(64G x 16)节点或 2 台
+      Atlas 800 A2(64G x 8)节点。[下载](https://www.modelscope.cn/models/vllm-ascend/DeepSeek-V3.2-W8A8)
+
+    建议将模型权重下载到多节点共享目录,如 `/root/.cache/`(教程 §3.1)。
+
+- title: 多节点通信验证(可选)
+  content: |-
+    如需多节点部署,按[多节点通信环境验证](https://docs.vllm.ai/projects/ascend/en/latest/installation.html#verify-multi-node-communication)
+    完成验证(教程 §3.2)。
+
+env_setup:
+  container:
+    A3:
+      content: |-
+        直接使用官方 docker 镜像运行 DeepSeek-V3.2(教程 §4.1):
+
+        ```shell
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0rc1-a3
+
+        docker run --rm \
+            --name vllm-ascend \
+            --privileged=true \
+            --shm-size=1g \
+            --net=host \
+            --device /dev/davinci0 \
+            --device /dev/davinci1 \
+            --device /dev/davinci2 \
+            --device /dev/davinci3 \
+            --device /dev/davinci4 \
+            --device /dev/davinci5 \
+            --device /dev/davinci6 \
+            --device /dev/davinci7 \
+            --device /dev/davinci8 \
+            --device /dev/davinci9 \
+            --device /dev/davinci10 \
+            --device /dev/davinci11 \
+            --device /dev/davinci12 \
+            --device /dev/davinci13 \
+            --device /dev/davinci14 \
+            --device /dev/davinci15 \
+            --device /dev/davinci_manager \
+            --device /dev/devmm_svm \
+            --device /dev/hisi_hdc \
+            -v /usr/local/dcmi:/usr/local/dcmi \
+            -v /usr/local/Ascend/driver/tools/hccn_tool:/usr/local/Ascend/driver/tools/hccn_tool \
+            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+            -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \
+            -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
+            -v /etc/ascend_install.info:/etc/ascend_install.info \
+            -v /root/.cache:/root/.cache \
+            -it $IMAGE bash
+        ```
+    A2:
+      content: |-
+        A2 镜像无 `-a3` 后缀,暴露 8 个设备(教程 §4.1):
+
+        ```shell
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0rc1
+
+        docker run --rm \
+            --name vllm-ascend \
+            --privileged=true \
+            --shm-size=1g \
+            --net=host \
+            --device /dev/davinci0 \
+            --device /dev/davinci1 \
+            --device /dev/davinci2 \
+            --device /dev/davinci3 \
+            --device /dev/davinci4 \
+            --device /dev/davinci5 \
+            --device /dev/davinci6 \
+            --device /dev/davinci7 \
+            --device /dev/davinci_manager \
+            --device /dev/devmm_svm \
+            --device /dev/hisi_hdc \
+            -v /usr/local/dcmi:/usr/local/dcmi \
+            -v /usr/local/Ascend/driver/tools/hccn_tool:/usr/local/Ascend/driver/tools/hccn_tool \
+            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+            -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \
+            -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
+            -v /etc/ascend_install.info:/etc/ascend_install.info \
+            -v /root/.cache:/root/.cache \
+            -it $IMAGE bash
+        ```
+
+scenarios:
+  - npu: Atlas 800I A3   # 硬件枚举对齐仓内惯例;教程表述为 Atlas 800 A3
+    precision: W8A8
+    deployment: "单节点-多卡"
+    case: "基线服务"
+    tags: [a3-single]
+    strategy: single_node_A3
+    steps:
+      - title: "启动服务"
+        content: |-
+          量化版 `DeepSeek-V3.2-w8a8` 可部署于 1 台 Atlas 800 A3(64G x 16)(教程 §5.1)。
+          教程假定权重位于 `/root/.cache/`:
+
+          ```bash
+          export HCCL_OP_EXPANSION_MODE="AIV"
+          export OMP_PROC_BIND=false
+          export OMP_NUM_THREADS=10
+          export VLLM_USE_V1=1
+          export HCCL_BUFFSIZE=200
+          export VLLM_ASCEND_ENABLE_MLAPO=1
+          export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+          export VLLM_ASCEND_ENABLE_FLASHCOMM1=1
+
+          vllm serve your_model_path \
+          --host 0.0.0.0 \
+          --port 8000 \
+          --data-parallel-size 2 \
+          --tensor-parallel-size 8 \
+          --quantization ascend \
+          --seed 1024 \
+          --served-model-name deepseek_v3_2 \
+          --enable-expert-parallel \
+          --max-num-seqs 16 \
+          --max-model-len 8192 \
+          --max-num-batched-tokens 4096 \
+          --trust-remote-code \
+          --no-enable-prefix-caching \
+          --gpu-memory-utilization 0.92 \
+          --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY"}' \
+          --speculative-config '{"num_speculative_tokens": 3, "method": "deepseek_mtp"}'
+          ```
+
+          服务经 `--served-model-name` 注册为 `deepseek_v3_2`。
+  - npu: Atlas 800I A3
+    precision: W8A8
+    deployment: "多节点"
+    case: "两节点数据并行(dp2 tp16)"
+    tags: [a3-multi]
+    strategy: multi_node_dp
+    steps:
+      - title: "启动服务(节点 0)"
+        content: |-
+          `DeepSeek-V3.2-w8a8` 多机部署至少需要 2 台 Atlas 800 A2(64G x 8);下方 A3 变体
+          跨 2 节点使用 dp2 tp16(教程 §5.2)。`node0_ip` 必须与主节点的 `local_ip` 一致。
+
+          共享环境集(两节点相同,教程 §5.2):`HCCL_OP_EXPANSION_MODE="AIV"`、
+          `HCCL_IF_IP=$local_ip`、`GLOO_SOCKET_IFNAME=$nic_name`、`TP_SOCKET_IFNAME=$nic_name`、
+          `HCCL_SOCKET_IFNAME=$nic_name`、`OMP_PROC_BIND=false`、`OMP_NUM_THREADS=10`、
+          `VLLM_USE_V1=1`、`HCCL_BUFFSIZE=200`、`VLLM_ASCEND_ENABLE_MLAPO=1`、
+          `PYTORCH_NPU_ALLOC_CONF=expandable_segments:True`、`VLLM_ASCEND_ENABLE_FLASHCOMM1=1`。
+
+          节点 0 serve 参数:`--host 0.0.0.0 --port 8077 --data-parallel-size 2
+          --data-parallel-size-local 1 --data-parallel-address $node0_ip
+          --data-parallel-rpc-port 12890 --tensor-parallel-size 16 --quantization ascend
+          --seed 1024 --served-model-name deepseek_v3_2 --enable-expert-parallel
+          --max-num-seqs 16 --max-model-len 8192 --max-num-batched-tokens 4096
+          --trust-remote-code --no-enable-prefix-caching --gpu-memory-utilization 0.92
+          --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY"}' --speculative-config
+          '{"num_speculative_tokens": 3, "method": "deepseek_mtp"}'`,权重路径为
+          `/root/.cache/modelscope/hub/models/vllm-ascend/DeepSeek-V3.2-W8A8`。
+
+          完整的节点 0/节点 1 脚本在教程 §5.2 原样发布——逐字拷贝并按节点设置
+          `local_ip`/`nic_name`/`node0_ip`。本 recipe 将多机 serve 命令移出版外,
+          避免集群 CI 把两节点服务当单机用例执行。
+      - title: "启动服务(节点 1)"
+        content: |-
+          节点 1 追加 `--headless` 与 `--data-parallel-start-rank 1`,
+          `--data-parallel-address` 指向节点 0(教程 §5.2):
+
+          节点 1 相对节点 0 的差异:追加 `--headless` 与 `--data-parallel-start-rank 1`,
+          保留 `--data-parallel-size-local 1`(教程 §5.2 节点 1 块中两者并存),
+          `--data-parallel-address` 指向 `$node0_ip`。其余参数与环境集
+          完全相同(教程 §5.2 节点 1 块——逐字拷贝)。
+
+          该部署的 A2 变体(2 节点,dp2 tp8,rpc 端口 13389,`OMP_NUM_THREADS=100`,
+          `HCCL_CONNECT_TIMEOUT=120`,`HCCL_INTRA_PCIE_ENABLE=1`,`HCCL_INTRA_ROCE_ENABLE=0`,
+          cudagraph sizes [8,16,24,32,40,48])结构相同——见教程 §5.2 A2 标签页。
+  - npu: Atlas 800I A3
+    precision: W8A8
+    deployment: "多节点-PD分离"
+    case: "PD 分离"
+    tags: [pd-multinode]   # 仓内 tag 词表(V4-Flash 先例)
+    strategy: pd_cluster
+    steps:
+      - title: "准备启动脚本与权重"
+        content: |-
+          DeepSeek-V3.2 在 4 台 Atlas 800 A3 节点上的 1P1D PD 分离:2 个 prefill 节点
+          (dp2 tp16)、2 个 decode 节点(dp8 tp4),使用 MooncakeConnectorV1 KV 传输
+          (教程 §5.3)。权重:`Eco-Tech/DeepSeek-V3.2-w8a8-mtp-QuaRot`,位于
+          `/root/.cache/Eco-Tech/`。每节点部署 `launch_online_dp.py`
+          ([示例](https://github.com/vllm-project/vllm-ascend/blob/main/examples/external_online_dp/launch_online_dp.py))
+          与 `run_dp_template.sh`,并在 prefill 主节点部署代理
+          (教程 §5.3 列出全部三个脚本与各节点完整环境集)。
+          **警告(教程 §5.3):** Decode Context Parallelism 必须在 prefill 与
+          decode 两侧同时启用,或同时关闭——单侧启用会导致已知精度问题。
+      - title: "各角色配置摘要"
+        content: |-
+          教程 §5.3(`run_dp_template.sh`)中各角色的关键事实:
+
+          - prefill 节点:`HCCL_BUFFSIZE=256`、`num_speculative_tokens: 1`、`--enforce-eager`、
+            `--max-model-len 68000 --max-num-batched-tokens 32560 --max-num-seqs 64`,
+            `--gpu-memory-utilization 0.82`,`--additional-config '{"layer_sharding": ["q_b_proj",
+            "o_proj"], "enable_dsa_cp": true}'`,Mooncake `kv_role: kv_producer`(`kv_port` 30000),
+            kv extra config prefill dp2/tp16。
+          - decode 节点:`HCCL_BUFFSIZE=256` + `TASK_QUEUE_ENABLE=1`,`num_speculative_tokens: 2`,
+            `--max-num-batched-tokens 12 --max-num-seqs 4 --gpu-memory-utilization 0.95`,
+            `--compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY",
+            "cudagraph_capture_sizes":[3, 6, 9, 12]}'`,`recompute_scheduler_enable: true`,
+            Mooncake `kv_role: kv_consumer`(`kv_port` 30100),kv extra config decode dp8/tp4。
+          - 公共:`ASCEND_AGGREGATE_ENABLE=1`、`ASCEND_TRANSPORT_PRINT=1`、`ACL_OP_INIT_MODE=1`、
+            `ASCEND_A3_ENABLE=1`、`VLLM_MOONCAKE_ABORT_REQUEST_TIMEOUT=480`。脚本还承载的
+            其他已验证值:`--seed 1024`、`--quantization ascend`、`--profiler-config`(双角色
+            torch profiler)、`ASCEND_RT_VISIBLE_DEVICES=$1`(rank 到设备映射)、decode 侧
+            `--max-model-len 68000`。
+      - title: "启动各节点"
+        content: |-
+          ```bash
+          # p0
+          python launch_online_dp.py --dp-size 2 --tp-size 16 --dp-size-local 1 --dp-rank-start 0 --dp-address <prefill_node_0_ip> --dp-rpc-port 12890 --vllm-start-port 9100
+          # p1
+          python launch_online_dp.py --dp-size 2 --tp-size 16 --dp-size-local 1 --dp-rank-start 1 --dp-address <prefill_node_0_ip> --dp-rpc-port 12890 --vllm-start-port 9100
+          # d0
+          python launch_online_dp.py --dp-size 8 --tp-size 4 --dp-size-local 4 --dp-rank-start 0 --dp-address <decode_node_0_ip> --dp-rpc-port 12777 --vllm-start-port 9100
+          # d1
+          python launch_online_dp.py --dp-size 8 --tp-size 4 --dp-size-local 4 --dp-rank-start 4 --dp-address <decode_node_0_ip> --dp-rpc-port 12777 --vllm-start-port 9100
+          ```
+
+          将占位 IP 替换为自己的节点地址。
+      - title: "请求转发"
+        content: |-
+          在 prefill 主节点运行代理(教程 §5.3),代理程序取自仓库示例
+          [load_balance_proxy_server_example.py](https://github.com/vllm-project/vllm-ascend/blob/main/examples/disaggregated_prefill_v1/load_balance_proxy_server_example.py)
+          (或 `vllm-ascend/examples/disaggregated_prefill_v1/` 的 `proxy.sh` 流程):
+
+          ```bash
+          unset http_proxy
+          unset https_proxy
+
+          python load_balance_proxy_server_example.py \
+              --port 8000 \
+              --host <prefill_node_0_ip> \
+              --prefiller-hosts \
+              <prefill_node_0_ip> \
+              <prefill_node_1_ip> \
+              --prefiller-ports \
+              9100 \
+              9100 \
+              --decoder-hosts \
+              <decode_node_0_ip> \
+              <decode_node_0_ip> \
+              <decode_node_0_ip> \
+              <decode_node_0_ip> \
+              <decode_node_1_ip> \
+              <decode_node_1_ip> \
+              <decode_node_1_ip> \
+              <decode_node_1_ip> \
+              --decoder-ports \
+              9100 9101 9102 9103 \
+              9100 9101 9102 9103
+          ```
+
+verification: |-
+  服务启动后,可通过输入提示词查询模型。`<node0_ip>` 为服务所在节点的 IP(如 localhost);
+  PD 分离部署使用代理脚本所在节点的主机 IP 与代理端口(教程 §6):
+
+  ```shell
+  curl http://<node0_ip>:<port>/v1/completions \
+      -H "Content-Type: application/json" \
+      -d '{
+          "model": "deepseek_v3_2",
+          "prompt": "The future of AI is",
+          "max_completion_tokens": 50,
+          "temperature": 0
+      }'
+  ```
+
+  预期结果:
+
+  HTTP 200 且 `choices` 字段包含生成文本(教程 §6 给出了响应体样例)。注意:`model` 字段
+  必须匹配当前档位的 `--served-model-name`——单机/双机为 `deepseek_v3_2`,PD 代理为
+  `deepseek_v3.2`(教程自身两种命名并存)。
+
+evaluation:
+  accuracy:
+    content: |-
+      ### 使用 AISBench
+
+      详见[使用 AISBench](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/evaluation/using_ais_bench.html);自行运行并记录结果(教程 §7 未发布参考数字)。
+
+      ### 使用 lm-eval
+
+      按[使用 lm_eval](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/evaluation/using_lm_eval.html) 安装后执行(教程 §7):
+
+      ```shell
+      lm_eval \
+      --model local-completions \
+      --model_args model=/root/.cache/Eco-Tech/DeepSeek-V3.2-w8a8-mtp-QuaRot,base_url=http://127.0.0.1:8000/v1/completions,tokenized_requests=False,trust_remote_code=True \
+      --tasks gsm8k \
+      --output_path ./
+      ```
+
+      注意:上方命令保留教程原样的检查点路径作为 `model`;若对运行中的服务档位评测,
+      请改用该档位的 served 名(单机/双机 `deepseek_v3_2`,PD 代理 `deepseek_v3.2`)。
+
+performance:
+  accuracy: |-
+    教程 §7 未发布本模型的精度参考数字——按上方 evaluation 一节运行 AISBench 或 lm-eval
+    并记录结果。
+
+    第一方实测(2026-11-25,`quay.io/ascend/vllm-ascend:nightly-main-a3`,vllm 0.33.0,
+    Atlas 800T A3 单机 dp2 tp8,AISBench gsm8k 1319 题、4-shot CoT chat、batch 16、
+    max_out_len 4096):95.98(95.9818),零失败——教程未发布参考值,此为自洽口径结果。
+  benchmark: |-
+    AISBench 性能参考(教程 §8):
+
+      - **硬件**:A3-752T,4 节点
+      - **部署**:1P1D,prefill 节点 DP2+TP16,decode 节点 DP8+TP4
+      - **输入/输出**:64k/3k
+      - **性能**:533 tps,TPOT 32ms
+
+      vllm bench serve 示例(教程 §8):
+
+      ```shell
+      export VLLM_USE_MODELSCOPE=True
+      vllm bench serve --model /root/.cache/Eco-Tech/DeepSeek-V3.2-w8a8-mtp-QuaRot --dataset-name random --random-input 200 --num-prompts 200 --request-rate 1 --save-result --result-dir ./
+      ```
+
+tuning: |-
+  函数调用自 v0.13.0rc1 起支持,请使用最新版本。详见
+  [DeepSeek-V3.2 使用指南](https://docs.vllm.ai/projects/recipes/en/latest/DeepSeek/DeepSeek-V3_2.html#tool-calling-example)
+  (教程 §9)。
+
+  通用调优参考:[公共性能调优文档](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/performance_and_debug/optimization_and_tuning.html)
+  与[特性指南](https://docs.vllm.ai/projects/ascend/en/latest/user_guide/support_matrix/feature_matrix.html)。
+
+faq: |-
+  常见环境、安装与通用参数问题参见[公共 FAQ](https://docs.vllm.ai/projects/ascend/en/latest/faqs.html)。PD 分离部署问题,教程同样指向公共 FAQ(教程 §5.3/§10)。
+
+references:
+  - title: "官方教程"
+    url: "https://docs.vllm.ai/projects/ascend/en/v0.23.0/tutorials/models/DeepSeek-V3.2.html"
+  - title: "模型权重 W8A8(ModelScope)"
+    url: "https://www.modelscope.cn/models/vllm-ascend/DeepSeek-V3.2-W8A8"
+  - title: "PD 分离指南(Mooncake)"
+    url: "https://docs.vllm.ai/projects/ascend/en/v0.23.0/tutorials/features/pd_disaggregation_mooncake_multi_node.html"
+  - title: "大规模专家并行的分布式 DP 服务"
+    url: "https://docs.vllm.ai/projects/ascend/en/latest/user_guide/feature_guide/large_scale_ep.html"
+  - title: "PD 启动脚本"
+    url: "https://github.com/vllm-project/vllm-ascend/blob/main/examples/external_online_dp/launch_online_dp.py"
+  - title: "PD 负载均衡代理示例"
+    url: "https://github.com/vllm-project/vllm-ascend/blob/main/examples/disaggregated_prefill_v1/load_balance_proxy_server_example.py"
