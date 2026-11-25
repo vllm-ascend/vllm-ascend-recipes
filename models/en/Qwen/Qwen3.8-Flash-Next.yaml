@@ -196,6 +196,10 @@ scenarios:
           ```
       - title: Service Verification
         content: |-
+          CI and single-node verify run the text chat curl below. Multimodal OCR
+          needs a real image URL, so keep that example in the guide-only block
+          under `verification` (not an executable `bash` fence here).
+
           ```bash
           curl http://127.0.0.1:8088/v1/chat/completions \
             -H "Content-Type: application/json" \
@@ -207,25 +211,26 @@ scenarios:
             }'
           ```
 
-          Multimodal OCR smoke (replace `IMAGE_URL`):
-
-          ```bash
-          curl http://127.0.0.1:8088/v1/chat/completions \
-            -H "Content-Type: application/json" \
-            -d '{
-              "model": "qwen3.8-flash-next",
-              "messages": [{"role":"user","content":[
-                {"type":"text","text":"Read the text in the image."},
-                {"type":"image_url","image_url":{"url":"IMAGE_URL"}}
-              ]}],
-              "max_tokens": 128,
-              "temperature": 0
-            }'
-          ```
-
 verification: |-
   Expect `/v1/models` HTTP 200 and ACL graph replay active in the serve log on `v0.32.0rc1-a3`.
   Text chat should identify as Qwen. Multimodal OCR on the sample logo returns `TONGYI` / `Qwen`.
+
+  Manual multimodal OCR smoke (replace `IMAGE_URL` with a reachable image; not
+  executed by PR recipe verify):
+
+  ```text
+  curl http://127.0.0.1:8088/v1/chat/completions \
+    -H "Content-Type: application/json" \
+    -d '{
+      "model": "qwen3.8-flash-next",
+      "messages": [{"role":"user","content":[
+        {"type":"text","text":"Read the text in the image."},
+        {"type":"image_url","image_url":{"url":"IMAGE_URL"}}
+      ]}],
+      "max_tokens": 128,
+      "temperature": 0
+    }'
+  ```
 
 evaluation:
   accuracy:
