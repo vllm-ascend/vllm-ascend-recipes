@@ -1,0 +1,23 @@
+{
+  "verification_scope": "single-node API smoke; not accuracy or full feature coverage",
+  "recipe_path": "models/en/Qwen/Qwen3.8-Flash-Next.yaml",
+  "model_id": "Eco-Tech/Qwen3.8-Flash-Next-w8a8-mtp",
+  "hw_key": "atlas_800_a3",
+  "head_sha": "ef5f693f1933c6c51d78024e5e319b93b0d68aae",
+  "workflow_run_id": "45562856457",
+  "trigger_type": "pr",
+  "image": "quay.nju.edu.cn/ascend/vllm-ascend:v0.32.0rc1-a3",
+  "started_at": "2026-11-25T06:44:30Z",
+  "scenarios": [
+    {
+      "index": 0,
+      "npu": "Atlas A3",
+      "precision": "W8A8",
+      "deployment": "Single-Node",
+      "case": "DP1xTP8 ACLGraph (verified)",
+      "serve_cmd": "export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7\nexport VLLM_ASCEND_ENABLE_QSA_LIGHTNING_INDEXER=1\nexport VLLM_ASCEND_ENABLE_QSA_E3V=1\nexport VLLM_USE_V2_MODEL_RUNNER=1\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\nexport MODEL_PATH=/root/.cache/modelscope/hub/models/Eco-Tech/Qwen3.8-Flash-Next-w8a8-mtp\n\nvllm serve ${MODEL_PATH} \\\n    --trust-remote-code \\\n    --quantization ascend \\\n    --served-model-name qwen3.8-flash-next \\\n    --tensor-parallel-size 8 \\\n    --data-parallel-size 1 \\\n    --enable-expert-parallel \\\n    --max-model-len 8192 \\\n    --gpu-memory-utilization 0.9 \\\n    --compilation-config '{\"cudagraph_mode\":\"FULL_DECODE_ONLY\"}' \\\n    --host 0.0.0.0 \\\n    --port 8088",
+      "verification_status": "pass",
+      "verification_reason": "Task API response validated"
+    }
+  ]
+}
