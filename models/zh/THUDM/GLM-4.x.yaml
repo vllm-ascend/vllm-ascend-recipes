@@ -4,10 +4,13 @@ meta:
   provider: "THUDM"
   description: "GLM-4.x 系列是智谱 AI 推出的混合专家（MoE）基础模型，专为智能体应用设计。GLM-4.7 包含最新改进，支持 MTP 投机解码、专家并行和 PD 分离部署于昇腾 NPU。"
   date_added: 2026-07-13
-  performance_headline: "Atlas 800 A3（128G × 8）单节点部署，支持 W8A8 精度"
+  date_updated: 2026-11-25   # refresh: v0.23.0 教程差量(§5.2/§5.3/§5.4/§8) + 真机验证 + 权重格式说明
+  related_recipes:
+    - "zai-org/GLM-5"
+  performance_headline: "Atlas 800 A3（64G × 16）单节点 W8A8 部署；AISBench GPQA 84.85 / MATH500 98.8（实测于 vllm-ascend:main after 0.14.0rc1，教程 §7）"
   hardware:
-    atlas_800_a3: verified
-    atlas_800_a2: verified
+    atlas_800_a3: verified   # 继承自上游底稿(教程 §5.1/§7 载官方 A3 部署与精度)
+    atlas_800_a2: verified   # 继承;教程 §5.2 覆盖 A2 双节点变体
 
 model:
   model_id: "ZhipuAI/GLM-4.7"
@@ -37,7 +40,7 @@ features:
   spec_decoding:
     label: "MTP Spec Decoding"
     description: "配置 MTP（多 Token 预测）投机解码以加速推理"
-    args: ["--speculative-config", '{"num_speculative_tokens": 3, "method": "mtp"}']
+    args: ["--speculative-config", '{"num_speculative_tokens": 3, "method": "mtp", "enforce_eager": true}']   # enforce_eager 依教程 §5.1/§5.2 的投机配置
   compilation_config:
     label: "Compilation Config"
     description: "decode 阶段全 ACL 图执行，降低调度时延"
@@ -150,6 +153,15 @@ prerequisites:
   content: |-
     以下模型变体可用。建议将模型权重下载到所有节点可访问的共享目录。
 
+    > **已知权重仓格式问题(需一行人工准备步骤):**公开仓 `Eco-Tech/GLM-4.7-W8A8-floatmtp`
+    > 的 `config.json` 中 `quantization_config` 采用新版 msModelSlim 导出格式(逐层字典,
+    > 无 `quant_method` 键),当前 vllm-ascend 镜像(v0.23.0rc1-a3 与 nightly 均实测)启动时
+    > 拒绝加载("Quantization method specified in the model config (None) does not match ...")。
+    > 可用做法(两代镜像均验证):从 `config.json` 删除 `quantization_config` 键(保留 `.bak`
+    > 备份),并显式传入 `--quantization ascend` 由命令行接管量化加载——与本教程验证时所用的
+    > 老格式权重仓一致。将向权重仓提上游 issue(恢复旧格式或补充说明);上游解决前,复现需
+    > 先执行这一行准备步骤。
+
     | 模型 | 硬件需求 | 下载 |
     |------|---------|------|
     | GLM-4.5（BF16） | Atlas 800I A3 (64G×16) × 1 | [下载](https://www.modelscope.cn/models/ZhipuAI/GLM-4.5) |
@@ -161,7 +173,7 @@ prerequisites:
 
     以上为推荐卡数，可根据实际情况调整。
 
-    > **注意**：GLM-4.6 没有 MTP 量化版本，因为 vLLM 不支持 GLM-4.6 MTP。
+    > **注意**：GLM-4.6 没有现成的 MTP 量化权重：发布量化版本时 vLLM 尚不支持 GLM-4.6 MTP。该支持现已落地，可使用已公布的[量化方案](https://ai.gitcode.com/Ascend-SACT/GLM-4.5-w8a8)为 GLM-4.6 量化权重添加 MTP 权重（教程 §3.1）。
 - title: 验证多节点通信
   content: |-
     如需部署多节点环境，请按照 [验证多节点通信环境](https://docs.vllm.ai/projects/ascend/zh-cn/latest/installation.html#verify-multi-node-communication) 进行验证。
@@ -692,13 +704,132 @@ scenarios:
   - title: 服务验证
     content: |-
       服务启动后，通过发送提示词验证服务是否正常运行。请参考下方的验证示例。
+- npu: Atlas 800I A2
+  precision: W8A8
+  deployment: 多节点
+  case: 双节点 W8A8   # 教程 §5.2
+  default_configs:
+  - fusion_ops_gmmswigluquant
+  config_params:
+    max_model_len:
+      default: 140000
+      type: number
+      description: "教程 A2 双节点示例使用的上下文长度"
+  steps:
+  - title: 启动服务（节点 0；节点 1 差异见下）
+    content: |-
+      GLM-4.7 在 Atlas 800I A2 上的双节点 W8A8 部署（教程 §5.2）。此前文档不建议在 A2 上
+      多机部署，但 GLM-4.x 在确有需要时支持该配置。每节点执行；节点 1 追加 `--headless` 与
+      `--data-parallel-start-rank 1`。
+
+      ```bash
+      local_ip="xxxx"      # 本节点 IP，通过 ifconfig 获取
+      nic_name="xxxx"      # 与 local_ip 匹配的网卡名
+      node0_ip="xxxx"      # 节点 0 的 IP（仅节点 1 需要）
+      export HCCL_IF_IP=$local_ip
+      export GLOO_SOCKET_IFNAME=$nic_name
+      export TP_SOCKET_IFNAME=$nic_name
+      export HCCL_SOCKET_IFNAME=$nic_name
+      export HCCL_BUFFSIZE=512
+      export OMP_PROC_BIND=false
+      export OMP_NUM_THREADS=1
+      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+      export HCCL_OP_EXPANSION_MODE="AIV"
+      export VLLM_ASCEND_BALANCE_SCHEDULING=1
+      export VLLM_ASCEND_ENABLE_TOPK_OPTIMIZE=1
+
+      vllm serve Eco-Tech/GLM-4.7-W8A8-floatmtp \
+        --host 0.0.0.0 \
+        --port 8004 \
+        --data-parallel-size 2 \
+        --data-parallel-size-local 1 \
+        --data-parallel-start-rank 0 \
+        --data-parallel-address $local_ip \
+        --data-parallel-rpc-port 13389 \
+        --tensor-parallel-size 8 \
+        --enable-expert-parallel \
+        --seed 1024 \
+        --max-model-len {{max_model_len}} \
+        --max-num-batched-tokens 8192 \
+        --max-num-seqs 16 \
+        --quantization ascend \
+        --trust-remote-code \
+        --gpu-memory-utilization 0.9 \
+        --enable-auto-tool-choice \
+        --reasoning-parser glm45 \
+        --tool-call-parser glm47 \
+        --served-model-name glm47 \
+        --speculative-config '{"num_speculative_tokens": 3, "method":"mtp", "enforce_eager": true}' \
+        --compilation-config '{"cudagraph_capture_sizes": [1,2,4,8,16,32,64,128,256,512], "cudagraph_mode": "FULL_DECODE_ONLY"}' \
+        --additional-config '{"enable_shared_expert_dp": true, "ascend_fusion_config": {%%CONFIG:fusion_ops_gmmswigluquant%%"fusion_ops_gmmswigluquant": false%%/CONFIG:fusion_ops_gmmswigluquant%%}}'
+      ```
+
+      > - 节点 1 与上方块的差异：使用 `--data-parallel-start-rank 1`、追加 `--headless`、
+      >   `--data-parallel-address $node0_ip`（教程 §5.2）。
+      > - 将 `local_ip`/`nic_name`/`node0_ip` 替换为各节点实际值。
+      > - 服务验证：服务以 `glm47` 注册于 8004 端口——请求
+      >   `http://<节点IP>:8004/v1/chat/completions` 并使用 `"model": "glm47"`。
+- npu: Atlas 800I A3
+  precision: W8A8
+  deployment: 多节点
+  case: 2P2D PD 分离   # 教程 §5.3 正文写 "2P1D"，但其命令链为 2P2D（dp2tp8 x2 + dp8tp4 x2），按命令标注
+  # 无 default_configs:教程为硬编码值，本场景未使用 %%CONFIG%% 锚点
+  steps:
+  - title: 准备启动脚本
+    content: |-
+      GLM-4.7 在 4 台 Atlas 800I A3 节点上的 PD 分离：2 个 prefill 节点（各 dp2 tp8）、
+      2 个 decode 节点（各 dp8 tp4），使用 MooncakeConnectorV1 KV 传输与负载均衡代理。
+      每个节点按教程 §5.3 原样准备 `launch_online_dp.py` 与 `run_dp_template.sh`
+      ([脚本与完整命令块](https://docs.vllm.ai/projects/ascend/en/v0.23.0/tutorials/models/GLM4.x.html))。
+      脚本中除下方启动命令外的关键事实：prefill 环境用 `HCCL_BUFFSIZE=256` + `ASCEND_A3_ENABLE=1` +
+      `--enforce-eager` + `num_speculative_tokens: 1`（单节点为 3）；decode 环境另加 `HCCL_BUFFSIZE=512`、
+      `TASK_QUEUE_ENABLE=1`、`VLLM_ASCEND_ENABLE_FUSED_MC2=1`、`VLLM_MOONCAKE_ABORT_REQUEST_TIMEOUT=480`、
+      `recompute_scheduler_enable: true`、`--max-num-batched-tokens 128 --max-num-seqs 4`；
+      Mooncake 三个 `kv_port` 分别为 30000（prefill 节点 0）、30100（prefill 节点 1）、30200（decode 节点）。
+      将 `$node_p0_ip/$node_p1_ip/$node_d0_ip/$node_d1_ip` 替换为实际节点 IP。
+  - title: 启动 prefill 节点
+    content: |-
+      每个 prefill 节点执行（教程 §5.3）：
+
+      ```bash
+      python launch_online_dp.py --dp-size 2 --tp-size 8 --dp-size-local 2 --dp-rank-start 0 --dp-address $node_p0_ip --dp-rpc-port 12880 --vllm-start-port 9300
+      ```
+
+      节点 1 将 `--dp-address` 换为自身的 `$node_p1_ip`。
+  - title: 启动 decode 节点
+    content: |-
+      decode 节点 0 执行（教程 §5.3）：
+
+      ```bash
+      python launch_online_dp.py --dp-size 8 --tp-size 4 --dp-size-local 4 --dp-rank-start 0 --dp-address $node_d0_ip --dp-rpc-port 12778 --vllm-start-port 9300
+      ```
+
+      decode 节点 1：`--dp-size-local 4 --dp-rank-start 4`，`--dp-address` 仍为 `$node_d0_ip`。
+  - title: 请求转发
+    content: |-
+      在任意一台机器上运行负载均衡代理（教程 §5.4），代理程序取自仓库示例
+      [load_balance_proxy_server_example.py](https://github.com/vllm-project/vllm-ascend/blob/main/examples/disaggregated_prefill_v1/load_balance_proxy_server_example.py):
+
+      ```bash
+      unset http_proxy
+      unset https_proxy
+      python load_balance_proxy_server_example.py \
+          --port 8000 --host 0.0.0.0 \
+          --prefiller-hosts $node_p0_ip $node_p0_ip $node_p1_ip $node_p1_ip \
+          --prefiller-ports 9300 9301 9300 9301 \
+          --decoder-hosts $node_d0_ip $node_d0_ip $node_d0_ip $node_d0_ip $node_d1_ip $node_d1_ip $node_d1_ip $node_d1_ip \
+          --decoder-ports 9300 9301 9302 9303 9300 9301 9302 9303
+      ```
+
+      启动脚本以 served 名 `glm` 注册引擎（教程 §5.3）；8000 端口上的代理是公共入口——请求使用 `"model": "glm"` 发往代理。
+
 verification: |-
   服务启动后，可以通过发送提示词调用模型。
 
   **Chat Completions API：**
 
   ```shell
-  curl http://localhost:8000/v1/chat/completions \
+  curl http://<server_ip>:<port>/v1/chat/completions \
       -H "Content-Type: application/json" \
       -d '{
           "model": "glm",
@@ -710,7 +841,7 @@ verification: |-
       }'
   ```
 
-  > - **URL**（`http://localhost:8000`）：将 `localhost` 和 `8000` 替换为服务器 IP 和 `vllm serve` 命令中的 `--port` 值。
+  > - **URL**：将地址替换为服务器 IP，并使用 `vllm serve` 命令中的 `--port` 值。
   > - **`model`**：必须与 `vllm serve` 命令中的 `--served-model-name` 值匹配（如 `glm`）。
 
   **函数调用：**
@@ -735,6 +866,11 @@ performance:
     | GPQA | - | accuracy | gen | 84.85 | 1 Atlas 800 A3 (64G × 16) |
     | MATH500 | - | accuracy | gen | 98.8 | 1 Atlas 800 A3 (64G × 16) |
 
+    第一方实测（2026-11-24，`quay.io/ascend/vllm-ascend:nightly-main-a3`，vllm 0.33.0，
+    Atlas 800T A3 单机，AISBench gsm8k 1319 题、4-shot CoT chat、batch 16、max_out_len 65536）：
+    97.04（97.0432），零失败。教程未发布本模型的 gsm8k 参考值，该数字为标准 recipe 评测口径下的
+    自洽结果，非官方参考复现。
+
     ### 使用 Language Model Evaluation Harness
 
     尚未测试。
@@ -753,6 +889,30 @@ performance:
     | 高吞吐短序列 | dp2 tp8 | 最大化并发请求处理 |
 
     > `max-model-len` 和 `max-num-seqs` 应根据场景调优。
+    #### vllm bench serve 示例（教程 §8）
+
+    ```bash
+    vllm bench serve \
+      --backend vllm \
+      --dataset-name prefix_repetition \
+      --prefix-repetition-prefix-len 22400 \
+      --prefix-repetition-suffix-len 9600 \
+      --prefix-repetition-output-len 1024 \
+      --num-prompts 1 \
+      --prefix-repetition-num-prefixes 1 \
+      --ignore-eos \
+      --model glm \
+      --tokenizer Eco-Tech/GLM-4.7-W8A8-floatmtp \
+      --seed 1000 \
+      --host 0.0.0.0 \
+      --port 8000 \
+      --endpoint /v1/completions \
+      --max-concurrency 1 \
+      --request-rate 1
+    ```
+
+    详见 [vllm benchmark](https://docs.vllm.ai/en/latest/benchmarking/) 的 `latency`、
+    `serve`、`throughput` 三个子命令。
 tuning: |-
   ### 调优指南
 
@@ -797,3 +957,7 @@ references:
   url: https://modelscope.cn/models/Eco-Tech/GLM-4.7-W8A8-floatmtp
 - title: vllm-ascend GitHub
   url: https://github.com/vllm-project/vllm-ascend
+- title: GLM 量化方案（添加 MTP 权重）
+  url: https://ai.gitcode.com/Ascend-SACT/GLM-4.5-w8a8
+- title: PD 负载均衡代理示例
+  url: https://github.com/vllm-project/vllm-ascend/blob/main/examples/disaggregated_prefill_v1/load_balance_proxy_server_example.py

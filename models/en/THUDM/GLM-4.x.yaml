@@ -4,10 +4,13 @@ meta:
   provider: "THUDM"
   description: "GLM-4.x series are Mixture-of-Experts (MoE) foundational models from Zhipu AI, specifically designed for agent applications. GLM-4.7 features the latest improvements with support for MTP speculative decoding, expert parallelism, and PD disaggregation on Ascend NPUs."
   date_added: 2026-07-13
-  performance_headline: "Single-node deployment on Atlas 800 A3 (128G × 8) with W8A8 precision"
+  date_updated: 2026-11-25   # refresh: v0.23.0 tutorial deltas (§5.2/§5.3/§5.4/§8) + real-machine verification + weight-schema note
+  related_recipes:
+    - "zai-org/GLM-5"
+  performance_headline: "Single-node Atlas 800 A3 (64G × 16) W8A8 serving; AISBench GPQA 84.85 / MATH500 98.8 (measured on vllm-ascend:main after 0.14.0rc1, tutorial §7)"
   hardware:
-    atlas_800_a3: verified
-    atlas_800_a2: verified
+    atlas_800_a3: verified   # inherited from the upstream base recipe (tutorial §5.1/§7 official A3 deployment and accuracy)
+    atlas_800_a2: verified   # inherited; tutorial §5.2 covers the A2 dual-node variant
 
 model:
   model_id: "ZhipuAI/GLM-4.7"
@@ -37,7 +40,7 @@ features:
   spec_decoding:
     label: "MTP Spec Decoding"
     description: "Configures MTP (Multi-Token Prediction) speculative decoding to accelerate inference"
-    args: ["--speculative-config", '{"num_speculative_tokens": 3, "method": "mtp"}']
+    args: ["--speculative-config", '{"num_speculative_tokens": 3, "method": "mtp", "enforce_eager": true}']   # enforce_eager per tutorial §5.1/§5.2 spec configs
   compilation_config:
     label: "Compilation Config"
     description: "Runs decode with full ACL graph execution to reduce scheduling latency"
@@ -150,6 +153,18 @@ prerequisites:
   content: |-
     The following model variants are available. It is recommended to download the model weight to a shared directory accessible to all nodes.
 
+    > **Known weight-repo schema issue (one-line manual step required):** the published
+    > `Eco-Tech/GLM-4.7-W8A8-floatmtp` repo ships a `config.json` whose `quantization_config`
+    > uses the new msModelSlim export schema (per-layer dict, no `quant_method` key). Current
+    > vllm-ascend images reject it at startup ("Quantization method specified in the model
+    > config (None) does not match ..."). Working procedure (verified on both v0.23.0rc1-a3
+    > and nightly): remove the `quantization_config` key from `config.json` (keep a `.bak`
+    > backup) and pass `--quantization ascend` so quantization loading is taken over by the
+    > CLI — matching the older-format weight repos this tutorial was verified with. An
+    > upstream issue against the weights repo will be filed to restore the legacy schema
+    > or document the removal; until then, this one-line preparation step
+    > is required for reproducibility.
+
     | Model | Hardware Requirement | Download |
     |-------|---------------------|----------|
     | GLM-4.5 (BF16) | Atlas 800I A3 (64G×16) × 1 | [Download](https://www.modelscope.cn/models/ZhipuAI/GLM-4.5) |
@@ -161,7 +176,7 @@ prerequisites:
 
     These are the recommended numbers of cards, which can be adjusted according to the actual situation.
 
-    > **Note**: GLM-4.6 does not have an MTP quantized version because vLLM does not support GLM-4.6 MTP.
+    > **Note**: GLM-4.6 has no pre-quantized MTP weights: none were published while vLLM lacked GLM-4.6 MTP support. Support has since landed, so MTP weights can now be added to GLM-4.6 quantized weights with the published [quantization scheme](https://ai.gitcode.com/Ascend-SACT/GLM-4.5-w8a8) (tutorial §3.1).
 - title: Verify Multi-node Communication
   content: |-
     If you want to deploy a multi-node environment, you need to verify multi-node communication according to [verify multi-node communication environment](https://docs.vllm.ai/projects/ascend/en/latest/installation.html#verify-multi-node-communication).
@@ -221,7 +236,7 @@ env_setup:
             -it -d $IMAGE bash
         ```
 
-        > **Note**: A3 has 8 NPUs with dual-die design (16 chips total: `/dev/davinci[0-15]`).
+        > **Note**: A3 has 8 NPUs with a dual-die design (16 chips total: `/dev/davinci[0-15]`).
     A2:
       content: |-
         You can use the official all-in-one Docker image for GLM-4.x models.
@@ -329,7 +344,7 @@ scenarios:
   steps:
   - title: Start the server
     content: |-
-      Single-node deployment for GLM-4.7 W8A8 quantized model on Atlas 800I A3. This option targets long-context high-concurrency (>4) scenarios and recommends `dp2 tp8`.
+      Single-node deployment for GLM-4.7 W8A8 quantized model on Atlas 800I A3. This option targets long-context high-concurrency (>4) scenarios; the recommended layout is `dp2 tp8`.
 
       ```bash
       export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15
@@ -361,7 +376,7 @@ scenarios:
 
       > - `--quantization ascend`: required for W8A8 quantized models. Remove this parameter when using BF16 weights.
       > - `--speculative-config`: configures MTP speculative decoding to accelerate inference.
-      > - `fusion_ops_gmmswigluquant`: should be `false` when total number of NPUs is <= 16 due to performance degradation.
+      > - `fusion_ops_gmmswigluquant`: should be `false` when the total number of NPUs is <= 16 due to performance degradation.
       > - For long-context low-concurrency (<=4) scenarios, recommend `dp1 tp16`; for long-context high-concurrency (>4), low-latency short sequences, and high-throughput short sequences, recommend `dp2 tp8`.
       > - `max-model-len` and `max-num-seqs` should be set according to the actual scenario.
 
@@ -427,7 +442,7 @@ scenarios:
 
       > - `--quantization ascend`: required for W8A8 quantized models. Remove this parameter when using BF16 weights.
       > - `--speculative-config`: configures MTP speculative decoding to accelerate inference.
-      > - `fusion_ops_gmmswigluquant`: should be `false` when total number of NPUs is <= 16 due to performance degradation.
+      > - `fusion_ops_gmmswigluquant`: should be `false` when the total number of NPUs is <= 16 due to performance degradation.
       > - `max-model-len` and `max-num-seqs` should be set according to the actual scenario.
   - title: Service Verification
     content: |-
@@ -584,7 +599,7 @@ scenarios:
       > - A2 has 8 NPUs, so `--tensor-parallel-size 8` uses all available NPUs.
       > - `--quantization ascend`: required for W8A8 quantized models. Remove this parameter when using BF16 weights.
       > - `--speculative-config`: configures MTP speculative decoding to accelerate inference.
-      > - `fusion_ops_gmmswigluquant`: should be `false` when total number of NPUs is <= 16 due to performance degradation.
+      > - `fusion_ops_gmmswigluquant`: should be `false` when the total number of NPUs is <= 16 due to performance degradation.
       > - `max-model-len` and `max-num-seqs` should be set according to the actual scenario.
   - title: Service Verification
     content: |-
@@ -692,13 +707,137 @@ scenarios:
   - title: Service Verification
     content: |-
       After the service is started, verify it is running by sending a prompt. Refer to the verification section below for a usage example.
+- npu: Atlas 800I A2
+  precision: W8A8
+  deployment: Multi-Node
+  case: Dual Node W8A8   # tutorial §5.2
+  default_configs:
+  - fusion_ops_gmmswigluquant
+  config_params:
+    max_model_len:
+      default: 140000
+      type: number
+      description: "Context length used by the tutorial A2 dual-node example"
+  steps:
+  - title: Start the server (node 0; Node 1 differences below)
+    content: |-
+      Dual-node W8A8 deployment on Atlas 800I A2 for GLM-4.7 (tutorial §5.2). While prior
+      documentation advises against multi-node on A2, this configuration is supported for
+      GLM-4.x when required. Execute on each node; Node 1 adds `--headless` and
+      `--data-parallel-start-rank 1`.
+
+      ```bash
+      local_ip="xxxx"      # this node's IP, obtained via ifconfig
+      nic_name="xxxx"      # NIC matching local_ip
+      node0_ip="xxxx"      # node 0 IP (needed on node 1 only)
+      export HCCL_IF_IP=$local_ip
+      export GLOO_SOCKET_IFNAME=$nic_name    # nic matching $local_ip
+      export TP_SOCKET_IFNAME=$nic_name
+      export HCCL_SOCKET_IFNAME=$nic_name
+      export HCCL_BUFFSIZE=512
+      export OMP_PROC_BIND=false
+      export OMP_NUM_THREADS=1
+      export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+      export HCCL_OP_EXPANSION_MODE="AIV"
+      export VLLM_ASCEND_BALANCE_SCHEDULING=1
+      export VLLM_ASCEND_ENABLE_TOPK_OPTIMIZE=1
+
+      vllm serve Eco-Tech/GLM-4.7-W8A8-floatmtp \
+        --host 0.0.0.0 \
+        --port 8004 \
+        --data-parallel-size 2 \
+        --data-parallel-size-local 1 \
+        --data-parallel-start-rank 0 \
+        --data-parallel-address $local_ip \
+        --data-parallel-rpc-port 13389 \
+        --tensor-parallel-size 8 \
+        --enable-expert-parallel \
+        --seed 1024 \
+        --max-model-len {{max_model_len}} \
+        --max-num-batched-tokens 8192 \
+        --max-num-seqs 16 \
+        --quantization ascend \
+        --trust-remote-code \
+        --gpu-memory-utilization 0.9 \
+        --enable-auto-tool-choice \
+        --reasoning-parser glm45 \
+        --tool-call-parser glm47 \
+        --served-model-name glm47 \
+        --speculative-config '{"num_speculative_tokens": 3, "method":"mtp", "enforce_eager": true}' \
+        --compilation-config '{"cudagraph_capture_sizes": [1,2,4,8,16,32,64,128,256,512], "cudagraph_mode": "FULL_DECODE_ONLY"}' \
+        --additional-config '{"enable_shared_expert_dp": true, "ascend_fusion_config": {%%CONFIG:fusion_ops_gmmswigluquant%%"fusion_ops_gmmswigluquant": false%%/CONFIG:fusion_ops_gmmswigluquant%%}}'
+      ```
+
+      > - Node 1 differences vs the block above: use `--data-parallel-start-rank 1`, add
+      >   `--headless`, and set `--data-parallel-address $node0_ip` (tutorial §5.2).
+      > - Replace `local_ip`/`nic_name`/`node0_ip` with the actual per-node values.
+      > - Service verification: the server registers `glm47` on port 8004 — query
+      >   `http://<node_ip>:8004/v1/chat/completions` with `"model": "glm47"`.
+- npu: Atlas 800I A3
+  precision: W8A8
+  deployment: Multi-Node
+  case: 2P2D PD Disaggregation   # tutorial §5.3 text says "2P1D" but its command chain is 2P2D (dp2tp8 x2 + dp8tp4 x2); labeled per commands
+  # no default_configs: the tutorial hardcodes these values and no %%CONFIG%% anchor is used in this scenario
+  steps:
+  - title: Prepare launcher scripts
+    content: |-
+      PD disaggregation for GLM-4.7 on 4x Atlas 800I A3 nodes: 2 prefill nodes (dp2 tp8 each)
+      and 2 decode nodes (dp8 tp4 each), with MooncakeConnectorV1 KV transfer and a load-balance
+      proxy. Prepare `launch_online_dp.py` and `run_dp_template.sh` on every node exactly as
+      published in tutorial §5.3
+      ([scripts and full command blocks](https://docs.vllm.ai/projects/ascend/en/v0.23.0/tutorials/models/GLM4.x.html)).
+      Key facts from those scripts, beyond the launch commands below:
+      prefill env uses `HCCL_BUFFSIZE=256` + `ASCEND_A3_ENABLE=1` + `--enforce-eager` +
+      `num_speculative_tokens: 1` (single-node uses 3); decode env adds `HCCL_BUFFSIZE=512`,
+      `TASK_QUEUE_ENABLE=1`, `VLLM_ASCEND_ENABLE_FUSED_MC2=1`,
+      `VLLM_MOONCAKE_ABORT_REQUEST_TIMEOUT=480`, `recompute_scheduler_enable: true`, and
+      `--max-num-batched-tokens 128 --max-num-seqs 4`; the three Mooncake `kv_port` values are
+      30000 (prefill node 0), 30100 (prefill node 1), 30200 (decode nodes).
+      Replace `$node_p0_ip/$node_p1_ip/$node_d0_ip/$node_d1_ip` with the actual node IPs.
+  - title: Launch prefill nodes
+    content: |-
+      On each prefill node (tutorial §5.3):
+
+      ```bash
+      python launch_online_dp.py --dp-size 2 --tp-size 8 --dp-size-local 2 --dp-rank-start 0 --dp-address $node_p0_ip --dp-rpc-port 12880 --vllm-start-port 9300
+      ```
+
+      Node 1 uses its own `$node_p1_ip` as `--dp-address`.
+  - title: Launch decode nodes
+    content: |-
+      On decode node 0 (tutorial §5.3):
+
+      ```bash
+      python launch_online_dp.py --dp-size 8 --tp-size 4 --dp-size-local 4 --dp-rank-start 0 --dp-address $node_d0_ip --dp-rpc-port 12778 --vllm-start-port 9300
+      ```
+
+      On decode node 1: `--dp-size-local 4 --dp-rank-start 4`, same `--dp-address $node_d0_ip`.
+  - title: Request forwarding
+    content: |-
+      Run the load-balance proxy on any machine (tutorial §5.4), using the repository example
+      [load_balance_proxy_server_example.py](https://github.com/vllm-project/vllm-ascend/blob/main/examples/disaggregated_prefill_v1/load_balance_proxy_server_example.py):
+
+      ```bash
+      unset http_proxy
+      unset https_proxy
+      python load_balance_proxy_server_example.py \
+          --port 8000 --host 0.0.0.0 \
+          --prefiller-hosts $node_p0_ip $node_p0_ip $node_p1_ip $node_p1_ip \
+          --prefiller-ports 9300 9301 9300 9301 \
+          --decoder-hosts $node_d0_ip $node_d0_ip $node_d0_ip $node_d0_ip $node_d1_ip $node_d1_ip $node_d1_ip $node_d1_ip \
+          --decoder-ports 9300 9301 9302 9303 9300 9301 9302 9303
+      ```
+
+      The launcher scripts register the engine under served name `glm` (tutorial §5.3); the
+      proxy on port 8000 is the public entry — send requests with `"model": "glm"` to the proxy.
+
 verification: |-
   After the service is started, the model can be invoked by sending a prompt.
 
   **Chat Completions API:**
 
   ```shell
-  curl http://localhost:<port>/v1/chat/completions \
+  curl http://<server_ip>:<port>/v1/chat/completions \
       -H "Content-Type: application/json" \
       -d '{
           "model": "glm",
@@ -710,7 +849,7 @@ verification: |-
       }'
   ```
 
-  > - **URL**: Replace `localhost` with your server IP and use the port from the `vllm serve` command.
+  > - **URL**: use your server IP and the `--port` value from the `vllm serve` command.
   > - **`model`**: Must match the `--served-model-name` value from the `vllm serve` command (e.g., `glm`).
 
   **Function Calling:**
@@ -735,6 +874,12 @@ performance:
     | GPQA | - | accuracy | gen | 84.85 | 1 Atlas 800 A3 (64G × 16) |
     | MATH500 | - | accuracy | gen | 98.8 | 1 Atlas 800 A3 (64G × 16) |
 
+    First-party check (2026-11-24, `quay.io/ascend/vllm-ascend:nightly-main-a3`, vllm 0.33.0,
+    single-node Atlas 800T A3, AISBench gsm8k 1319 items, 4-shot CoT chat, batch 16,
+    max_out_len 65536): 97.04 (97.0432), zero task failures. The tutorial publishes no gsm8k
+    reference for this model, so this is a self-consistency result under the standard recipe
+    evaluation, not an official-reference reproduction.
+
     ### Using Language Model Evaluation Harness
 
     Not tested yet.
@@ -753,19 +898,42 @@ performance:
     | High-throughput, short sequences | dp2 tp8 | Maximizes concurrent request processing |
 
     > `max-model-len` and `max-num-seqs` should be tuned per scenario.
+    #### vllm bench serve example (tutorial §8)
+
+    ```bash
+    vllm bench serve \
+      --backend vllm \
+      --dataset-name prefix_repetition \
+      --prefix-repetition-prefix-len 22400 \
+      --prefix-repetition-suffix-len 9600 \
+      --prefix-repetition-output-len 1024 \
+      --num-prompts 1 \
+      --prefix-repetition-num-prefixes 1 \
+      --ignore-eos \
+      --model glm \
+      --tokenizer Eco-Tech/GLM-4.7-W8A8-floatmtp \
+      --seed 1000 \
+      --host 0.0.0.0 \
+      --port 8000 \
+      --endpoint /v1/completions \
+      --max-concurrency 1 \
+      --request-rate 1
+    ```
+
+    Refer to [vllm benchmark](https://docs.vllm.ai/en/latest/benchmarking/) for the `latency`,
+    `serve`, and `throughput` subcommands.
 tuning: |-
   ### Tuning Guidelines
 
-  Please refer to the [Public Performance Tuning Documentation](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/performance_and_debug/optimization_and_tuning.html) for tuning methods.
-  Please refer to the [Feature Guide](https://docs.vllm.ai/projects/ascend/en/latest/user_guide/support_matrix/feature_matrix.html) for detailed feature descriptions.
+  Please refer to the [Public Performance Tuning Documentation](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/performance_and_debug/optimization_and_tuning.html) for tuning methods, and to the [Feature Guide](https://docs.vllm.ai/projects/ascend/en/latest/user_guide/support_matrix/feature_matrix.html) for detailed feature descriptions.
 
   **Key tuning notes for GLM-4.x:**
 
-  - `fusion_ops_gmmswigluquant` should be `false` when total number of NPUs is <= 16 due to performance degradation.
+  - `fusion_ops_gmmswigluquant` should be `false` when the total number of NPUs is <= 16 due to performance degradation.
   - `VLLM_ASCEND_ENABLE_FLASHCOMM1`: disable for long-sequence (>=16k) and low-concurrency (<=8 batch size) scenarios.
   - `VLLM_ASCEND_ENABLE_TOPK_OPTIMIZE=1` is recommended for GLM-4.x models.
 faq: |-
-  For common environment, installation, and general parameter issues, please refer to the [Public FAQ](https://docs.vllm.ai/projects/ascend/en/latest/faqs.html). This chapter only covers model-specific issues.
+  For common environment, installation, and general parameter issues, please refer to the [Public FAQ](https://docs.vllm.ai/projects/ascend/en/latest/faqs.html). This section only covers model-specific issues.
 
   **Q: HCCL port conflicts?**
 
@@ -797,3 +965,7 @@ references:
   url: https://modelscope.cn/models/Eco-Tech/GLM-4.7-W8A8-floatmtp
 - title: vllm-ascend GitHub
   url: https://github.com/vllm-project/vllm-ascend
+- title: GLM quantization scheme (add MTP weights)
+  url: https://ai.gitcode.com/Ascend-SACT/GLM-4.5-w8a8
+- title: PD load-balance proxy example
+  url: https://github.com/vllm-project/vllm-ascend/blob/main/examples/disaggregated_prefill_v1/load_balance_proxy_server_example.py
