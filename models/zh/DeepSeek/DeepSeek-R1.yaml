@@ -1,0 +1,394 @@
+# DeepSeek-R1 recipe(zh)——事实源:vllm-ascend v0.23.0 教程 docs/source/tutorials/models/DeepSeek-R1.md
+# 注释中的章节号均指该教程。版本矩阵:教程声明其基于 vLLM-Ascend v0.13.0 验证,且该版本为首个支持本模型的版本(§1);
+# 教程镜像为模板变量 |vllm_ascend_version|(§4.1)——本 recipe 按仓内存量惯例钉 v0.23.0rc1(-a3 后缀选择 Atlas A3 镜像)。
+meta:
+  title: "DeepSeek-R1"
+  slug: "deepseek-r1"
+  provider: "DeepSeek"
+  description: "DeepSeek 推出的高性能混合专家(MoE)推理模型,擅长复杂逻辑推理、数学求解与代码生成;本 recipe 部署全量化版 DeepSeek-R1-W8A8。"
+  date_added: "2026-11-25"
+  difficulty: advanced
+  tasks:
+    - text
+  related_recipes:
+    - "deepseek-ai/DeepSeek-V4-Flash"
+  performance_headline: "Atlas 800 A3(64G x 16)单机 dp4 tp4 W8A8 部署;AISBench aime2024 80.00 / GPQA 72.22(教程 §7,实测于 vllm-ascend:0.13.0)"
+  hardware:
+    atlas_800_a3: verified   # 教程 §5.1/§7 载官方 A3 部署与实测精度(依 GLM-5/V4-Flash 等存量惯例;第一方服务验证与压测 2026-11-25 已在 nightly 完成,精度复跑受阻于官方权重问题)
+    atlas_800_a2: unsupported   # 教程 §3.1 提及 2x A2 选项,但本 recipe 无 A2 场景——保持 A2 nightly 检查通道关闭
+
+model:
+  model_id: "vllm-ascend/DeepSeek-R1-W8A8"
+  min_vllm_version: "v0.13.0"   # 教程 §1:验证且首个支持的版本
+  architecture: moe
+  parameter_count: "671B"        # 来源:HF model card(教程未载)
+  active_parameters: "37B"       # 来源:HF model card
+  context_length: 16384          # 教程 §5.1 已验证服务长度;精度评测须 ≥35000(§5.1)
+  modality: text
+  base_args:
+    - "--quantization ascend"    # §5.1:W8A8 量化权重必带
+    - "--trust-remote-code"      # §5.1
+    - "--enable-expert-parallel" # §5.1
+  base_env:
+    VLLM_ASCEND_BALANCE_SCHEDULING: "1"                # §5.1:均衡调度;提升吞吐降低 TPOT,TTFT 可能退化;PD 分离场景不建议
+    PYTORCH_NPU_ALLOC_CONF: "expandable_segments:True" # §5.1
+  docker_image:
+    atlas_800_a3: "quay.io/ascend/vllm-ascend:v0.23.0rc1-a3"   # §4.1:-a3 后缀选择 Atlas A3 镜像
+    atlas_800_a2: "quay.io/ascend/vllm-ascend:v0.23.0rc1"       # §4.1:A2 镜像无后缀
+  nightly_required: false
+  install:
+    pip: false
+    docker:
+      command: "docker run --rm --name vllm-ascend --shm-size=1g --net=host -it quay.io/ascend/vllm-ascend:v0.23.0rc1-a3 bash"
+      note: "精简示意;实际部署请使用 env_setup.container 中的完整设备挂载命令(教程 §4.1)。"
+
+features:
+  expert_parallel:
+    description: "MoE 专家并行(教程 §5.1)"
+    args: ["--enable-expert-parallel"]
+  spec_decoding:
+    label: "MTP 投机解码"
+    description: "已验证启动命令内置的 MTP 投机解码(教程 §5.1)"
+    args: ["--speculative-config", '{"num_speculative_tokens":3,"method":"mtp"}']
+  balance_scheduling:
+    label: "均衡调度"
+    description: "昇腾均衡调度;提升输出吞吐降低 TPOT,TTFT 可能退化;PD 分离场景不建议(教程 §5.1)"
+    env:
+      VLLM_ASCEND_BALANCE_SCHEDULING: "1"
+
+variants:
+  default:
+    model_id: "vllm-ascend/DeepSeek-R1-W8A8"
+    precision: W8A8
+    vram_minimum_gb: 806   # 推导值,按 docs/recipe-schema.md 公式 ceil(671 × 1 × 1.2) = 806(671B INT8 ≈ 1 字节/参数);非教程数字
+    description: "全量化 W8A8(INT8 权重与激活)部署于 1 台 Atlas 800 A3 或 2 台 Atlas 800 A2"
+    supported_hardware: [atlas_800_a3, atlas_800_a2]
+
+compatible_strategies:
+  - single_node_A3
+  - multi_node_dp
+
+config_params:
+  max_model_len:
+    default: 16384
+    type: number
+    description: "最大输入+输出 token 之和;16384 覆盖 3.5k/1.5k 性能测试——精度评测须至少 35000(教程 §5.1)"
+
+guide: ""
+performance_model_names:
+  - "DeepSeek-R1-W8A8"
+
+overview: |-
+  DeepSeek-R1 是 DeepSeek 研发的高性能混合专家推理模型,擅长复杂逻辑推理、数学与代码
+  生成。本 recipe 部署全量化 `DeepSeek-R1-W8A8` 版本(INT8 权重与激活),可部署于单台
+  Atlas 800 A3(64G x 16)或两台 Atlas 800 A2(64G x 8)。教程推荐单机采用 dp4 tp4
+  布局(优于 dp2 tp8,§5.1),并启用 MTP 投机解码;两节点数据并行部署按 §5.2 的每节点
+  脚本执行(2 节点 DP4,节点 1 以 headless 运行)。PD 分离部署教程推荐改用 DeepSeek-V3.1
+  (§5.3)。参考精度:AISBench aime2024 80.00、GPQA 72.22(vllm-ascend:0.13.0,§7)。
+
+weight_download:
+  # 注(2026-11-25):该权重仓 README 载明仅用于 vLLM Ascend CI 测试;教程 §7 精度参考值即出自
+  # 该构建("for reference only")。2026-11-25 nightly 镜像一方精度复跑遇量化格式不兼容
+  # (权重可加载但推理输出乱码;v0.23.0rc1 镜像推理正常)——详见后续上游 issue。
+  - weight_version: W8A8
+    sources:
+      - source: ModelScope   # 教程 §3.1 下载链接
+        url: "https://www.modelscope.cn/models/vllm-ascend/DeepSeek-R1-W8A8"
+        # 示例命令(非教程原文;下载目标目录为本 recipe 的选择)
+        command: |
+          pip install modelscope
+          modelscope download --model vllm-ascend/DeepSeek-R1-W8A8
+
+prerequisites:
+- title: 模型权重
+  content: |-
+    - `DeepSeek-R1-W8A8`(量化版):需要 1 台 Atlas 800 A3(64G x 16)节点或 2 台 Atlas 800 A2
+      (64G x 8)节点。[下载模型权重](https://www.modelscope.cn/models/vllm-ascend/DeepSeek-R1-W8A8)。
+
+    建议将模型权重下载到多节点共享目录(教程 §3.1)。
+
+- title: 支持特性
+  content: |-
+    模型支持矩阵见[支持特性列表](https://docs.vllm.ai/projects/ascend/zh-cn/latest/user_guide/support_matrix/supported_models.html),
+    特性配置见[特性指南](https://docs.vllm.ai/projects/ascend/zh-cn/latest/user_guide/feature_guide/index.html)(教程 §2)。
+    §5.1 说明另提及:W4A8 权重可为 KV cache 分配更多显存,支撑更高系统吞吐。
+
+- title: 多节点通信验证(可选)
+  content: |-
+    如需多节点部署,按[多节点通信环境验证](https://docs.vllm.ai/projects/ascend/zh-cn/latest/installation.html#verify-multi-node-communication)
+    完成验证(教程 §3.2)。
+
+env_setup:
+  container:
+    A3:
+      content: |-
+        根据机型选择镜像并在节点上启动 docker 容器,参考[使用 docker](https://docs.vllm.ai/projects/ascend/zh-cn/latest/installation.html#set-up-using-docker)。
+
+        ```shell
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0rc1-a3
+
+        docker run --rm \
+            --name vllm-ascend \
+            --privileged=true \
+            --shm-size=1g \
+            --net=host \
+            --device /dev/davinci0 \
+            --device /dev/davinci1 \
+            --device /dev/davinci2 \
+            --device /dev/davinci3 \
+            --device /dev/davinci4 \
+            --device /dev/davinci5 \
+            --device /dev/davinci6 \
+            --device /dev/davinci7 \
+            --device /dev/davinci8 \
+            --device /dev/davinci9 \
+            --device /dev/davinci10 \
+            --device /dev/davinci11 \
+            --device /dev/davinci12 \
+            --device /dev/davinci13 \
+            --device /dev/davinci14 \
+            --device /dev/davinci15 \
+            --device /dev/davinci_manager \
+            --device /dev/devmm_svm \
+            --device /dev/hisi_hdc \
+            -v /usr/local/dcmi:/usr/local/dcmi \
+            -v /usr/local/Ascend/driver/tools/hccn_tool:/usr/local/Ascend/driver/tools/hccn_tool \
+            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+            -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \
+            -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
+            -v /etc/ascend_install.info:/etc/ascend_install.info \
+            -v /root/.cache:/root/.cache \
+            -it $IMAGE bash
+        ```
+
+        docker run 成功后,用 `docker ps` 确认容器处于运行状态(教程 §4.1)。
+    A2:
+      content: |-
+        A2 镜像无 `-a3` 后缀,暴露 8 个设备:
+
+        ```shell
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0rc1
+
+        docker run --rm \
+            --name vllm-ascend \
+            --privileged=true \
+            --shm-size=1g \
+            --net=host \
+            --device /dev/davinci0 \
+            --device /dev/davinci1 \
+            --device /dev/davinci2 \
+            --device /dev/davinci3 \
+            --device /dev/davinci4 \
+            --device /dev/davinci5 \
+            --device /dev/davinci6 \
+            --device /dev/davinci7 \
+            --device /dev/davinci_manager \
+            --device /dev/devmm_svm \
+            --device /dev/hisi_hdc \
+            -v /usr/local/dcmi:/usr/local/dcmi \
+            -v /usr/local/Ascend/driver/tools/hccn_tool:/usr/local/Ascend/driver/tools/hccn_tool \
+            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+            -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \
+            -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
+            -v /etc/ascend_install.info:/etc/ascend_install.info \
+            -v /root/.cache:/root/.cache \
+            -it $IMAGE bash
+        ```
+
+scenarios:
+  - npu: Atlas 800I A3   # 硬件枚举对齐仓内惯例;教程表述为 Atlas 800 A3
+    precision: W8A8
+    deployment: "单节点-多卡"
+    case: "基线服务"
+    tags: [a3-single]
+    strategy: single_node_A3
+    steps:
+      - title: "启动服务"
+        content: |-
+          ```bash
+          nic_name="xxxx"      # 通过 ifconfig 获取,与 local_ip 匹配的网卡名
+          local_ip="xxxx"      # 本节点 IP
+
+          export HCCL_OP_EXPANSION_MODE="AIV"   # §5.1(单机环境变量组)
+          export HCCL_IF_IP=$local_ip
+          export GLOO_SOCKET_IFNAME=$nic_name
+          export TP_SOCKET_IFNAME=$nic_name
+          export HCCL_SOCKET_IFNAME=$nic_name
+          export VLLM_ASCEND_BALANCE_SCHEDULING=1
+          export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+
+          vllm serve vllm-ascend/DeepSeek-R1-W8A8 \
+            --host 0.0.0.0 \
+            --port 8000 \
+            --data-parallel-size 4 \
+            --tensor-parallel-size 4 \
+            --quantization ascend \
+            --seed 1024 \
+            --served-model-name deepseek_r1 \
+            --enable-expert-parallel \
+            --max-num-seqs 16 \
+            --max-model-len {{max_model_len}} \
+            --max-num-batched-tokens 4096 \
+            --trust-remote-code \
+            --gpu-memory-utilization 0.92 \
+            --speculative-config '{"num_speculative_tokens":3,"method":"mtp"}' \
+            --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY"}'
+          ```
+
+          全部取值为教程 §5.1 的已验证基线。单机采用 `dp4 tp4`——教程推荐其优于
+          `dp2 tp8`。`--max-model-len` 16384 覆盖 3.5k/1.5k 性能测试;精度评测至少 35000。
+          服务经 `--served-model-name` 注册为 `deepseek_r1`。注意:基线实测于 `vllm-ascend:v0.13.0`(教程 §1);本 recipe 镜像为 v0.23.0rc1(仓内惯例)——工具链有差异时先复核参数。
+      - title: "功能验证"
+        content: |-
+          ```bash
+          curl http://<server_ip>:8000/v1/chat/completions \
+              -H "Content-Type: application/json" \
+              -d '{
+                  "model": "deepseek_r1",
+                  "messages": [{
+                      "role": "user",
+                      "content": [{"type": "text", "text": "The future of AI is"}]
+                  }],
+                  "max_tokens": 1024,
+                  "temperature": 1.0,
+                  "top_p": 0.95
+              }'
+          ```
+
+          预期:HTTP 200 OK 且 `choices` 字段含生成文本(`<think>...` 推理前缀属该模型正常行为,
+          教程 §5.1)。
+      - title: "快速压测"
+        content: |-
+          ```bash
+          vllm bench serve --model deepseek_r1 --dataset-name random --random-input 200 --num-prompts 200 --request-rate 1 --save-result --result-dir ./
+          ```
+
+          详见下方 Performance(性能)一节(教程 §8)。
+  - npu: Atlas 800I A3
+    precision: W8A8
+    deployment: "多节点"
+    case: "两节点数据并行(dp4 tp4)"
+    tags: [a3-multi]
+    strategy: multi_node_dp
+    steps:
+      - title: "拓扑"
+        content: |-
+          两节点数据并行部署(教程 §5.2):DP4 分布于两节点,每节点 2 个本地 rank,每 rank tp4。
+          节点 0 为主节点(不带 `--headless`);节点 1 以 `--headless` 运行并设
+          `--data-parallel-start-rank 2`。
+
+          双节点共享环境变量:`HCCL_IF_IP`、`GLOO_SOCKET_IFNAME`、`TP_SOCKET_IFNAME`、
+          `HCCL_SOCKET_IFNAME`(均由节点 IP/网卡推导)、`OMP_PROC_BIND=false`、
+          `OMP_NUM_THREADS=1`、`HCCL_BUFFSIZE=200`、`PYTORCH_NPU_ALLOC_CONF=expandable_segments:True`、
+          `VLLM_ASCEND_BALANCE_SCHEDULING=1`、`HCCL_INTRA_PCIE_ENABLE=1`、
+          `HCCL_INTRA_ROCE_ENABLE=0`。
+
+          服务参数与单机基线一致(§5.1:quantization ascend、seed 1024、served-model-name
+          deepseek_r1、专家并行、max-num-seqs 16、max-model-len 16384、
+          max-num-batched-tokens 4096、trust-remote-code、gpu-memory-utilization 0.92、
+          MTP 投机解码配置、FULL_DECODE_ONLY),外加数据并行参数:`--data-parallel-size 4`、
+          `--data-parallel-size-local 2`、`--data-parallel-rpc-port 13389`,以及每节点的
+          `--data-parallel-start-rank`(节点 0 设 0,节点 1 设 2),`--data-parallel-address` 指向节点 0 IP。
+      - title: "完整命令"
+        content: |-
+          节点 0/节点 1 的完整启动脚本见教程 §5.2
+          ([DeepSeek-R1 教程](https://docs.vllm.ai/projects/ascend/en/v0.23.0/tutorials/models/DeepSeek-R1.html))——
+          逐字复制并按节点设置 `local_ip`/`nic_name`/`node0_ip`。本 recipe 将多机命令置于带外,
+          避免集群 CI 把两节点 serve 当单机用例执行。
+      - title: "功能验证"
+        content: |-
+          ```bash
+          curl http://<server_ip>:8000/v1/chat/completions \
+              -H "Content-Type: application/json" \
+              -d '{
+                  "model": "deepseek_r1",
+                  "messages": [{
+                      "role": "user",
+                      "content": [{"type": "text", "text": "The future of AI is"}]
+                  }],
+                  "max_tokens": 1024,
+                  "temperature": 1.0,
+                  "top_p": 0.95
+              }'
+          ```
+
+          预期:HTTP 200 OK 且 `choices` 字段含生成文本。
+
+verification: |-
+  服务启动后,可通过输入提示词查询模型:
+
+  ```shell
+  curl http://<server_ip>:<port>/v1/completions \
+      -H "Content-Type: application/json" \
+      -d '{
+          "model": "deepseek_r1",
+          "prompt": "The future of AI is",
+          "max_completion_tokens": 50,
+          "temperature": 0
+      }'
+  ```
+
+  预期结果:
+
+  服务返回 HTTP 200 OK,JSON 响应包含生成文本(教程 §6)。
+
+evaluation:
+  accuracy:
+    content: |-
+      ### 使用 AISBench
+
+      详见[使用 AISBench](https://docs.vllm.ai/projects/ascend/zh-cn/latest/developer_guide/evaluation/using_ais_bench.html)。
+
+      ### 使用 lm-eval
+
+      按[使用 lm_eval](https://docs.vllm.ai/projects/ascend/zh-cn/latest/developer_guide/evaluation/using_lm_eval.html) 安装后执行:
+
+      ```shell
+      lm_eval \
+        --model local-completions \
+        --model_args model=deepseek_r1,base_url=http://<server_ip>:<port>/v1/completions,tokenized_requests=False,trust_remote_code=True \
+        --tasks gsm8k \
+        --output_path ./
+      ```
+
+performance:
+  accuracy: |-
+      `DeepSeek-R1-W8A8` 在 `vllm-ascend:0.13.0` 上的参考结果(教程 §7):
+
+      | dataset | version | metric | mode | vllm-api-general-chat |
+      |----- | ----- | ----- | ----- | -----|
+      | aime2024dataset | - | accuracy | gen | 80.00 |
+      | gpqadataset | - | accuracy | gen | 72.22 |
+  benchmark: |-
+      使用 `vllm bench serve` 压测(教程 §8)。压测工具提供三个子命令:`latency`(单批时延)、
+      `serve`(在线服务吞吐)、`throughput`(离线推理吞吐)。以 serve 为例:
+
+      ```shell
+      vllm bench serve --model deepseek_r1 --dataset-name random --random-input 200 --num-prompts 200 --request-rate 1 --save-result --result-dir ./
+      ```
+
+      详见 [vllm benchmark](https://docs.vllm.ai/en/latest/benchmarking/),以及
+      [使用 AISBench 做性能评测](https://docs.vllm.ai/projects/ascend/zh-cn/latest/developer_guide/evaluation/using_ais_bench.html#execute-performance-evaluation)。
+
+tuning: |-
+  性能调优与 PD 分离部署,教程推荐改用 DeepSeek-V3.1:
+  [DeepSeek-V3.1](https://docs.vllm.ai/projects/ascend/en/v0.23.0/tutorials/models/DeepSeek-V3.1.html)
+  (教程 §5.3/§9——"tested and demonstrates excellent performance")。
+
+  通用调优参考:[公共性能调优文档](https://docs.vllm.ai/projects/ascend/zh-cn/latest/developer_guide/performance_and_debug/optimization_and_tuning.html)
+  与[特性指南](https://docs.vllm.ai/projects/ascend/zh-cn/latest/user_guide/support_matrix/feature_matrix.html)。
+
+faq: |-
+  常见环境、安装与通用参数问题参见[公共 FAQ](https://docs.vllm.ai/projects/ascend/zh-cn/latest/faqs.html)
+  (教程 §10;教程未声明模型专属 FAQ)。
+
+  - **问:前缀缓存是开还是关?**
+
+    答:教程 §5.1 的已验证启动命令未携带前缀缓存相关参数,即特性处于默认态。§5.1 说明
+    提及 `--no-enable-prefix-caching` 为显式关闭方式;如已添加该参数,移除它即可恢复启用。
+
+references:
+  - title: "官方教程"
+    url: "https://docs.vllm.ai/projects/ascend/en/v0.23.0/tutorials/models/DeepSeek-R1.html"
+  - title: "模型权重(ModelScope)"
+    url: "https://www.modelscope.cn/models/vllm-ascend/DeepSeek-R1-W8A8"
