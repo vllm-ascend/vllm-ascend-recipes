@@ -31,12 +31,12 @@ model:
     OMP_NUM_THREADS: "1"
     HCCL_BUFFSIZE: "1536"
   docker_image:
-    atlas_800_a3: quay.io/ascend/vllm-ascend:v0.23.0.post1-a3
+    atlas_800_a3: quay.io/ascend/vllm-ascend:v0.30.0-a3-openeuler
   install:
     pip: false
     docker:
       command: docker pull
-        quay.io/ascend/vllm-ascend:v0.23.0.post1-a3
+        quay.io/ascend/vllm-ascend:v0.30.0-a3-openeuler
 variants:
   default:
     precision: W8A8
@@ -192,7 +192,7 @@ env_setup:
 
         ```bash
         # A3 release container
-        IMAGE=quay.io/ascend/vllm-ascend:v0.23.0.post1-a3
+        IMAGE=quay.io/ascend/vllm-ascend:v0.30.0-a3-openeuler
         docker run --rm -it --name internvl241-release --net=host --ipc=host \
           --device /dev/davinci0 --device /dev/davinci1 --device /dev/davinci2 --device /dev/davinci3 \
           --device /dev/davinci4 --device /dev/davinci5 --device /dev/davinci6 --device /dev/davinci7 \
