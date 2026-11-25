@@ -18,11 +18,11 @@ model:
     - --trust-remote-code
   base_env: {}
   docker_image:
-    atlas_800_a3: quay.io/ascend/vllm-ascend:v0.23.0.post1-a3
+    atlas_800_a3: quay.io/ascend/vllm-ascend:v0.30.0-a3-openeuler
   install:
     pip: false
     docker:
-      command: docker pull quay.io/ascend/vllm-ascend:v0.23.0.post1-a3
+      command: docker pull quay.io/ascend/vllm-ascend:v0.30.0-a3-openeuler
 variants:
   default:
     precision: W8A8
@@ -244,7 +244,7 @@ env_setup:
 
           ```bash
 
-          export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0.post1-a3
+          export IMAGE=quay.io/ascend/vllm-ascend:v0.30.0-a3-openeuler
 
           export MINIMAX_CONTAINER=${MINIMAX_CONTAINER:-minimax-single-a3}
 
@@ -284,7 +284,7 @@ env_setup:
             export WEIGHTS_ROOT=${WEIGHTS_ROOT:-/models}
             export PD_ROLE PREFILL_NODE_0_IP DECODE_NODE_0_IP
             export GATEWAY_NODE_0_IP=$PREFILL_NODE_0_IP
-            export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0.post1-a3
+            export IMAGE=quay.io/ascend/vllm-ascend:v0.30.0-a3-openeuler
             export PD_OUT="/models/evidence/minimax-m27-w8a8-a3/release-pd-$(date -u +%Y%m%dT%H%M%SZ)-$PD_ROLE"
             export PD_CONTAINER="minimax-${PD_OUT##*/}"
             case "$PD_ROLE" in
