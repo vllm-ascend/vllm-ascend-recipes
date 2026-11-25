@@ -5,7 +5,7 @@ meta:
   description: "Qwen3 系列中的 MoE（混合专家）模型，总参数量 30.5B，每 token 激活 3.3B 参数。稀疏 MoE 架构实现高效训练与推理，在推理、指令遵循和智能体能力方面表现优异，同时相比同等能力的稠密模型具有更低的计算成本。"
   date_added: 2026-07-07
   performance_headline: "Atlas 800 A2/A3 单节点部署，支持 BF16 与 W8A8 精度"
-  date_updated: 2026-11-18
+  date_updated: 2026-11-25
   difficulty: intermediate
   related_recipes:
     - "Qwen/Qwen3.6-27B"
@@ -135,6 +135,26 @@ overview: |-
   > 主分支验证应使用当前 nightly-main 镜像（A3 使用 nightly-main-a3），并记录镜像 digest、vLLM 与 vLLM-Ascend commit。下方 v0.23.0rc1 命令保留为历史版本示例，不代表已完成当前 main 分支实测。
 
   Qwen3-30B-A3B 是 Qwen3 系列中的混合专家（MoE）模型，总参数量 30.5B，每 token 激活 3.3B 参数。稀疏 MoE 架构实现了高效的训练和推理，在推理、指令遵循和智能体能力方面表现出色，同时相比同等能力的稠密模型保持了更低的计算成本。
+  ### Prefill 与 Decode 分离
+
+  上游 recipes 已支持 `pd_cluster`，可使用 **Ascend Router**
+  (`pd_router: ascend`) 和 **Mooncake (Ascend)**
+  (`pd_connector: mooncake_ascend`)。这两个选项均需由匹配硬件和模型权重的
+  当前 preset 通过对应的 `select` 字段显式启用，详见
+  [Ascend PD preset 约定](https://github.com/vllm-project/recipes/blob/main/SCHEMA.md#ascend-pd-presets)。
+  本配方的 `2-node` 场景是 Prefill/Decode 合设的内部 DP，不是 PD 分离。
+  已有单机及 DP 验证结果不能作为 PD preset 的验证依据。
+
+  按照 [Ascend Mooncake 部署指南](https://docs.vllm.ai/projects/ascend/en/latest/tutorials/features/pd_disaggregation_mooncake_multi_node.html)
+  准备独立的 Prefill、Decode 服务池、代理及通信环境。两侧使用相同硬件系列和
+  模型权重，分配独立设备集合，并保持各角色的节点数、TP/DP/PP、IP、HTTP/KV
+  端口及代理端点配置一致。固定运行时与匹配的代理脚本版本：renderer 默认使用
+  `MooncakeConnectorV2`，需实际确认运行时支持，不能由下文历史镜像推断其可用性。
+
+  先检查每个 worker 就绪，再通过代理验证聊天和流式输出，并在两侧日志中确认
+  KV 传输成功。AISBench 和 vLLM benchmark 均应指向代理，记录 P:D 拓扑、
+  各角色配置、权重修订及运行时版本。PD、非对称 TP 以及 PD 叠加 Eagle3 均需
+  分别进行模型验证；本说明不新增 PD 场景或已验证声明。
 weight_download:
 - weight_version: BF16
   sources:

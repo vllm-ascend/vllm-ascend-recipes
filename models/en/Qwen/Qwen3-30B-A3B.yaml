@@ -5,7 +5,7 @@ meta:
   description: "A Mixture-of-Experts (MoE) model in the Qwen3 series, featuring 30.5B total parameters with 3.3B activated per token. The sparse MoE architecture enables efficient training and inference, delivering strong performance across reasoning, instruction-following, and agent capabilities while maintaining lower computational cost."
   date_added: 2026-07-07
   performance_headline: "Single-node deployment on Atlas 800 A2/A3 with BF16 and W8A8 precision"
-  date_updated: 2026-11-18
+  date_updated: 2026-11-25
   difficulty: intermediate
   related_recipes:
     - "Qwen/Qwen3.6-27B"
@@ -136,6 +136,31 @@ overview: |-
   > For main-branch validation, use the current nightly-main image (nightly-main-a3 for A3) and record the image digest and both vLLM and vLLM-Ascend commits. The v0.23.0rc1 commands below remain historical release examples; they do not establish validation of current main.
 
   Qwen3-30B-A3B is a Mixture-of-Experts (MoE) model in the Qwen3 series, featuring 30.5B total parameters with 3.3B activated per token. The sparse MoE architecture enables efficient training and inference, delivering strong performance across reasoning, instruction-following, and agent capabilities while maintaining lower computational cost compared to dense models of similar capability.
+  ### Prefill-decode disaggregation
+
+  The upstream recipes renderer supports `pd_cluster` with **Ascend Router**
+  (`pd_router: ascend`) and **Mooncake (Ascend)**
+  (`pd_connector: mooncake_ascend`). Both choices require an active preset
+  matching the hardware and model variant, with the corresponding `select`
+  entries; see the [Ascend PD preset contract](https://github.com/vllm-project/recipes/blob/main/SCHEMA.md#ascend-pd-presets).
+  This recipe's `2-node` scenario is colocated internal DP, not PD. Its
+  single-node and DP verification results do not qualify a PD preset.
+
+  Follow the [Ascend Mooncake deployment guide](https://docs.vllm.ai/projects/ascend/en/latest/tutorials/features/pd_disaggregation_mooncake_multi_node.html)
+  to prepare separate Prefill and Decode service pools, a proxy, and the
+  communication environment. Use the same hardware family and checkpoint
+  for both roles. Reserve separate device sets and configure the per-role
+  node count, TP/DP/PP, IPs, HTTP/KV ports and proxy endpoints consistently.
+  Pin the runtime and matching proxy script: the renderer defaults to
+  `MooncakeConnectorV2`, whose availability must be checked rather than
+  inferred from the historical image used by the examples below.
+
+  Check readiness on each worker, then verify chat and streaming output
+  through the proxy and successful KV transfer in both roles' logs. Point
+  AISBench and vLLM benchmarks at the proxy and record the P:D topology,
+  per-role settings, checkpoint revision and runtime versions. PD, unequal
+  TP and PD with Eagle3 each require separate model-specific validation;
+  no PD scenario or verification claim is added by this guidance.
 weight_download:
 - weight_version: BF16
   sources:
