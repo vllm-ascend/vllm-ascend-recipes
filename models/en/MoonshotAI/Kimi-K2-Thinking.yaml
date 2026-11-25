@@ -1,0 +1,426 @@
+# Kimi-K2-Thinking recipe (en) — source of truth: vllm-ascend v0.23.0 tutorial docs/source/tutorials/models/Kimi-K2-Thinking.md
+# Section citations in comments refer to that tutorial. Version matrix (tutorial §1 / §7 / §4.1):
+#   min stable version declared by tutorial: v0.9.0rc1; accuracy/performance baselines cited @v0.20.2rc1;
+#   the tutorial image is templated (|vllm_ascend_version|, §4.1; the docs page substitution
+#   renders v0.23.0.post1-a3) — this recipe pins the repo-convention tag v0.23.0rc1-a3, and the
+#   nightly CI default image is the v0.23.0 series; re-verify flags if the toolchain differs.
+meta:
+  title: "Kimi-K2-Thinking"
+  slug: "kimi-k2-thinking"
+  provider: "Moonshot AI"
+  # description source: HF model card + tutorial §1
+  description: "Large-scale Mixture-of-Experts model with a hybrid thinking architecture from Moonshot AI, built for multi-step reasoning, agentic search, and mathematical and code problem-solving tasks."
+  date_added: 2026-11-25
+  difficulty: advanced
+  tasks:
+    - text
+  related_recipes:
+    - "moonshotai/Kimi-K2.6"
+  performance_headline: "Single-node Atlas 800 A3 (64G x 16) TP16 serving; gsm8k 5-shot flexible-extract 0.8992 (tutorial §7)"
+  hardware:
+    atlas_800_a3: verified   # tutorial §5.1/§7/§8 publish official deployment & measured results on A3 (repo convention per GLM-5/K2.6; first-party re-run recorded 2026-11-24 on the nightly image)
+    atlas_800_a2: unsupported   # tutorial targets A3 only (§3.1); explicit declaration keeps semantics clear for the site (nightly routing only reads verified)
+
+model:
+  model_id: "moonshotai/Kimi-K2-Thinking"
+  min_vllm_version: "v0.9.0rc1"   # tutorial §1: first supported and validated version; accuracy baselines cited @v0.20.2rc1 (§7/§8)
+  architecture: moe
+  parameter_count: "1T"            # source: HF model card (not stated in tutorial)
+  active_parameters: "32B"         # source: HF model card
+  context_length: 262144           # source: HF model card config.json max_position_embeddings
+  modality: text
+  base_args:
+    - "--trust-remote-code"        # §5.1: package ships custom configuration/modeling/tokenizer/chat-template files
+    - "--enable-expert-parallel"   # §5.1: distributes MoE experts across NPUs
+  base_env:
+    HCCL_BUFFSIZE: "1024"                              # §5.1 table: validated value
+    TASK_QUEUE_ENABLE: "1"                             # §5.1 table: version-sensitive, validated value
+    OMP_PROC_BIND: "false"                             # §5.1 table: avoids strict OpenMP CPU binding
+    HCCL_OP_EXPANSION_MODE: "AIV"                      # §5.1 table: AIV communication path
+    PYTORCH_NPU_ALLOC_CONF: "expandable_segments:True" # §5.1 table: reduces NPU memory fragmentation
+  docker_image:
+    atlas_800_a3: "quay.io/ascend/vllm-ascend:v0.23.0rc1-a3"   # §4.1: -a3 suffix selects the Atlas A3 image
+  nightly_required: false
+  install:
+    pip: false
+    docker:
+      command: "docker run --rm --name vllm-ascend --shm-size=1g --net=host -it quay.io/ascend/vllm-ascend:v0.23.0rc1-a3 bash"
+      note: "Simplified form; run the full device-mount command in env_setup.container (tutorial §4.1) for real deployments."
+
+features:
+  expert_parallel:
+    description: "MoE expert parallelism across NPUs (tutorial §5.1, validated enabled)"
+    args: ["--enable-expert-parallel"]
+  prefix_caching:
+    label: "Prefix Caching"
+    description: "KV-cache prefix caching; the validated baseline disables it via --no-enable-prefix-caching (tutorial §5.1). Enable by removing that flag and adding --enable-prefix-caching."
+    args: ["--enable-prefix-caching"]
+    flag_when_false: "--no-enable-prefix-caching"
+
+opt_in_features:
+  - prefix_caching
+
+variants:
+  default:
+    model_id: "moonshotai/Kimi-K2-Thinking"
+    precision: bf16   # checkpoint ships a quantization_config (§3.1 targets edit) so the ~1T model fits one 1TB-HBM node; tutorial §3.1 wording is "(bfloat16)"
+    vram_minimum_gb: 1024   # one Atlas 800 A3 (64G x 16) node HBM total (tutorial §3.1)
+    description: "Native checkpoint with MoE-targeted quantization on a single Atlas 800 A3 (64G x 16) node, TP16"
+    supported_hardware: [atlas_800_a3]
+
+compatible_strategies:
+  - single_node_A3
+
+guide: ""
+performance_model_names:
+  - "Kimi-K2-Thinking"
+
+overview: |-
+  Kimi-K2-Thinking is a large-scale Mixture-of-Experts model developed by Moonshot AI,
+  featuring a hybrid thinking architecture that interleaves reasoning and acting for
+  complex problem-solving. The checkpoint ships with a quantization configuration whose
+  expert-group targets must be adjusted before serving (tutorial §3.1). This recipe
+  deploys it on a single Atlas 800 A3 (64G x 16) node with tensor-parallel-size 16,
+  covering environment preparation, online serving, functional verification, accuracy
+  evaluation, and performance benchmarking, and records the reference gsm8k and
+  throughput numbers published in the official tutorial (§7, §8). The tutorial declares
+  vLLM-Ascend v0.9.0rc1 as the first supported version; the accuracy and performance
+  baselines cited here were measured on v0.20.2rc1.
+
+weight_download:
+  - weight_version: bfloat16
+    sources:
+      - source: HuggingFace   # tutorial §3.1 download link
+        url: "https://huggingface.co/moonshotai/Kimi-K2-Thinking"
+        command: |
+          huggingface-cli download moonshotai/Kimi-K2-Thinking --local-dir /mnt/sfs_turbo/.cache/Kimi-K2-Thinking
+
+prerequisites:
+- title: Model Weight
+  content: |-
+    - `Kimi-K2-Thinking` (bfloat16): requires 1 Atlas 800 A3 (64G x 16) node. [Download model weight](https://huggingface.co/moonshotai/Kimi-K2-Thinking).
+
+    It is recommended to download the model weight to a shared directory, such as `/mnt/sfs_turbo/.cache/`.
+
+    After downloading, edit the value of `quantization_config.config_groups.group_0.targets`
+    from `["Linear"]` to `["MoE"]` in `config.json` to activate the quantized MoE experts (tutorial §3.1):
+
+    ```json
+    {
+      "quantization_config": {
+        "config_groups": {
+          "group_0": {
+            "targets": [
+              "MoE"
+            ]
+          }
+        }
+      }
+    }
+    ```
+
+    > Known nightly-image issue: with this targets edit applied, the nightly image
+    > (`vllm-ascend:nightly-main-a3`, vllm 0.33.0, 2026-11-24) hits an NPU OOM on all 16 dies
+    > during weight loading; the accuracy results in this recipe were produced with the
+    > un-edited `config.json` (the same condition as the published tutorial accuracy section).
+
+    The weight directory contains 62 safetensors shards plus custom modeling/tokenizer files
+    (`modeling_deepseek.py`, `tokenization_kimi.py`, `tiktoken.model`, `chat_template.jinja`, ...).
+
+env_setup:
+  container:
+    A3:
+      content: |-
+        Select an image based on your machine type and start the docker image on your node, refer to [using docker](https://docs.vllm.ai/projects/ascend/en/latest/installation.html#set-up-using-docker).
+
+        ```shell
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0rc1-a3
+
+        docker run --rm \
+        --name vllm-ascend \
+        --net=host \
+        --shm-size=1g \
+        --device /dev/davinci0 \
+        --device /dev/davinci1 \
+        --device /dev/davinci2 \
+        --device /dev/davinci3 \
+        --device /dev/davinci4 \
+        --device /dev/davinci5 \
+        --device /dev/davinci6 \
+        --device /dev/davinci7 \
+        --device /dev/davinci8 \
+        --device /dev/davinci9 \
+        --device /dev/davinci10 \
+        --device /dev/davinci11 \
+        --device /dev/davinci12 \
+        --device /dev/davinci13 \
+        --device /dev/davinci14 \
+        --device /dev/davinci15 \
+        --device /dev/davinci_manager \
+        --device /dev/devmm_svm \
+        --device /dev/hisi_hdc \
+        -v /usr/local/dcmi:/usr/local/dcmi \
+        -v /usr/local/Ascend/driver/tools/hccn_tool:/usr/local/Ascend/driver/tools/hccn_tool \
+        -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+        -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \
+        -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
+        -v /etc/ascend_install.info:/etc/ascend_install.info \
+        -v /mnt/sfs_turbo/.cache:/home/cache \
+        -it $IMAGE bash
+        ```
+
+        The `-a3` image suffix selects the Atlas A3 build; `--net=host` exposes the vLLM service
+        port on the host directly; the 16 `davinci` devices plus `davinci_manager`, `devmm_svm`, and
+        `hisi_hdc` expose the full A3 node (tutorial §4.1).
+
+        Inside the container, verify the Ascend devices are visible:
+
+        ```shell
+        npu-smi info
+        ```
+
+        Expected: the command exits successfully and lists 16 healthy NPU devices.
+
+scenarios:
+  - npu: Atlas 800I A3   # hardware enum aligned with repo convention
+    precision: bf16      # checkpoint ships a quantization_config (§3.1 targets edit); tutorial §3.1 wording is "(bfloat16)"
+    deployment: "Single-Node"
+    case: "Baseline serving"
+    tags: [a3-single]
+    strategy: single_node_A3
+    steps:
+      - title: "Prepare weights"
+        content: |-
+          Download the checkpoint to a shared directory, then edit
+          `quantization_config.config_groups.group_0.targets` from `["Linear"]` to `["MoE"]`
+          in `config.json` (tutorial §3.1).
+      - title: "Start the container"
+        content: |-
+          Launch the container with the full device-mount set from `env_setup.container`
+          (tutorial §4.1) and confirm `npu-smi info` lists 16 devices.
+      - title: "Start the server"
+        content: |-
+          ```bash
+          export HCCL_BUFFSIZE=1024 TASK_QUEUE_ENABLE=1 OMP_PROC_BIND=false
+          export HCCL_OP_EXPANSION_MODE=AIV PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+          vllm serve your_model_path \
+              --tensor-parallel-size 16 \
+              --port 8000 \
+              --max-model-len 8192 \
+              --max-num-batched-tokens 8192 \
+              --max-num-seqs 12 \
+              --gpu-memory-utilization 0.9 \
+              --trust-remote-code \
+              --enable-expert-parallel \
+              --no-enable-prefix-caching \
+              --compilation-config '{"cudagraph_capture_sizes": [16, 32]}' \
+              --served-model-name Kimi-K2-Thinking
+          ```
+
+          Serve parameter values are the validated baselines from tutorial §5.1. Three declared
+          adaptations: the model path is replaced with the repo-standard `your_model_path`
+          placeholder; `--served-model-name Kimi-K2-Thinking` is added explicitly — tutorial
+          §10 notes that without an explicit served name, short model names fail to resolve, so
+          the requests in the following steps use exactly this name; and `--compilation-config`
+          with capture sizes `[16, 32]` is required on TP16 (the default capture sizes trip a
+          vLLM assertion on current images) — verified in a first-party run on the nightly
+          image (2026-11-24, vllm 0.33.0). The baseline disables prefix
+          caching via `--no-enable-prefix-caching`; to enable the Prefix Caching option, remove
+          that flag and add `--enable-prefix-caching`.
+
+          Expected startup logs:
+
+          ```text
+          INFO:     Started server process [...]
+          INFO:     Waiting for application startup.
+          INFO:     Application startup complete.
+          ```
+
+          No HCCL or NPU initialization errors should appear.
+      - title: "Functional verification"
+        content: |-
+          ```bash
+          curl http://<server_ip>:8000/v1/chat/completions -H "Content-Type: application/json" -d '{
+            "model": "Kimi-K2-Thinking",
+            "messages": [{"role": "user", "content": "Who are you?"}],
+            "temperature": 1.0
+          }'
+          ```
+
+          Expected: HTTP 200 and `choices[0].message.content` contains the generated response (tutorial §6).
+      - title: "Quick benchmark"
+        content: |-
+          ```bash
+          vllm bench serve \
+            --backend openai-chat \
+            --model Kimi-K2-Thinking \
+            --endpoint /v1/chat/completions \
+            --dataset-name random \
+            --random-input-len 1024 \
+            --random-output-len 1024 \
+            --num-prompts 10 \
+            --request-rate 1
+          ```
+
+          Reference output throughput is ~46 tok/s at 1k/1k with 10/10 successes (tutorial §8).
+
+verification: |-
+  Once your server is started, you can query the model with input prompts:
+
+  ```shell
+  curl http://<server_ip>:<port>/v1/chat/completions \
+      -H "Content-Type: application/json" \
+      -d '{
+          "model": "Kimi-K2-Thinking",
+          "messages": [{
+              "role": "user",
+              "content": "Who are you?"
+          }],
+          "temperature": 1.0
+      }'
+  ```
+
+  Expected Result:
+
+  The service returns HTTP 200; `choices[0].message.content` contains the generated
+  assistant response (tutorial §6).
+
+evaluation:
+  accuracy:
+    content: |-
+      ### Using AISBench
+
+      Refer to [Using AISBench](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/evaluation/using_ais_bench.html) for details.
+
+      ### Using lm-eval
+
+      Install lm-eval per [Using lm_eval](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/evaluation/using_lm_eval.html), then run (command first-party verified on
+      the nightly image, vllm 0.33.0, 2026-11-24):
+
+      ```shell
+      lm_eval \
+        --model local-completions \
+        --model_args model=Kimi-K2-Thinking,tokenizer=<your_model_path>,base_url=http://127.0.0.1:8000/v1/completions,tokenized_requests=True,trust_remote_code=True,max_gen_toks=2048 \
+        --tasks gsm8k --num_fewshot 5 --apply_chat_template --fewshot_as_multiturn \
+        --gen_kwargs temperature=0.0,top_p=1.0 \
+        --batch_size 16 \
+        --output_path ./
+      ```
+
+      Note: `tokenized_requests=True` is required — with the tutorial's `False`, chat-template
+      requests are rejected (HTTP 422) by the completions endpoint; `tokenizer` in
+      `model_args` must point to the local weight path to avoid a network fetch; and
+      `batch_size 16` is safe in that mode (the batch-size-1 restriction the tutorial notes
+      applies only to `tokenized_requests=False`). The reference configuration is `gsm8k` (5-shot),
+      `--apply_chat_template`, `--fewshot_as_multiturn`, greedy decoding (`temperature=0.0`,
+      `top_p=1.0`), max 2048 output tokens. Full-set measured results on nightly
+      (1319 items, no limit, lm-eval 0.4.13): flexible-extract 0.9007 / strict-match 0.8317 vs
+      tutorial §7 references 0.8992/0.8453 (+0.15pp / −1.36pp ≈1.4σ); lm-eval's default
+      2047-token context truncation applies to both. The 300-item pre-check scored
+      0.9000/0.8367, consistent with the full run.
+
+performance:
+  accuracy: |-
+      Reference results for `Kimi-K2-Thinking` powered by `vllm-ascend:v0.20.2rc1` on one
+      Atlas 800 A3 node (64G x 16), from tutorial §7:
+
+      | task | version | filter | n-shot | metric | value | stderr |
+      | --- | ---: | --- | ---: | --- | ---: | ---: |
+      | `gsm8k` | 3 | `flexible-extract` | 5 | `exact_match` | 0.8992 | 0.0083 |
+      | `gsm8k` | 3 | `strict-match` | 5 | `exact_match` | 0.8453 | 0.0100 |
+
+      First-party checks (2026-11-24, `quay.io/ascend/vllm-ascend:nightly-main-a3`, vllm 0.33.0,
+      single-node Atlas 800T A3): AISBench gsm8k (1319 items, 4-shot CoT chat, batch 16,
+      max_out_len 4096) = 96.06; lm-eval gsm8k full set per the command in the evaluation
+      section (1319 items, no limit) = flexible-extract 0.9007 / strict-match 0.8317
+      (+0.15pp / −1.36pp ≈1.4σ vs the references above).
+  benchmark: |-
+      Benchmark via `vllm bench serve` (tutorial §8). Command example:
+
+      ```shell
+      vllm bench serve \
+        --backend openai-chat \
+        --model Kimi-K2-Thinking \
+        --endpoint /v1/chat/completions \
+        --dataset-name random \
+        --random-input-len 1024 \
+        --random-output-len 1024 \
+        --num-prompts 10 \
+        --request-rate 1
+      ```
+
+      Reference results with `vllm-ascend:v0.20.2rc1` on one Atlas 800 A3 node (64G x 16),
+      OpenAI chat serving, random lengths, 10 prompts, `--request-rate 1`:
+
+      | random input len | random output len | success | duration (s) | request throughput (req/s) | output throughput (tok/s) | total throughput (tok/s) | mean TTFT (ms) | mean TPOT (ms) | mean ITL (ms) |
+      | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+      | 512 | 512 | 10 / 10 | 111.00 | 0.09 | 46.12 | 94.38 | 507.60 | 200.47 | 200.08 |
+      | 1024 | 1024 | 10 / 10 | 221.52 | 0.05 | 46.23 | 93.48 | 566.39 | 208.20 | 208.00 |
+      | 2048 | 2048 | 10 / 10 | 479.72 | 0.02 | 42.69 | 85.78 | 722.32 | 230.26 | 230.15 |
+
+      Concurrency sweep — keep 1024/1024 fixed and vary `--max-concurrency` (tutorial §8):
+
+      ```shell
+      MODEL_NAME=Kimi-K2-Thinking
+      INPUT_LEN=1024
+      OUTPUT_LEN=1024
+
+      for CONCURRENCY in 1 2 4 8 16 32; do
+        NUM_PROMPTS=$((CONCURRENCY * 10))
+        vllm bench serve \
+          --backend openai-chat \
+          --model "$MODEL_NAME" \
+          --endpoint /v1/chat/completions \
+          --dataset-name random \
+          --random-input-len "$INPUT_LEN" \
+          --random-output-len "$OUTPUT_LEN" \
+          --num-prompts "$NUM_PROMPTS" \
+          --request-rate inf \
+          --max-concurrency "$CONCURRENCY"
+      done
+      ```
+
+      | max concurrency | prompts | success | duration (s) | request throughput (req/s) | output throughput (tok/s) | total throughput (tok/s) | mean TTFT (ms) | P99 TTFT (ms) | mean TPOT (ms) |
+      | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+      | 1 | 10 | 10 / 10 | 595.07 | 0.02 | 17.21 | 34.80 | 473.71 | 712.49 | 57.71 |
+      | 2 | 20 | 20 / 20 | 623.88 | 0.03 | 32.83 | 66.35 | 708.16 | 996.59 | 60.29 |
+      | 4 | 40 | 40 / 40 | 725.38 | 0.06 | 56.47 | 114.13 | 956.11 | 1137.55 | 69.97 |
+      | 8 | 80 | 80 / 80 | 907.44 | 0.09 | 90.28 | 182.43 | 1361.85 | 1900.15 | 87.37 |
+      | 16 | 160 | 160 / 160 | 3093.07 | 0.05 | 52.97 | 107.04 | 76766.84 | 251245.22 | 222.07 |
+
+      The reference table covers up to concurrency 16 (tutorial §8); the loop also includes 32
+      for self-baselining. At concurrency 16 the mean TTFT grows to ~76.7 s (severe queueing). Limit concurrency by
+      latency SLO, or raise `--max-num-seqs` / `--max-num-batched-tokens` only if NPU memory allows.
+
+tuning: |-
+  Scenario overview (tutorial §9.1; values validated in the tutorial environment, for reference only):
+
+  | Scenario | Deployment Mode | Total NPUs | Weight Version | Key Considerations |
+  |----------|----------------|------------|----------------|---------------------|
+  | Long Context | Single-node | 16 (A3) | bfloat16 | Keep `--max-model-len` close to the real maximum input/output length; reduce `--max-num-seqs` first under memory pressure. Validated single-node baseline covers up to 2K/2K. |
+  | Low Latency | Single-node | 16 (A3) | bfloat16 | Reduce `--max-num-seqs` and `--max-num-batched-tokens` from the baseline (12 / 8192); concurrency 1-4 kept mean TTFT below 1 s in the §8 sweep. |
+  | High Throughput | Single-node | 16 (A3) | bfloat16 | Increase `--max-num-seqs` gradually; concurrency 8 gave the best output throughput in the §8 sweep. |
+
+  General tuning reference: [Public Performance Tuning Documentation](https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/performance_and_debug/optimization_and_tuning.html)
+  and the [Feature Guide](https://docs.vllm.ai/projects/ascend/en/latest/user_guide/support_matrix/feature_matrix.html).
+  Supported-feature matrix for this model: [supported models](https://docs.vllm.ai/projects/ascend/en/latest/user_guide/support_matrix/supported_models.html) (tutorial §2).
+
+faq: |-
+  For common environment, installation, and general parameter issues, refer to the
+  [Public FAQ](https://docs.vllm.ai/projects/ascend/en/latest/faqs.html); this section only
+  covers model-specific issues (tutorial §10).
+
+  - **Q: API returns `{"error":"Model not found"}` or `404` when requesting with `model: "Kimi-K2-Thinking"`?**
+
+    A: This recipe starts the server with an explicit `--served-model-name Kimi-K2-Thinking`,
+    so requests must use exactly that name; any other `model` value cannot be resolved. (Tutorial
+    §10 documents the underlying resolution behavior: without an explicit served name, the server
+    expects the full HF model id rather than a short name.)
+
+references:
+  - title: "Official tutorial"
+    url: "https://docs.vllm.ai/projects/ascend/en/v0.23.0/tutorials/models/Kimi-K2-Thinking.html"
+  - title: "Nightly verification config"
+    url: "https://github.com/vllm-project/vllm-ascend/blob/v0.23.0rc1/tests/e2e/nightly/single_node/models/configs/Kimi-K2-Thinking.yaml"
+  - title: "Model weights (HuggingFace)"
+    url: "https://huggingface.co/moonshotai/Kimi-K2-Thinking"

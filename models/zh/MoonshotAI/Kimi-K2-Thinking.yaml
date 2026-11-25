@@ -1,0 +1,407 @@
+# Kimi-K2-Thinking recipe（zh）——事实源：vllm-ascend v0.23.0 教程 docs/source/tutorials/models/Kimi-K2-Thinking.md
+# 注释中的章节号均指该教程。版本矩阵（教程 §1/§7/§4.1）：教程声明的最低稳定版 v0.9.0rc1；
+# 精度/性能基线 @v0.20.2rc1；教程镜像为模板变量（§4.1，文档页 substitution 渲染值为 v0.23.0.post1-a3）
+# ——本件按仓内存量惯例钉 v0.23.0rc1-a3（nightly CI 默认镜像为 v0.23.0 系）；工具链有差异时先复核参数。
+meta:
+  title: "Kimi-K2-Thinking"
+  slug: "kimi-k2-thinking"
+  provider: "Moonshot AI"
+  # description 来源：HF model card + 教程 §1
+  description: "Moonshot AI 推出的大规模混合专家模型，具备混合思考（hybrid thinking）架构，面向多步推理、智能体检索与数学/代码问题求解任务。"
+  date_added: 2026-11-25
+  difficulty: advanced
+  tasks:
+    - text
+  related_recipes:
+    - "moonshotai/Kimi-K2.6"
+  performance_headline: "Atlas 800 A3（64G x 16）单机 TP16 部署；gsm8k 5-shot flexible-extract 0.8992（教程 §7）"
+  hardware:
+    atlas_800_a3: verified   # 教程 §5.1/§7/§8 载官方 A3 部署与实测结果(依 GLM-5/K2.6 等存量惯例;第一方复验 2026-11-24 已在 nightly 镜像完成)
+    atlas_800_a2: unsupported   # 教程仅面向 A3（§3.1）；显式声明使语义明确并与站点展示一致（nightly 路由仅认 verified）
+
+model:
+  model_id: "moonshotai/Kimi-K2-Thinking"
+  min_vllm_version: "v0.9.0rc1"   # 教程 §1:首个支持并验证的版本；精度基线 @v0.20.2rc1（§7/§8）
+  architecture: moe
+  parameter_count: "1T"            # 来源：HF model card（教程未载）
+  active_parameters: "32B"         # 来源：HF model card
+  context_length: 262144           # 来源：HF model card config.json max_position_embeddings
+  modality: text
+  base_args:
+    - "--trust-remote-code"        # §5.1:模型包自带自定义 configuration/modeling/tokenizer/chat-template
+    - "--enable-expert-parallel"   # §5.1:MoE 专家分布到各 NPU
+  base_env:
+    HCCL_BUFFSIZE: "1024"                              # §5.1 表：已验证值
+    TASK_QUEUE_ENABLE: "1"                             # §5.1 表：版本敏感项，已验证值
+    OMP_PROC_BIND: "false"                             # §5.1 表：避免过严 OpenMP CPU 绑定
+    HCCL_OP_EXPANSION_MODE: "AIV"                      # §5.1 表：AIV 通信路径
+    PYTORCH_NPU_ALLOC_CONF: "expandable_segments:True" # §5.1 表：降低 NPU 显存碎片
+  docker_image:
+    atlas_800_a3: "quay.io/ascend/vllm-ascend:v0.23.0rc1-a3"   # §4.1:-a3 后缀选择 Atlas A3 镜像
+  nightly_required: false
+  install:
+    pip: false
+    docker:
+      command: "docker run --rm --name vllm-ascend --shm-size=1g --net=host -it quay.io/ascend/vllm-ascend:v0.23.0rc1-a3 bash"
+      note: "精简示意；实际部署请使用 env_setup.container 中的完整设备挂载命令（教程 §4.1）。"
+
+features:
+  expert_parallel:
+    description: "MoE 专家并行（教程 §5.1，已验证启用）"
+    args: ["--enable-expert-parallel"]
+  prefix_caching:
+    label: "前缀缓存"
+    description: "KV 前缀缓存；已验证基线通过 --no-enable-prefix-caching 关闭（教程 §5.1）。启用方式：移除该参数并加 --enable-prefix-caching。"
+    args: ["--enable-prefix-caching"]
+    flag_when_false: "--no-enable-prefix-caching"
+
+opt_in_features:
+  - prefix_caching
+
+variants:
+  default:
+    model_id: "moonshotai/Kimi-K2-Thinking"
+    precision: bf16   # 检查点自带 quantization_config（§3.1 targets 编辑），约 1T 模型因此可驻留 1TB HBM 节点；教程 §3.1 表述为 "(bfloat16)"
+    vram_minimum_gb: 1024   # 单台 Atlas 800 A3（64G x 16）节点 HBM 总量（教程 §3.1）
+    description: "原生检查点（量化目标切至 MoE 专家）部署于单台 Atlas 800 A3（64G x 16）节点，TP16"
+    supported_hardware: [atlas_800_a3]
+
+compatible_strategies:
+  - single_node_A3
+
+guide: ""
+performance_model_names:
+  - "Kimi-K2-Thinking"
+
+overview: |-
+  Kimi-K2-Thinking 是 Moonshot AI 研发的大规模混合专家（MoE）模型，采用混合思考架构，
+  在复杂问题求解中交织推理与行动。检查点自带量化配置，服务前须将专家组量化目标调整
+  至 MoE（教程 §3.1）。本 recipe 将其部署在单台 Atlas 800 A3（64G x 16）节点上
+  （tensor-parallel-size 16），覆盖环境准备、在线服务、功能验证、精度评测与性能压测
+  全流程，并收录官方教程（§7、§8）公布的 gsm8k 精度与吞吐参考数据。教程声明
+  vLLM-Ascend v0.9.0rc1 为首个支持版本；本文引用的精度与性能基线实测于 v0.20.2rc1。
+
+weight_download:
+  - weight_version: bfloat16
+    sources:
+      - source: HuggingFace   # 教程 §3.1 下载链接
+        url: "https://huggingface.co/moonshotai/Kimi-K2-Thinking"
+        command: |
+          huggingface-cli download moonshotai/Kimi-K2-Thinking --local-dir /mnt/sfs_turbo/.cache/Kimi-K2-Thinking
+
+prerequisites:
+- title: 模型权重
+  content: |-
+    - `Kimi-K2-Thinking`（bfloat16）：需要 1 台 Atlas 800 A3（64G x 16）节点。[下载模型权重](https://huggingface.co/moonshotai/Kimi-K2-Thinking)。
+
+    建议将模型权重下载到共享目录，如 `/mnt/sfs_turbo/.cache/`。
+
+    下载完成后，编辑 `config.json` 中 `quantization_config.config_groups.group_0.targets`
+    的值，从 `["Linear"]` 改为 `["MoE"]`，以启用量化 MoE 专家（教程 §3.1）：
+
+    ```json
+    {
+      "quantization_config": {
+        "config_groups": {
+          "group_0": {
+            "targets": [
+              "MoE"
+            ]
+          }
+        }
+      }
+    }
+    ```
+
+    > 已知 nightly 镜像问题:应用该 targets 编辑后,nightly 镜像(`vllm-ascend:nightly-main-a3`,
+    > vllm 0.33.0,2026-11-24)在权重加载阶段 16 卡全部 NPU OOM;本 recipe 的精度结果均使用
+    > 未编辑的 `config.json` 产出(与教程已发布精度小节同条件)。
+
+    权重目录包含 62 个 safetensors 分片及自定义建模/分词文件
+    （`modeling_deepseek.py`、`tokenization_kimi.py`、`tiktoken.model`、`chat_template.jinja` 等）。
+
+env_setup:
+  container:
+    A3:
+      content: |-
+        根据机型选择镜像并在节点上启动 docker 容器，参考[使用 docker](https://docs.vllm.ai/projects/ascend/zh-cn/latest/installation.html#set-up-using-docker)。
+
+        ```shell
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0rc1-a3
+
+        docker run --rm \
+        --name vllm-ascend \
+        --net=host \
+        --shm-size=1g \
+        --device /dev/davinci0 \
+        --device /dev/davinci1 \
+        --device /dev/davinci2 \
+        --device /dev/davinci3 \
+        --device /dev/davinci4 \
+        --device /dev/davinci5 \
+        --device /dev/davinci6 \
+        --device /dev/davinci7 \
+        --device /dev/davinci8 \
+        --device /dev/davinci9 \
+        --device /dev/davinci10 \
+        --device /dev/davinci11 \
+        --device /dev/davinci12 \
+        --device /dev/davinci13 \
+        --device /dev/davinci14 \
+        --device /dev/davinci15 \
+        --device /dev/davinci_manager \
+        --device /dev/devmm_svm \
+        --device /dev/hisi_hdc \
+        -v /usr/local/dcmi:/usr/local/dcmi \
+        -v /usr/local/Ascend/driver/tools/hccn_tool:/usr/local/Ascend/driver/tools/hccn_tool \
+        -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+        -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \
+        -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
+        -v /etc/ascend_install.info:/etc/ascend_install.info \
+        -v /mnt/sfs_turbo/.cache:/home/cache \
+        -it $IMAGE bash
+        ```
+
+        `-a3` 后缀选择 Atlas A3 构建镜像；`--net=host` 使 vLLM 服务端口直接暴露在主机上；
+        16 个 `davinci` 设备加 `davinci_manager`、`devmm_svm`、`hisi_hdc` 完整暴露 A3 节点（教程 §4.1）。
+
+        在容器内确认 Ascend 设备可见：
+
+        ```shell
+        npu-smi info
+        ```
+
+        预期：命令成功返回，列出 16 个健康 NPU 设备。
+
+scenarios:
+  - npu: Atlas 800I A3   # 硬件枚举对齐仓内惯例
+    precision: bf16      # 检查点自带 quantization_config（§3.1 targets 编辑）；教程 §3.1 表述为 "(bfloat16)"
+    deployment: "单节点-多卡"
+    case: "基线服务"
+    tags: [a3-single]
+    strategy: single_node_A3
+    steps:
+      - title: "准备权重"
+        content: |-
+          下载检查点到共享目录，然后编辑 `config.json` 中
+          `quantization_config.config_groups.group_0.targets`，从 `["Linear"]` 改为 `["MoE"]`
+          （教程 §3.1）。
+      - title: "启动容器"
+        content: |-
+          按 `env_setup.container` 的完整设备挂载集合启动容器（教程 §4.1），
+          并确认 `npu-smi info` 列出 16 个设备。
+      - title: "启动服务"
+        content: |-
+          ```bash
+          export HCCL_BUFFSIZE=1024 TASK_QUEUE_ENABLE=1 OMP_PROC_BIND=false
+          export HCCL_OP_EXPANSION_MODE=AIV PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+          vllm serve your_model_path \
+              --tensor-parallel-size 16 \
+              --port 8000 \
+              --max-model-len 8192 \
+              --max-num-batched-tokens 8192 \
+              --max-num-seqs 12 \
+              --gpu-memory-utilization 0.9 \
+              --trust-remote-code \
+              --enable-expert-parallel \
+              --no-enable-prefix-caching \
+              --compilation-config '{"cudagraph_capture_sizes": [16, 32]}' \
+              --served-model-name Kimi-K2-Thinking
+          ```
+
+          服务参数取值为教程 §5.1 的已验证基线。三处已声明改编：模型路径替换为仓内惯例的
+          `your_model_path` 占位符；显式添加 `--served-model-name Kimi-K2-Thinking`——教程 §10
+          表明未显式指定时短模型名无法解析，故后续步骤的请求均使用该名称；`--compilation-config`
+          捕获数组 `[16, 32]` 在 TP16 下必需（默认捕获数组在当前镜像触发 vLLM 断言）——已于
+          nightly 镜像一方实测验证（2026-11-24，vllm 0.33.0）。基线通过
+          `--no-enable-prefix-caching` 关闭前缀缓存；如需启用前缀缓存选项，移除该参数并加
+          `--enable-prefix-caching`。
+
+          预期启动日志：
+
+          ```text
+          INFO:     Started server process [...]
+          INFO:     Waiting for application startup.
+          INFO:     Application startup complete.
+          ```
+
+          不应出现任何 HCCL 或 NPU 初始化相关报错。
+      - title: "功能验证"
+        content: |-
+          ```bash
+          curl http://<server_ip>:8000/v1/chat/completions -H "Content-Type: application/json" -d '{
+            "model": "Kimi-K2-Thinking",
+            "messages": [{"role": "user", "content": "Who are you?"}],
+            "temperature": 1.0
+          }'
+          ```
+
+          预期：HTTP 200 且 `choices[0].message.content` 包含生成回复（教程 §6）。
+      - title: "快速压测"
+        content: |-
+          ```bash
+          vllm bench serve \
+            --backend openai-chat \
+            --model Kimi-K2-Thinking \
+            --endpoint /v1/chat/completions \
+            --dataset-name random \
+            --random-input-len 1024 \
+            --random-output-len 1024 \
+            --num-prompts 10 \
+            --request-rate 1
+          ```
+
+          参考吞吐：1k/1k、10/10 成功时输出吞吐约 46 tok/s（教程 §8）。
+
+verification: |-
+  服务启动后，可通过输入提示词查询模型：
+
+  ```shell
+  curl http://<server_ip>:<port>/v1/chat/completions \
+      -H "Content-Type: application/json" \
+      -d '{
+          "model": "Kimi-K2-Thinking",
+          "messages": [{
+              "role": "user",
+              "content": "Who are you?"
+          }],
+          "temperature": 1.0
+      }'
+  ```
+
+  预期结果：
+
+  服务返回 HTTP 200；`choices[0].message.content` 包含生成的助手回复（教程 §6）。
+
+evaluation:
+  accuracy:
+    content: |-
+      ### 使用 AISBench
+
+      详见[使用 AISBench](https://docs.vllm.ai/projects/ascend/zh-cn/latest/developer_guide/evaluation/using_ais_bench.html)。
+
+      ### 使用 lm-eval
+
+      按[使用 lm_eval](https://docs.vllm.ai/projects/ascend/zh-cn/latest/developer_guide/evaluation/using_lm_eval.html) 安装后执行（命令为 nightly 镜像一方实测版，vllm 0.33.0，2026-11-24）：
+
+      ```shell
+      lm_eval \
+        --model local-completions \
+        --model_args model=Kimi-K2-Thinking,tokenizer=<your_model_path>,base_url=http://127.0.0.1:8000/v1/completions,tokenized_requests=True,trust_remote_code=True,max_gen_toks=2048 \
+        --tasks gsm8k --num_fewshot 5 --apply_chat_template --fewshot_as_multiturn \
+        --gen_kwargs temperature=0.0,top_p=1.0 \
+        --batch_size 16 \
+        --output_path ./
+      ```
+
+      说明：`tokenized_requests=True` 为必需——沿用教程的 `False` 时聊天模板请求会被
+      completions 接口拒绝（HTTP 422）；`--tokenizer` 须指向本地权重路径以避免联网拉取；
+      该模式下 `batch_size 16` 安全（教程所述 batch size 1 限制仅适用于
+      `tokenized_requests=False`）。参考配置为 `gsm8k`（5-shot）、`--apply_chat_template`、
+      `--fewshot_as_multiturn`、贪心解码（`temperature=0.0`、`top_p=1.0`）、最大输出
+      2048 token。nightly 全量实测结果（1319 题、无 limit、lm-eval 0.4.13）：flexible-extract
+      0.9007 / strict-match 0.8317，对照教程 §7 参考 0.8992/0.8453（+0.15pp / −1.36pp ≈1.4σ）；
+      lm-eval 默认 2047 token 上下文截断对两者同样适用。300 题快速核对得 0.9000/0.8367，
+      与全量一致。
+
+performance:
+  accuracy: |-
+      `Kimi-K2-Thinking` 在 `vllm-ascend:v0.20.2rc1`、单台 Atlas 800 A3（64G x 16）上的
+      gsm8k 参考结果（教程 §7）：
+
+      | task | version | filter | n-shot | metric | value | stderr |
+      | --- | ---: | --- | ---: | --- | ---: | ---: |
+      | `gsm8k` | 3 | `flexible-extract` | 5 | `exact_match` | 0.8992 | 0.0083 |
+      | `gsm8k` | 3 | `strict-match` | 5 | `exact_match` | 0.8453 | 0.0100 |
+
+      第一方实测(2026-11-24,`quay.io/ascend/vllm-ascend:nightly-main-a3`,vllm 0.33.0,
+      Atlas 800T A3 单机):AISBench gsm8k(1319 题、4-shot CoT chat、batch 16、
+      max_out_len 4096)= 96.06;lm-eval gsm8k 按 evaluation 一节命令跑全量(1319 题、无 limit)
+      = flexible-extract 0.9007 / strict-match 0.8317(较上表参考值 +0.15pp / -1.36pp ≈1.4σ)。
+  benchmark: |-
+      使用 `vllm bench serve` 压测（教程 §8）。命令示例：
+
+      ```shell
+      vllm bench serve \
+        --backend openai-chat \
+        --model Kimi-K2-Thinking \
+        --endpoint /v1/chat/completions \
+        --dataset-name random \
+        --random-input-len 1024 \
+        --random-output-len 1024 \
+        --num-prompts 10 \
+        --request-rate 1
+      ```
+
+      `vllm-ascend:v0.20.2rc1`、单台 Atlas 800 A3（64G x 16）、OpenAI chat 服务、随机长度、
+      10 条请求、`--request-rate 1` 的参考结果：
+
+      | random input len | random output len | success | duration （s） | request throughput （req/s） | output throughput （tok/s） | total throughput （tok/s） | mean TTFT （ms） | mean TPOT （ms） | mean ITL （ms） |
+      | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+      | 512 | 512 | 10 / 10 | 111.00 | 0.09 | 46.12 | 94.38 | 507.60 | 200.47 | 200.08 |
+      | 1024 | 1024 | 10 / 10 | 221.52 | 0.05 | 46.23 | 93.48 | 566.39 | 208.20 | 208.00 |
+      | 2048 | 2048 | 10 / 10 | 479.72 | 0.02 | 42.69 | 85.78 | 722.32 | 230.26 | 230.15 |
+
+      并发扫描——保持 1024/1024 不变，改变 `--max-concurrency`（教程 §8）：
+
+      ```shell
+      MODEL_NAME=Kimi-K2-Thinking
+      INPUT_LEN=1024
+      OUTPUT_LEN=1024
+
+      for CONCURRENCY in 1 2 4 8 16 32; do
+        NUM_PROMPTS=$((CONCURRENCY * 10))
+        vllm bench serve \
+          --backend openai-chat \
+          --model "$MODEL_NAME" \
+          --endpoint /v1/chat/completions \
+          --dataset-name random \
+          --random-input-len "$INPUT_LEN" \
+          --random-output-len "$OUTPUT_LEN" \
+          --num-prompts "$NUM_PROMPTS" \
+          --request-rate inf \
+          --max-concurrency "$CONCURRENCY"
+      done
+      ```
+
+      | max concurrency | prompts | success | duration （s） | request throughput （req/s） | output throughput （tok/s） | total throughput （tok/s） | mean TTFT （ms） | P99 TTFT （ms） | mean TPOT （ms） |
+      | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+      | 1 | 10 | 10 / 10 | 595.07 | 0.02 | 17.21 | 34.80 | 473.71 | 712.49 | 57.71 |
+      | 2 | 20 | 20 / 20 | 623.88 | 0.03 | 32.83 | 66.35 | 708.16 | 996.59 | 60.29 |
+      | 4 | 40 | 40 / 40 | 725.38 | 0.06 | 56.47 | 114.13 | 956.11 | 1137.55 | 69.97 |
+      | 8 | 80 | 80 / 80 | 907.44 | 0.09 | 90.28 | 182.43 | 1361.85 | 1900.15 | 87.37 |
+      | 16 | 160 | 160 / 160 | 3093.07 | 0.05 | 52.97 | 107.04 | 76766.84 | 251245.22 | 222.07 |
+
+      参考表覆盖至并发 16（教程 §8）；循环含 32 供自行摸底。并发 16 时平均 TTFT 升至约 76.7 s（严重排队）。生产部署请按时延 SLO 限制并发，
+      或仅在 NPU 显存允许时上调 `--max-num-seqs` / `--max-num-batched-tokens`。
+
+tuning: |-
+  场景总览（教程 §9.1；数值为教程环境验证值，仅供参考）：
+
+  | Scenario | Deployment Mode | Total NPUs | Weight Version | Key Considerations |
+  |----------|----------------|------------|----------------|---------------------|
+  | Long Context | Single-node | 16 （A3） | bfloat16 | `--max-model-len` 贴近真实最大输入/输出长度；显存吃紧时先降 `--max-num-seqs`。单机基线已验证至 2K/2K。 |
+  | Low Latency | Single-node | 16 （A3） | bfloat16 | 从基线（12 / 8192）下调 `--max-num-seqs` 与 `--max-num-batched-tokens`；§8 扫描中并发 1-4 平均 TTFT 低于 1 s。 |
+  | High Throughput | Single-node | 16 （A3） | bfloat16 | 逐步上调 `--max-num-seqs`；§8 扫描中并发 8 输出吞吐最优。 |
+
+  通用调优参考：[公共性能调优文档](https://docs.vllm.ai/projects/ascend/zh-cn/latest/developer_guide/performance_and_debug/optimization_and_tuning.html)
+  与[特性指南](https://docs.vllm.ai/projects/ascend/zh-cn/latest/user_guide/support_matrix/feature_matrix.html)。
+  模型支持特性矩阵：[supported models](https://docs.vllm.ai/projects/ascend/zh-cn/latest/user_guide/support_matrix/supported_models.html)（教程 §2）。
+
+faq: |-
+  常见环境、安装与通用参数问题参见[公共 FAQ](https://docs.vllm.ai/projects/ascend/zh-cn/latest/faqs.html)；
+  本节仅覆盖模型专属问题（教程 §10）。
+
+  - **问：请求 `model: "Kimi-K2-Thinking"` 时 API 返回 `{"error":"Model not found"}` 或 `404`？**
+
+    答：本 recipe 启动服务时已显式设置 `--served-model-name Kimi-K2-Thinking`，请求必须
+    使用该名称；其他 `model` 值无法解析。（教程 §10 记载了底层解析行为：未显式指定服务名时，
+    服务端要求使用完整 HF 模型 ID 而非短名。）
+
+references:
+  - title: "官方教程"
+    url: "https://docs.vllm.ai/projects/ascend/en/v0.23.0/tutorials/models/Kimi-K2-Thinking.html"   # 教程已移出 main，仅英文版，故钉 en 版本化路径
+  - title: "Nightly 验证配置"
+    url: "https://github.com/vllm-project/vllm-ascend/blob/v0.23.0rc1/tests/e2e/nightly/single_node/models/configs/Kimi-K2-Thinking.yaml"
+  - title: "模型权重（HuggingFace）"
+    url: "https://huggingface.co/moonshotai/Kimi-K2-Thinking"
