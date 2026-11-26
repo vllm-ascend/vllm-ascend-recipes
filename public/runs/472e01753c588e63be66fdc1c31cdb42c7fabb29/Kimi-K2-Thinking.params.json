@@ -1,0 +1,23 @@
+{
+  "verification_scope": "single-node API smoke; not accuracy or full feature coverage",
+  "recipe_path": "models/en/MoonshotAI/Kimi-K2-Thinking.yaml",
+  "model_id": "moonshotai/Kimi-K2-Thinking",
+  "hw_key": "atlas_800_a3",
+  "head_sha": "472e01753c588e63be66fdc1c31cdb42c7fabb29",
+  "workflow_run_id": "45768486744",
+  "trigger_type": "pr",
+  "image": "quay.nju.edu.cn/ascend/vllm-ascend:v0.23.0rc1-a3",
+  "started_at": "2026-11-26T06:28:52Z",
+  "scenarios": [
+    {
+      "index": 0,
+      "npu": "Atlas 800I A3",
+      "precision": "bf16",
+      "deployment": "Single-Node",
+      "case": "Baseline serving",
+      "serve_cmd": "export HCCL_BUFFSIZE=1024 TASK_QUEUE_ENABLE=1 OMP_PROC_BIND=false\nexport HCCL_OP_EXPANSION_MODE=AIV PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\nvllm serve /root/.cache/modelscope/hub/models/moonshotai/Kimi-K2-Thinking \\\n    --tensor-parallel-size 16 \\\n    --port 8000 \\\n    --max-model-len 8192 \\\n    --max-num-batched-tokens 8192 \\\n    --max-num-seqs 12 \\\n    --gpu-memory-utilization 0.9 \\\n    --trust-remote-code \\\n    --enable-expert-parallel \\\n    --no-enable-prefix-caching \\\n    --compilation-config '{\"cudagraph_capture_sizes\": [16, 32]}' \\\n    --served-model-name Kimi-K2-Thinking",
+      "verification_status": "pass",
+      "verification_reason": "Task API response validated"
+    }
+  ]
+}
