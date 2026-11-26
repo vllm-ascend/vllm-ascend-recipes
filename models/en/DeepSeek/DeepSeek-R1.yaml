@@ -215,8 +215,10 @@ scenarios:
       - title: "Start the server"
         content: |-
           ```bash
-          nic_name="xxxx"      # NIC matching local_ip, obtained via ifconfig
-          local_ip="xxxx"      # this node's IP
+          # Auto-detected so the block runs in non-interactive environments (e.g. CI);
+          # pre-set the two variables to override. The tutorial obtains them via ifconfig.
+          nic_name="${nic_name:-$(ifconfig 2>/dev/null | sed -n 's/^\([a-zA-Z0-9_]*\):.*/\1/p' | grep -v '^lo$' | head -n 1)}" || true
+          local_ip="${local_ip:-$(hostname -I 2>/dev/null | cut -d' ' -f1)}" || true
 
           export HCCL_OP_EXPANSION_MODE="AIV"   # §5.1 (single-node env set)
           export HCCL_IF_IP=$local_ip

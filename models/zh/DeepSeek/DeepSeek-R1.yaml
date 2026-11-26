@@ -206,8 +206,9 @@ scenarios:
       - title: "启动服务"
         content: |-
           ```bash
-          nic_name="xxxx"      # 通过 ifconfig 获取,与 local_ip 匹配的网卡名
-          local_ip="xxxx"      # 本节点 IP
+          # 自动探测适配非交互环境(如 CI);预置这两个变量可覆盖;教程中通过 ifconfig 获取
+          nic_name="${nic_name:-$(ifconfig 2>/dev/null | sed -n 's/^\([a-zA-Z0-9_]*\):.*/\1/p' | grep -v '^lo$' | head -n 1)}" || true
+          local_ip="${local_ip:-$(hostname -I 2>/dev/null | cut -d' ' -f1)}" || true
 
           export HCCL_OP_EXPANSION_MODE="AIV"   # §5.1(单机环境变量组)
           export HCCL_IF_IP=$local_ip
