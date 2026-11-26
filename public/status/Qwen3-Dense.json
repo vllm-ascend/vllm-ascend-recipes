@@ -1,0 +1,24 @@
+{
+  "model": "Qwen3-Dense",
+  "last_pr_run": {
+    "kind": "pr",
+    "status": "skip",
+    "conclusion": "success",
+    "head_sha": "943d00cf65463bcb8a41920aa72b04cc744824f5",
+    "head_sha_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/commit/943d00cf65463bcb8a41920aa72b04cc744824f5",
+    "workflow_run_id": 45758482580,
+    "workflow_run_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/actions/runs/45758482580",
+    "recipe_path": "models/en/Qwen/Qwen3-Dense.yaml",
+    "recipe_yaml_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/blob/943d00cf65463bcb8a41920aa72b04cc744824f5/models/en/Qwen/Qwen3-Dense.yaml",
+    "params_url": "https://vllm-ascend.github.io/vllm-ascend-recipes/runs/943d00cf65463bcb8a41920aa72b04cc744824f5/Qwen3-Dense.params.json",
+    "started_at": "2026-11-26T04:57:47Z",
+    "finished_at": "2026-11-26T08:24:22Z",
+    "pr_number": null,
+    "pr_url": null,
+    "pr_title": null,
+    "pr_author": null
+  },
+  "last_nightly_run": null,
+  "last_manual_run": null,
+  "targets": {}
+}

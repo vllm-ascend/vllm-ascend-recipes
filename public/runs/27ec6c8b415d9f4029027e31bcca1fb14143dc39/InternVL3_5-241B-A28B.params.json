@@ -1,0 +1,11 @@
+{
+  "recipe_path": "models/en/OpenGVLab/InternVL3_5-241B-A28B.yaml",
+  "model_id": "",
+  "hw_key": "atlas_800_a3",
+  "head_sha": "27ec6c8b415d9f4029027e31bcca1fb14143dc39",
+  "trigger_type": "pr",
+  "image": "quay.nju.edu.cn/ascend/vllm-ascend:v0.23.0.post1-a3",
+  "started_at": "2026-11-24T18:15:57Z",
+  "scenarios": [],
+  "skip_reason": "镜像未预装该权重 (model_id=OpenGVLab/InternVL3_5-241B-A28B, 目录=Eco-Tech/InternVL3_5-241B-A28B-w8a8, 已尝试 ['', 'Eco-Tech', 'vllm-ascend', 'models', '/root/.cache/'])"
+}

@@ -1,0 +1,23 @@
+{
+  "verification_scope": "single-node API smoke; not accuracy or full feature coverage",
+  "recipe_path": "models/en/DeepSeek/DeepSeek-R1.yaml",
+  "model_id": "vllm-ascend/DeepSeek-R1-W8A8",
+  "hw_key": "atlas_800_a3",
+  "head_sha": "0ffcfa95df866d0d4d93911390d2a58d128da744",
+  "workflow_run_id": "45623286063",
+  "trigger_type": "pr",
+  "image": "quay.nju.edu.cn/ascend/vllm-ascend:v0.23.0rc1-a3",
+  "started_at": "2026-11-25T13:24:34Z",
+  "scenarios": [
+    {
+      "index": 0,
+      "npu": "Atlas 800I A3",
+      "precision": "W8A8",
+      "deployment": "Single-Node",
+      "case": "Baseline serving",
+      "serve_cmd": "nic_name=\"xxxx\"      # NIC matching local_ip, obtained via ifconfig\nlocal_ip=\"xxxx\"      # this node's IP\n\nexport HCCL_OP_EXPANSION_MODE=\"AIV\"   # §5.1 (single-node env set)\nexport HCCL_IF_IP=$local_ip\nexport GLOO_SOCKET_IFNAME=$nic_name\nexport TP_SOCKET_IFNAME=$nic_name\nexport HCCL_SOCKET_IFNAME=$nic_name\nexport VLLM_ASCEND_BALANCE_SCHEDULING=1\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\n\nvllm serve /root/.cache/modelscope/hub/models/vllm-ascend/DeepSeek-R1-W8A8 \\\n  --host 0.0.0.0 \\\n  --port 8000 \\\n  --data-parallel-size 4 \\\n  --tensor-parallel-size 4 \\\n  --quantization ascend \\\n  --seed 1024 \\\n  --served-model-name deepseek_r1 \\\n  --enable-expert-parallel \\\n  --max-num-seqs 16 \\\n  --max-model-len 16384 \\\n  --max-num-batched-tokens 4096 \\\n  --trust-remote-code \\\n  --gpu-memory-utilization 0.92 \\\n  --compilation-config '{\"cudagraph_mode\": \"FULL_DECODE_ONLY\"}'",
+      "verification_status": "fail",
+      "verification_reason": "Model server did not become ready"
+    }
+  ]
+}

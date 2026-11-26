@@ -1,0 +1,24 @@
+{
+  "model": "Kimi-K2-Thinking",
+  "last_pr_run": {
+    "kind": "pr",
+    "status": "pass",
+    "conclusion": "success",
+    "head_sha": "472e01753c588e63be66fdc1c31cdb42c7fabb29",
+    "head_sha_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/commit/472e01753c588e63be66fdc1c31cdb42c7fabb29",
+    "workflow_run_id": 45768486744,
+    "workflow_run_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/actions/runs/45768486744",
+    "recipe_path": "models/en/MoonshotAI/Kimi-K2-Thinking.yaml",
+    "recipe_yaml_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/blob/472e01753c588e63be66fdc1c31cdb42c7fabb29/models/en/MoonshotAI/Kimi-K2-Thinking.yaml",
+    "params_url": "https://vllm-ascend.github.io/vllm-ascend-recipes/runs/472e01753c588e63be66fdc1c31cdb42c7fabb29/Kimi-K2-Thinking.params.json",
+    "started_at": "2026-11-26T06:28:52Z",
+    "finished_at": "2026-11-26T08:00:30Z",
+    "pr_number": null,
+    "pr_url": null,
+    "pr_title": null,
+    "pr_author": null
+  },
+  "last_nightly_run": null,
+  "last_manual_run": null,
+  "targets": {}
+}
