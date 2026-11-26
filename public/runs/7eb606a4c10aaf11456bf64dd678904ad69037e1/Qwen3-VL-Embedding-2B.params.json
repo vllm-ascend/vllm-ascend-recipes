@@ -1,0 +1,83 @@
+{
+  "verification_scope": "single-node API smoke; not accuracy or full feature coverage",
+  "recipe_path": "models/en/Qwen/Qwen3-VL-Embedding-2B.yaml",
+  "model_id": "Qwen/Qwen3-VL-Embedding-2B",
+  "hw_key": "mixed",
+  "head_sha": "7eb606a4c10aaf11456bf64dd678904ad69037e1",
+  "workflow_run_id": "44711596415",
+  "trigger_type": "pr",
+  "image": "mixed; see hardware_runs",
+  "started_at": "2026-11-20T09:32:28Z",
+  "scenarios": [
+    {
+      "index": 0,
+      "npu": "Atlas 800I A2",
+      "precision": "bf16",
+      "deployment": "Single-Node",
+      "case": "Single Node Single Card (A2)",
+      "serve_cmd": "export ASCEND_RT_VISIBLE_DEVICES=0\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\n\nvllm serve /root/.cache/modelscope/hub/models/Qwen/Qwen3-VL-Embedding-2B \\\n    --served-model-name Qwen/Qwen3-VL-Embedding-2B \\\n    --runner pooling \\\n    --max-model-len 1024 \\\n    --port 8000",
+      "verification_status": "pass",
+      "verification_reason": "Task API response validated"
+    },
+    {
+      "index": 0,
+      "npu": "Atlas A3",
+      "precision": "bf16",
+      "deployment": "Single-Node",
+      "case": "A3 (pooling, TP1, enforce-eager)",
+      "serve_cmd": "export ASCEND_RT_VISIBLE_DEVICES=0\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\n\nvllm serve /root/.cache/modelscope/hub/models/Qwen/Qwen3-VL-Embedding-2B \\\n    --served-model-name Qwen/Qwen3-VL-Embedding-2B \\\n    --runner pooling \\\n    --max-model-len 1024 \\\n    --enforce-eager \\\n    --host 0.0.0.0 \\\n    --port 8000",
+      "verification_status": "pass",
+      "verification_reason": "Task API response validated"
+    }
+  ],
+  "hardware_runs": [
+    {
+      "verification_scope": "single-node API smoke; not accuracy or full feature coverage",
+      "recipe_path": "models/en/Qwen/Qwen3-VL-Embedding-2B.yaml",
+      "model_id": "Qwen/Qwen3-VL-Embedding-2B",
+      "hw_key": "atlas_800_a2",
+      "head_sha": "7eb606a4c10aaf11456bf64dd678904ad69037e1",
+      "workflow_run_id": "44711596415",
+      "trigger_type": "pr",
+      "image": "quay.nju.edu.cn/ascend/vllm-ascend:v0.23.0",
+      "started_at": "2026-11-20T09:32:28Z",
+      "scenarios": [
+        {
+          "index": 0,
+          "npu": "Atlas 800I A2",
+          "precision": "bf16",
+          "deployment": "Single-Node",
+          "case": "Single Node Single Card (A2)",
+          "serve_cmd": "export ASCEND_RT_VISIBLE_DEVICES=0\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\n\nvllm serve /root/.cache/modelscope/hub/models/Qwen/Qwen3-VL-Embedding-2B \\\n    --served-model-name Qwen/Qwen3-VL-Embedding-2B \\\n    --runner pooling \\\n    --max-model-len 1024 \\\n    --port 8000",
+          "verification_status": "pass",
+          "verification_reason": "Task API response validated"
+        }
+      ],
+      "status": "pass"
+    },
+    {
+      "verification_scope": "single-node API smoke; not accuracy or full feature coverage",
+      "recipe_path": "models/en/Qwen/Qwen3-VL-Embedding-2B.yaml",
+      "model_id": "Qwen/Qwen3-VL-Embedding-2B",
+      "hw_key": "atlas_800_a3",
+      "head_sha": "7eb606a4c10aaf11456bf64dd678904ad69037e1",
+      "workflow_run_id": "44711596415",
+      "trigger_type": "pr",
+      "image": "quay.nju.edu.cn/ascend/vllm-ascend:v0.23.0-a3",
+      "started_at": "2026-11-20T09:32:28Z",
+      "scenarios": [
+        {
+          "index": 0,
+          "npu": "Atlas A3",
+          "precision": "bf16",
+          "deployment": "Single-Node",
+          "case": "A3 (pooling, TP1, enforce-eager)",
+          "serve_cmd": "export ASCEND_RT_VISIBLE_DEVICES=0\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\n\nvllm serve /root/.cache/modelscope/hub/models/Qwen/Qwen3-VL-Embedding-2B \\\n    --served-model-name Qwen/Qwen3-VL-Embedding-2B \\\n    --runner pooling \\\n    --max-model-len 1024 \\\n    --enforce-eager \\\n    --host 0.0.0.0 \\\n    --port 8000",
+          "verification_status": "pass",
+          "verification_reason": "Task API response validated"
+        }
+      ],
+      "status": "pass"
+    }
+  ]
+}

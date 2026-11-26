@@ -1,0 +1,24 @@
+{
+  "model": "MiniMax-M2.7",
+  "last_pr_run": {
+    "kind": "pr",
+    "status": "fail",
+    "conclusion": "failure",
+    "head_sha": "f36f92a0e437db6b875712bede9251e6b5b41779",
+    "head_sha_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/commit/f36f92a0e437db6b875712bede9251e6b5b41779",
+    "workflow_run_id": 45457655649,
+    "workflow_run_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/actions/runs/45457655649",
+    "recipe_path": "models/en/MiniMaxAI/MiniMax-M2.7.yaml",
+    "recipe_yaml_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/blob/f36f92a0e437db6b875712bede9251e6b5b41779/models/en/MiniMaxAI/MiniMax-M2.7.yaml",
+    "params_url": "https://vllm-ascend.github.io/vllm-ascend-recipes/runs/f36f92a0e437db6b875712bede9251e6b5b41779/MiniMax-M2.7.params.json",
+    "started_at": "2026-11-24T18:15:57Z",
+    "finished_at": "2026-11-25T01:47:02Z",
+    "pr_number": null,
+    "pr_url": null,
+    "pr_title": null,
+    "pr_author": null
+  },
+  "last_nightly_run": null,
+  "last_manual_run": null,
+  "targets": {}
+}

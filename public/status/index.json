@@ -1,10 +1,16 @@
 {
   "models": [
     {
+      "slug": "DeepSeek-R1"
+    },
+    {
       "slug": "DeepSeek-V2-Lite-W8A8"
     },
     {
       "slug": "DeepSeek-V3.1"
+    },
+    {
+      "slug": "DeepSeek-V3.2"
     },
     {
       "slug": "DeepSeek-V4-Flash"
@@ -19,16 +25,52 @@
       "slug": "GLM-5"
     },
     {
+      "slug": "Hunyuan-A13B-Instruct"
+    },
+    {
+      "slug": "Hy3-preview"
+    },
+    {
+      "slug": "InternVL3_5-241B-A28B"
+    },
+    {
+      "slug": "InternVL3_5-38B"
+    },
+    {
+      "slug": "Kimi-K2-Thinking"
+    },
+    {
       "slug": "Kimi-K2.6"
     },
     {
+      "slug": "MiniMax-M2.7"
+    },
+    {
       "slug": "PaddleOCR-VL"
+    },
+    {
+      "slug": "Qwen3-0.6B"
+    },
+    {
+      "slug": "Qwen3-1.7B"
+    },
+    {
+      "slug": "Qwen3-14B"
     },
     {
       "slug": "Qwen3-235B-A22B"
     },
     {
       "slug": "Qwen3-30B-A3B"
+    },
+    {
+      "slug": "Qwen3-32B"
+    },
+    {
+      "slug": "Qwen3-4B"
+    },
+    {
+      "slug": "Qwen3-8B"
     },
     {
       "slug": "Qwen3-ASR-1.7B"
@@ -77,6 +119,9 @@
     },
     {
       "slug": "Qwen3.6-35B-A3B"
+    },
+    {
+      "slug": "Qwen3.8-Flash-Next"
     },
     {
       "slug": "template2_non_pd"
