@@ -1,0 +1,61 @@
+{
+  "verification_scope": "single-node API smoke; not accuracy or full feature coverage",
+  "recipe_path": "models/en/Qwen/Qwen3.5-397B-A17B.yaml",
+  "model_id": "Eco-Tech/Qwen3.5-397B-A17B-w8a8-mtp",
+  "hw_key": "mixed",
+  "head_sha": "563c8ad3879a83b990266a9db59b70f8170349a1",
+  "workflow_run_id": "45162852779",
+  "trigger_type": "pr",
+  "image": "mixed; see hardware_runs",
+  "started_at": "2026-11-23T11:11:07Z",
+  "scenarios": [
+    {
+      "index": 0,
+      "npu": "Atlas 800I A3",
+      "precision": "W8A8",
+      "deployment": "Single-Node",
+      "case": "Single-Node Online Deployment (TP16, 133K context)",
+      "serve_cmd": "# Load model from ModelScope to speed up download (skip when using local weights).\nexport VLLM_USE_MODELSCOPE=True\nexport HCCL_BUFFSIZE=1024\nexport HCCL_OP_EXPANSION_MODE=\"AIV\"\n\n# Host-level tuning; skipped gracefully inside the verify container (read-only /sys, no sysctl perms)\necho performance | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor 2>/dev/null || true\nsysctl -w vm.swappiness=0 2>/dev/null || true\nsysctl -w kernel.numa_balancing=0 2>/dev/null || true\nsysctl kernel.sched_migration_cost_ns=50000 2>/dev/null || true\n\n  # NOTE (first-party): with the §5.4 PD value enable_fused_mc2=2, the MegaMoe path\n  # rejected the dummy-run token count at TP16 on this stack; the tutorial §5.1\n  # single-node value 1 is kept (root cause pending).\nvllm serve /root/.cache/modelscope/hub/models/Eco-Tech/Qwen3.5-397B-A17B-w8a8-mtp \\\n  --host 0.0.0.0 \\\n  --port 8000 \\\n  --data-parallel-size 1 \\\n  --tensor-parallel-size 16 \\\n  --enable-expert-parallel \\\n  --seed 1024 \\\n  --quantization ascend \\\n  --served-model-name qwen3.5 \\\n  --max-num-seqs 128 \\\n  --max-model-len 133000 \\\n  --max-num-batched-tokens 16384 \\\n  --trust-remote-code \\\n  --gpu-memory-utilization 0.90 \\\n  --enable-prefix-caching \\\n  --compilation-config '{\"cudagraph_mode\":\"FULL_DECODE_ONLY\"}' \\\n  --additional-config '{\"enable_cpu_binding\": true, \"enable_fused_mc2\": 1, \"enable_flashcomm1\": true}'",
+      "verification_status": "pass",
+      "verification_reason": "Task API response validated"
+    }
+  ],
+  "hardware_runs": [
+    {
+      "verification_scope": "single-node API smoke; not accuracy or full feature coverage",
+      "recipe_path": "models/en/Qwen/Qwen3.5-397B-A17B.yaml",
+      "model_id": "Eco-Tech/Qwen3.5-397B-A17B-w8a8-mtp",
+      "hw_key": "atlas_800_a3",
+      "head_sha": "563c8ad3879a83b990266a9db59b70f8170349a1",
+      "workflow_run_id": "45162852779",
+      "trigger_type": "pr",
+      "image": "quay.nju.edu.cn/ascend/vllm-ascend:nightly-main-a3",
+      "started_at": "2026-11-23T11:11:07Z",
+      "scenarios": [
+        {
+          "index": 0,
+          "npu": "Atlas 800I A3",
+          "precision": "W8A8",
+          "deployment": "Single-Node",
+          "case": "Single-Node Online Deployment (TP16, 133K context)",
+          "serve_cmd": "# Load model from ModelScope to speed up download (skip when using local weights).\nexport VLLM_USE_MODELSCOPE=True\nexport HCCL_BUFFSIZE=1024\nexport HCCL_OP_EXPANSION_MODE=\"AIV\"\n\n# Host-level tuning; skipped gracefully inside the verify container (read-only /sys, no sysctl perms)\necho performance | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor 2>/dev/null || true\nsysctl -w vm.swappiness=0 2>/dev/null || true\nsysctl -w kernel.numa_balancing=0 2>/dev/null || true\nsysctl kernel.sched_migration_cost_ns=50000 2>/dev/null || true\n\n  # NOTE (first-party): with the §5.4 PD value enable_fused_mc2=2, the MegaMoe path\n  # rejected the dummy-run token count at TP16 on this stack; the tutorial §5.1\n  # single-node value 1 is kept (root cause pending).\nvllm serve /root/.cache/modelscope/hub/models/Eco-Tech/Qwen3.5-397B-A17B-w8a8-mtp \\\n  --host 0.0.0.0 \\\n  --port 8000 \\\n  --data-parallel-size 1 \\\n  --tensor-parallel-size 16 \\\n  --enable-expert-parallel \\\n  --seed 1024 \\\n  --quantization ascend \\\n  --served-model-name qwen3.5 \\\n  --max-num-seqs 128 \\\n  --max-model-len 133000 \\\n  --max-num-batched-tokens 16384 \\\n  --trust-remote-code \\\n  --gpu-memory-utilization 0.90 \\\n  --enable-prefix-caching \\\n  --compilation-config '{\"cudagraph_mode\":\"FULL_DECODE_ONLY\"}' \\\n  --additional-config '{\"enable_cpu_binding\": true, \"enable_fused_mc2\": 1, \"enable_flashcomm1\": true}'",
+          "verification_status": "pass",
+          "verification_reason": "Task API response validated"
+        }
+      ],
+      "status": "pass"
+    },
+    {
+      "recipe_path": "models/en/Qwen/Qwen3.5-397B-A17B.yaml",
+      "model_id": "",
+      "hw_key": "ascend_950dt",
+      "head_sha": "563c8ad3879a83b990266a9db59b70f8170349a1",
+      "trigger_type": "pr",
+      "image": "quay.nju.edu.cn/ascend/vllm-ascend:nightly-main-a5",
+      "started_at": "2026-11-23T11:11:07Z",
+      "scenarios": [],
+      "skip_reason": "镜像未预装该权重 (model_id=Eco-Tech/Qwen3.5-397B-A17B-w8a8-mtp, 目录=Eco-Tech/Qwen3.5-397B-A17B-w8a8-mtp, 已尝试 ['', 'Eco-Tech', 'vllm-ascend', 'models', '/root/.cache/'])",
+      "status": "skip"
+    }
+  ]
+}

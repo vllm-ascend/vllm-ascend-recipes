@@ -1,0 +1,24 @@
+{
+  "model": "InternVL3_5-241B-A28B",
+  "last_pr_run": {
+    "kind": "pr",
+    "status": "skip",
+    "conclusion": "success",
+    "head_sha": "27ec6c8b415d9f4029027e31bcca1fb14143dc39",
+    "head_sha_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/commit/27ec6c8b415d9f4029027e31bcca1fb14143dc39",
+    "workflow_run_id": 45457654025,
+    "workflow_run_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/actions/runs/45457654025",
+    "recipe_path": "models/en/OpenGVLab/InternVL3_5-241B-A28B.yaml",
+    "recipe_yaml_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/blob/27ec6c8b415d9f4029027e31bcca1fb14143dc39/models/en/OpenGVLab/InternVL3_5-241B-A28B.yaml",
+    "params_url": "https://vllm-ascend.github.io/vllm-ascend-recipes/runs/27ec6c8b415d9f4029027e31bcca1fb14143dc39/InternVL3_5-241B-A28B.params.json",
+    "started_at": "2026-11-24T18:15:57Z",
+    "finished_at": "2026-11-25T01:15:54Z",
+    "pr_number": null,
+    "pr_url": null,
+    "pr_title": null,
+    "pr_author": null
+  },
+  "last_nightly_run": null,
+  "last_manual_run": null,
+  "targets": {}
+}

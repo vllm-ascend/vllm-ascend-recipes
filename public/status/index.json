@@ -1,10 +1,16 @@
 {
   "models": [
     {
+      "slug": "DeepSeek-R1"
+    },
+    {
       "slug": "DeepSeek-V2-Lite-W8A8"
     },
     {
       "slug": "DeepSeek-V3.1"
+    },
+    {
+      "slug": "DeepSeek-V3.2"
     },
     {
       "slug": "DeepSeek-V4-Flash"
@@ -22,7 +28,22 @@
       "slug": "Hunyuan-A13B-Instruct"
     },
     {
+      "slug": "Hy3-preview"
+    },
+    {
+      "slug": "InternVL3_5-241B-A28B"
+    },
+    {
+      "slug": "InternVL3_5-38B"
+    },
+    {
+      "slug": "Kimi-K2-Thinking"
+    },
+    {
       "slug": "Kimi-K2.6"
+    },
+    {
+      "slug": "MiniMax-M2.7"
     },
     {
       "slug": "PaddleOCR-VL"
@@ -56,6 +77,9 @@
     },
     {
       "slug": "Qwen3-Coder-30B-A3B-Instruct"
+    },
+    {
+      "slug": "Qwen3-Dense"
     },
     {
       "slug": "Qwen3-Embedding-0.6B"

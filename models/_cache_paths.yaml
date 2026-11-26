@@ -41,6 +41,9 @@ aliases:
   - model_id: vllm-ascend/DeepSeek-V2-Lite-W8A8
     cache_dir: vllm-ascend/DeepSeek-V2-Lite-W8A8
 
+  - model_id: Eco-Tech/Qwen3.5-397B-A17B-w8a8-mtp
+    cache_dir: Eco-Tech/Qwen3.5-397B-A17B-w8a8-mtp
+
   - model_id: deepseek-ai/DeepSeek-V4-Flash
     cache_dir:
       default: DeepSeek-V4-Flash-w8a8-mtp
@@ -61,5 +64,7 @@ aliases:
     cache_dir: Qwen/Qwen3-Omni-30B-A3B-Thinking
   - model_id: Qwen/Qwen3-Coder-30B-A3B-Instruct
     cache_dir: Qwen3-Coder-30B-A3B-Instruct-w8a8
+  - model_id: Qwen/Qwen3-VL-Embedding-2B
+    cache_dir: Qwen/Qwen3-VL-Embedding-2B
   - model_id: Eco-Tech/Kimi-K3-w4a8
     cache_dir: Kimi-K3-w4a8

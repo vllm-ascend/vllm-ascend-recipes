@@ -16,7 +16,7 @@ meta:
   performance_headline: "Four-node Atlas 800 A3 (16 NPUs each) DP4/TP16/EP64 serving of the full W4A8 checkpoint"
   hardware:
     atlas_800_a3: verified   # tutorial §7/§10 publish official A3 deployment and AISBench accuracy (repo convention per GLM-5/K2.6; first-party re-run pending, see PR description)
-    atlas_800_a2: unsupported   # tutorial §3.1/§5.1 target A3 only; explicit unsupported keeps the A2 nightly leg from false-greening
+    atlas_800_a2: unsupported   # this recipe documents the A3 lane; the current tutorial also carries a 950DT and an A2 tab (see the tutorial for those lanes)
 
 model:
   model_id: "Eco-Tech/Kimi-K3-w4a8"
@@ -319,6 +319,203 @@ scenarios:
           the message content for an `image_url` + text pair. Tool calls: keep
           `--enable-auto-tool-choice` and `--tool-call-parser kimi_k3`, and include `tools` with
           `tool_choice: "auto"` in the request (tutorial §6).
+
+  - npu: Atlas 800I A3
+    precision: W4A8
+    deployment: "Multi-Node PD"
+    case: "Eight-node 4P+4D PD separation (Mooncake)"
+    tags: [pd-multinode]
+    strategy: pd_cluster
+    steps:
+      - title: "Set shared env (every node)"
+        content: |-
+          ```bash
+          export MODEL_PATH="<KIMI_K3_FULL_W4A8_PATH>"
+          export DRAFT_MODEL_PATH="<KIMI_K3_DRAFT_MLA_NPU_PATH>"   # Eco-Tech/Kimi-K3-DSpark-MLA-NPU per the tutorial A3 tab
+          export LOCAL_IP="<CURRENT_NODE_IP>"
+          export NIC_NAME="<CURRENT_NODE_NIC>"
+          export P_MASTER_IP="<PREFILL_NODE0_IP>"
+          export P_MASTER_PORT=41000
+          export D_MASTER_IP="<DECODE_NODE0_IP>"
+          export D_RPC_PORT=13345
+          export SERVICE_PORT=8000
+          export TP_SIZE=16
+
+          export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15
+          export HCCL_IF_IP=$LOCAL_IP
+          export GLOO_SOCKET_IFNAME=$NIC_NAME
+          export TP_SOCKET_IFNAME=$NIC_NAME
+          export HCCL_SOCKET_IFNAME=$NIC_NAME
+          export VLLM_EXECUTE_MODEL_TIMEOUT_SECONDS=30000
+          export HCCL_BUFFSIZE=1024
+          export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+          export VLLM_USE_V2_MODEL_RUNNER=1
+          export LD_LIBRARY_PATH=/usr/local/Ascend/ascend-toolkit/latest/python/site-packages/mooncake:$LD_LIBRARY_PATH
+          ```
+
+          Mooncake and the PD proxy are deployed outside the engine commands
+          (tutorial §5.2); refer to the Mooncake PD disaggregation guide for
+          the proxy workflow.
+      - title: "Prefill engine template (each Prefill node, ranks 0-3)"
+        content: |-
+          The four Prefill nodes run one engine spread PP4 across the pool
+          (DP1/TP16/PP4, layer partition "25,25,24,19"). Save as
+          `run_dp_template.sh`; the node rank is the PP stage (0-3), and
+          worker ranks 1-3 additionally use `--headless`:
+
+          ```bash
+          KV_PORT=<PREFILL_KV_PORT>
+          NODE_RANK=$1   # PP stage: 0, 1, 2 or 3
+          SERVICE_PORT=$2
+
+          export VLLM_HOST_IP=$LOCAL_IP
+          export VLLM_PP_LAYER_PARTITION="25,25,24,19"
+          export PYTHONHASHSEED=0
+
+          SPECULATIVE_CONFIG="$(
+            printf \
+            '{"method":"dspark","model":"%s","num_speculative_tokens":7,"draft_tensor_parallel_size":'"$TP_SIZE"',"draft_sample_method":"greedy","enforce_eager":true}' \
+            "$DRAFT_MODEL_PATH"
+          )"
+
+          vllm serve "$MODEL_PATH" \
+              --host 0.0.0.0 \
+              --port "$SERVICE_PORT" \
+              --enable-auto-tool-choice \
+              --reasoning-parser kimi_k3 \
+              --tool-call-parser kimi_k3 \
+              --tokenizer-mode kimi_k3 \
+              --data-parallel-size 1 \
+              --pipeline-parallel-size 4 \
+              --nnodes 4 \
+              --node-rank "$NODE_RANK" \
+              --distributed-executor-backend mp \
+              --master-addr "$P_MASTER_IP" \
+              --master-port "$P_MASTER_PORT" \
+              --tensor-parallel-size "$TP_SIZE" \
+              --enable-expert-parallel \
+              --seed 1024 \
+              --served-model-name kimi-k3 \
+              --max-model-len 262144 \
+              --max-num-batched-tokens 8192 \
+              --max-num-seqs 32 \
+              --enforce-eager \
+              --trust-remote-code \
+              --gpu-memory-utilization 0.80 \
+              --speculative-config "$SPECULATIVE_CONFIG" \
+              --mm-encoder-tp-mode data \
+              --mm-processor-cache-gb 1 \
+              --skip-mm-profiling \
+              --enable-prefix-caching \
+              --additional-config '{"enable_flashcomm1":true,"multistream_overlap_shared_expert":false,"enable_fused_mc2":2,"enable_shared_expert_dp":true}' \
+              --limit-mm-per-prompt '{"vision_chunk": 2}' \
+              --kv-transfer-config \
+              '{
+                "kv_connector": "MooncakeConnectorV2",
+                "kv_role": "kv_producer",
+                "kv_port": "'"$KV_PORT"'",
+                "kv_connector_extra_config": {
+                  "prefill": {
+                    "dp_size": 1,
+                    "tp_size": '"$TP_SIZE"',
+                    "pp_size": 4,
+                    "pp_layer_partition": "25,25,24,19"
+                  },
+                  "decode": {
+                    "dp_size": 4,
+                    "tp_size": '"$TP_SIZE"'
+                  }
+                }
+              }'
+          ```
+      - title: "Decode engine template (each Decode node, ranks 0-3)"
+        content: |-
+          ```bash
+          export HCCL_OP_EXPANSION_MODE=AIV
+
+          KV_PORT=<DECODE_KV_PORT>
+          DP_RANK=$1        # 0, 1, 2 or 3
+          SERVICE_PORT=$2
+
+          SPECULATIVE_CONFIG="$(
+            printf \
+            '{"method":"dspark","model":"%s","num_speculative_tokens":7,"draft_tensor_parallel_size":'"$TP_SIZE"',"draft_sample_method":"greedy","enforce_eager":false}' \
+            "$DRAFT_MODEL_PATH"
+          )"
+
+          vllm serve "$MODEL_PATH" \
+              --host 0.0.0.0 \
+              --port "$SERVICE_PORT" \
+              --enable-auto-tool-choice \
+              --reasoning-parser kimi_k3 \
+              --tool-call-parser kimi_k3 \
+              --tokenizer-mode kimi_k3 \
+              --data-parallel-size 4 \
+              --data-parallel-rank "$DP_RANK" \
+              --data-parallel-address "$D_MASTER_IP" \
+              --data-parallel-rpc-port "$D_RPC_PORT" \
+              --tensor-parallel-size "$TP_SIZE" \
+              --cp-kv-cache-interleave-size 384 \
+              --block-size 384 \
+              --enable-expert-parallel \
+              --seed 1024 \
+              --served-model-name kimi-k3 \
+              --max-model-len 262144 \
+              --max-num-batched-tokens 8192 \
+              --max-num-seqs 32 \
+              --trust-remote-code \
+              --gpu-memory-utilization 0.80 \
+              --speculative-config "$SPECULATIVE_CONFIG" \
+              --mm-encoder-tp-mode data \
+              --mm-processor-cache-gb 1 \
+              --skip-mm-profiling \
+              --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY"}' \
+              --enable-prefix-caching \
+              --additional-config '{"multistream_overlap_shared_expert":true,"enable_mlapo":true,"scheduler_config":{"recompute_scheduler_enable":true}}' \
+              --limit-mm-per-prompt '{"vision_chunk":2}' \
+              --kv-transfer-config \
+              '{
+                "kv_connector": "MooncakeConnectorV2",
+                "kv_role": "kv_consumer",
+                "kv_port": "'"$KV_PORT"'",
+                "kv_connector_extra_config": {
+                  "prefill": {
+                    "dp_size": 1,
+                    "tp_size": '"$TP_SIZE"',
+                    "pp_size": 4,
+                    "pp_layer_partition": "25,25,24,19"
+                  },
+                  "decode": {
+                    "dp_size": 4,
+                    "tp_size": '"$TP_SIZE"'
+                  }
+                }
+              }'
+          ```
+      - title: "Start the decode pool (launch_online_dp)"
+        content: |-
+          Start the four Prefill nodes first (PP stages 0-3), then start the
+          decode pool. Each Decode node runs one DP rank over all 16 devices:
+
+          ```bash
+          python launch_online_dp.py \
+              --dp-size 4 \
+              --tp-size 16 \
+              --dp-size-local 1 \
+              --dp-rank-start <LOCAL_RANK> \
+              --dp-address "$D_MASTER_IP" \
+              --dp-rpc-port "$D_RPC_PORT" \
+              --vllm-start-port <VLLM_START_PORT>
+          ```
+      - title: "Deploy the PD proxy and verify"
+        content: |-
+          Deploy the PD disaggregation proxy per the Mooncake PD guide, then
+          verify the deployment following the guide's verification workflow
+          (tutorial §5.3.3 shows the long-context variant of this check).
+          The tutorial also documents a 1M long-context variant of this lane
+          in §5.3 and a pooled variant with a MemCache KV pool in §5.4; see
+          the tutorial for those.
+
 
 verification: |-
   Once all four nodes finish model loading and graph compilation, send a chat request to the
