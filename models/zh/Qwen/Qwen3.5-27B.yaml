@@ -424,7 +424,7 @@ scenarios:
           --quantization ascend \
           --served-model-name qwen3.5 \
           --max-num-seqs 4 \
-          --max-model-len 133000 \
+          --max-model-len 133120 \
           --max-num-batched-tokens 4096 \
           --trust-remote-code \
           --allowed-local-media-path / \
