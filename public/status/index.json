@@ -79,6 +79,9 @@
       "slug": "Qwen3-Coder-30B-A3B-Instruct"
     },
     {
+      "slug": "Qwen3-Dense"
+    },
+    {
       "slug": "Qwen3-Embedding-0.6B"
     },
     {
