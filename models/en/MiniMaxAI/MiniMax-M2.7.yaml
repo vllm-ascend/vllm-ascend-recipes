@@ -776,6 +776,27 @@ scenarios:
           check_request_count 2
           )
           ```
+performance:
+  accuracy: |-
+    These results were measured with MiniMax-M2.7 W8A8 and EAGLE3 on Atlas 800I A3 using `v0.30.0-a3-openeuler`.
+
+    | Deployment | Serving checks | AISBench accuracy |
+    | --- | --- | --- |
+    | Single-node short context, TP4 × DP4 + EP | Chat and weather tool calls passed | GSM8K demo: 8/8 correct |
+    | Single-node long context, TP8 + PCP2 | Chat and weather tool calls passed; the retrieval test gave the expected answer with 131,996 input tokens | AIME2025: 28/30 correct (93.33%) |
+    | Two-node 1P1D, TP8 × DP2 per role | The gateway returned the expected answer; the Decode external KV token counter increased from 0 to 1,814 for the test request | AIME2025: 27/30 correct (90.00%) |
+  benchmark: |-
+    AISBench measured aggregate output throughput. The short-context runs used roughly 3.5K input tokens and 1,500 output tokens per request. The long-context and 1P1D runs averaged 130,884 input tokens and generated 1,024 tokens per request.
+
+    | Deployment | Peak concurrent requests | Successful requests | Output throughput (tokens/s) |
+    | --- | ---: | ---: | ---: |
+    | Single-node short context | 48 | 192/192 | 2,275.77 |
+    | Single-node short context | 190 | 760/760 | 4,736.78 |
+    | Single-node long context, 128K workload | 20 | 80/80 | 324.69 |
+    | Two-node 1P1D, 128K workload | 40 | 160/160 | 76.80 |
+
+    Throughput depends on the workload and concurrency shown in each row.
+
 references:
   - title: Pinned tutorial baseline
     url: https://github.com/vllm-project/vllm-ascend/blob/5cb98caaadeff42b5b62b996e34bb2aaa29d20fd/docs/source/tutorials/models/MiniMax-M2.md

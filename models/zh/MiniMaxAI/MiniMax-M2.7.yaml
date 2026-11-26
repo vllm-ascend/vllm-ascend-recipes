@@ -771,6 +771,27 @@ scenarios:
           check_request_count 2
           )
           ```
+performance:
+  accuracy: |-
+    以下结果在 Atlas 800I A3 实机上测得，使用 `v0.30.0-a3-openeuler` 镜像、MiniMax-M2.7 W8A8 权重和 EAGLE3 草稿模型。
+
+    | 部署场景 | 服务验证 | AISBench 准确率 |
+    | --- | --- | --- |
+    | 单机短上下文，TP4 × DP4 + EP | 文本对话和天气工具调用通过 | GSM8K 示例：答对 8/8 题 |
+    | 单机长上下文，TP8 + PCP2 | 文本对话和天气工具调用通过；131,996 token 输入的检索请求返回预期答案 | AIME2025：答对 28/30 题（93.33%） |
+    | 双机 1P1D，Prefill 和 Decode 各 TP8 × DP2 | 网关返回预期答案；该次请求使 Decode 端外部 KV token 计数从 0 增至 1,814 | AIME2025：答对 27/30 题（90.00%） |
+  benchmark: |-
+    输出吞吐为 AISBench 测得的整套服务总输出速率。短上下文测试每条请求输入约 3.5K token、输出 1,500 token。长上下文和双机 1P1D 测试每条平均输入 130,884 token、输出 1,024 token。
+
+    | 部署场景 | 峰值并发请求数 | 成功请求 | 输出吞吐（token/s） |
+    | --- | ---: | ---: | ---: |
+    | 单机短上下文 | 48 | 192/192 | 2,275.77 |
+    | 单机短上下文 | 190 | 760/760 | 4,736.78 |
+    | 单机长上下文，128K 负载 | 20 | 80/80 | 324.69 |
+    | 双机 1P1D，128K 负载 | 40 | 160/160 | 76.80 |
+
+    各行的吞吐对应各自的负载和并发设置。
+
 references:
   - title: 固定版本教程基线
     url: https://github.com/vllm-project/vllm-ascend/blob/5cb98caaadeff42b5b62b996e34bb2aaa29d20fd/docs/source/tutorials/models/MiniMax-M2.md
