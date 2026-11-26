@@ -41,6 +41,9 @@ aliases:
   - model_id: vllm-ascend/DeepSeek-V2-Lite-W8A8
     cache_dir: vllm-ascend/DeepSeek-V2-Lite-W8A8
 
+  - model_id: Eco-Tech/Qwen3.5-397B-A17B-w8a8-mtp
+    cache_dir: Eco-Tech/Qwen3.5-397B-A17B-w8a8-mtp
+
   - model_id: deepseek-ai/DeepSeek-V4-Flash
     cache_dir:
       default: DeepSeek-V4-Flash-w8a8-mtp
