@@ -581,7 +581,11 @@ SCRIPT_HEREDOC
     else
       log_error "  AISBench model config not found: $AIS_CFG"
     fi
-    BENCH_OUTPUT=$(ais_bench --models vllm_api_stream_chat --datasets synthetic_gen --mode perf --debug --num-prompts 50 2>&1 || echo "AISBENCH_FAILED")
+    AIS_SYNTHETIC="${AIS_CFG%/configs/*}/datasets/synthetic.py"
+    BENCH_OUTPUT=$({
+      "$PYTHON" "$SCRIPT_DIR/../.github/_scripts/normalize_aisbench_token_ids.py" "$AIS_SYNTHETIC" &&
+        ais_bench --models vllm_api_stream_chat --datasets synthetic_gen --mode perf --debug --num-prompts 50
+    } 2>&1 || echo "AISBENCH_FAILED")
     echo "$BENCH_OUTPUT" | tail -30
     BENCH_FILE="/tmp/verify-results/$(basename "$RECIPE" .yaml).bench"
     echo "===== AISBENCH PERFORMANCE =====" > "$BENCH_FILE"

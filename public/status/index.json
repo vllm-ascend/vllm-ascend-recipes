@@ -1,10 +1,16 @@
 {
   "models": [
     {
+      "slug": "DeepSeek-R1"
+    },
+    {
       "slug": "DeepSeek-V2-Lite-W8A8"
     },
     {
       "slug": "DeepSeek-V3.1"
+    },
+    {
+      "slug": "DeepSeek-V3.2"
     },
     {
       "slug": "DeepSeek-V4-Flash"
@@ -29,6 +35,9 @@
     },
     {
       "slug": "InternVL3_5-38B"
+    },
+    {
+      "slug": "Kimi-K2-Thinking"
     },
     {
       "slug": "Kimi-K2.6"
