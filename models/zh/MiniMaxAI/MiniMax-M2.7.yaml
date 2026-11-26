@@ -239,7 +239,7 @@ env_setup:
           ### 单机（短上下文或长上下文）
 
 
-          在 A3 宿主机执行。如果权重放在其他位置，先把 WEIGHTS_ROOT 设为两个权重目录的共同父目录。
+          在 A3 宿主机执行。如果权重放在其他位置，先把 WEIGHTS_ROOT 设为两个权重目录的共同父目录。配置完成后，在同一个终端继续执行部署步骤。
 
 
           ```bash
@@ -268,7 +268,7 @@ env_setup:
           ### 双机（1P1D）
 
 
-          两台 A3 宿主机依次执行两段。按提示填角色、主机 IP 和存放 W8A8、EAGLE3 权重的根目录。
+          两台 A3 宿主机依次执行两段。按提示填角色、主机 IP 和存放 W8A8、EAGLE3 权重的根目录。配置完成后，在各自的终端继续执行部署步骤。
 
 
           使用 `ip route get "$peer" from "$self"` 所选网卡上可互通的宿主机 IPv4 地址。Gloo、TP、HCCL 使用该路由网卡。另行检查 A3 设备侧互联及对端 NPU vNIC 连通性。网关需访问 Prefill 的 HTTP 7000–7001 和 Decode 的 7100–7101，客户端需访问 Prefill 网关的 TCP 8009。两台宿主机各自预留 DP RPC 12321。双向检查对端 TCP 能访问 Mooncake 控制端点（Prefill 起始端口 55880、Decode 起始端口 56900）及各 rank 的 AscendDirect/HIXL 监听端口。启动后用对应容器的进程、日志和 `ss -lntp` 确认实际监听端口，临时放行仅限对应端口和对端地址。HTTP 后端检查完成后，通过网关请求和 Decode 计数验证跨机 KV 传输。
@@ -339,9 +339,7 @@ scenarios:
     case: long-1p1d
     npu_per_node: 16
     steps:
-      - title: 1. 准备两台宿主机
-        content: 在两台宿主机分别执行「环境准备 → Docker」中双机小节的两段命令，然后在同一个终端继续。
-      - title: 2. 准备双机启动器
+      - title: 1. 准备双机启动器
         content: |-
           两台机器都先执行第一段进入容器，再在容器内执行第二段。
 
@@ -415,7 +413,7 @@ scenarios:
             /workspace/recipe-helpers/examples/disaggregated_prefill_v1/load_balance_proxy_server_example.py &&
             python /workspace/recipe-helpers/examples/disaggregated_prefill_v1/load_balance_proxy_server_example.py --help >/dev/null
           ```
-      - title: 3. 启动 Prefill
+      - title: 2. 启动 Prefill
         content: |-
           在 Prefill 容器中依次执行两段，保留终端运行。
 
@@ -468,7 +466,7 @@ scenarios:
             --dp-size 2 --tp-size 8 --dp-size-local 2 --dp-rank-start 0 \
             --dp-address "$PREFILL_NODE_0_IP" --dp-rpc-port 12321 --vllm-start-port 7000
           ```
-      - title: 4. 启动 Decode
+      - title: 3. 启动 Decode
         content: |-
           在 Decode 容器中依次执行两段，保留终端运行。
 
@@ -523,9 +521,9 @@ scenarios:
             --dp-size 2 --tp-size 8 --dp-size-local 2 --dp-rank-start 0 \
             --dp-address "$DECODE_NODE_0_IP" --dp-rpc-port 12321 --vllm-start-port 7100
           ```
-      - title: 5. 检查后端并启动网关
+      - title: 4. 检查后端并启动网关
         content: |-
-          在 Prefill 宿主机另开终端，加载第 1 步输出的 session.env，再复制第 2 步第一段进入容器。四个后端都返回 minimax 后启动网关。
+          在 Prefill 宿主机另开终端，加载「环境准备」输出的 `session.env`，再执行「准备双机启动器」的第一段命令进入容器。四个后端都返回 minimax 后启动网关。
 
           ```bash
           curl --noproxy '*' --fail --silent --show-error --connect-timeout 5 --max-time 15 "http://${PREFILL_NODE_0_IP}:7000/v1/models" &&
@@ -542,7 +540,7 @@ scenarios:
             --prefiller-hosts "$PREFILL_NODE_0_IP" "$PREFILL_NODE_0_IP" --prefiller-ports 7000 7001 \
             --decoder-hosts "$DECODE_NODE_0_IP" "$DECODE_NODE_0_IP" --decoder-ports 7100 7101
           ```
-      - title: 6. 验证推理和跨机 KV
+      - title: 5. 验证推理和跨机 KV
         content: >-
           在 Prefill 宿主机执行，确认模型返回正常且 Decode 的外部 KV token 计数增加。
 
@@ -550,7 +548,7 @@ scenarios:
           ```bash
 
           (
-            : "${PD_OUT:?Load the session.env from step 1}" "${DECODE_NODE_0_IP:?Missing Decode IP}" "${GATEWAY_NODE_0_IP:?Missing gateway IP}"
+            : "${PD_OUT:?Load the session.env from Environment Setup}" "${DECODE_NODE_0_IP:?Missing Decode IP}" "${GATEWAY_NODE_0_IP:?Missing gateway IP}"
             kv_metrics() {
               local rank
               for rank in 7100 7101; do
@@ -596,9 +594,7 @@ scenarios:
       - a3-single
     strategy: single_node_A3
     steps:
-      - title: 1. 准备宿主机
-        content: 在 A3 宿主机执行「环境准备 → Docker」中的单机命令，然后在同一个终端继续。
-      - title: 2. 启动 MiniMax
+      - title: 1. 启动 MiniMax
         content: >-
           进入容器，在容器内执行启动命令。
 
@@ -650,7 +646,7 @@ scenarios:
             --tool-call-parser minimax_m2 \
             --reasoning-parser minimax_m2_append_think
           ```
-      - title: 3. 验证文本和工具调用
+      - title: 2. 验证文本和工具调用
         content: |-
           在第二个 A3 宿主机终端检查模型列表，并各发出一次文本和工具调用请求。
 
@@ -688,9 +684,7 @@ scenarios:
       - a3-single
     strategy: single_node_A3
     steps:
-      - title: 1. 准备宿主机
-        content: 在 A3 宿主机执行「环境准备 → Docker」中的单机命令，然后在同一个终端继续。
-      - title: 2. 启动 MiniMax
+      - title: 1. 启动 MiniMax
         content: >-
           进入容器，在容器内执行启动命令。
 
@@ -747,7 +741,7 @@ scenarios:
             --tool-call-parser minimax_m2 \
             --reasoning-parser minimax_m2_append_think
           ```
-      - title: 3. 验证文本和工具调用
+      - title: 2. 验证文本和工具调用
         content: |-
           在第二个 A3 宿主机终端检查模型列表，并各发出一次文本和工具调用请求。
 

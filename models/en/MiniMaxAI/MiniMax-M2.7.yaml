@@ -240,7 +240,8 @@ env_setup:
 
 
           Run on the A3 host. Set WEIGHTS_ROOT to the directory containing both
-          checkpoints if it differs from /models.
+          checkpoints if it differs from /models. After setup, continue with
+          the deployment steps in the same shell.
 
 
           ```bash
@@ -270,7 +271,8 @@ env_setup:
 
 
           Run both blocks on each A3 host. Enter the host IPs and the directory
-          containing the local W8A8 and EAGLE3 checkpoints.
+          containing the local W8A8 and EAGLE3 checkpoints. After setup, continue
+          with the deployment steps on each host in the same shell.
 
 
           Use the routable host IPv4 addresses on the interface selected by `ip route get "$peer" from "$self"`. The route interface is used by Gloo, TP and HCCL. Check the A3 device-side fabric and peer NPU vNIC connectivity separately. Allow the gateway to reach backend HTTP ports 7000–7001 on Prefill and 7100–7101 on Decode. Clients must reach TCP 8009 on the Prefill gateway. Reserve 12321 for the DP RPC on each host. Allow peer TCP traffic to the required Mooncake control endpoints (Prefill base 55880 and Decode base 56900) and the rank-specific AscendDirect/HIXL listeners. After startup, match the role container PIDs and logs against `ss -lntp` to identify the actual listeners, then check both directions from the peer. Scope any temporary rules to those ports and the peer address. After the HTTP checks, use the gateway request and Decode counters to verify cross-host KV transfer.
@@ -341,9 +343,7 @@ scenarios:
     case: long-1p1d
     npu_per_node: 16
     steps:
-      - title: 1. Set up both hosts
-        content: In Environment Setup → Docker, run the two 1P1D blocks on each host. Continue in the same shell.
-      - title: 2. Prepare the launcher
+      - title: 1. Prepare the launcher
         content: |-
           Enter each container with the first block, then run the second block inside that container.
 
@@ -417,7 +417,7 @@ scenarios:
             /workspace/recipe-helpers/examples/disaggregated_prefill_v1/load_balance_proxy_server_example.py &&
             python /workspace/recipe-helpers/examples/disaggregated_prefill_v1/load_balance_proxy_server_example.py --help >/dev/null
           ```
-      - title: 3. Start Prefill
+      - title: 2. Start Prefill
         content: |-
           Run both blocks in the Prefill container and keep that terminal open.
 
@@ -470,7 +470,7 @@ scenarios:
             --dp-size 2 --tp-size 8 --dp-size-local 2 --dp-rank-start 0 \
             --dp-address "$PREFILL_NODE_0_IP" --dp-rpc-port 12321 --vllm-start-port 7000
           ```
-      - title: 4. Start Decode
+      - title: 3. Start Decode
         content: |-
           Run both blocks in the Decode container and keep that terminal open.
 
@@ -525,9 +525,9 @@ scenarios:
             --dp-size 2 --tp-size 8 --dp-size-local 2 --dp-rank-start 0 \
             --dp-address "$DECODE_NODE_0_IP" --dp-rpc-port 12321 --vllm-start-port 7100
           ```
-      - title: 5. Check the backends and start the gateway
+      - title: 4. Check the backends and start the gateway
         content: |-
-          In a new Prefill host shell, source the session.env path printed in step 1 and use the first block from step 2 to enter its container. Start the gateway after all four backends list minimax.
+          In a new Prefill host shell, source the `session.env` path printed under Environment Setup, then use the first block under Prepare the launcher to enter the container. Start the gateway after all four backends list minimax.
 
           ```bash
           curl --noproxy '*' --fail --silent --show-error --connect-timeout 5 --max-time 15 "http://${PREFILL_NODE_0_IP}:7000/v1/models" &&
@@ -544,7 +544,7 @@ scenarios:
             --prefiller-hosts "$PREFILL_NODE_0_IP" "$PREFILL_NODE_0_IP" --prefiller-ports 7000 7001 \
             --decoder-hosts "$DECODE_NODE_0_IP" "$DECODE_NODE_0_IP" --decoder-ports 7100 7101
           ```
-      - title: 6. Verify inference and cross-host KV transfer
+      - title: 5. Verify inference and cross-host KV transfer
         content: >-
           Run on the Prefill host. Check the response and confirm that the
           Decode external-KV token counter increases.
@@ -553,7 +553,7 @@ scenarios:
           ```bash
 
           (
-            : "${PD_OUT:?Load the session.env from step 1}" "${DECODE_NODE_0_IP:?Missing Decode IP}" "${GATEWAY_NODE_0_IP:?Missing gateway IP}"
+            : "${PD_OUT:?Load the session.env from Environment Setup}" "${DECODE_NODE_0_IP:?Missing Decode IP}" "${GATEWAY_NODE_0_IP:?Missing gateway IP}"
             kv_metrics() {
               local rank
               for rank in 7100 7101; do
@@ -599,9 +599,7 @@ scenarios:
       - a3-single
     strategy: single_node_A3
     steps:
-      - title: 1. Set up the host
-        content: In Environment Setup → Docker, run the single-node block on the A3 host. Continue in the same shell.
-      - title: 2. Start MiniMax
+      - title: 1. Start MiniMax
         content: >-
           Enter the container and run the startup block there.
 
@@ -653,7 +651,7 @@ scenarios:
             --tool-call-parser minimax_m2 \
             --reasoning-parser minimax_m2_append_think
           ```
-      - title: 3. Verify text and tool calling
+      - title: 2. Verify text and tool calling
         content: |-
           In a second A3 host terminal, check model discovery, one text response and one tool call.
 
@@ -691,9 +689,7 @@ scenarios:
       - a3-single
     strategy: single_node_A3
     steps:
-      - title: 1. Set up the host
-        content: In Environment Setup → Docker, run the single-node block on the A3 host. Continue in the same shell.
-      - title: 2. Start MiniMax
+      - title: 1. Start MiniMax
         content: >-
           Enter the container and run the startup block there.
 
@@ -750,7 +746,7 @@ scenarios:
             --tool-call-parser minimax_m2 \
             --reasoning-parser minimax_m2_append_think
           ```
-      - title: 3. Verify text and tool calling
+      - title: 2. Verify text and tool calling
         content: |-
           In a second A3 host terminal, check model discovery, one text response and one tool call.
 
