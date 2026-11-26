@@ -214,7 +214,7 @@ scenarios:
     steps:
       - title: 启动服务
         content: >-
-          服务监听本机回环地址。
+          在「环境准备」启动的 release 容器内执行。服务监听本机回环地址。
 
 
           ```bash
@@ -372,8 +372,22 @@ scenarios:
           done
           ```
 performance:
-  accuracy: 见各自的 AISBench 与 MMMU 步骤。历史教程未提供对应的数值精度基线。
-  benchmark: 见文本性能步骤。历史教程未提供对应工作负载的数值性能基线。
+  accuracy: |-
+    在单台 Atlas 800I A3 上使用 `v0.30.0-a3-openeuler`、W8A8 和 TP4 × DP2 + EP 完成测试。健康检查、模型列表和图文请求均返回 HTTP 200，图文响应描述了草地上躺着的老虎。
+
+    | 测评 | 完成情况 | 结果 |
+    | --- | --- | --- |
+    | AISBench GSM8K 小样本 | 8/8 条请求 | 答对 6/8（75.00%） |
+    | MMMU 试跑 | 6/6 条请求 | 接口和计分校验通过 |
+    | MMMU 完整验证集 | 900/900 条非空响应 | 准确率 67.89% |
+  benchmark: |-
+    文本性能测试的配置输入长度为 2048 token，每条输出 128 token，并发为 1。三轮共完成 300 条计入测评的请求。
+
+    | 随机种子 | 完成请求 | 输出吞吐（token/s） |
+    | --- | --- | --- |
+    | 0 | 100/100 | 31.3452 |
+    | 1 | 100/100 | 31.3485 |
+    | 2 | 100/100 | 31.3571 |
 references:
   - title: 历史教程
     url: https://docs.vllm.ai/projects/ascend/en/v0.23.0/tutorials/models/InternVL3.5.html

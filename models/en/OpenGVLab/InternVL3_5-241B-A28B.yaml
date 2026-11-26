@@ -214,7 +214,8 @@ scenarios:
     steps:
       - title: Start the server
         content: >-
-          The service listens on the loopback interface.
+          Run in the release container opened under Environment Setup. The
+          service listens on the loopback interface.
 
 
           ```bash
@@ -385,10 +386,22 @@ scenarios:
           done
           ```
 performance:
-  accuracy: See the separate AISBench and MMMU steps. The historical tutorial has
-    no numeric reference score.
-  benchmark: See the text benchmark step. The historical tutorial has no numeric
-    reference result for this workload.
+  accuracy: |-
+    Tested on one Atlas 800I A3 with `v0.30.0-a3-openeuler`, W8A8, and TP4 × DP2 + EP. The health check, model listing, and image request returned HTTP 200. The image response described a tiger lying on grass.
+
+    | Evaluation | Completed | Result |
+    | --- | --- | --- |
+    | AISBench GSM8K demo | 8/8 requests | 6/8 correct (75.00%) |
+    | MMMU diagnostic trial | 6/6 requests | Endpoint and scoring checks passed |
+    | MMMU full validation | 900/900 nonempty responses | 67.89% accuracy |
+  benchmark: |-
+    The text benchmark used a configured input length of 2048 tokens, 128 output tokens per request, and concurrency 1. All 300 measured requests completed across three runs.
+
+    | Seed | Requests completed | Output throughput (tokens/s) |
+    | --- | --- | --- |
+    | 0 | 100/100 | 31.3452 |
+    | 1 | 100/100 | 31.3485 |
+    | 2 | 100/100 | 31.3571 |
 references:
   - title: Historical tutorial
     url: https://docs.vllm.ai/projects/ascend/en/v0.23.0/tutorials/models/InternVL3.5.html
