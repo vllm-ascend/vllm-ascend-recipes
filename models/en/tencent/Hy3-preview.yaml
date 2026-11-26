@@ -205,40 +205,10 @@ scenarios:
       - a3-single
     strategy: single_node_A3
     steps:
-      - title: Open the release container on the A3 host
-        content: >-
-          Run on the A3 host with 16 visible devices, port 8000 free and the
-          verified BF16 checkpoint under `/models/tencent/Hy3-preview`. Docker
-          opens a shell using the release image entrypoint.
-
-
-          ```bash
-
-          IMAGE=quay.io/ascend/vllm-ascend:v0.30.0-a3-openeuler
-
-          CHECKPOINT=/models/tencent/Hy3-preview
-
-          CONTAINER_NAME=${HY3_CONTAINER_NAME:-hy3-preview-a3-release}
-
-          test -s "$CHECKPOINT/config.json" &&
-
-          docker run --rm -it --name "$CONTAINER_NAME" --net=host --ipc=host \
-            --device /dev/davinci0 --device /dev/davinci1 --device /dev/davinci2 --device /dev/davinci3 \
-            --device /dev/davinci4 --device /dev/davinci5 --device /dev/davinci6 --device /dev/davinci7 \
-            --device /dev/davinci8 --device /dev/davinci9 --device /dev/davinci10 --device /dev/davinci11 \
-            --device /dev/davinci12 --device /dev/davinci13 --device /dev/davinci14 --device /dev/davinci15 \
-            --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc \
-            -v /usr/local/Ascend/driver:/usr/local/Ascend/driver \
-            -v /usr/local/dcmi:/usr/local/dcmi \
-            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
-            -v /etc/ascend_install.info:/etc/ascend_install.info \
-            -v /models:/models -v "$CHECKPOINT:$CHECKPOINT:ro" -w /models \
-            "$IMAGE" bash
-          ```
       - title: Start the server in the container
         content: >-
-          Run in the release container. The service binds to loopback. Wait for
-          the server to report that startup has completed.
+          Run in the release container opened under Environment Setup. The
+          service binds to loopback. Wait for the startup-complete log.
 
 
           ```bash
@@ -365,15 +335,23 @@ scenarios:
 verification: The hardware run passed the greeting, parsed reasoning, automatic
   tool calling, and MTP draft and acceptance counter checks.
 performance:
-  accuracy: The Nov 21, 2026 A3 run answered 32/32 GSM8K-lite questions correctly.
-    In the Nov 22, 2026 remediation retest, all 32/32 requests returned and
-    31/32 answers were correct (96.875% accuracy). Both runs used a temperature
-    of 0.6. The [official test
-    case](https://github.com/vllm-project/vllm-ascend/blob/128f35ed1461ecb34bc8b87583a67a66bc4bd1d6/tests/e2e/cases/models/configs/Hunyuan/Hy3-preview.yaml)
-    gives a reference score of 93.07 and a 10-point tolerance. The historical
-    tutorial lists reference scores for GSM8K and C-Eval.
-  benchmark: Each input setting (1024, 4096 and 16384 tokens) completed 4/4
-    requests, with 128 output tokens per request.
+  accuracy: |-
+    On one Atlas 800I A3 with `v0.30.0-a3-openeuler`, BF16, TP16, EP, and one MTP draft token, both GSM8K-lite runs completed all 32 requests at a temperature of 0.6.
+
+    | Run | Correct | Accuracy |
+    | --- | --- | --- |
+    | Initial run | 32/32 | 100.00% |
+    | Follow-up run | 31/32 | 96.875% |
+
+    The [official test case](https://github.com/vllm-project/vllm-ascend/blob/128f35ed1461ecb34bc8b87583a67a66bc4bd1d6/tests/e2e/cases/models/configs/Hunyuan/Hy3-preview.yaml) gives a reference score of 93.07 and a tolerance of 10 percentage points. The historical tutorial also lists GSM8K and C-Eval reference scores.
+  benchmark: |-
+    The online text benchmark used the same A3 configuration, with concurrency 1 and 128 output tokens per request. Each measured input was 15 tokens longer than its configured length.
+
+    | Configured input (tokens) | Requests completed | Mean TTFT (ms) | Mean TPOT (ms) | Output throughput (tokens/s) |
+    | --- | --- | --- | --- | --- |
+    | 1024 | 4/4 | 406.99 | 29.05 | 31.24 |
+    | 4096 | 4/4 | 843.02 | 30.21 | 27.35 |
+    | 16384 | 4/4 | 2779.66 | 31.37 | 18.92 |
 references:
   - title: Pinned tutorial baseline
     url: https://github.com/vllm-project/vllm-ascend/blob/5cb98caaadeff42b5b62b996e34bb2aaa29d20fd/docs/source/tutorials/models/Hy3-preview.md

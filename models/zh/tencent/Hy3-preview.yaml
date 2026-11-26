@@ -202,38 +202,9 @@ scenarios:
       - a3-single
     strategy: single_node_A3
     steps:
-      - title: 在 A3 宿主机终端进入 release 容器
-        content: >-
-          在 A3 宿主机执行。确保 16 个设备可见、8000 端口空闲，且已校验的 BF16 权重位于
-          `/models/tencent/Hy3-preview`。Docker 通过 release 镜像的默认入口打开 shell。
-
-
-          ```bash
-
-          IMAGE=quay.io/ascend/vllm-ascend:v0.30.0-a3-openeuler
-
-          CHECKPOINT=/models/tencent/Hy3-preview
-
-          CONTAINER_NAME=${HY3_CONTAINER_NAME:-hy3-preview-a3-release}
-
-          test -s "$CHECKPOINT/config.json" &&
-
-          docker run --rm -it --name "$CONTAINER_NAME" --net=host --ipc=host \
-            --device /dev/davinci0 --device /dev/davinci1 --device /dev/davinci2 --device /dev/davinci3 \
-            --device /dev/davinci4 --device /dev/davinci5 --device /dev/davinci6 --device /dev/davinci7 \
-            --device /dev/davinci8 --device /dev/davinci9 --device /dev/davinci10 --device /dev/davinci11 \
-            --device /dev/davinci12 --device /dev/davinci13 --device /dev/davinci14 --device /dev/davinci15 \
-            --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc \
-            -v /usr/local/Ascend/driver:/usr/local/Ascend/driver \
-            -v /usr/local/dcmi:/usr/local/dcmi \
-            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
-            -v /etc/ascend_install.info:/etc/ascend_install.info \
-            -v /models:/models -v "$CHECKPOINT:$CHECKPOINT:ro" -w /models \
-            "$IMAGE" bash
-          ```
       - title: 在容器终端启动服务
         content: |-
-          在 release 容器内执行。服务监听本机地址，等待启动完成的日志。
+          在「环境准备」启动的 release 容器内执行。服务监听本机地址，等待启动完成的日志。
 
           ```bash
           export VLLM_USE_RUST_FRONTEND=0
@@ -350,11 +321,23 @@ scenarios:
           ```
 verification: 实机通过问候、独立推理字段、自动工具调用及 MTP 草稿与接受计数的检查。
 performance:
-  accuracy: 2026 年 11 月 21 日 A3 首测 GSM8K-lite 答对 32/32。2026 年 11 月 22 日复测中，32/32
-    条请求返回，答对 31/32，准确率 96.875%。两轮温度均为 0.6。
-    [官方用例](https://github.com/vllm-project/vllm-ascend/blob/128f35ed1461ecb34bc8b87583a67a66bc4bd1d6/tests/e2e/cases/models/configs/Hunyuan/Hy3-preview.yaml)
-    给出 93.07 参考值和 10 个百分点容差。历史教程同时列出 GSM8K 和 C-Eval 参考值。
-  benchmark: 输入配置 1024、4096、16384 token，每档 4/4 请求成功，输出为 128 token。
+  accuracy: |-
+    在单台 Atlas 800I A3 上使用 `v0.30.0-a3-openeuler`、BF16、TP16、EP 和 1 个 MTP 草稿 token。两轮 GSM8K-lite 测试的温度参数均为 0.6，各完成 32 条请求。
+
+    | 轮次 | 答对题数 | 准确率 |
+    | --- | --- | --- |
+    | 首测 | 32/32 | 100.00% |
+    | 复测 | 31/32 | 96.875% |
+
+    [官方用例](https://github.com/vllm-project/vllm-ascend/blob/128f35ed1461ecb34bc8b87583a67a66bc4bd1d6/tests/e2e/cases/models/configs/Hunyuan/Hy3-preview.yaml)给出的参考分数为 93.07，容差为 10 个百分点。历史教程也列出了 GSM8K 和 C-Eval 的参考分数。
+  benchmark: |-
+    在线文本性能测试沿用同一套 A3 配置，并发为 1，每条请求输出 128 token。每条请求的实际输入比配置长度多 15 token。
+
+    | 配置输入长度（token） | 完成请求 | 平均 TTFT（ms） | 平均 TPOT（ms） | 输出吞吐（token/s） |
+    | --- | --- | --- | --- | --- |
+    | 1024 | 4/4 | 406.99 | 29.05 | 31.24 |
+    | 4096 | 4/4 | 843.02 | 30.21 | 27.35 |
+    | 16384 | 4/4 | 2779.66 | 31.37 | 18.92 |
 references:
   - title: 固定版本教程基线
     url: https://github.com/vllm-project/vllm-ascend/blob/5cb98caaadeff42b5b62b996e34bb2aaa29d20fd/docs/source/tutorials/models/Hy3-preview.md
