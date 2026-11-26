@@ -1,6 +1,9 @@
 {
   "models": [
     {
+      "slug": "DeepSeek-R1"
+    },
+    {
       "slug": "DeepSeek-V2-Lite-W8A8"
     },
     {

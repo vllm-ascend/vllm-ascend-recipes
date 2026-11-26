@@ -1,0 +1,24 @@
+{
+  "model": "DeepSeek-R1",
+  "last_pr_run": {
+    "kind": "pr",
+    "status": "fail",
+    "conclusion": "failure",
+    "head_sha": "0ffcfa95df866d0d4d93911390d2a58d128da744",
+    "head_sha_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/commit/0ffcfa95df866d0d4d93911390d2a58d128da744",
+    "workflow_run_id": 45623286063,
+    "workflow_run_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/actions/runs/45623286063",
+    "recipe_path": "models/en/DeepSeek/DeepSeek-R1.yaml",
+    "recipe_yaml_url": "https://github.com/vllm-ascend/vllm-ascend-recipes/blob/0ffcfa95df866d0d4d93911390d2a58d128da744/models/en/DeepSeek/DeepSeek-R1.yaml",
+    "params_url": "https://vllm-ascend.github.io/vllm-ascend-recipes/runs/0ffcfa95df866d0d4d93911390d2a58d128da744/DeepSeek-R1.params.json",
+    "started_at": "2026-11-25T13:24:34Z",
+    "finished_at": "2026-11-26T02:13:11Z",
+    "pr_number": null,
+    "pr_url": null,
+    "pr_title": null,
+    "pr_author": null
+  },
+  "last_nightly_run": null,
+  "last_manual_run": null,
+  "targets": {}
+}
