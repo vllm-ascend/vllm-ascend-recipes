@@ -209,32 +209,32 @@ scenarios:
     strategy: single_node_A3
     steps:
       - title: Start the server
-        content: >-
-          Run in the release container opened under Environment Setup. The
-          service listens on the loopback interface.
-
+        content: |-
+          Run in the release container opened under Environment Setup. The service listens on the loopback interface.
 
           ```bash
-
           # A3 release serve
-
-          cd /models
-
           export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
-
           export TASK_QUEUE_ENABLE=1
-
           export HCCL_OP_EXPANSION_MODE=AIV
-
           export OMP_PROC_BIND=false
-
           export OMP_NUM_THREADS=1
-
           export HCCL_BUFFSIZE=1536
-
           export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3
 
-          vllm serve Eco-Tech/InternVL3_5-38B-w8a8 \
+          MODEL_PATH=Eco-Tech/InternVL3_5-38B-w8a8
+          case "$MODEL_PATH" in
+            /*) ;;
+            *) MODEL_PATH="/models/$MODEL_PATH" ;;
+          esac
+
+          MEDIA_DIR=/models/evidence/internvl-release-retest
+          media_args=()
+          if [[ -d "$MEDIA_DIR" ]]; then
+            media_args=(--allowed-local-media-path "$MEDIA_DIR")
+          fi
+
+          vllm serve "$MODEL_PATH" \
             --host 127.0.0.1 \
             --port 2002 \
             --served-model-name internvl3_5 \
@@ -249,33 +249,67 @@ scenarios:
             --mm-processor-cache-gb 0 \
             --enable-chunked-prefill \
             --safetensors-load-strategy prefetch \
-            --allowed-local-media-path /models/evidence/internvl-release-retest
+            "${media_args[@]}"
           ```
       - title: Check readiness and run image inference
-        content: >-
-          Place the original tutorial photo at
-          `/models/evidence/internvl-release-retest/tiger.jpeg` before running
-          this block. Confirm that the response describes a tiger lying on
-          grass.
+        content: |-
+          For manual verification, place the tutorial photo at `/models/evidence/internvl-release-retest/tiger.jpeg` and confirm that the response describes a tiger lying on grass. CI uses a generated red image and checks the returned color.
 
+          ```python
+          import base64
+          import io
+          import json
+          import os
+          import urllib.request
+          from pathlib import PurePosixPath
 
-          ```bash
+          base_url = "http://127.0.0.1:2002"
+          model = "internvl3_5"
+          urllib.request.install_opener(
+              urllib.request.build_opener(urllib.request.ProxyHandler({}))
+          )
 
-          # A3 release image inference
+          with urllib.request.urlopen(f"{base_url}/health", timeout=15) as response:
+              print(f"Health HTTP {response.status}")
+          with urllib.request.urlopen(f"{base_url}/v1/models", timeout=15) as response:
+              models = json.load(response)
+              assert any(item["id"] == model for item in models["data"]), models
+              print(f"Models HTTP {response.status}")
 
-          curl --noproxy '*' -fsS --connect-timeout 5 --max-time 15
-          http://127.0.0.1:2002/health -w 'Health HTTP %{http_code}\n' &&
+          ci = bool(os.getenv("CI_REQUEST_PROOF_FILE"))
+          if ci:
+              from PIL import Image
 
-          curl --noproxy '*' -fsS --connect-timeout 5 --max-time 15
-          http://127.0.0.1:2002/v1/models -w '\nModels HTTP %{http_code}\n' &&
+              image = io.BytesIO()
+              Image.new("RGB", (448, 448), "red").save(image, format="PNG")
+              image_url = "data:image/png;base64," + base64.b64encode(image.getvalue()).decode("ascii")
+              prompt = "What color fills this image? Answer with one color word."
+          else:
+              image_url = PurePosixPath("/models/evidence/internvl-release-retest/tiger.jpeg").as_uri()
+              prompt = "What animal is shown in the image, and what is it doing?"
 
-          image_uri=$(printf 'file:%s' '///models/evidence/internvl-release-retest/tiger.jpeg') &&
+          payload = {
+              "model": model,
+              "temperature": 0,
+              "max_tokens": 64,
+              "messages": [{"role": "user", "content": [
+                  {"type": "image_url", "image_url": {"url": image_url}},
+                  {"type": "text", "text": prompt},
+              ]}],
+          }
+          request = urllib.request.Request(
+              f"{base_url}/v1/chat/completions",
+              data=json.dumps(payload).encode(),
+              headers={"Content-Type": "application/json"},
+          )
+          with urllib.request.urlopen(request, timeout=120) as response:
+              result = json.load(response)
+              print(f"Image request HTTP {response.status}")
+              print(json.dumps(result, ensure_ascii=False, indent=2))
 
-          curl --noproxy '*' --fail-with-body --silent --show-error
-          --connect-timeout 5 --max-time 120 \
-            http://127.0.0.1:2002/v1/chat/completions -H 'Content-Type: application/json' \
-            --data-binary '{"model":"internvl3_5","temperature":0,"max_tokens":64,"messages":[{"role":"user","content":[{"type":"image_url","image_url":{"url":"'"$image_uri"'"}},{"type":"text","text":"What animal is shown in the image, and what is it doing?"}]}]}' \
-            --write-out "\nImage request HTTP %{http_code}\n"
+          if ci:
+              answer = result["choices"][0]["message"]["content"]
+              assert answer.strip().casefold().rstrip(".!") == "red", answer
           ```
       - title: Run the AISBench GSM8K demo
         content: >-

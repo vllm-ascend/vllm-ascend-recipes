@@ -213,31 +213,32 @@ scenarios:
     strategy: single_node_A3
     steps:
       - title: 启动服务
-        content: >-
+        content: |-
           在「环境准备」启动的 release 容器内执行。服务监听本机回环地址。
 
-
           ```bash
-
           # A3 release serve
-
-          cd /models
-
           export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
-
           export TASK_QUEUE_ENABLE=1
-
           export HCCL_OP_EXPANSION_MODE=AIV
-
           export OMP_PROC_BIND=false
-
           export OMP_NUM_THREADS=1
-
           export HCCL_BUFFSIZE=1536
-
           export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
 
-          vllm serve Eco-Tech/InternVL3_5-241B-A28B-w8a8 \
+          MODEL_PATH=Eco-Tech/InternVL3_5-241B-A28B-w8a8
+          case "$MODEL_PATH" in
+            /*) ;;
+            *) MODEL_PATH="/models/$MODEL_PATH" ;;
+          esac
+
+          MEDIA_DIR=/models/evidence/internvl-release-retest
+          media_args=()
+          if [[ -d "$MEDIA_DIR" ]]; then
+            media_args=(--allowed-local-media-path "$MEDIA_DIR")
+          fi
+
+          vllm serve "$MODEL_PATH" \
             --host 127.0.0.1 \
             --port 2001 \
             --served-model-name internvl3_5 \
@@ -254,21 +255,67 @@ scenarios:
             --enable-chunked-prefill \
             --enable-expert-parallel \
             --safetensors-load-strategy prefetch \
-            --allowed-local-media-path /models/evidence/internvl-release-retest
+            "${media_args[@]}"
           ```
       - title: 检查服务并运行图文推理
         content: |-
-          先将教程原图放在 `/models/evidence/internvl-release-retest/tiger.jpeg`，再执行命令。确认回复描述老虎趴在草地上。
+          手动验证前，将教程原图放在 `/models/evidence/internvl-release-retest/tiger.jpeg`，并确认回复描述老虎趴在草地上。CI 使用程序生成的红色图片，并校验返回的颜色。
 
-          ```bash
-          # A3 release image inference
-          curl --noproxy '*' -fsS --connect-timeout 5 --max-time 15 http://127.0.0.1:2001/health -w 'Health HTTP %{http_code}\n' &&
-          curl --noproxy '*' -fsS --connect-timeout 5 --max-time 15 http://127.0.0.1:2001/v1/models -w '\nModels HTTP %{http_code}\n' &&
-          image_uri=$(printf 'file:%s' '///models/evidence/internvl-release-retest/tiger.jpeg') &&
-          curl --noproxy '*' --fail-with-body --silent --show-error --connect-timeout 5 --max-time 120 \
-            http://127.0.0.1:2001/v1/chat/completions -H 'Content-Type: application/json' \
-            --data-binary '{"model":"internvl3_5","temperature":0,"max_tokens":64,"messages":[{"role":"user","content":[{"type":"image_url","image_url":{"url":"'"$image_uri"'"}},{"type":"text","text":"What animal is shown in the image, and what is it doing?"}]}]}' \
-            --write-out "\nImage request HTTP %{http_code}\n"
+          ```python
+          import base64
+          import io
+          import json
+          import os
+          import urllib.request
+          from pathlib import PurePosixPath
+
+          base_url = "http://127.0.0.1:2001"
+          model = "internvl3_5"
+          urllib.request.install_opener(
+              urllib.request.build_opener(urllib.request.ProxyHandler({}))
+          )
+
+          with urllib.request.urlopen(f"{base_url}/health", timeout=15) as response:
+              print(f"Health HTTP {response.status}")
+          with urllib.request.urlopen(f"{base_url}/v1/models", timeout=15) as response:
+              models = json.load(response)
+              assert any(item["id"] == model for item in models["data"]), models
+              print(f"Models HTTP {response.status}")
+
+          ci = bool(os.getenv("CI_REQUEST_PROOF_FILE"))
+          if ci:
+              from PIL import Image
+
+              image = io.BytesIO()
+              Image.new("RGB", (448, 448), "red").save(image, format="PNG")
+              image_url = "data:image/png;base64," + base64.b64encode(image.getvalue()).decode("ascii")
+              prompt = "What color fills this image? Answer with one color word."
+          else:
+              image_url = PurePosixPath("/models/evidence/internvl-release-retest/tiger.jpeg").as_uri()
+              prompt = "What animal is shown in the image, and what is it doing?"
+
+          payload = {
+              "model": model,
+              "temperature": 0,
+              "max_tokens": 64,
+              "messages": [{"role": "user", "content": [
+                  {"type": "image_url", "image_url": {"url": image_url}},
+                  {"type": "text", "text": prompt},
+              ]}],
+          }
+          request = urllib.request.Request(
+              f"{base_url}/v1/chat/completions",
+              data=json.dumps(payload).encode(),
+              headers={"Content-Type": "application/json"},
+          )
+          with urllib.request.urlopen(request, timeout=120) as response:
+              result = json.load(response)
+              print(f"Image request HTTP {response.status}")
+              print(json.dumps(result, ensure_ascii=False, indent=2))
+
+          if ci:
+              answer = result["choices"][0]["message"]["content"]
+              assert answer.strip().casefold().rstrip(".!") == "red", answer
           ```
       - title: 运行 AISBench GSM8K 小样本
         content: |-
