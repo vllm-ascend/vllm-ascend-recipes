@@ -16,8 +16,8 @@
       "deployment": "Single-Node",
       "case": "Multi Card",
       "serve_cmd": "#!/bin/sh\nexport MODEL_PATH=Eco-Tech/Qwen3.5-27B-w8a8-mtp\nexport VLLM_USE_MODELSCOPE=True\nexport VLLM_ENGINE_READY_TIMEOUT=1800\nexport HCCL_BUFFSIZE=512\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\nexport OMP_PROC_BIND=false\nexport OMP_NUM_THREADS=1\nexport TASK_QUEUE_ENABLE=1\n\nvllm serve $MODEL_PATH \\\n    --host 0.0.0.0 \\\n    --port 8000 \\\n    --data-parallel-size 4 \\\n    --tensor-parallel-size 2 \\\n    --quantization ascend \\\n    --served-model-name qwen3.5 \\\n    --max-num-seqs 32 \\\n    --max-model-len 32768 \\\n    --max-num-batched-tokens 16384 \\\n    --trust-remote-code \\\n    --allowed-local-media-path / \\\n    --dtype bfloat16 \\\n    --reasoning-parser qwen3 \\\n    --mm-processor-cache-gb 0 \\\n    --mm-encoder-tp-mode data \\\n    --mm-processor-cache-type shm \\\n    --gpu-memory-utilization 0.85 \\\n    --no-enable-prefix-caching \\\n    --compilation-config '{\"cudagraph_mode\":\"FULL_DECODE_ONLY\"}' \\\n    --additional-config '{\"enable_cpu_binding\":true}' \\\n    --async-scheduling",
-      "verification_status": "fail",
-      "verification_reason": "Model server did not become ready"
+      "verification_status": "pass",
+      "verification_reason": "Task API response validated"
     },
     {
       "index": 0,
@@ -79,11 +79,11 @@
           "deployment": "Single-Node",
           "case": "Multi Card",
           "serve_cmd": "#!/bin/sh\nexport MODEL_PATH=Eco-Tech/Qwen3.5-27B-w8a8-mtp\nexport VLLM_USE_MODELSCOPE=True\nexport VLLM_ENGINE_READY_TIMEOUT=1800\nexport HCCL_BUFFSIZE=512\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\nexport OMP_PROC_BIND=false\nexport OMP_NUM_THREADS=1\nexport TASK_QUEUE_ENABLE=1\n\nvllm serve $MODEL_PATH \\\n    --host 0.0.0.0 \\\n    --port 8000 \\\n    --data-parallel-size 4 \\\n    --tensor-parallel-size 2 \\\n    --quantization ascend \\\n    --served-model-name qwen3.5 \\\n    --max-num-seqs 32 \\\n    --max-model-len 32768 \\\n    --max-num-batched-tokens 16384 \\\n    --trust-remote-code \\\n    --allowed-local-media-path / \\\n    --dtype bfloat16 \\\n    --reasoning-parser qwen3 \\\n    --mm-processor-cache-gb 0 \\\n    --mm-encoder-tp-mode data \\\n    --mm-processor-cache-type shm \\\n    --gpu-memory-utilization 0.85 \\\n    --no-enable-prefix-caching \\\n    --compilation-config '{\"cudagraph_mode\":\"FULL_DECODE_ONLY\"}' \\\n    --additional-config '{\"enable_cpu_binding\":true}' \\\n    --async-scheduling",
-          "verification_status": "fail",
-          "verification_reason": "Model server did not become ready"
+          "verification_status": "pass",
+          "verification_reason": "Task API response validated"
         }
       ],
-      "status": "fail"
+      "status": "pass"
     },
     {
       "verification_scope": "single-node API smoke; not accuracy or full feature coverage",
