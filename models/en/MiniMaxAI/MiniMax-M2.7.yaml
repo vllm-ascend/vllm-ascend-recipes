@@ -670,8 +670,21 @@ scenarios:
             python3 -c 'import json,sys; data=json.load(sys.stdin); print(json.dumps(data)); assert any(m["id"] == "MiniMax-M2.7" for m in data["data"])'
           response=$(curl --noproxy '*' --fail-with-body --silent --show-error --connect-timeout 5 --max-time 120 http://127.0.0.1:8000/v1/chat/completions \
             -H 'Content-Type: application/json' \
-            -d '{"model":"MiniMax-M2.7","max_tokens":512,"temperature":0,"messages":[{"role":"user","content":"Say hi in one word."}]}')
-          python3 -c 'import json,sys; r=json.load(sys.stdin); print(json.dumps(r, ensure_ascii=False, indent=2)); assert r["model"] == "MiniMax-M2.7"; c=(r["choices"][0]["message"].get("content") or "").strip(); assert not c.startswith("<think>") or "</think>" in c; assert c.rsplit("</think>",1)[-1].strip().casefold().strip(".!") in {"hello","hi"}' <<<"$response"
+            -d '{"model":"MiniMax-M2.7","max_tokens":1024,"temperature":1.0,"top_p":0.95,"top_k":40,"seed":42,"messages":[{"role":"user","content":"Reply with exactly one word: Hi."}]}')
+          python3 -c '
+          import json
+          import sys
+
+          result = json.load(sys.stdin)
+          print(json.dumps(result, ensure_ascii=False, indent=2))
+          assert result["model"] == "MiniMax-M2.7"
+          choice = result["choices"][0]
+          assert choice["finish_reason"] == "stop", choice["finish_reason"]
+          content = (choice["message"].get("content") or "").strip()
+          assert not content.startswith("<think>") or "</think>" in content, "Missing final answer"
+          answer = content.rsplit("</think>", 1)[-1].strip().casefold().strip(".!")
+          assert answer == "hi", answer
+          ' <<<"$response"
           check_request_count 1
 
           response=$(curl --noproxy '*' --fail-with-body --silent --show-error --connect-timeout 5 --max-time 120 http://127.0.0.1:8000/v1/chat/completions \
