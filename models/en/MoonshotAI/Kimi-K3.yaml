@@ -64,6 +64,7 @@ features:
 
 compatible_strategies:
   - multi_node_dp
+  - pd_cluster
 
 guide: ""
 performance_model_names:
