@@ -1,0 +1,328 @@
+# English version (structure mirrors models/zh; prose translation pending).
+meta:
+  title: "DeepSeek-V4.1-Flash"
+  slug: "deepseek-v4-1-flash"
+  provider: "DeepSeek"
+  description: "SWA"
+  date_added: 2026-10-29
+  date_updated: 2026-10-29
+  difficulty: advanced
+  tasks:
+    - text
+  performance_headline: "并发 1 单卡 E2E 吞吐 177.09 TPS"
+  related_recipes: []
+  hardware:
+    atlas_800_a3: verified
+model:
+  model_id: "deepseek-ai/DeepSeek-V4.1-Flash"
+  min_vllm_version: "v0.23.0rc1"
+  architecture: moe
+  parameter_count: "763B"
+  active_parameters: "763B"
+  context_length: 1048576
+  modality: text
+  base_args:
+    - "--trust-remote-code"
+  base_env:
+    TASK_QUEUE_ENABLE: "1"
+    OMP_NUM_THREADS: "1"
+    HCCL_SOCKET_IFNAME: "bond4"
+    VLLM_USE_V2_MODEL_RUNNER: "0"
+    HCCL_CONNECT_TIMEOUT: "1200"
+    GLOO_SOCKET_IFNAME: "bond4"
+    LD_PRELOAD: "/usr/lib64/libjemalloc.so.2:$LD_PRELOAD"
+    LS_COLORS: "rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=00:su=37;41:sg=30;43:ca=00:tw=30;42:ow=34;42:st=37;44:ex=01;32:*.tar=01;31:*.tgz=01;31:*.arc=01;31:*.arj=01;31:*.taz=01;31:*.lha=01;31:*.lz4=01;31:*.lzh=01;31:*.lzma=01;31:*.tlz=01;31:*.txz=01;31:*.tzo=01;31:*.t7z=01;31:*.zip=01;31:*.z=01;31:*.dz=01;31:*.gz=01;31:*.lrz=01;31:*.lz=01;31:*.lzo=01;31:*.xz=01;31:*.zst=01;31:*.tzst=01;31:*.bz2=01;31:*.bz=01;31:*.tbz=01;31:*.tbz2=01;31:*.tz=01;31:*.deb=01;31:*.rpm=01;31:*.jar=01;31:*.war=01;31:*.ear=01;31:*.sar=01;31:*.rar=01;31:*.alz=01;31:*.ace=01;31:*.zoo=01;31:*.cpio=01;31:*.7z=01;31:*.rz=01;31:*.cab=01;31:*.wim=01;31:*.swm=01;31:*.dwm=01;31:*.esd=01;31:*.avif=01;35:*.jpg=01;35:*.jpeg=01;35:*.mjpg=01;35:*.mjpeg=01;35:*.gif=01;35:*.bmp=01;35:*.pbm=01;35:*.pgm=01;35:*.ppm=01;35:*.tga=01;35:*.xbm=01;35:*.xpm=01;35:*.tif=01;35:*.tiff=01;35:*.png=01;35:*.svg=01;35:*.svgz=01;35:*.mng=01;35:*.pcx=01;35:*.mov=01;35:*.mpg=01;35:*.mpeg=01;35:*.m2v=01;35:*.mkv=01;35:*.webm=01;35:*.webp=01;35:*.ogm=01;35:*.mp4=01;35:*.m4v=01;35:*.mp4v=01;35:*.vob=01;35:*.qt=01;35:*.nuv=01;35:*.wmv=01;35:*.asf=01;35:*.rm=01;35:*.rmvb=01;35:*.flc=01;35:*.avi=01;35:*.fli=01;35:*.flv=01;35:*.gl=01;35:*.dl=01;35:*.xcf=01;35:*.xwd=01;35:*.yuv=01;35:*.cgm=01;35:*.emf=01;35:*.ogv=01;35:*.ogx=01;35:*.aac=00;36:*.au=00;36:*.flac=00;36:*.m4a=00;36:*.mid=00;36:*.midi=00;36:*.mka=00;36:*.mp3=00;36:*.mpc=00;36:*.ogg=00;36:*.ra=00;36:*.wav=00;36:*.oga=00;36:*.opus=00;36:*.spx=00;36:*.xspf=00;36:*~=00;90:*#=00;90:*.bak=00;90:*.crdownload=00;90:*.dpkg-dist=00;90:*.dpkg-new=00;90:*.dpkg-old=00;90:*.dpkg-tmp=00;90:*.old=00;90:*.orig=00;90:*.part=00;90:*.rej=00;90:*.rpmnew=00;90:*.rpmorig=00;90:*.rpmsave=00;90:*.swp=00;90:*.tmp=00;90:*.ucf-dist=00;90:*.ucf-new=00;90:*.ucf-old=00;90:"
+    HCCL_BUFFSIZE: "1024"
+    VLLM_EXECUTE_MODEL_TIMEOUT_SECONDS: "30000"
+    HCCL_EXEC_TIMEOUT: "204"
+    HCCL_OP_EXPANSION_MODE: "AIV"
+    ASCEND_CUSTOM_OPP_PATH: "/usr/local/python3.12.13/lib/python3.12/site-packages/fla_npu/opp/vendors/fla_npu_transformer:/usr/local/python3.12.13/lib/python3.12/site-packages/fla_npu/opp/vendors/fla_npu_transformer/op_api/lib"
+    VLLM_ENGINE_READY_TIMEOUT_S: "36000"
+    TP_SOCKET_IFNAME: "bond4"
+    VLLM_RPC_TIMEOUT: "3600000"
+    HCCL_IF_IP: "135.98.25.9"
+  docker_image:
+    atlas_800_a3: "quay.io/ascend/vllm-ascend:nightly-main-a3-openeuler"
+  nightly_required: false
+  install:
+    # Ascend 推荐 Docker 方式；pip 需源码编译，隐藏 pip 标签
+    pip: false
+    docker:
+      command: "docker run --rm --net=host --shm-size=512g -v /root/.cache/modelscope:/root/.cache/modelscope --device /dev/davinci0 --device /dev/davinci1 --device /dev/davinci2 --device /dev/davinci3 --device /dev/davinci4 --device /dev/davinci5 --device /dev/davinci6 --device /dev/davinci7 --device /dev/davinci8 --device /dev/davinci9 --device /dev/davinci10 --device /dev/davinci11 --device /dev/davinci12 --device /dev/davinci13 --device /dev/davinci14 --device /dev/davinci15 -it quay.io/ascend/vllm-ascend:nightly-main-a3-openeuler bash"
+      note: "Ascend 官方镜像；权重目录已挂载进容器；设备/驱动挂载见 env_setup.container。"
+features:
+  expert_parallel:
+    description: "跨 DP rank 的 MoE 专家并行"
+    args: ["--enable-expert-parallel"]
+  tool_calling:
+    description: "原生工具调用"
+    args: ["--enable-auto-tool-choice", "--tool-call-parser deepseek_v41"]
+  reasoning:
+    description: "推理模式（思考链）"
+    args: ["--reasoning-parser deepseek_v41"]
+  spec_decoding:
+    label: "MTP Spec Decoding"
+    description: "MTP 投机解码，加速推理"
+    args: ["--speculative-config", '{"num_speculative_tokens": 1, "method": "mtp", "enforce_eager": true}']
+  flashcomm1:
+    label: "FlashComm1"
+    description: "FlashComm 通信优化，提升芯片间带宽"
+    env:
+      VLLM_ASCEND_ENABLE_FLASHCOMM1: "1"
+  prefix_caching:
+    label: "Prefix Caching"
+    description: "KV 缓存前缀缓存"
+    args: ["--enable-prefix-caching"]
+    flag_when_false: "--no-enable-prefix-caching"
+  async_scheduling:
+    label: "Async Scheduling"
+    description: "异步调度，CPU 调度与 NPU 计算重叠"
+    args: ["--async-scheduling"]
+  compilation_config:
+    label: "Compilation Config"
+    description: "decode 阶段全 ACL 图执行，降低调度时延"
+    args: ["--compilation-config", '{"cudagraph_mode":"FULL_DECODE_ONLY"}']
+  cpu_binding:
+    label: "CPU Binding"
+    description: "CPU 核绑定，降低 NUMA 时延"
+    args: ["--additional-config", '{"enable_cpu_binding": true}']
+  multistream_overlap:
+    label: "Multi-stream Overlap"
+    description: "MoE 共享专家多流重叠"
+    args: ["--additional-config", '{"multistream_overlap_shared_expert": true}']
+  npugraph_ex:
+    label: "NPUGraph EX"
+    description: "NPUGraph EX 加速图执行"
+    args: ["--additional-config", '{"ascend_compilation_config": {"enable_npugraph_ex": true, "enable_static_kernel": false}}']
+opt_in_features:
+  - prefix_caching
+  - cpu_binding
+  - multistream_overlap
+  - npugraph_ex
+variants:
+  ascend_w8a8:
+    model_id: "deepseek-ai/DeepSeek-V4.1-Flash"
+    label: "W8A8 (A3)"
+    precision: W8A8
+    vram_minimum_gb: 916
+    description: "W8A8 量化服务于 Atlas 800I A3。"
+    supported_hardware: [atlas_800_a3]
+    tp:
+      atlas_800_a3: 4
+compatible_strategies:
+  - single_node_A2
+  - single_node_A3
+  - single_node_A5
+  - pd_cluster
+hardware_overrides:
+  ascend_a3:
+    extra_args:
+      - "--compilation-config"
+      - '{"cudagraph_mode": "FULL_DECODE_ONLY"}'
+    extra_env:
+      HCCL_BUFFSIZE: "2560"
+strategy_overrides:
+  pd_cluster:
+    prefill:
+      nodes: { default: 1 }
+    decode:
+      nodes: { default: 1 }
+dependencies: []
+guide: ""
+performance_model_names:
+  - "DeepSeek-V4.1-Flash"
+config_params:
+  max_model_len:
+    default: 286720
+    type: number
+    description: "最大上下文长度(输入+输出 token 之和),按实际场景调整"
+  max_num_seqs:
+    default: 32
+    type: number
+    description: "每个 DP 组最大并发序列数"
+  gpu_memory_utilization:
+    default: 0.9
+    type: number
+    description: "KV cache 可用的显存比例"
+overview: |-
+  SWA
+weight_download:
+- weight_version: "W8A8"
+  sources:
+  - source: "Hugging Face"
+    command: |-
+      ```bash
+      pip install modelscope
+      modelscope download --model deepseek-ai/DeepSeek-V4.1-Flash
+      ```
+prerequisites:
+- title: "模型权重"
+  content: |-
+    请按上面 weight_download 下载权重；多节点部署请先验证多节点通信环境。
+env_setup:
+  container:
+    A3:
+      content: |-
+      根据您的机器类型选择镜像，并在节点上启动 Docker 镜像。
+
+        ```bash
+
+        export IMAGE=quay.io/ascend/vllm-ascend:nightly-main-a3-openeuler
+        docker run --rm \
+            --name vllm-ascend \
+            --shm-size=512g \
+            --net=host \
+            --device /dev/davinci0 \
+            --device /dev/davinci1 \
+            --device /dev/davinci2 \
+            --device /dev/davinci3 \
+            --device /dev/davinci4 \
+            --device /dev/davinci5 \
+            --device /dev/davinci6 \
+            --device /dev/davinci7 \
+            --device /dev/davinci8 \
+            --device /dev/davinci9 \
+            --device /dev/davinci10 \
+            --device /dev/davinci11 \
+            --device /dev/davinci12 \
+            --device /dev/davinci13 \
+            --device /dev/davinci14 \
+            --device /dev/davinci15 \
+            --device /dev/davinci_manager \
+            --device /dev/devmm_svm \
+            --device /dev/hisi_hdc \
+            -v /usr/local/dcmi:/usr/local/dcmi \
+            -v /usr/local/Ascend/driver/tools/hccn_tool:/usr/local/Ascend/driver/tools/hccn_tool \
+            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+            -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \
+            -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
+            -v /etc/ascend_install.info:/etc/ascend_install.info \
+            -v /etc/hccn.conf:/etc/hccn.conf \
+            -it $IMAGE bash
+        ```
+  pip:
+    content: |-
+      Ascend 推荐 Docker 方式；pip 需源码编译，不提供官方 wheel。
+extra_config:
+  label: "DSA CP"
+scenarios:
+- npu: Atlas 800I A3
+  precision: W8A8
+  deployment: 多节点-PD分离
+  case: PD 分离
+  tags: [ascend]
+  strategy: pd_cluster
+  steps:
+  - title: "启动服务"
+    content: |-
+      #!/bin/bash
+      ############## P节点启动脚本 ##############
+      # [COLLECT_INFO] source=auto version=1.2 timestamp=2026-10-13 15:19:33
+      # 从运行中的vllm进程还原: dsv41flash
+      # 完整保留模型运行环境变量和启动参数，复制当前环境配置
+      
+      MODEL_PATH="/data/model_weights/DeepSeek-V4.1-Flash-w8a8"
+      
+      # kv_role: kv_producer
+      
+      # 环境变量
+      export HCCL_SOCKET_IFNAME="bond4"
+      export VLLM_USE_V2_MODEL_RUNNER="0"
+      export HCCL_CONNECT_TIMEOUT="1200"
+      export GLOO_SOCKET_IFNAME="bond4"
+      export LD_PRELOAD="/usr/lib64/libjemalloc.so.2:/usr/lib64/libjemalloc.so.2:$LD_PRELOAD"
+      export LS_COLORS="rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=00:su=37;41:sg=30;43:ca=00:tw=30;42:ow=34;42:st=37;44:ex=01;32:*.tar=01;31:*.tgz=01;31:*.arc=01;31:*.arj=01;31:*.taz=01;31:*.lha=01;31:*.lz4=01;31:*.lzh=01;31:*.lzma=01;31:*.tlz=01;31:*.txz=01;31:*.tzo=01;31:*.t7z=01;31:*.zip=01;31:*.z=01;31:*.dz=01;31:*.gz=01;31:*.lrz=01;31:*.lz=01;31:*.lzo=01;31:*.xz=01;31:*.zst=01;31:*.tzst=01;31:*.bz2=01;31:*.bz=01;31:*.tbz=01;31:*.tbz2=01;31:*.tz=01;31:*.deb=01;31:*.rpm=01;31:*.jar=01;31:*.war=01;31:*.ear=01;31:*.sar=01;31:*.rar=01;31:*.alz=01;31:*.ace=01;31:*.zoo=01;31:*.cpio=01;31:*.7z=01;31:*.rz=01;31:*.cab=01;31:*.wim=01;31:*.swm=01;31:*.dwm=01;31:*.esd=01;31:*.avif=01;35:*.jpg=01;35:*.jpeg=01;35:*.mjpg=01;35:*.mjpeg=01;35:*.gif=01;35:*.bmp=01;35:*.pbm=01;35:*.pgm=01;35:*.ppm=01;35:*.tga=01;35:*.xbm=01;35:*.xpm=01;35:*.tif=01;35:*.tiff=01;35:*.png=01;35:*.svg=01;35:*.svgz=01;35:*.mng=01;35:*.pcx=01;35:*.mov=01;35:*.mpg=01;35:*.mpeg=01;35:*.m2v=01;35:*.mkv=01;35:*.webm=01;35:*.webp=01;35:*.ogm=01;35:*.mp4=01;35:*.m4v=01;35:*.mp4v=01;35:*.vob=01;35:*.qt=01;35:*.nuv=01;35:*.wmv=01;35:*.asf=01;35:*.rm=01;35:*.rmvb=01;35:*.flc=01;35:*.avi=01;35:*.fli=01;35:*.flv=01;35:*.gl=01;35:*.dl=01;35:*.xcf=01;35:*.xwd=01;35:*.yuv=01;35:*.cgm=01;35:*.emf=01;35:*.ogv=01;35:*.ogx=01;35:*.aac=00;36:*.au=00;36:*.flac=00;36:*.m4a=00;36:*.mid=00;36:*.midi=00;36:*.mka=00;36:*.mp3=00;36:*.mpc=00;36:*.ogg=00;36:*.ra=00;36:*.wav=00;36:*.oga=00;36:*.opus=00;36:*.spx=00;36:*.xspf=00;36:*~=00;90:*#=00;90:*.bak=00;90:*.crdownload=00;90:*.dpkg-dist=00;90:*.dpkg-new=00;90:*.dpkg-old=00;90:*.dpkg-tmp=00;90:*.old=00;90:*.orig=00;90:*.part=00;90:*.rej=00;90:*.rpmnew=00;90:*.rpmorig=00;90:*.rpmsave=00;90:*.swp=00;90:*.tmp=00;90:*.ucf-dist=00;90:*.ucf-new=00;90:*.ucf-old=00;90:"
+      export HCCL_BUFFSIZE="1024"
+      export VLLM_EXECUTE_MODEL_TIMEOUT_SECONDS="30000"
+      export HCCL_EXEC_TIMEOUT="204"
+      export HCCL_OP_EXPANSION_MODE="AIV"
+      export ASCEND_CUSTOM_OPP_PATH="/usr/local/python3.12.13/lib/python3.12/site-packages/fla_npu/opp/vendors/fla_npu_transformer:/usr/local/python3.12.13/lib/python3.12/site-packages/fla_npu/opp/vendors/fla_npu_transformer/op_api/lib"
+      export VLLM_ENGINE_READY_TIMEOUT_S="36000"
+      export TASK_QUEUE_ENABLE="1"
+      export TP_SOCKET_IFNAME="bond4"
+      export OMP_NUM_THREADS="1"
+      export VLLM_RPC_TIMEOUT="3600000"
+      export HCCL_IF_IP="135.98.25.9"
+      
+      # 模型启动命令
+      # 以下参数可能需要根据实际环境修改：
+      #   $MODEL_PATH  模型权重路径（已在上方定义）
+      #   --port       服务端口，需确保未被占用
+      # 其他参数为原始部署配置，请勿随意修改
+      nohup vllm serve $MODEL_PATH --host 0.0.0.0 --port 6703 --data-parallel-size 4 --data-parallel-rank 3 --data-parallel-address 135.98.25.9 --data-parallel-rpc-port 10521 --tensor-parallel-size 4 --enable-expert-parallel --seed 1024 --served-model-name DeepSeek-V4.1-Flash --max-model-len {{max_model_len}} --max-num-batched-tokens 8192 --max-num-seqs {{max_num_seqs}} --enable-prefix-caching --model-loader-extra-config={"enable_multithread_load":true,"num_threads":128} --safetensors-load-strategy lazy --speculative-config '{"num_speculative_tokens": 5, "method":"dspark"}' --trust-remote-code --block-size 128 --tokenizer-mode deepseek_v41 --tool-call-parser deepseek_v41 --enable-auto-tool-choice --reasoning-parser deepseek_v41 --gpu-memory-utilization {{gpu_memory_utilization}} --quantization ascend --enforce-eager --engram-config '{"cpu_offload":true,"dp_shared_memory":true}' --additional-config '{ "enable_cpu_binding":true, "enable_fused_mc2":1, "enable_dsa_cp":true, "enable_flashcomm1":true, "enable_shared_expert_dp":true }' --kv-transfer-config '{"kv_connector": "MooncakeHybridConnector", "kv_role": "kv_producer", "kv_port": "30000", "engine_id": "0", "kv_connector_extra_config": { "prefill": { "dp_size": 4, "tp_size": 4 }, "decode": { "dp_size": 8, "tp_size": 2 } } }' > run_model.log 2>&1 &
+      
+      
+      
+      ############### D节点启动脚本 ###############
+      # [COLLECT_INFO] source=auto version=1.2 timestamp=2026-10-13 15:18:31
+      # 从运行中的vllm进程还原: dsv41flash
+      # 完整保留模型运行环境变量和启动参数，复制当前环境配置
+      
+      MODEL_PATH="/data/model_weights/DeepSeek-V4.1-Flash-w8a8"
+      
+      # kv_role: kv_consumer
+      
+      # 环境变量
+      export HCCL_SOCKET_IFNAME="bond4"
+      export VLLM_USE_V2_MODEL_RUNNER="0"
+      export HCCL_CONNECT_TIMEOUT="1200"
+      export GLOO_SOCKET_IFNAME="bond4"
+      export LD_PRELOAD="/usr/lib64/libjemalloc.so.2:/usr/lib64/libjemalloc.so.2:$LD_PRELOAD"
+      export LS_COLORS="rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=00:su=37;41:sg=30;43:ca=00:tw=30;42:ow=34;42:st=37;44:ex=01;32:*.tar=01;31:*.tgz=01;31:*.arc=01;31:*.arj=01;31:*.taz=01;31:*.lha=01;31:*.lz4=01;31:*.lzh=01;31:*.lzma=01;31:*.tlz=01;31:*.txz=01;31:*.tzo=01;31:*.t7z=01;31:*.zip=01;31:*.z=01;31:*.dz=01;31:*.gz=01;31:*.lrz=01;31:*.lz=01;31:*.lzo=01;31:*.xz=01;31:*.zst=01;31:*.tzst=01;31:*.bz2=01;31:*.bz=01;31:*.tbz=01;31:*.tbz2=01;31:*.tz=01;31:*.deb=01;31:*.rpm=01;31:*.jar=01;31:*.war=01;31:*.ear=01;31:*.sar=01;31:*.rar=01;31:*.alz=01;31:*.ace=01;31:*.zoo=01;31:*.cpio=01;31:*.7z=01;31:*.rz=01;31:*.cab=01;31:*.wim=01;31:*.swm=01;31:*.dwm=01;31:*.esd=01;31:*.avif=01;35:*.jpg=01;35:*.jpeg=01;35:*.mjpg=01;35:*.mjpeg=01;35:*.gif=01;35:*.bmp=01;35:*.pbm=01;35:*.pgm=01;35:*.ppm=01;35:*.tga=01;35:*.xbm=01;35:*.xpm=01;35:*.tif=01;35:*.tiff=01;35:*.png=01;35:*.svg=01;35:*.svgz=01;35:*.mng=01;35:*.pcx=01;35:*.mov=01;35:*.mpg=01;35:*.mpeg=01;35:*.m2v=01;35:*.mkv=01;35:*.webm=01;35:*.webp=01;35:*.ogm=01;35:*.mp4=01;35:*.m4v=01;35:*.mp4v=01;35:*.vob=01;35:*.qt=01;35:*.nuv=01;35:*.wmv=01;35:*.asf=01;35:*.rm=01;35:*.rmvb=01;35:*.flc=01;35:*.avi=01;35:*.fli=01;35:*.flv=01;35:*.gl=01;35:*.dl=01;35:*.xcf=01;35:*.xwd=01;35:*.yuv=01;35:*.cgm=01;35:*.emf=01;35:*.ogv=01;35:*.ogx=01;35:*.aac=00;36:*.au=00;36:*.flac=00;36:*.m4a=00;36:*.mid=00;36:*.midi=00;36:*.mka=00;36:*.mp3=00;36:*.mpc=00;36:*.ogg=00;36:*.ra=00;36:*.wav=00;36:*.oga=00;36:*.opus=00;36:*.spx=00;36:*.xspf=00;36:*~=00;90:*#=00;90:*.bak=00;90:*.crdownload=00;90:*.dpkg-dist=00;90:*.dpkg-new=00;90:*.dpkg-old=00;90:*.dpkg-tmp=00;90:*.old=00;90:*.orig=00;90:*.part=00;90:*.rej=00;90:*.rpmnew=00;90:*.rpmorig=00;90:*.rpmsave=00;90:*.swp=00;90:*.tmp=00;90:*.ucf-dist=00;90:*.ucf-new=00;90:*.ucf-old=00;90:"
+      export HCCL_BUFFSIZE="1800"
+      export VLLM_EXECUTE_MODEL_TIMEOUT_SECONDS="30000"
+      export HCCL_EXEC_TIMEOUT="204"
+      export ASCEND_CUSTOM_OPP_PATH="/usr/local/python3.12.13/lib/python3.12/site-packages/fla_npu/opp/vendors/fla_npu_transformer:/usr/local/python3.12.13/lib/python3.12/site-packages/fla_npu/opp/vendors/fla_npu_transformer/op_api/lib"
+      export VLLM_ENGINE_READY_TIMEOUT_S="36000"
+      export TASK_QUEUE_ENABLE="1"
+      export TP_SOCKET_IFNAME="bond4"
+      export OMP_NUM_THREADS="1"
+      export VLLM_RPC_TIMEOUT="3600000"
+      export HCCL_IF_IP="135.98.25.4"
+      
+      # 模型启动命令
+      # 以下参数可能需要根据实际环境修改：
+      #   $MODEL_PATH  模型权重路径（已在上方定义）
+      #   --port       服务端口，需确保未被占用
+      # 其他参数为原始部署配置，请勿随意修改
+      nohup vllm serve $MODEL_PATH --host 0.0.0.0 --port 6727 --data-parallel-size 8 --data-parallel-rank 6 --data-parallel-address 135.98.25.4 --data-parallel-rpc-port 10523 --tensor-parallel-size 2 --enable-expert-parallel --seed 1024 --served-model-name DeepSeek-V4.1-Flash --max-model-len {{max_model_len}} --max-num-batched-tokens 400 --max-num-seqs {{max_num_seqs}} --async-scheduling --block-size 128 --no-enable-prefix-caching --model-loader-extra-config={"enable_multithread_load":true,"num_threads":128} --safetensors-load-strategy lazy --trust-remote-code --tokenizer-mode deepseek_v41 --tool-call-parser deepseek_v41 --enable-auto-tool-choice --reasoning-parser deepseek_v41 --gpu-memory-utilization {{gpu_memory_utilization}} --quantization ascend --speculative-config '{"num_speculative_tokens": 5, "method":"dspark","enforce_eager":true}' --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY"}' --kv-transfer-config '{"kv_connector": "MooncakeHybridConnector", "kv_role": "kv_consumer", "kv_port": "30100", "engine_id": "1", "kv_connector_extra_config": { "prefill": { "dp_size": 4, "tp_size": 4 }, "decode": { "dp_size": 8, "tp_size": 2 } } }' --engram-config '{"cpu_offload":true,"dp_shared_memory":true}' --additional-config '{ "ascend_compilation_config":{ "enable_npugraph_ex":true, "enable_static_kernel":false }, "enable_cpu_binding":true, "multistream_overlap_shared_expert":true, "recompute_scheduler_enable":true }' > run_model.log 2>&1 &
+  - title: "服务验证"
+    content: |-
+      ```shell
+      curl http://<node0_ip>:<port>/v1/chat/completions \
+          -H "Content-Type: application/json" \
+          -d '{"model": "<served-model-name>", "messages": [{"role": "user", "content": "Who are you?"}], "max_tokens": 256, "temperature": 0}'
+      ```
+verification: |-
+  服务启动后，使用上面的 curl 命令验证；预期返回 HTTP 200 OK 且包含 choices 字段的 JSON 响应。
+evaluation:
+  accuracy:
+    content: |-
+      评估方法参考 AISBench。
+  performance:
+    content: |-
+      性能评估参考 AISBench 性能评估与 vllm benchmark 文档。
+performance:
+  accuracy: |-
+  评估方法参考 AISBench。
+  benchmark: |-
+    ### 场景概览
+
+    |场景|部署模式|总 NPU 数|权重版本|关键考虑因素|
+    |---|---|---|---|---|
+    |PD 分离|多节点-PD分离|40（A3）|W8A8|实测环境配置|
+
+    ### 详细节点配置
+
+    |模型名称|产品组合|场景|设备信息|组网形态|总卡数|数据格式|上下文长度|平均输入|平均输出|
+    |---|---|---|---|---|---|---|---|---|---|
+    |DeepSeek-V4.1-Flash|Atlas 800I A3 多节点-PD分离|PD 分离|Atlas 800I A3|多节点-PD分离|40|W8A8|1048576|190K/1K|-|
+tuning: |-
+  请参考公共性能调优文档与特性指南；本章仅涵盖模型特定问题。
+faq: |-
+  关于常见的环境、安装和通用参数问题，请参考公共 FAQ。
+references:
+- title: vllm-ascend 文档
+  url: https://docs.vllm.ai/projects/ascend/zh-cn/latest/tutorials/models/
+- title: vllm-ascend GitHub
+  url: https://github.com/vllm-project/vllm-ascend
