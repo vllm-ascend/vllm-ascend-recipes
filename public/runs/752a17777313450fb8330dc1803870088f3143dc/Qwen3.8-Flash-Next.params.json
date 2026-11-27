@@ -1,0 +1,8 @@
+{
+  "recipe_path": "models/en/Qwen/Qwen3.8-Flash-Next.yaml",
+  "hw_key": "atlas_800_a3",
+  "image": "quay.nju.edu.cn/ascend/vllm-ascend:v0.32.0rc1-a3",
+  "scenarios": [],
+  "missing_reason": "selected hardware job did not provide results",
+  "head_sha": "752a17777313450fb8330dc1803870088f3143dc"
+}

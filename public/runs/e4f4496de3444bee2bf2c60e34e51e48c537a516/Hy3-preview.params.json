@@ -1,0 +1,11 @@
+{
+  "recipe_path": "models/en/tencent/Hy3-preview.yaml",
+  "model_id": "",
+  "hw_key": "atlas_800_a3",
+  "head_sha": "e4f4496de3444bee2bf2c60e34e51e48c537a516",
+  "trigger_type": "pr",
+  "image": "quay.nju.edu.cn/ascend/vllm-ascend:v0.30.0-a3-openeuler",
+  "started_at": "2026-11-26T19:37:20Z",
+  "scenarios": [],
+  "skip_reason": "镜像未预装该权重 (model_id=tencent/Hy3-preview, 目录=tencent/Hy3-preview, 已尝试 ['', 'Eco-Tech', 'vllm-ascend', 'models', '/root/.cache/'])"
+}

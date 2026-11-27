@@ -1,0 +1,11 @@
+{
+  "recipe_path": "models/en/Tencent/Hunyuan-A13B-Instruct.yaml",
+  "model_id": "",
+  "hw_key": "atlas_800_a3",
+  "head_sha": "da9cd1efc2bd9363c0810bf3eecb75f3fbd834af",
+  "trigger_type": "pr",
+  "image": "quay.nju.edu.cn/ascend/vllm-ascend:v0.23.0-a3",
+  "started_at": "2026-11-20T03:20:13Z",
+  "scenarios": [],
+  "skip_reason": "镜像未预装该权重 (model_id=Tencent-Hunyuan/Hunyuan-A13B-Instruct, 目录=Tencent-Hunyuan/Hunyuan-A13B-Instruct, 已尝试 ['', 'Eco-Tech', 'vllm-ascend', 'models', '/root/.cache/'])"
+}
