@@ -1,0 +1,23 @@
+{
+  "verification_scope": "single-node API smoke; not accuracy or full feature coverage",
+  "recipe_path": "models/en/OpenGVLab/InternVL3_5-241B-A28B.yaml",
+  "model_id": "OpenGVLab/InternVL3_5-241B-A28B",
+  "hw_key": "atlas_800_a3",
+  "head_sha": "7d17142af5200cbc30ce201b369cb0eb4b9c81b0",
+  "workflow_run_id": "45952488473",
+  "trigger_type": "pr",
+  "image": "quay.nju.edu.cn/ascend/vllm-ascend:v0.30.0-a3-openeuler",
+  "started_at": "2026-11-27T06:32:10Z",
+  "scenarios": [
+    {
+      "index": 0,
+      "npu": "Atlas 800I A3",
+      "precision": "W8A8",
+      "deployment": "Single-Node",
+      "case": "TP4 DP2 EP",
+      "serve_cmd": "# A3 release serve\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\nexport TASK_QUEUE_ENABLE=1\nexport HCCL_OP_EXPANSION_MODE=AIV\nexport OMP_PROC_BIND=false\nexport OMP_NUM_THREADS=1\nexport HCCL_BUFFSIZE=1536\nexport ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7\n\nMODEL_PATH=/root/.cache/modelscope/hub/models/Eco-Tech/InternVL3_5-241B-A28B-w8a8\ncase \"$MODEL_PATH\" in\n  /*) ;;\n  *) MODEL_PATH=\"/models/$MODEL_PATH\" ;;\nesac\n\nMEDIA_DIR=/models/evidence/internvl-release-retest\nmedia_args=()\nif [[ -d \"$MEDIA_DIR\" ]]; then\n  media_args=(--allowed-local-media-path \"$MEDIA_DIR\")\nfi\n\nvllm serve \"$MODEL_PATH\" \\\n  --host 127.0.0.1 \\\n  --port 2001 \\\n  --served-model-name internvl3_5 \\\n  --trust-remote-code \\\n  --max-model-len 40960 \\\n  --max-num-batched-tokens 4096 \\\n  --tensor-parallel-size 4 \\\n  --data-parallel-size 2 \\\n  --max-num-seqs 70 \\\n  --gpu-memory-utilization 0.9 \\\n  --compilation-config '{\"cudagraph_mode\":\"FULL_DECODE_ONLY\"}' \\\n  --additional-config '{\"weight_nz_mode\":1,\"enable_cpu_binding\":true,\"enable_fused_mc2\":1}' \\\n  --mm-processor-cache-gb 0 \\\n  --enable-chunked-prefill \\\n  --enable-expert-parallel \\\n  --safetensors-load-strategy prefetch \\\n  \"${media_args[@]}\"",
+      "verification_status": "pass",
+      "verification_reason": "Task API response validated"
+    }
+  ]
+}
