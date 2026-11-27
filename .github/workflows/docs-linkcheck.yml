@@ -22,10 +22,37 @@ jobs:
   linkcheck:
     name: Check recipe documentation links
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # Full history so a pull request can diff against its base branch.
+          fetch-depth: 0
+
+      # A pull request only needs to validate the recipe docs it touches; the
+      # weekly schedule (and manual runs) still sweep the whole corpus. Checking
+      # every recipe on each PR made the job run out of its time budget while
+      # crawling slow external hosts (modelscope.cn, huggingface.co).
+      - name: Select recipe documents to check
+        id: scope
+        run: |
+          set -euo pipefail
+          targets="models/**/*.yaml"
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            changed=$(git diff --name-only --diff-filter=ACMR \
+              "origin/${{ github.base_ref }}...HEAD" -- 'models/**/*.yaml' | tr '\n' ' ')
+            changed=${changed% }
+            if [ -n "$changed" ]; then
+              targets="$changed"
+              echo "Checking the recipe docs changed by this PR: $targets"
+            else
+              echo "No recipe YAML changed; checking the full corpus."
+            fi
+          else
+            echo "Scheduled or manual run; checking the full corpus."
+          fi
+          echo "targets=$targets" >> "$GITHUB_OUTPUT"
 
       - name: Check links in recipe documentation
         uses: lycheeverse/lychee-action@v2
@@ -35,11 +62,12 @@ jobs:
             --verbose
             --no-progress
             --accept 200..=399
-            --max-concurrency 4
+            --timeout 20
+            --max-concurrency 8
             --max-retries 3
             --retry-wait-time 5
             --exclude 'https?://(localhost|127\.0\.0\.1)(:[0-9]+)?(/|$)'
             --exclude 'https://gitcode\.com/.+\.git$'
             --exclude 'https://docs\.vllm\.com\.cn/.*'
-            'models/**/*.yaml'
+            ${{ steps.scope.outputs.targets }}
           fail: true
