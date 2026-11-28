@@ -1,0 +1,302 @@
+{
+  "meta.title": {
+    "en": "Qwen3.5-27B",
+    "zh": "Qwen3.5-27B"
+  },
+  "meta.description": {
+    "en": "Qwen3.5-27B is a dense hybrid Mamba-Transformer multimodal model (gated delta networks + full attention, 27B parameters, 262144-token context, MTP head). This recipe covers its W8A8 and BF16 Ascend deployment on Atlas 800 A2/A3 and Atlas 300I DUO.",
+    "zh": "Qwen3.5-27B 是 Qwen3.5 系列的稠密混合 Mamba-Transformer 多模态模型（门控 delta 网络 + 全注意力，27B 参数，262144 token 上下文，带 MTP 头）。本配方覆盖其在 Atlas 800 A2/A3 与 Atlas 300I DUO 上的 W8A8 与 BF16 昇腾部署。"
+  },
+  "meta.performance_headline": {
+    "en": "DP-first W8A8 (TP=2) or BF16 on Atlas 800 A3/A2; TP-only FP16 path on Atlas 300I DUO",
+    "zh": "以 DP 优先的 W8A8（TP=2）或 BF16 部署于 Atlas 800 A3/A2；Atlas 300I DUO 仅支持 TP 的 FP16 路径"
+  },
+  "model.install.docker.note": {
+    "en": "Pinned Ascend image; the full per-SKU device and driver mounts are listed in env_setup.",
+    "zh": "固定版本的昇腾镜像；各 SKU 完整的设备与驱动挂载见 env_setup。"
+  },
+  "features.spec_decoding.description": {
+    "en": "MTP speculative decoding (qwen3_5_mtp, 3 tokens) — both Qwen3.5-27B and Qwen3.6-27B share this MTP head",
+    "zh": "MTP 投机解码（qwen3_5_mtp，3 个 token）—— Qwen3.5-27B 与 Qwen3.6-27B 共用同一套 MTP 头"
+  },
+  "features.compilation_config.description": {
+    "en": "Full ACL graph execution in decode (--compilation-config cudagraph_mode=FULL_DECODE_ONLY)",
+    "zh": "decode 阶段全量 ACL Graph 执行（--compilation-config cudagraph_mode=FULL_DECODE_ONLY）"
+  },
+  "features.async_scheduling.description": {
+    "en": "Asynchronous scheduling to overlap CPU scheduling with NPU computation",
+    "zh": "异步调度，让 CPU 调度与 NPU 计算重叠"
+  },
+  "features.prefix_caching.description": {
+    "en": "KV-cache prefix caching (--enable-prefix-caching / --no-enable-prefix-caching)",
+    "zh": "KV cache 前缀缓存（--enable-prefix-caching / --no-enable-prefix-caching）"
+  },
+  "features.cpu_binding.description": {
+    "en": "Pin Ascend worker threads and NPU IRQs to the CPU ranges closest to the driven NPU",
+    "zh": "把昇腾 worker 线程与 NPU 中断绑定到离所驱动 NPU 最近的 CPU 范围"
+  },
+  "variants.default.description": {
+    "en": "ModelSlim W8A8 checkpoint with the MTP head; the recommended default on Atlas 800 A2/A3",
+    "zh": "带 MTP 头的 ModelSlim W8A8 权重；Atlas 800 A2/A3 上的推荐默认项"
+  },
+  "variants.bf16.description": {
+    "en": "Full-precision BF16 weights (~55.6 GB) — needs TP=2 on 64 GB dies",
+    "zh": "全精度 BF16 权重（约 55.6 GB）—— 在 64 GB 单 die 上需要 TP=2"
+  },
+  "variants.p310.description": {
+    "en": "Same W8A8 MTP checkpoint on Atlas 300I DUO, which only supports TP and requires FP16 runtime",
+    "zh": "同一份 W8A8 MTP 权重用于 Atlas 300I DUO：该平台只支持 TP，且必须 FP16 运行"
+  },
+  "config_params.max_model_len.description": {
+    "en": "Maximum context length (input + output tokens); the model supports up to 262144",
+    "zh": "最大上下文长度（输入 + 输出 token）；模型上限为 262144"
+  },
+  "config_params.max_num_seqs.description": {
+    "en": "Maximum number of concurrent sequences per DP group",
+    "zh": "每个 DP 组允许的最大并发序列数"
+  },
+  "config_params.gpu_memory_utilization.description": {
+    "en": "Fraction of NPU HBM used for the KV cache",
+    "zh": "NPU HBM 中用于 KV cache 的比例"
+  },
+  "overview": {
+    "en": "Qwen3.5-27B is the flagship dense model of the Qwen3.5 family. It uses gated delta networks (linear attention) with a full-attention layer every fourth block, accepts text plus image/video input, serves a 262144-token context, and ships an MTP head that backs `qwen3_5_mtp` speculative decoding.\n\nOn Ascend, the deployment principle is **DP-first**: the W8A8 checkpoint is roughly 30 GB and fits on a single 64 GB die, so keep TP=2 and spend the remaining dies on data parallelism. TP=8 is only for 256K+ context, where sharding the KV cache across eight dies is what buys the window.",
+    "zh": "Qwen3.5-27B 是 Qwen3.5 系列的旗舰稠密模型。它采用门控 delta 网络（线性注意力），每四个 block 插入一层全注意力，支持文本与图像/视频输入，原生 262144 token 上下文，并带 MTP 头支撑 `qwen3_5_mtp` 投机解码。\n\n在昇腾上的部署原则是 **DP 优先**：W8A8 权重约 30 GB，单张 64 GB die 即可容纳，因此保持 TP=2，把其余 die 全部分给数据并行。TP=8 只用于 256K+ 上下文——此时把 KV cache 切分到 8 张 die 才是拿到该窗口的手段。"
+  },
+  "weight_download[0].weight_version": {
+    "en": "Qwen3.5-27B BF16",
+    "zh": "Qwen3.5-27B BF16"
+  },
+  "weight_download[1].weight_version": {
+    "en": "Qwen3.5-27B-w8a8-mtp",
+    "zh": "Qwen3.5-27B-w8a8-mtp"
+  },
+  "quantization.content": {
+    "en": "The container image ships a pre-quantized W8A8 build under the `Eco-Tech/` namespace on ModelScope: `Qwen3.5-27B-w8a8-mtp`. It carries the MTP head, so speculative decoding works without a separate draft model. Quantized weights must be started with `--quantization ascend`; drop the flag to serve BF16 (`Qwen/Qwen3.5-27B`).\n\nAtlas 300I DUO has no BF16 path: it runs the same W8A8 checkpoint with `--dtype float16` and `--mamba-ssm-cache-dtype float16`.",
+    "zh": "镜像生态中提供预量化 W8A8 权重，位于 ModelScope 的 `Eco-Tech/` 命名空间：`Qwen3.5-27B-w8a8-mtp`。它自带 MTP 头，因此投机解码无需额外的 draft 模型。量化权重必须带 `--quantization ascend` 启动；去掉该参数即服务 BF16（`Qwen/Qwen3.5-27B`）。\n\nAtlas 300I DUO 没有 BF16 路径：它运行同一份 W8A8 权重，但必须 `--dtype float16` 且 `--mamba-ssm-cache-dtype float16`。"
+  },
+  "prerequisites[0].title": {
+    "en": "Hardware",
+    "zh": "硬件"
+  },
+  "prerequisites[0].content": {
+    "en": "- **Atlas 800 A3** (64 GB × 16): one node. The 16-NPU layout is TP=2 + DP=8.\n- **Atlas 800 A2** (64 GB × 8): one node. The 8-NPU layout is TP=2 + DP=4.\n- **Atlas 300I DUO**: at least two devices; only TP is supported (TP=2 or TP=4), FP16 runtime only.",
+    "zh": "- **Atlas 800 A3**（64 GB × 16）：单节点。16 NPU 布局为 TP=2 + DP=8。\n- **Atlas 800 A2**（64 GB × 8）：单节点。8 NPU 布局为 TP=2 + DP=4。\n- **Atlas 300I DUO**：至少 2 张卡；只支持 TP（TP=2 或 TP=4），且只能 FP16 运行。"
+  },
+  "prerequisites[1].title": {
+    "en": "Version floor",
+    "zh": "版本下限"
+  },
+  "prerequisites[1].content": {
+    "en": "`min_vllm_version` is `0.30.0`. Qwen3.5-27B is first supported in `vllm-ascend:v0.17.0rc1` and Atlas 300I DUO support starts at `v0.23.0rc1`, but this recipe's rendered commands are validated only against the v0.30.0 image line.",
+    "zh": "`min_vllm_version` 为 `0.30.0`。Qwen3.5-27B 自 `vllm-ascend:v0.17.0rc1` 起获得支持，Atlas 300I DUO 支持自 `v0.23.0rc1` 起；但本配方渲染出的命令只在 v0.30.0 镜像线上验证。"
+  },
+  "env_setup.pip.content": {
+    "en": "There is no Ascend wheel on PyPI, so a source build is the only pip path:\n\n```bash\ngit clone https://github.com/vllm-project/vllm-ascend.git\ncd vllm-ascend\npip install -e .\n```\n\nVerify:\n```bash\npip show vllm-ascend\n```",
+    "zh": "昇腾侧 PyPI 没有对应轮子，pip 路径只能源码构建：\n\n```bash\ngit clone https://github.com/vllm-project/vllm-ascend.git\ncd vllm-ascend\npip install -e .\n```\n\n验证：\n```bash\npip show vllm-ascend\n```"
+  },
+  "env_setup.container.Atlas 800 A3.content": {
+    "en": "```bash\nexport IMAGE=quay.io/ascend/vllm-ascend:v0.30.0-a3\ndocker run --rm \\\n    --name vllm-ascend \\\n    --shm-size=1g \\\n    --net=host \\\n    --device /dev/davinci0 --device /dev/davinci1 --device /dev/davinci2 --device /dev/davinci3 \\\n    --device /dev/davinci4 --device /dev/davinci5 --device /dev/davinci6 --device /dev/davinci7 \\\n    --device /dev/davinci8 --device /dev/davinci9 --device /dev/davinci10 --device /dev/davinci11 \\\n    --device /dev/davinci12 --device /dev/davinci13 --device /dev/davinci14 --device /dev/davinci15 \\\n    --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc \\\n    -v /usr/local/dcmi:/usr/local/dcmi \\\n    -v /usr/local/Ascend/driver/tools/hccn_tool:/usr/local/Ascend/driver/tools/hccn_tool \\\n    -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \\\n    -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \\\n    -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \\\n    -v /etc/ascend_install.info:/etc/ascend_install.info \\\n    -v /root/.cache:/root/.cache \\\n    -it $IMAGE bash\n```",
+    "zh": "```bash\nexport IMAGE=quay.io/ascend/vllm-ascend:v0.30.0-a3\ndocker run --rm \\\n    --name vllm-ascend \\\n    --shm-size=1g \\\n    --net=host \\\n    --device /dev/davinci0 --device /dev/davinci1 --device /dev/davinci2 --device /dev/davinci3 \\\n    --device /dev/davinci4 --device /dev/davinci5 --device /dev/davinci6 --device /dev/davinci7 \\\n    --device /dev/davinci8 --device /dev/davinci9 --device /dev/davinci10 --device /dev/davinci11 \\\n    --device /dev/davinci12 --device /dev/davinci13 --device /dev/davinci14 --device /dev/davinci15 \\\n    --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc \\\n    -v /usr/local/dcmi:/usr/local/dcmi \\\n    -v /usr/local/Ascend/driver/tools/hccn_tool:/usr/local/Ascend/driver/tools/hccn_tool \\\n    -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \\\n    -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \\\n    -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \\\n    -v /etc/ascend_install.info:/etc/ascend_install.info \\\n    -v /root/.cache:/root/.cache \\\n    -it $IMAGE bash\n```"
+  },
+  "env_setup.container.Atlas 800 A2.content": {
+    "en": "```bash\nexport IMAGE=quay.io/ascend/vllm-ascend:v0.30.0\ndocker run --rm \\\n    --name vllm-ascend \\\n    --shm-size=1g \\\n    --net=host \\\n    --device /dev/davinci0 --device /dev/davinci1 --device /dev/davinci2 --device /dev/davinci3 \\\n    --device /dev/davinci4 --device /dev/davinci5 --device /dev/davinci6 --device /dev/davinci7 \\\n    --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc \\\n    -v /usr/local/dcmi:/usr/local/dcmi \\\n    -v /usr/local/Ascend/driver/tools/hccn_tool:/usr/local/Ascend/driver/tools/hccn_tool \\\n    -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \\\n    -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \\\n    -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \\\n    -v /etc/ascend_install.info:/etc/ascend_install.info \\\n    -v /root/.cache:/root/.cache \\\n    -it $IMAGE bash\n```",
+    "zh": "```bash\nexport IMAGE=quay.io/ascend/vllm-ascend:v0.30.0\ndocker run --rm \\\n    --name vllm-ascend \\\n    --shm-size=1g \\\n    --net=host \\\n    --device /dev/davinci0 --device /dev/davinci1 --device /dev/davinci2 --device /dev/davinci3 \\\n    --device /dev/davinci4 --device /dev/davinci5 --device /dev/davinci6 --device /dev/davinci7 \\\n    --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc \\\n    -v /usr/local/dcmi:/usr/local/dcmi \\\n    -v /usr/local/Ascend/driver/tools/hccn_tool:/usr/local/Ascend/driver/tools/hccn_tool \\\n    -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \\\n    -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \\\n    -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \\\n    -v /etc/ascend_install.info:/etc/ascend_install.info \\\n    -v /root/.cache:/root/.cache \\\n    -it $IMAGE bash\n```"
+  },
+  "env_setup.container.Atlas 300I DUO.content": {
+    "en": "```bash\nexport IMAGE=quay.io/ascend/vllm-ascend:v0.30.0-310p\ndocker run --rm \\\n    --name vllm-ascend \\\n    --shm-size=1g \\\n    --device /dev/davinci0 --device /dev/davinci1 --device /dev/davinci2 --device /dev/davinci3 \\\n    --device /dev/davinci4 --device /dev/davinci5 --device /dev/davinci6 --device /dev/davinci7 \\\n    --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc \\\n    -v /usr/local/dcmi:/usr/local/dcmi \\\n    -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \\\n    -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \\\n    -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \\\n    -v /etc/ascend_install.info:/etc/ascend_install.info \\\n    -v /root/.cache:/root/.cache \\\n    -p 8080:8080 \\\n    -it $IMAGE bash\n```\n\nOn Atlas 300I DUO you may need to remove the conflicting Triton builds in the source-install path:\n\n```bash\npip uninstall -y triton-ascend triton\n```",
+    "zh": "```bash\nexport IMAGE=quay.io/ascend/vllm-ascend:v0.30.0-310p\ndocker run --rm \\\n    --name vllm-ascend \\\n    --shm-size=1g \\\n    --device /dev/davinci0 --device /dev/davinci1 --device /dev/davinci2 --device /dev/davinci3 \\\n    --device /dev/davinci4 --device /dev/davinci5 --device /dev/davinci6 --device /dev/davinci7 \\\n    --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc \\\n    -v /usr/local/dcmi:/usr/local/dcmi \\\n    -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \\\n    -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \\\n    -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \\\n    -v /etc/ascend_install.info:/etc/ascend_install.info \\\n    -v /root/.cache:/root/.cache \\\n    -p 8080:8080 \\\n    -it $IMAGE bash\n```\n\n在 Atlas 300I DUO 上若走源码安装，可能需要移除冲突的 Triton：\n\n```bash\npip uninstall -y triton-ascend triton\n```"
+  },
+  "scenarios[0].deployment": {
+    "en": "Single-Node",
+    "zh": "Single-Node"
+  },
+  "scenarios[0].case": {
+    "en": "Multi Card",
+    "zh": "Multi Card"
+  },
+  "scenarios[0].steps[0].title": {
+    "en": "Start the server",
+    "zh": "启动服务"
+  },
+  "scenarios[0].steps[0].content": {
+    "en": "**Status: experimental.** The tutorial's Atlas 800 A2 layout assumes 64 GB dies (64G × 8). This repository's A2 verification runner is an Atlas 800I A2 with **910B4 parts (32 GB per die)**, where the 133k-context W8A8 configuration does not fit: weights take ~15 GB per die and the KV cache pushes the die past 32 GB, so the engines never become ready. The command below keeps the tutorial topology (TP2 + DP4) but caps `--max-model-len` at 32768 so it can run on these 32 GB dies; use the tutorial's 133000 on 64 GB A2 hardware.\n\n```bash\n#!/bin/sh\nexport MODEL_PATH=Eco-Tech/Qwen3.5-27B-w8a8-mtp\nexport VLLM_USE_MODELSCOPE=True\nexport VLLM_ENGINE_READY_TIMEOUT=1800\nexport HCCL_BUFFSIZE=512\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\nexport OMP_PROC_BIND=false\nexport OMP_NUM_THREADS=1\nexport TASK_QUEUE_ENABLE=1\n\nvllm serve $MODEL_PATH \\\n    --host 0.0.0.0 \\\n    --port 8000 \\\n    --data-parallel-size 4 \\\n    --tensor-parallel-size 2 \\\n    --quantization ascend \\\n    --served-model-name qwen3.5 \\\n    --max-num-seqs {{max_num_seqs}} \\\n    --max-model-len 32768 \\\n    --max-num-batched-tokens 16384 \\\n    --trust-remote-code \\\n    --allowed-local-media-path / \\\n    --dtype bfloat16 \\\n    --reasoning-parser qwen3 \\\n    --mm-processor-cache-gb 0 \\\n    --mm-encoder-tp-mode data \\\n    --mm-processor-cache-type shm \\\n    --gpu-memory-utilization {{gpu_memory_utilization}} \\\n    {{prefix_caching}} \\\n    {{spec_decoding}} \\\n    {{compilation_config}} \\\n    {{cpu_binding}} \\\n    {{async_scheduling}}\n```",
+    "zh": "**状态：experimental。** 教程的 Atlas 800 A2 布局按 64 GB/die 设计（64G × 8）。本仓库的 A2 验证 runner 是 **910B4（32 GB/die）**，133k 上下文的 W8A8 配置放不下：权重约占 15 GB/die，叠加 KV cache 后单 die 超过 32 GB，引擎无法就绪。下方命令保留教程拓扑（TP2 + DP4），但把 `--max-model-len` 降到 32768 以便在 32 GB 单卡上跑通；64 GB A2 硬件上请使用教程的 133000。\n\n```bash\n#!/bin/sh\nexport MODEL_PATH=Eco-Tech/Qwen3.5-27B-w8a8-mtp\nexport VLLM_USE_MODELSCOPE=True\nexport VLLM_ENGINE_READY_TIMEOUT=1800\nexport HCCL_BUFFSIZE=512\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\nexport OMP_PROC_BIND=false\nexport OMP_NUM_THREADS=1\nexport TASK_QUEUE_ENABLE=1\n\nvllm serve $MODEL_PATH \\\n    --host 0.0.0.0 \\\n    --port 8000 \\\n    --data-parallel-size 4 \\\n    --tensor-parallel-size 2 \\\n    --quantization ascend \\\n    --served-model-name qwen3.5 \\\n    --max-num-seqs {{max_num_seqs}} \\\n    --max-model-len 32768 \\\n    --max-num-batched-tokens 16384 \\\n    --trust-remote-code \\\n    --allowed-local-media-path / \\\n    --dtype bfloat16 \\\n    --reasoning-parser qwen3 \\\n    --mm-processor-cache-gb 0 \\\n    --mm-encoder-tp-mode data \\\n    --mm-processor-cache-type shm \\\n    --gpu-memory-utilization {{gpu_memory_utilization}} \\\n    {{prefix_caching}} \\\n    {{spec_decoding}} \\\n    {{compilation_config}} \\\n    {{cpu_binding}} \\\n    {{async_scheduling}}\n```"
+  },
+  "scenarios[0].steps[1].title": {
+    "en": "Service verification",
+    "zh": "服务验证"
+  },
+  "scenarios[0].steps[1].content": {
+    "en": "See the `verification` section below.",
+    "zh": "见下方 `verification` 段落。"
+  },
+  "scenarios[1].deployment": {
+    "en": "Single-Node",
+    "zh": "Single-Node"
+  },
+  "scenarios[1].case": {
+    "en": "Multi Card",
+    "zh": "Multi Card"
+  },
+  "scenarios[1].steps[0].title": {
+    "en": "Start the server",
+    "zh": "启动服务"
+  },
+  "scenarios[1].steps[0].content": {
+    "en": "**Status: experimental — awaiting a real-device run.** This is the tutorial's Atlas 800 A3 layout (TP=2 + DP=8 fills all 16 NPUs). The badge stays `experimental` until the rendered command is executed end-to-end on an A3 node.\n\n```bash\n#!/bin/sh\nexport MODEL_PATH=Eco-Tech/Qwen3.5-27B-w8a8-mtp\nexport VLLM_USE_MODELSCOPE=True\nexport HCCL_BUFFSIZE=512\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\nexport OMP_PROC_BIND=false\nexport OMP_NUM_THREADS=1\nexport TASK_QUEUE_ENABLE=1\n\nvllm serve $MODEL_PATH \\\n    --host 0.0.0.0 \\\n    --port 8000 \\\n    --data-parallel-size 8 \\\n    --tensor-parallel-size 2 \\\n    --quantization ascend \\\n    --served-model-name qwen3.5 \\\n    --max-num-seqs {{max_num_seqs}} \\\n    --max-model-len {{max_model_len}} \\\n    --max-num-batched-tokens 16384 \\\n    --trust-remote-code \\\n    --allowed-local-media-path / \\\n    --dtype bfloat16 \\\n    --reasoning-parser qwen3 \\\n    --mm-processor-cache-gb 0 \\\n    --mm-encoder-tp-mode data \\\n    --mm-processor-cache-type shm \\\n    --gpu-memory-utilization {{gpu_memory_utilization}} \\\n    {{prefix_caching}} \\\n    {{spec_decoding}} \\\n    {{compilation_config}} \\\n    {{cpu_binding}} \\\n    {{async_scheduling}}\n```",
+    "zh": "**状态：experimental —— 等待真机运行。** 这是教程给出的 Atlas 800 A3 布局（TP=2 + DP=8 占满 16 张 NPU）。在 A3 节点上把渲染出的命令端到端跑通之前，徽标保持 `experimental`。\n\n```bash\n#!/bin/sh\nexport MODEL_PATH=Eco-Tech/Qwen3.5-27B-w8a8-mtp\nexport VLLM_USE_MODELSCOPE=True\nexport HCCL_BUFFSIZE=512\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\nexport OMP_PROC_BIND=false\nexport OMP_NUM_THREADS=1\nexport TASK_QUEUE_ENABLE=1\n\nvllm serve $MODEL_PATH \\\n    --host 0.0.0.0 \\\n    --port 8000 \\\n    --data-parallel-size 8 \\\n    --tensor-parallel-size 2 \\\n    --quantization ascend \\\n    --served-model-name qwen3.5 \\\n    --max-num-seqs {{max_num_seqs}} \\\n    --max-model-len {{max_model_len}} \\\n    --max-num-batched-tokens 16384 \\\n    --trust-remote-code \\\n    --allowed-local-media-path / \\\n    --dtype bfloat16 \\\n    --reasoning-parser qwen3 \\\n    --mm-processor-cache-gb 0 \\\n    --mm-encoder-tp-mode data \\\n    --mm-processor-cache-type shm \\\n    --gpu-memory-utilization {{gpu_memory_utilization}} \\\n    {{prefix_caching}} \\\n    {{spec_decoding}} \\\n    {{compilation_config}} \\\n    {{cpu_binding}} \\\n    {{async_scheduling}}\n```"
+  },
+  "scenarios[1].steps[1].title": {
+    "en": "Service verification",
+    "zh": "服务验证"
+  },
+  "scenarios[1].steps[1].content": {
+    "en": "See the `verification` section below.",
+    "zh": "见下方 `verification` 段落。"
+  },
+  "scenarios[2].deployment": {
+    "en": "Single-Node",
+    "zh": "Single-Node"
+  },
+  "scenarios[2].case": {
+    "en": "Low Latency (128k)",
+    "zh": "Low Latency (128k)"
+  },
+  "scenarios[2].steps[0].title": {
+    "en": "Start the server",
+    "zh": "启动服务"
+  },
+  "scenarios[2].steps[0].content": {
+    "en": "**Status: experimental — awaiting a real-device run.** This is the tutorial's Low Latency row for Atlas 800 A3: the same TP=2 + DP=8 topology as the throughput case, but `--max-num-seqs 4` and `--max-num-batched-tokens 4096` to cut batch latency. The badge stays `experimental` until the rendered command is executed end-to-end on an A3 node.\n\n```bash\n#!/bin/sh\nexport MODEL_PATH=Eco-Tech/Qwen3.5-27B-w8a8-mtp\nexport VLLM_USE_MODELSCOPE=True\nexport HCCL_BUFFSIZE=512\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\nexport OMP_PROC_BIND=false\nexport OMP_NUM_THREADS=1\nexport TASK_QUEUE_ENABLE=1\n\nvllm serve $MODEL_PATH \\\n    --host 0.0.0.0 \\\n    --port 8000 \\\n    --data-parallel-size 8 \\\n    --tensor-parallel-size 2 \\\n    --quantization ascend \\\n    --served-model-name qwen3.5 \\\n    --max-num-seqs 4 \\\n    --max-model-len 133120 \\\n    --max-num-batched-tokens 4096 \\\n    --trust-remote-code \\\n    --allowed-local-media-path / \\\n    --dtype bfloat16 \\\n    --reasoning-parser qwen3 \\\n    --mm-processor-cache-gb 0 \\\n    --mm-encoder-tp-mode data \\\n    --mm-processor-cache-type shm \\\n    --gpu-memory-utilization {{gpu_memory_utilization}} \\\n    {{prefix_caching}} \\\n    {{spec_decoding}} \\\n    {{compilation_config}} \\\n    {{cpu_binding}} \\\n    {{async_scheduling}}\n```",
+    "zh": "**状态：experimental —— 等待真机运行。** 这是教程给出的 Atlas 800 A3 低时延档：拓扑与吞吐档相同（TP=2 + DP=8），但把 `--max-num-seqs` 降到 4、`--max-num-batched-tokens` 降到 4096，以降低批次等待。在 A3 节点上把渲染出的命令端到端跑通之前，徽标保持 `experimental`。\n\n```bash\n#!/bin/sh\nexport MODEL_PATH=Eco-Tech/Qwen3.5-27B-w8a8-mtp\nexport VLLM_USE_MODELSCOPE=True\nexport HCCL_BUFFSIZE=512\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\nexport OMP_PROC_BIND=false\nexport OMP_NUM_THREADS=1\nexport TASK_QUEUE_ENABLE=1\n\nvllm serve $MODEL_PATH \\\n    --host 0.0.0.0 \\\n    --port 8000 \\\n    --data-parallel-size 8 \\\n    --tensor-parallel-size 2 \\\n    --quantization ascend \\\n    --served-model-name qwen3.5 \\\n    --max-num-seqs 4 \\\n    --max-model-len 133120 \\\n    --max-num-batched-tokens 4096 \\\n    --trust-remote-code \\\n    --allowed-local-media-path / \\\n    --dtype bfloat16 \\\n    --reasoning-parser qwen3 \\\n    --mm-processor-cache-gb 0 \\\n    --mm-encoder-tp-mode data \\\n    --mm-processor-cache-type shm \\\n    --gpu-memory-utilization {{gpu_memory_utilization}} \\\n    {{prefix_caching}} \\\n    {{spec_decoding}} \\\n    {{compilation_config}} \\\n    {{cpu_binding}} \\\n    {{async_scheduling}}\n```"
+  },
+  "scenarios[2].steps[1].title": {
+    "en": "Service verification",
+    "zh": "服务验证"
+  },
+  "scenarios[2].steps[1].content": {
+    "en": "See the `verification` section below.",
+    "zh": "见下方 `verification` 段落。"
+  },
+  "scenarios[3].deployment": {
+    "en": "Single-Node",
+    "zh": "Single-Node"
+  },
+  "scenarios[3].case": {
+    "en": "Multi Card",
+    "zh": "Multi Card"
+  },
+  "scenarios[3].steps[0].title": {
+    "en": "Start the server",
+    "zh": "启动服务"
+  },
+  "scenarios[3].steps[0].content": {
+    "en": "**Status: experimental.** The tutorial's weight table covers BF16 on Atlas 800 A3/A2 but spells out only the W8A8 commands, so this BF16 layout is derived from the W8A8 one: drop `--quantization ascend` and use the BF16 weight id. No standalone BF16 measurement exists.\n\n```bash\n#!/bin/sh\nexport MODEL_PATH=Qwen/Qwen3.5-27B\nexport VLLM_USE_MODELSCOPE=True\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\nexport OMP_NUM_THREADS=1\nexport TASK_QUEUE_ENABLE=1\n\nvllm serve $MODEL_PATH \\\n    --host 0.0.0.0 \\\n    --port 8000 \\\n    --tensor-parallel-size 2 \\\n    --served-model-name qwen3.5 \\\n    --max-num-seqs {{max_num_seqs}} \\\n    --max-model-len {{max_model_len}} \\\n    --max-num-batched-tokens 16384 \\\n    --trust-remote-code \\\n    --allowed-local-media-path / \\\n    --dtype bfloat16 \\\n    --reasoning-parser qwen3 \\\n    --mm-processor-cache-gb 0 \\\n    --mm-encoder-tp-mode data \\\n    --mm-processor-cache-type shm \\\n    --gpu-memory-utilization {{gpu_memory_utilization}} \\\n    {{prefix_caching}} \\\n    {{spec_decoding}} \\\n    {{compilation_config}} \\\n    {{cpu_binding}} \\\n    {{async_scheduling}}\n```",
+    "zh": "**状态：experimental。** 教程的权重表覆盖了 Atlas 800 A3/A2 上的 BF16，但只给出了 W8A8 的完整命令，因此这里的 BF16 布局由 W8A8 推导：去掉 `--quantization ascend` 并换成 BF16 权重。没有独立的 BF16 测量数据。\n\n```bash\n#!/bin/sh\nexport MODEL_PATH=Qwen/Qwen3.5-27B\nexport VLLM_USE_MODELSCOPE=True\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\nexport OMP_NUM_THREADS=1\nexport TASK_QUEUE_ENABLE=1\n\nvllm serve $MODEL_PATH \\\n    --host 0.0.0.0 \\\n    --port 8000 \\\n    --tensor-parallel-size 2 \\\n    --served-model-name qwen3.5 \\\n    --max-num-seqs {{max_num_seqs}} \\\n    --max-model-len {{max_model_len}} \\\n    --max-num-batched-tokens 16384 \\\n    --trust-remote-code \\\n    --allowed-local-media-path / \\\n    --dtype bfloat16 \\\n    --reasoning-parser qwen3 \\\n    --mm-processor-cache-gb 0 \\\n    --mm-encoder-tp-mode data \\\n    --mm-processor-cache-type shm \\\n    --gpu-memory-utilization {{gpu_memory_utilization}} \\\n    {{prefix_caching}} \\\n    {{spec_decoding}} \\\n    {{compilation_config}} \\\n    {{cpu_binding}} \\\n    {{async_scheduling}}\n```"
+  },
+  "scenarios[3].steps[1].title": {
+    "en": "Service verification",
+    "zh": "服务验证"
+  },
+  "scenarios[3].steps[1].content": {
+    "en": "See the `verification` section below.",
+    "zh": "见下方 `verification` 段落。"
+  },
+  "scenarios[4].deployment": {
+    "en": "Single-Node",
+    "zh": "Single-Node"
+  },
+  "scenarios[4].case": {
+    "en": "Long Context (256K+)",
+    "zh": "Long Context (256K+)"
+  },
+  "scenarios[4].steps[0].title": {
+    "en": "Start the server",
+    "zh": "启动服务"
+  },
+  "scenarios[4].steps[0].content": {
+    "en": "**Status: experimental.** For 256K+ context, shard the KV cache across eight dies (TP=8) and keep two DP groups, then raise `--max-model-len` to the model maximum. TP=8 is the only layout in this recipe where the full 262144-token window is reachable on A3.\n\n```bash\n#!/bin/sh\nexport MODEL_PATH=Eco-Tech/Qwen3.5-27B-w8a8-mtp\nexport VLLM_USE_MODELSCOPE=True\nexport HCCL_BUFFSIZE=512\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\nexport OMP_NUM_THREADS=1\nexport TASK_QUEUE_ENABLE=1\n\nvllm serve $MODEL_PATH \\\n    --host 0.0.0.0 \\\n    --port 8000 \\\n    --data-parallel-size 2 \\\n    --tensor-parallel-size 8 \\\n    --quantization ascend \\\n    --served-model-name qwen3.5 \\\n    --max-num-seqs 8 \\\n    --max-model-len 262144 \\\n    --max-num-batched-tokens 8192 \\\n    --trust-remote-code \\\n    --allowed-local-media-path / \\\n    --dtype bfloat16 \\\n    --reasoning-parser qwen3 \\\n    --mm-processor-cache-gb 0 \\\n    --mm-encoder-tp-mode data \\\n    --mm-processor-cache-type shm \\\n    --gpu-memory-utilization 0.90 \\\n    {{prefix_caching}} \\\n    {{spec_decoding}} \\\n    {{compilation_config}} \\\n    {{cpu_binding}} \\\n    {{async_scheduling}}\n```",
+    "zh": "**状态：experimental。** 256K+ 上下文场景要把 KV cache 切分到 8 张 die（TP=8），同时保留 2 个 DP 组，并把 `--max-model-len` 提到模型上限 262144。这是本配方中 A3 上唯一能拿到完整 262144 token 窗口的布局。\n\n```bash\n#!/bin/sh\nexport MODEL_PATH=Eco-Tech/Qwen3.5-27B-w8a8-mtp\nexport VLLM_USE_MODELSCOPE=True\nexport HCCL_BUFFSIZE=512\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\nexport OMP_NUM_THREADS=1\nexport TASK_QUEUE_ENABLE=1\n\nvllm serve $MODEL_PATH \\\n    --host 0.0.0.0 \\\n    --port 8000 \\\n    --data-parallel-size 2 \\\n    --tensor-parallel-size 8 \\\n    --quantization ascend \\\n    --served-model-name qwen3.5 \\\n    --max-num-seqs 8 \\\n    --max-model-len 262144 \\\n    --max-num-batched-tokens 8192 \\\n    --trust-remote-code \\\n    --allowed-local-media-path / \\\n    --dtype bfloat16 \\\n    --reasoning-parser qwen3 \\\n    --mm-processor-cache-gb 0 \\\n    --mm-encoder-tp-mode data \\\n    --mm-processor-cache-type shm \\\n    --gpu-memory-utilization 0.90 \\\n    {{prefix_caching}} \\\n    {{spec_decoding}} \\\n    {{compilation_config}} \\\n    {{cpu_binding}} \\\n    {{async_scheduling}}\n```"
+  },
+  "scenarios[4].steps[1].title": {
+    "en": "Service verification",
+    "zh": "服务验证"
+  },
+  "scenarios[4].steps[1].content": {
+    "en": "See the `verification` section below.",
+    "zh": "见下方 `verification` 段落。"
+  },
+  "scenarios[5].deployment": {
+    "en": "Single-Node",
+    "zh": "Single-Node"
+  },
+  "scenarios[5].case": {
+    "en": "300I DUO (TP)",
+    "zh": "300I DUO (TP)"
+  },
+  "scenarios[5].steps[0].title": {
+    "en": "Start the server",
+    "zh": "启动服务"
+  },
+  "scenarios[5].steps[0].content": {
+    "en": "**Status: experimental — no 310P hardware available.** Atlas 300I DUO supports TP only (pick TP=2 or TP=4 for the devices you have) and an FP16 runtime. `enable_npugraph_ex` is not available on this platform, so it is switched off explicitly.\n\n```bash\n#!/bin/sh\nexport MODEL_PATH=Eco-Tech/Qwen3.5-27B-w8a8-mtp\nexport VLLM_USE_MODELSCOPE=True\nexport OMP_NUM_THREADS=1\n\nvllm serve $MODEL_PATH \\\n    --host 0.0.0.0 \\\n    --port 8000 \\\n    --tensor-parallel-size 4 \\\n    --quantization ascend \\\n    --served-model-name qwen3.5 \\\n    --max-num-seqs 128 \\\n    --max-model-len 16384 \\\n    --trust-remote-code \\\n    --gpu-memory-utilization 0.90 \\\n    --mamba-ssm-cache-dtype float16 \\\n    --dtype float16 \\\n    --speculative-config '{\"method\": \"qwen3_5_mtp\", \"num_speculative_tokens\": 1}' \\\n    --compilation-config '{\"cudagraph_mode\": \"FULL_DECODE_ONLY\", \"cudagraph_capture_sizes\": [2, 16]}' \\\n    --additional-config '{\"ascend_compilation_config\": {\"enable_npugraph_ex\": false}}'\n```",
+    "zh": "**状态：experimental —— 无 310P 硬件可测。** Atlas 300I DUO 只支持 TP（按实际卡数选 TP=2 或 TP=4），且只能 FP16 运行。该平台不支持 `enable_npugraph_ex`，因此显式关闭。\n\n```bash\n#!/bin/sh\nexport MODEL_PATH=Eco-Tech/Qwen3.5-27B-w8a8-mtp\nexport VLLM_USE_MODELSCOPE=True\nexport OMP_NUM_THREADS=1\n\nvllm serve $MODEL_PATH \\\n    --host 0.0.0.0 \\\n    --port 8000 \\\n    --tensor-parallel-size 4 \\\n    --quantization ascend \\\n    --served-model-name qwen3.5 \\\n    --max-num-seqs 128 \\\n    --max-model-len 16384 \\\n    --trust-remote-code \\\n    --gpu-memory-utilization 0.90 \\\n    --mamba-ssm-cache-dtype float16 \\\n    --dtype float16 \\\n    --speculative-config '{\"method\": \"qwen3_5_mtp\", \"num_speculative_tokens\": 1}' \\\n    --compilation-config '{\"cudagraph_mode\": \"FULL_DECODE_ONLY\", \"cudagraph_capture_sizes\": [2, 16]}' \\\n    --additional-config '{\"ascend_compilation_config\": {\"enable_npugraph_ex\": false}}'\n```"
+  },
+  "scenarios[5].steps[1].title": {
+    "en": "Service verification",
+    "zh": "服务验证"
+  },
+  "scenarios[5].steps[1].content": {
+    "en": "See the `verification` section below. Use `--served-model-name qwen3.5` and 16384 as the context ceiling.",
+    "zh": "见下方 `verification` 段落。使用 `--served-model-name qwen3.5`，上下文上限为 16384。"
+  },
+  "verification": {
+    "en": "After the service starts, the log should show:\n```text\n(APIServer pid=<pid>) INFO:     Started server process [<pid>]\n(APIServer pid=<pid>) INFO:     Waiting for application startup.\n(APIServer pid=<pid>) INFO:     Application startup complete.\n```\n\nSmoke-test the **Completions API**:\n```bash\ncurl http://localhost:<port>/v1/completions \\\n    -H \"Content-Type: application/json\" \\\n    -d '{\n        \"model\": \"qwen3.5\",\n        \"prompt\": \"The future of AI is\",\n        \"max_tokens\": 50,\n        \"temperature\": 0\n    }'\n```\n\nAnd the **Chat Completions API**:\n```bash\ncurl http://localhost:<port>/v1/chat/completions \\\n    -H \"Content-Type: application/json\" \\\n    -d '{\n        \"model\": \"qwen3.5\",\n        \"messages\": [{\"role\": \"user\", \"content\": \"The future of AI is\"}],\n        \"max_completion_tokens\": 4096,\n        \"chat_template_kwargs\": {\"enable_thinking\": false},\n        \"temperature\": 0.7,\n        \"top_p\": 0.95\n    }'\n```\n\nExpected: HTTP 200 OK with a `choices` field carrying generated text.",
+    "zh": "服务启动后，日志应出现：\n```text\n(APIServer pid=<pid>) INFO:     Started server process [<pid>]\n(APIServer pid=<pid>) INFO:     Waiting for application startup.\n(APIServer pid=<pid>) INFO:     Application startup complete.\n```\n\n用 **Completions API** 做冒烟测试：\n```bash\ncurl http://localhost:<port>/v1/completions \\\n    -H \"Content-Type: application/json\" \\\n    -d '{\n        \"model\": \"qwen3.5\",\n        \"prompt\": \"The future of AI is\",\n        \"max_tokens\": 50,\n        \"temperature\": 0\n    }'\n```\n\n以及 **Chat Completions API**：\n```bash\ncurl http://localhost:<port>/v1/chat/completions \\\n    -H \"Content-Type: application/json\" \\\n    -d '{\n        \"model\": \"qwen3.5\",\n        \"messages\": [{\"role\": \"user\", \"content\": \"The future of AI is\"}],\n        \"max_completion_tokens\": 4096,\n        \"chat_template_kwargs\": {\"enable_thinking\": false},\n        \"temperature\": 0.7,\n        \"top_p\": 0.95\n    }'\n```\n\n预期：返回 HTTP 200 OK，响应体含 `choices` 字段并生成文本。"
+  },
+  "evaluation.accuracy.content": {
+    "en": "### Using AISBench (recommended)\n\nFollow the vllm-ascend AISBench guide. The only published number for this model is the upstream tutorial's `gsm8k` run of `Qwen3.5-27B-w8a8` on **Atlas 800 A3 with `vllm-ascend:v0.17.0rc1`**:\n\n| dataset | version | metric | mode | vllm-api-general-chat |\n|---------|---------|--------|------|-----------------------|\n| gsm8k   | -       | accuracy | gen | 96.74 |\n\nThat number predates the v0.30.0 image line and has not been reproduced here; treat it as a reference, not a baseline for this recipe.\n\n### Using Language Model Evaluation Harness (lm_eval)\n\n```shell\nlm_eval \\\n  --model local-completions \\\n  --model_args model=qwen3.5,base_url=http://127.0.0.1:8000/v1/completions,tokenized_requests=False,trust_remote_code=True \\\n  --tasks gsm8k \\\n  --output_path ./\n```",
+    "zh": "### 使用 AISBench（推荐）\n\n参考 vllm-ascend 的 AISBench 指南。该模型唯一公开的数字来自上游教程：`Qwen3.5-27B-w8a8` 在 **Atlas 800 A3 + `vllm-ascend:v0.17.0rc1`** 上的 `gsm8k` 结果：\n\n| dataset | version | metric | mode | vllm-api-general-chat |\n|---------|---------|--------|------|-----------------------|\n| gsm8k   | -       | accuracy | gen | 96.74 |\n\n该数字早于 v0.30.0 镜像线，本配方未复现；请把它当作参考值，而不是本配方的基线。\n\n### 使用 Language Model Evaluation Harness（lm_eval）\n\n```shell\nlm_eval \\\n  --model local-completions \\\n  --model_args model=qwen3.5,base_url=http://127.0.0.1:8000/v1/completions,tokenized_requests=False,trust_remote_code=True \\\n  --tasks gsm8k \\\n  --output_path ./\n```"
+  },
+  "evaluation.performance.content": {
+    "en": "### Using AISBench\n\nSee the vllm-ascend AISBench performance-evaluation guide.\n\n### Using vllm bench serve\n\n```bash\nexport VLLM_USE_MODELSCOPE=True\n# W8A8 MTP checkpoint\nvllm bench serve --model Eco-Tech/Qwen3.5-27B-w8a8-mtp \\\n  --dataset-name random --random-input 200 --num-prompts 200 \\\n  --request-rate 1 --save-result --result-dir ./\n# BF16 checkpoint\nvllm bench serve --model Qwen/Qwen3.5-27B \\\n  --dataset-name random --random-input 200 --num-prompts 200 \\\n  --request-rate 1 --save-result --result-dir ./\n```\n\nNo throughput or latency figures are published for this recipe on Ascend.",
+    "zh": "### 使用 AISBench\n\n参考 vllm-ascend 的 AISBench 性能评测指南。\n\n### 使用 vllm bench serve\n\n```bash\nexport VLLM_USE_MODELSCOPE=True\n# W8A8 MTP 权重\nvllm bench serve --model Eco-Tech/Qwen3.5-27B-w8a8-mtp \\\n  --dataset-name random --random-input 200 --num-prompts 200 \\\n  --request-rate 1 --save-result --result-dir ./\n# BF16 权重\nvllm bench serve --model Qwen/Qwen3.5-27B \\\n  --dataset-name random --random-input 200 --num-prompts 200 \\\n  --request-rate 1 --save-result --result-dir ./\n```\n\n本配方未发布任何昇腾上的吞吐或时延数字。"
+  },
+  "tuning": {
+    "en": "### Parallelism strategy (DP-first)\n\n`Qwen3.5-27B-w8a8` is roughly 30 GB, so it fits on a single 64 GB HBM die. Keep **TP=2** as the default and give the remaining dies to DP for parallel request batches. **TP=8 is only for 256K+ context**, where sharding the KV cache across eight dies is what makes the window reachable.\n\n**Atlas 300I DUO**: TP only — TP=2 or TP=4, FP16 runtime, `--max-model-len` capped at 16384 here (raise it only after checking HBM headroom).\n\n| Scenario | Deployment | NPUs | Weight | Notes |\n|----------|------------|------|--------|-------|\n| High Throughput (128K ctx) | Single-Node A2 | 8 | Qwen3.5-27B-w8a8-mtp | TP=2 + DP=4 — uses all 8 NPUs for parallel request batches |\n| High Throughput (128K ctx) | Single-Node A3 | 16 | Qwen3.5-27B-w8a8-mtp | TP=2 + DP=8 — uses all 16 NPUs for parallel request batches |\n| Low Latency (128K ctx) | Single-Node A3 | 16 | Qwen3.5-27B-w8a8-mtp | TP=2 + DP=8, `--max-num-seqs 4` — lower per-layer Allreduce overhead for small interactive batches |\n| Long Context (256K+ ctx) | Single-Node A3 | 16 | Qwen3.5-27B-w8a8-mtp | TP=8 + DP=2 — shards the KV cache across 8 NPUs |\n| Short context, FP16 | Single-Node 300I DUO | 2-8 | Qwen3.5-27B-w8a8-mtp | TP=2 or TP=4, `--dtype float16` |\n\n| Scenario | Config | TP | DP | Max Num Seqs | Max Num Batched Tokens | Max Model Len | MTP Num | Async Scheduling |\n|----------|--------|----|----|--------------|------------------------|---------------|---------|-------------------|\n| High Throughput (128K) | Single-Node A2 | 2 | 4 | 32 | 16384 | 133000 | 3 | On |\n| High Throughput (128K) | Single-Node A3 | 2 | 8 | 32 | 16384 | 133120 | 3 | On |\n| Low Latency (128K) | Single-Node A3 | 2 | 8 | 4 | 4096 | 133120 | 3 | On |\n| Long Context (256K+) | Single-Node A3 | 8 | 2 | 8 | 8192 | 262144 | 3 | On |\n| Short context | Single-Node 300I DUO | 2-4 | 1 | 128 | 8192 | 16384 | 1 | Off |\n\n### Key levers\n\n- `--gpu-memory-utilization`: raise it to grow the KV cache; too high risks OOM because the warm-up peak differs from steady-state usage.\n- `--max-num-batched-tokens`: larger means lower latency but more activation HBM.\n- `--speculative-config`: both Qwen3.5-27B and Qwen3.6-27B use `qwen3_5_mtp`; on Atlas 300I DUO set `num_speculative_tokens` to 1.\n- `--compilation-config cudagraph_mode=FULL_DECODE_ONLY`: recommended; `PIECEWISE` is the alternative. On Atlas 300I DUO use at most two capture sizes.\n- `--additional-config '{\"enable_cpu_binding\": true}'`: pins threads and NPU IRQs near the driven NPU; on by default from v0.18.0rc1.",
+    "zh": "### 并行策略（DP 优先）\n\n`Qwen3.5-27B-w8a8` 约 30 GB，单张 64 GB HBM die 即可容纳。默认保持 **TP=2**，把其余 die 分给 DP 以并行处理请求批次。**TP=8 只用于 256K+ 上下文**——此时把 KV cache 切到 8 张 die 才是拿到该窗口的手段。\n\n**Atlas 300I DUO**：只支持 TP —— TP=2 或 TP=4，FP16 运行；此处 `--max-model-len` 保守取 16384（确认 HBM 余量后再上调）。\n\n| 场景 | 部署 | NPU 数 | 权重 | 说明 |\n|------|------|--------|------|------|\n| 高吞吐（128K 上下文） | 单节点 A2 | 8 | Qwen3.5-27B-w8a8-mtp | TP=2 + DP=4 —— 8 张 NPU 全部用于并行请求批次 |\n| 高吞吐（128K 上下文） | 单节点 A3 | 16 | Qwen3.5-27B-w8a8-mtp | TP=2 + DP=8 —— 16 张 NPU 全部用于并行请求批次 |\n| 低时延（128K 上下文） | 单节点 A3 | 16 | Qwen3.5-27B-w8a8-mtp | TP=2 + DP=8、`--max-num-seqs 4` —— 小批量交互场景下每层 Allreduce 开销更低 |\n| 长上下文（256K+） | 单节点 A3 | 16 | Qwen3.5-27B-w8a8-mtp | TP=8 + DP=2 —— KV cache 切分到 8 张 NPU |\n| 短上下文、FP16 | 单节点 300I DUO | 2-8 | Qwen3.5-27B-w8a8-mtp | TP=2 或 TP=4，`--dtype float16` |\n\n| 场景 | 配置 | TP | DP | Max Num Seqs | Max Num Batched Tokens | Max Model Len | MTP 数 | 异步调度 |\n|------|------|----|----|--------------|------------------------|---------------|--------|----------|\n| 高吞吐（128K） | 单节点 A2 | 2 | 4 | 32 | 16384 | 133000 | 3 | 开 |\n| 高吞吐（128K） | 单节点 A3 | 2 | 8 | 32 | 16384 | 133120 | 3 | 开 |\n| 低时延（128K） | 单节点 A3 | 2 | 8 | 4 | 4096 | 133120 | 3 | 开 |\n| 长上下文（256K+） | 单节点 A3 | 8 | 2 | 8 | 8192 | 262144 | 3 | 开 |\n| 短上下文 | 单节点 300I DUO | 2-4 | 1 | 128 | 8192 | 16384 | 1 | 关 |\n\n### 关键调节项\n\n- `--gpu-memory-utilization`：调大以扩大 KV cache；过高会 OOM，因为预热阶段峰值与稳态占用并不相同。\n- `--max-num-batched-tokens`：调大降低时延，但激活值 HBM 压力上升。\n- `--speculative-config`：Qwen3.5-27B 与 Qwen3.6-27B 都使用 `qwen3_5_mtp`；Atlas 300I DUO 上把 `num_speculative_tokens` 设为 1。\n- `--compilation-config cudagraph_mode=FULL_DECODE_ONLY`：推荐值，`PIECEWISE` 为备选。Atlas 300I DUO 上最多使用两个 capture size。\n- `--additional-config '{\"enable_cpu_binding\": true}'`：把线程与 NPU 中断绑到最近 NUMA 域；自 v0.18.0rc1 起默认开启。"
+  },
+  "faq": {
+    "en": "Common environment, installation and parameter questions are collected in the vLLM-Ascend public FAQ:\nhttps://docs.vllm.ai/projects/ascend/en/latest/faqs.html",
+    "zh": "常见环境、安装与参数问题见 vLLM-Ascend 公共 FAQ：\nhttps://docs.vllm.ai/projects/ascend/en/latest/faqs.html"
+  },
+  "references[0].title": {
+    "en": "Qwen3.5-27B model card (HuggingFace)",
+    "zh": "Qwen3.5-27B 模型卡（HuggingFace）"
+  },
+  "references[1].title": {
+    "en": "Qwen3.5-27B (ModelScope)",
+    "zh": "Qwen3.5-27B（ModelScope）"
+  },
+  "references[2].title": {
+    "en": "Qwen3.5-27B-w8a8-mtp (Eco-Tech, ModelScope)",
+    "zh": "Qwen3.5-27B-w8a8-mtp（Eco-Tech，ModelScope）"
+  },
+  "references[3].title": {
+    "en": "vllm-ascend tutorial (release v0.30.0)",
+    "zh": "vllm-ascend 教程（v0.30.0 发布版）"
+  },
+  "references[4].title": {
+    "en": "Additional Configuration",
+    "zh": "附加配置（Additional Configuration）"
+  },
+  "references[5].title": {
+    "en": "Feature matrix",
+    "zh": "特性矩阵（Feature matrix）"
+  },
+  "references[6].title": {
+    "en": "vLLM-Ascend public FAQ",
+    "zh": "vLLM-Ascend 公共 FAQ"
+  }
+}
