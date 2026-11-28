@@ -145,6 +145,16 @@ export const scenarioSchema = z
     tags: z.array(z.string()).optional(),
     strategy: z.string().optional(),
     npu_per_node: z.number().int().positive().optional(),
+    // Public hub identity for an offline CI cache lookup.
+    checkpoint_model_id: z
+      .string()
+      .regex(/^[\w][\w.-]*\/[\w][\w.-]*$/)
+      .optional(),
+    checkpoint_subdir: z
+      .string()
+      .regex(/^[\w-]+(?:\/[\w.-]+)*$/)
+      .refine((path) => !path.split('/').includes('..'))
+      .optional(),
     aisbench: z.array(aisbenchTestSchema).optional(),
     scripts: z.record(z.string(), scenarioScriptSchema).optional(),
     steps: z.array(scenarioStepSchema),
