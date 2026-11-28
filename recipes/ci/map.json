@@ -81,6 +81,31 @@
           "nodes": 1
         }
       ]
+    },
+    {
+      "name": "MiniMax-M3.1-Flash",
+      "yaml": "recipes/models/MiniMaxAI/MiniMax-M3.1-Flash.yaml",
+      "hf_id": "MiniMaxAI/MiniMax-M3.1-Flash",
+      "combos": [
+        {
+          "id": "a3-910c-w8a8-agg",
+          "hardware": "ascend_910c",
+          "variant": "ascend_w8a8",
+          "preset": "ascend_a3_w8a8_agg",
+          "features": {},
+          "expect": { "spec_decoding": "dspark", "tp": 4, "dp": 4 },
+          "nodes": 1
+        },
+        {
+          "id": "a5-950dt-mxfp8-agg",
+          "hardware": "ascend_950dt_8x",
+          "variant": "ascend_w8a8_mxfp8",
+          "preset": "ascend_a5_w8a8_mxfp8_agg",
+          "features": {},
+          "expect": { "spec_decoding": "dspark", "tp": 4, "dp": 2 },
+          "nodes": 1
+        }
+      ]
     }
   ]
 }

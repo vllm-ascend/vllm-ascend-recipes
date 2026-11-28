@@ -585,6 +585,8 @@ def run_combo(combo_dir: Path, results_dir: Path) -> int:
         "required_npu": meta["required_npu"],
         "port": meta["port"],
         "source_url": meta["source_url"],
+        "preset": meta.get("preset"),
+        "point": meta.get("point"),
         "smoke_test": meta.get("smoke_test", "chat"),
         "required": bool(meta.get("required", False)),
         "status": "fail",
@@ -603,6 +605,9 @@ def run_combo(combo_dir: Path, results_dir: Path) -> int:
         started = time.monotonic()
         try:
             run_sh = localized_run_sh(combo_dir, out_dir, meta)
+            if meta.get("preset"):
+                point = f" (point {meta['point']})" if meta.get("point") else ""
+                print(f"[combo] preset: {meta['preset']}{point}", flush=True)
             print("[combo] resolved serve command:\n" + format_serve_command(meta), flush=True)
             engine = start_bg(["bash", str(run_sh)], out_dir / "serve.log")
             base_url = f"http://127.0.0.1:{meta['port']}"
