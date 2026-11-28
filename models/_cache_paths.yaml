@@ -66,3 +66,5 @@ aliases:
     cache_dir: Qwen3-Coder-30B-A3B-Instruct-w8a8
   - model_id: Qwen/Qwen3-VL-Embedding-2B
     cache_dir: Qwen/Qwen3-VL-Embedding-2B
+  - model_id: Eco-Tech/Kimi-K3-w4a8
+    cache_dir: Kimi-K3-w4a8

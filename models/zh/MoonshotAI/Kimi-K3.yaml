@@ -1,0 +1,604 @@
+# Kimi-K3 recipe(zh)——事实源:main 分支时期的 vllm-ascend 教程快照(docs/source/tutorials/models/Kimi-K3.md)
+# 教程基于 vLLM-Ascend main 与 vLLM 0.27.1;镜像为 nightly-main-a3(§4.1)。仅 A3 系列。
+# 注意:本 recipe 追踪 main 分支时期的教程快照(DSpark 章节、--max-model-len 133120、nightly-main-a3 镜像),与 /latest/ 页面及 v0.23.0 tag 原文均不同;引用链接钉版本化路径保稳定——比对数字请以快照为准。
+meta:
+  title: "Kimi-K3"
+  slug: "kimi-k3"
+  provider: "Moonshot AI"
+  description: "结合 Kimi Delta Attention、门控 MLA 与潜在 MoE 层的多模态 MoE 模型,以完整 W4A8 检查点部署于四台 Atlas 800 A3 节点。"
+  date_added: "2026-10-16"
+  difficulty: advanced
+  tasks:
+    - text
+    - multimodal
+  related_recipes:
+    - "moonshotai/Kimi-K2.6"
+  performance_headline: "四台 Atlas 800 A3(每台 16 逻辑 NPU)DP4/TP16/EP64 部署完整 W4A8 检查点"
+  hardware:
+    atlas_800_a3: verified   # 教程 §7/§10 载官方 A3 部署与 AISBench 精度(依 GLM-5/K2.6 等存量惯例;第一方复验待资源,见 PR 说明)
+    atlas_800_a2: unsupported   # 本配方覆盖 A3 线;现版教程另有 950DT 与 A2 标签页(见教程对应章节)
+
+model:
+  model_id: "Eco-Tech/Kimi-K3-w4a8"
+  architecture: moe
+  parameter_count: "93 层 / 896 专家 MoE(参数量未公开)"   # 教程 §3.1 事实
+  active_parameters: null
+  context_length: 133120          # 教程 §5.1 的已验证服务端上限(模型原生上下文教程未给数值)
+  modality: multimodal
+  base_args:
+    - "--quantization ascend"
+    - "--enable-expert-parallel"
+    - "--safetensors-load-strategy lazy"
+  base_env:
+    HCCL_BUFFSIZE: "1024"
+    HCCL_BUFFSIZE_EP: "2048"
+    HCCL_INTRA_PCIE_ENABLE: "1"
+    HCCL_INTRA_ROCE_ENABLE: "0"
+    HCCL_OP_EXPANSION_MODE: "AIV"
+    OMP_PROC_BIND: "false"
+    OPENBLAS_NUM_THREADS: "1"
+    PYTORCH_NPU_ALLOC_CONF: "expandable_segments:True"
+    VLLM_ENGINE_READY_TIMEOUT_S: "7200"
+    VLLM_EXECUTE_MODEL_TIMEOUT_SECONDS: "3000"
+  docker_image:
+    atlas_800_a3: "quay.io/ascend/vllm-ascend:nightly-main-a3"   # main 分支 nightly;为可复现性固定 digest(教程 §4.1)
+  nightly_required: true
+  install:
+    pip: false
+    docker:
+      command: "docker run --rm -it --name vllm-kimi-k3 --net=host --shm-size=1g quay.io/ascend/vllm-ascend:nightly-main-a3 bash"
+      note: "精简示意;完整 16 设备挂载集见 env_setup.container(教程 §4.1)。"
+
+features:
+  expert_parallel:
+    description: "四节点 DP 组上的 EP64(教程 §5.1)"
+    args: ["--enable-expert-parallel"]
+  prefix_caching:
+    label: "前缀缓存"
+    description: "已验证基线为启用态(教程 §5.1)"
+    args: ["--enable-prefix-caching"]
+  spec_decoding:
+    label: "DSpark 投机解码"
+    description: "可选 GQA/MLA draft 检查点,7(或 5)个投机 token(教程 §5.2)"
+    args: ["--speculative-config", '{"model": "<DSPARK_DRAFT_PATH>", "method": "dspark", "num_speculative_tokens": 7}']   # dspark 必须带 draft 路径;Inferact/Kimi-K3-DSpark-Block5 用 5 token(§5.2)
+
+compatible_strategies:
+  - multi_node_dp
+  - pd_cluster
+
+guide: ""
+performance_model_names:
+  - "Kimi-K3"
+
+overview: |-
+  Kimi-K3 是结合 Kimi Delta Attention(KDA)、门控 MLA、注意力残差、SiTU 激活与潜在
+  MoE 层的多模态 MoE 模型。完整 W4A8 检查点(93 层、896 专家、约 1.49 TB 存储)部署于
+  四台 Atlas 800 A3 节点,DP4/TP16/EP64 混合布局,每节点 1 个 DP rank。软件栈为 main
+  分支 vllm-ascend + vLLM 0.27.1(nightly-main-a3 镜像)。可选 DSpark draft 以 7(或 5)
+  个投机 token 加速解码。
+
+weight_download:
+  - weight_version: W4A8 完整检查点
+    sources:
+      - source: ModelScope   # 教程 §3.1
+        url: "https://www.modelscope.cn/models/Eco-Tech/Kimi-K3-w4a8"
+        command: |
+          # 约 1.49 TB 存储;每节点挂载到相同路径
+          modelscope download --model Eco-Tech/Kimi-K3-w4a8 --local_dir /path/to/models/Kimi-K3-w4a8
+  - weight_version: DSpark draft(可选,三选一)   # 三个 draft 均有 HuggingFace 镜像(教程 §3.1)
+    sources:
+      - source: "RadixArk/Kimi-K3-DSpark(GQA draft,7 token)"
+        url: "https://www.modelscope.cn/models/RadixArk/Kimi-K3-DSpark"
+        command: |
+          modelscope download --model RadixArk/Kimi-K3-DSpark --local_dir /path/to/models/Kimi-K3-DSpark
+      - source: "Inferact/Kimi-K3-DSpark(MLA draft,7 token)"
+        url: "https://www.modelscope.cn/models/Inferact/Kimi-K3-DSpark"
+        command: |
+          modelscope download --model Inferact/Kimi-K3-DSpark --local_dir /path/to/models/Kimi-K3-DSpark
+      - source: "Inferact/Kimi-K3-DSpark-Block5(MLA draft,5 token 块)"
+        url: "https://www.modelscope.cn/models/Inferact/Kimi-K3-DSpark-Block5"
+        command: |
+          modelscope download --model Inferact/Kimi-K3-DSpark-Block5 --local_dir /path/to/models/Kimi-K3-DSpark-Block5
+
+prerequisites:
+- title: 模型权重
+  content: |-
+    - `Eco-Tech/Kimi-K3-w4a8`:完整 93 层、896 专家 W4A8 目标。约 1.49 TB 权重存储;
+      参考部署使用四台 Atlas 800 A3 节点,每节点 16 逻辑 NPU(DP4/TP16/EP64)。
+      [下载](https://www.modelscope.cn/models/Eco-Tech/Kimi-K3-w4a8)
+    - 可选 draft:RadixArk/Kimi-K3-DSpark(GQA,7 token)、Inferact/Kimi-K3-DSpark
+      (MLA,7 token)、Inferact/Kimi-K3-DSpark-Block5(MLA,5 token)。
+
+    服务启动前下载权重、tokenizer 与 processor 文件;每节点挂载到相同路径。权重体积是
+    存储要求而非运行时 NPU 显存——KV 缓存、激活、通信缓冲与可选 draft 也需要显存
+    (教程 §3.1)。
+
+- title: 多节点通信验证
+  content: |-
+    启动四节点服务前,按[多节点通信验证](https://docs.vllm.ai/projects/ascend/zh-cn/latest/installation.html#installation-multi-node-interconnect)
+    完成验证;所有节点使用相同模型修订与兼容软件栈(教程 §3.2)。
+
+env_setup:
+  container:
+    A3:
+      content: |-
+        示例使用 vLLM 0.27 栈的 main 分支 nightly 镜像;确认其包含 Kimi-K3 支持并固定
+        digest(教程 §4.1):
+
+        ```shell
+        export IMAGE=quay.io/ascend/vllm-ascend:nightly-main-a3
+        export MODEL_ROOT="/path/to/models"
+
+        docker run --rm -it \
+          --name vllm-kimi-k3 \
+          --net=host \
+          --shm-size=1g \
+          --device /dev/davinci0 \
+          --device /dev/davinci1 \
+          --device /dev/davinci2 \
+          --device /dev/davinci3 \
+          --device /dev/davinci4 \
+          --device /dev/davinci5 \
+          --device /dev/davinci6 \
+          --device /dev/davinci7 \
+          --device /dev/davinci8 \
+          --device /dev/davinci9 \
+          --device /dev/davinci10 \
+          --device /dev/davinci11 \
+          --device /dev/davinci12 \
+          --device /dev/davinci13 \
+          --device /dev/davinci14 \
+          --device /dev/davinci15 \
+          --device /dev/davinci_manager \
+          --device /dev/devmm_svm \
+          --device /dev/hisi_hdc \
+          -v /usr/local/dcmi:/usr/local/dcmi \
+          -v /usr/local/Ascend/driver:/usr/local/Ascend/driver \
+          -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+          -v /etc/ascend_install.info:/etc/ascend_install.info \
+          -v "$MODEL_ROOT:$MODEL_ROOT" \
+          "$IMAGE" bash
+        ```
+
+        服务启动前验证已装版本(教程 §4.1):
+
+        ```shell
+        python -m pip show vllm vllm-ascend
+        ```
+
+        源码构建替代(教程 §4.2):
+
+        ```shell
+        git clone --branch main https://github.com/vllm-project/vllm-ascend.git
+        cd vllm-ascend
+        git submodule update --init --recursive
+        docker build -f Dockerfile.a3 \
+          --build-arg VLLM_COMMIT="$(cat .github/vllm-main-verified.commit)" \
+          -t vllm-ascend-kimi-k3:main .
+        export IMAGE=vllm-ascend-kimi-k3:main
+        ```
+
+scenarios:
+  - npu: Atlas 800I A3
+    precision: W4A8
+    deployment: "多节点"
+    case: "四节点 DP4/TP16/EP64 服务"
+    tags: [multi-node-dp]
+    strategy: multi_node_dp
+    steps:
+      - title: "设置共享环境(每节点)"
+        content: |-
+          ```bash
+          export MODEL_PATH="<KIMI_K3_FULL_W4A8_PATH>"
+          export TOKENIZER_PATH="<KIMI_K3_TOKENIZER_PATH>"
+          export LOCAL_IP="<CURRENT_NODE_IP>"
+          export NODE0_IP="<NODE0_IP>"
+          export NIC_NAME="<CURRENT_NODE_NIC>"
+          export SERVICE_PORT=8000
+          export RPC_PORT=13345
+          export DP_SIZE=4
+          export TP_SIZE=16
+
+          export HCCL_IF_IP=$LOCAL_IP
+          export GLOO_SOCKET_IFNAME=$NIC_NAME
+          export TP_SOCKET_IFNAME=$NIC_NAME
+          export HCCL_SOCKET_IFNAME=$NIC_NAME
+          export VLLM_ENGINE_READY_TIMEOUT_S=7200
+          export VLLM_EXECUTE_MODEL_TIMEOUT_SECONDS=3000
+          export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+          export HCCL_BUFFSIZE=1024
+          export HCCL_BUFFSIZE_EP=2048
+          export HCCL_INTRA_PCIE_ENABLE=1
+          export HCCL_INTRA_ROCE_ENABLE=0
+          export HCCL_OP_EXPANSION_MODE=AIV
+          export OMP_PROC_BIND=false
+          export OPENBLAS_NUM_THREADS=1
+          export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15
+          ```
+      - title: "启动服务(节点 0 = 主节点)"
+        content: |-
+          ```bash
+          vllm serve "$MODEL_PATH" \
+            --host 0.0.0.0 \
+            --port $SERVICE_PORT \
+            --served-model-name kimi-k3 \
+            --tokenizer "$TOKENIZER_PATH" \
+            --tokenizer-mode kimi_k3 \
+            --quantization ascend \
+            --safetensors-load-strategy lazy \
+            --tensor-parallel-size $TP_SIZE \
+            --data-parallel-size $DP_SIZE \
+            --data-parallel-size-local 1 \
+            --data-parallel-address $LOCAL_IP \
+            --data-parallel-rpc-port $RPC_PORT \
+            --enable-expert-parallel \
+            --enable-prefix-caching \
+            --max-model-len 133120 \
+            --max-num-seqs 16 \
+            --max-num-batched-tokens 8192 \
+            --gpu-memory-utilization 0.85 \
+            --reasoning-parser kimi_k3 \
+            --tool-call-parser kimi_k3 \
+            --enable-auto-tool-choice \
+            --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY"}'
+          ```
+
+          等待所有 rank 完成权重加载与图编译后再发请求(教程 §5.1)。
+      - title: "启动服务(节点 1-3,headless)"
+        content: |-
+          `DP_START_RANK` 分别设为 1、2、3,然后:
+
+          ```bash
+          export DP_START_RANK="<1_OR_2_OR_3>"
+
+          vllm serve "$MODEL_PATH" \
+            --headless \
+            --host 0.0.0.0 \
+            --port $SERVICE_PORT \
+            --served-model-name kimi-k3 \
+            --tokenizer "$TOKENIZER_PATH" \
+            --tokenizer-mode kimi_k3 \
+            --quantization ascend \
+            --safetensors-load-strategy lazy \
+            --tensor-parallel-size $TP_SIZE \
+            --data-parallel-size $DP_SIZE \
+            --data-parallel-size-local 1 \
+            --data-parallel-start-rank $DP_START_RANK \
+            --data-parallel-address $NODE0_IP \
+            --data-parallel-rpc-port $RPC_PORT \
+            --enable-expert-parallel \
+            --enable-prefix-caching \
+            --max-model-len 133120 \
+            --max-num-seqs 16 \
+            --max-num-batched-tokens 8192 \
+            --gpu-memory-utilization 0.85 \
+            --reasoning-parser kimi_k3 \
+            --tool-call-parser kimi_k3 \
+            --enable-auto-tool-choice \
+            --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY"}'
+          ```
+      - title: "可选:DSpark 投机解码"
+        content: |-
+          在每节点相同路径下载一个 draft,然后加到节点 0 与 headless worker 命令中(教程 §5.2):
+
+          ```bash
+          --speculative-config \
+          '{
+            "method": "dspark",
+            "model": "<DSPARK_DRAFT_PATH>",
+            "num_speculative_tokens": 7,
+            "draft_tensor_parallel_size": 16,
+            "max_model_len": 4096,
+            "draft_sample_method": "greedy",
+            "enforce_eager": true
+          }'
+          ```
+
+          `Inferact/Kimi-K3-DSpark-Block5` 使用 5 token。启用前先核算 draft 的额外显存。
+      - title: "功能验证"
+        content: |-
+          ```bash
+          curl "http://<node0_ip>:8000/v1/chat/completions" \
+            -H 'Content-Type: application/json' \
+            -d '{
+              "model": "kimi-k3",
+              "messages": [
+                {"role": "user", "content": "Explain why prefix caching helps repeated long prompts."}
+              ],
+              "temperature": 0,
+              "max_tokens": 128
+            }'
+          ```
+
+          预期:HTTP 200,choice 非空且含生成文本。多模态冒烟:将消息内容换成 image_url + 文本。
+          工具调用:保留 `--enable-auto-tool-choice` 与 `--tool-call-parser kimi_k3`,
+          请求中带 `tools` 与 `tool_choice: "auto"`(教程 §6)。
+
+  - npu: Atlas 800I A3
+    precision: W4A8
+    deployment: "多节点 PD 分离"
+    case: "八节点 4P+4D PD 分离(Mooncake)"
+    tags: [pd-multinode]
+    strategy: pd_cluster
+    steps:
+      - title: "设置共享环境(所有节点)"
+        content: |-
+          ```bash
+          export MODEL_PATH="<KIMI_K3_FULL_W4A8_PATH>"
+          export DRAFT_MODEL_PATH="<KIMI_K3_DRAFT_MLA_NPU_PATH>"   # 教程 A3 标签页:Eco-Tech/Kimi-K3-DSpark-MLA-NPU
+          export LOCAL_IP="<当前节点 IP>"
+          export NIC_NAME="<当前节点网卡名>"
+          export P_MASTER_IP="<Prefill 节点 0 的 IP>"
+          export P_MASTER_PORT=41000
+          export D_MASTER_IP="<Decode 节点 0 的 IP>"
+          export D_RPC_PORT=13345
+          export SERVICE_PORT=8000
+          export TP_SIZE=16
+
+          export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15
+          export HCCL_IF_IP=$LOCAL_IP
+          export GLOO_SOCKET_IFNAME=$NIC_NAME
+          export TP_SOCKET_IFNAME=$NIC_NAME
+          export HCCL_SOCKET_IFNAME=$NIC_NAME
+          export VLLM_EXECUTE_MODEL_TIMEOUT_SECONDS=30000
+          export HCCL_BUFFSIZE=1024
+          export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+          export VLLM_USE_V2_MODEL_RUNNER=1
+          export LD_LIBRARY_PATH=/usr/local/Ascend/ascend-toolkit/latest/python/site-packages/mooncake:$LD_LIBRARY_PATH
+          ```
+
+          Mooncake 与 PD 代理在引擎命令之外部署(教程 §5.2);代理部署流程
+          参见 Mooncake PD 分离指南。
+      - title: "Prefill 引擎模板(每个 Prefill 节点,rank 0-3)"
+        content: |-
+          四个 Prefill 节点运行同一个引擎,PP4 分布在池内(DP1/TP16/PP4,
+          层切分 "25,25,24,19")。保存为 `run_dp_template.sh`;节点序号即
+          PP 阶段(rank 0-3),worker rank 1-3 另加 `--headless`:
+
+          ```bash
+          KV_PORT=<PREFILL_KV_PORT>
+          NODE_RANK=$1   # PP 阶段:rank 0、1、2 或 3
+          SERVICE_PORT=$2
+
+          export VLLM_HOST_IP=$LOCAL_IP
+          export VLLM_PP_LAYER_PARTITION="25,25,24,19"
+          export PYTHONHASHSEED=0
+
+          SPECULATIVE_CONFIG="$(
+            printf \
+            '{"method":"dspark","model":"%s","num_speculative_tokens":7,"draft_tensor_parallel_size":'"$TP_SIZE"',"draft_sample_method":"greedy","enforce_eager":true}' \
+            "$DRAFT_MODEL_PATH"
+          )"
+
+          vllm serve "$MODEL_PATH" \
+              --host 0.0.0.0 \
+              --port "$SERVICE_PORT" \
+              --enable-auto-tool-choice \
+              --reasoning-parser kimi_k3 \
+              --tool-call-parser kimi_k3 \
+              --tokenizer-mode kimi_k3 \
+              --data-parallel-size 1 \
+              --pipeline-parallel-size 4 \
+              --nnodes 4 \
+              --node-rank "$NODE_RANK" \
+              --distributed-executor-backend mp \
+              --master-addr "$P_MASTER_IP" \
+              --master-port "$P_MASTER_PORT" \
+              --tensor-parallel-size "$TP_SIZE" \
+              --enable-expert-parallel \
+              --seed 1024 \
+              --served-model-name kimi-k3 \
+              --max-model-len 262144 \
+              --max-num-batched-tokens 8192 \
+              --max-num-seqs 32 \
+              --enforce-eager \
+              --trust-remote-code \
+              --gpu-memory-utilization 0.80 \
+              --speculative-config "$SPECULATIVE_CONFIG" \
+              --mm-encoder-tp-mode data \
+              --mm-processor-cache-gb 1 \
+              --skip-mm-profiling \
+              --enable-prefix-caching \
+              --additional-config '{"enable_flashcomm1":true,"multistream_overlap_shared_expert":false,"enable_fused_mc2":2,"enable_shared_expert_dp":true}' \
+              --limit-mm-per-prompt '{"vision_chunk": 2}' \
+              --kv-transfer-config \
+              '{
+                "kv_connector": "MooncakeConnectorV2",
+                "kv_role": "kv_producer",
+                "kv_port": "'"$KV_PORT"'",
+                "kv_connector_extra_config": {
+                  "prefill": {
+                    "dp_size": 1,
+                    "tp_size": '"$TP_SIZE"',
+                    "pp_size": 4,
+                    "pp_layer_partition": "25,25,24,19"
+                  },
+                  "decode": {
+                    "dp_size": 4,
+                    "tp_size": '"$TP_SIZE"'
+                  }
+                }
+              }'
+          ```
+      - title: "Decode 引擎模板(每个 Decode 节点,rank 0-3)"
+        content: |-
+          ```bash
+          export HCCL_OP_EXPANSION_MODE=AIV
+
+          KV_PORT=<DECODE_KV_PORT>
+          DP_RANK=$1        # rank 0、1、2 或 3
+          SERVICE_PORT=$2
+
+          SPECULATIVE_CONFIG="$(
+            printf \
+            '{"method":"dspark","model":"%s","num_speculative_tokens":7,"draft_tensor_parallel_size":'"$TP_SIZE"',"draft_sample_method":"greedy","enforce_eager":false}' \
+            "$DRAFT_MODEL_PATH"
+          )"
+
+          vllm serve "$MODEL_PATH" \
+              --host 0.0.0.0 \
+              --port "$SERVICE_PORT" \
+              --enable-auto-tool-choice \
+              --reasoning-parser kimi_k3 \
+              --tool-call-parser kimi_k3 \
+              --tokenizer-mode kimi_k3 \
+              --data-parallel-size 4 \
+              --data-parallel-rank "$DP_RANK" \
+              --data-parallel-address "$D_MASTER_IP" \
+              --data-parallel-rpc-port "$D_RPC_PORT" \
+              --tensor-parallel-size "$TP_SIZE" \
+              --cp-kv-cache-interleave-size 384 \
+              --block-size 384 \
+              --enable-expert-parallel \
+              --seed 1024 \
+              --served-model-name kimi-k3 \
+              --max-model-len 262144 \
+              --max-num-batched-tokens 8192 \
+              --max-num-seqs 32 \
+              --trust-remote-code \
+              --gpu-memory-utilization 0.80 \
+              --speculative-config "$SPECULATIVE_CONFIG" \
+              --mm-encoder-tp-mode data \
+              --mm-processor-cache-gb 1 \
+              --skip-mm-profiling \
+              --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY"}' \
+              --enable-prefix-caching \
+              --additional-config '{"multistream_overlap_shared_expert":true,"enable_mlapo":true,"scheduler_config":{"recompute_scheduler_enable":true}}' \
+              --limit-mm-per-prompt '{"vision_chunk":2}' \
+              --kv-transfer-config \
+              '{
+                "kv_connector": "MooncakeConnectorV2",
+                "kv_role": "kv_consumer",
+                "kv_port": "'"$KV_PORT"'",
+                "kv_connector_extra_config": {
+                  "prefill": {
+                    "dp_size": 1,
+                    "tp_size": '"$TP_SIZE"',
+                    "pp_size": 4,
+                    "pp_layer_partition": "25,25,24,19"
+                  },
+                  "decode": {
+                    "dp_size": 4,
+                    "tp_size": '"$TP_SIZE"'
+                  }
+                }
+              }'
+          ```
+      - title: "启动 Decode 池(launch_online_dp)"
+        content: |-
+          先启动四个 Prefill 节点(PP 阶段 0-3),再启动 Decode 池。每个
+          Decode 节点以一个 DP rank 覆盖全部 16 卡:
+
+          ```bash
+          python launch_online_dp.py \
+              --dp-size 4 \
+              --tp-size 16 \
+              --dp-size-local 1 \
+              --dp-rank-start <LOCAL_RANK> \
+              --dp-address "$D_MASTER_IP" \
+              --dp-rpc-port "$D_RPC_PORT" \
+              --vllm-start-port <VLLM_START_PORT>
+          ```
+      - title: "部署 PD 代理并验证"
+        content: |-
+          按 Mooncake PD 指南部署 PD 分离代理,并按指南的验证流程完成部署
+          验证(教程 §5.3.3 展示了该验证在长上下文变体下的做法)。教程
+          §5.3 另给出该线的 1M 长上下文变体,§5.4 给出带 MemCache KV 池的
+          池化变体;详见教程对应章节。
+
+
+verification: |-
+  四节点全部完成模型加载与图编译后,向节点 0 端点发送对话请求(见功能验证步骤):
+
+  ```shell
+  curl http://<node0_ip>:<port>/v1/chat/completions \
+      -H "Content-Type: application/json" \
+      -d '{
+          "model": "kimi-k3",
+          "messages": [
+              {"role": "user", "content": "Explain why prefix caching helps repeated long prompts."}
+          ],
+          "temperature": 0,
+          "max_tokens": 128
+      }'
+  ```
+
+  预期结果:
+
+  HTTP 200 且含生成文本;停止 token 可能在 `max_tokens` 前结束生成(教程 §6)。
+
+evaluation:
+  accuracy:
+    content: |-
+      使用完整 93 层、896 专家检查点配合四节点服务(教程 §7)。
+
+      ### 使用 AISBench
+
+      按[使用 AISBench](https://docs.vllm.ai/projects/ascend/zh-cn/latest/developer_guide/evaluation/using_ais_bench.html)
+      配置 `kimi-k3` chat 端点并跑 GPQA。对比结果时保持模型/分词器修订、chat 渲染、推理模式、
+      采样参数、数据集与评测器版本固定;分数之外同时记录完成/失败/缺失/未解析样本数(教程 §7.1)。
+
+      ### 使用 lm-eval
+
+      见[使用 lm_eval](https://docs.vllm.ai/projects/ascend/zh-cn/latest/developer_guide/evaluation/using_lm_eval.html);
+      跨后端对比时使用相同完整检查点与服务配置(教程 §7.2)。
+
+performance:
+  benchmark: |-
+      在服务网络内的压测机上执行(相同 vLLM 版本与 tokenizer 文件),教程 §8.2:
+
+      ```shell
+      export NODE0_IP="<NODE0_IP>"
+      export TOKENIZER_PATH="<KIMI_K3_TOKENIZER_PATH>"
+
+      vllm bench serve \
+        --backend openai-chat \
+        --base-url "http://<node0_ip>:8000" \
+        --endpoint /v1/chat/completions \
+        --model kimi-k3 \
+        --tokenizer "$TOKENIZER_PATH" \
+        --tokenizer-mode kimi_k3 \
+        --dataset-name random \
+        --random-input-len 1024 \
+        --random-output-len 128 \
+        --random-range-ratio 0.0 \
+        --num-prompts 100 \
+        --max-concurrency 4 \
+        --request-rate inf \
+        --ignore-eos \
+        --save-result \
+        --result-dir ./benchmark-results
+      ```
+
+      AISBench 性能评测:[使用 AISBench](https://docs.vllm.ai/projects/ascend/zh-cn/latest/developer_guide/evaluation/using_ais_bench.html#execute-performance-evaluation)(教程 §8.1)。
+
+      100 条请求、并发至多 4、随机 1024 输入/128 输出。`--ignore-eos` 防止提前 EOS 截短输出。
+      确认 100 条全部成功;从控制台与保存的 JSON 查看吞吐、TTFT、TPOT。记录检查点修订、
+      拓扑、图模式、前缀缓存设置、长度、并发、错误数——冷前缀与前缀命中负载分开报告;
+      使用 DSpark 时另记 draft 与投机 token 数(教程 §8.2)。
+
+tuning: |-
+  参考配置(教程 §9.1——已验证基线,非最优性声明):4 台 A3 节点、64 逻辑 NPU、
+  每 DP rank TP16、全局 DP4 / EP64、max-num-seqs 16、max-num-batched-tokens 8192、
+  max-model-len 133120、`FULL_DECODE_ONLY`。
+
+  调优指南(教程 §9.2):更高吞吐——逐步上调 `--max-num-seqs` / `--max-num-batched-tokens`
+  (盯显存余量与尾时延);更低时延——对比匹配 DSpark draft(同负载下 draft 接受率与精度);
+  更长上下文——`--max-model-len` 与并发、token 预算联动调整;重复提示——启用前缀缓存并
+  分开对比冷/缓存。通用方法:[公开调优指南](https://docs.vllm.ai/projects/ascend/zh-cn/latest/developer_guide/performance_and_debug/optimization_and_tuning.html)
+  与[特性矩阵](https://docs.vllm.ai/projects/ascend/zh-cn/latest/user_guide/support_matrix/feature_matrix.html)。
+
+faq: |-
+  常见环境、安装与通用参数问题参见[公共 FAQ](https://docs.vllm.ai/projects/ascend/zh-cn/latest/faqs.html)(教程 §10)。
+
+  - **问:DSpark 该配哪个检查点?**
+
+    答:选与目标架构、分词器、量化变体匹配的 draft——RadixArk GQA draft 或任一 Inferact MLA
+    draft,并使用匹配的 `num_speculative_tokens`(7/7/5)。QuaRot 检查点须在每个节点保留
+    其量化元数据与随附旋转张量(教程 §10)。
+
+references:
+  - title: "官方教程"
+    url: "https://docs.vllm.ai/projects/ascend/en/v0.23.0/tutorials/models/Kimi-K3.html"
+  - title: "模型权重(ModelScope)"
+    url: "https://www.modelscope.cn/models/Eco-Tech/Kimi-K3-w4a8"
