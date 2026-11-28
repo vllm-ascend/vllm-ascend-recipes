@@ -1,0 +1,465 @@
+meta:
+  title: InternVL3_5-38B
+  slug: internvl3-5-38b
+  provider: OpenGVLab
+  description: 在 Atlas 800I A3 上以 TP4 部署 InternVL3.5 38B W8A8 图文服务。
+  date_added: 2026-10-20
+  difficulty: advanced
+  hardware:
+    atlas_800_a3: verified
+model:
+  model_id: OpenGVLab/InternVL3_5-38B
+  architecture: dense
+  parameter_count: 38.4B
+  active_parameters: null
+  context_length: 40960
+  modality: multimodal
+  base_args:
+    - --trust-remote-code
+    - --served-model-name
+    - internvl3_5
+    - --tensor-parallel-size
+    - "4"
+  base_env:
+    PYTORCH_NPU_ALLOC_CONF: expandable_segments:True
+    TASK_QUEUE_ENABLE: "1"
+    HCCL_OP_EXPANSION_MODE: AIV
+    OMP_PROC_BIND: "false"
+    OMP_NUM_THREADS: "1"
+    HCCL_BUFFSIZE: "1536"
+  docker_image:
+    atlas_800_a3: quay.io/ascend/vllm-ascend:v0.30.0-a3-openeuler
+  install:
+    pip: false
+    docker:
+      command: docker pull
+        quay.io/ascend/vllm-ascend:v0.30.0-a3-openeuler
+variants:
+  default:
+    precision: W8A8
+    description: 用于 Atlas A3 TP4 部署的 W8A8 权重。
+    model_id: Eco-Tech/InternVL3_5-38B-w8a8
+compatible_strategies:
+  - single_node_A3
+hardware_overrides: {}
+strategy_overrides: {}
+guide: ""
+overview: |-
+  InternVL3.5 38B 将 InternViT 视觉编码器与 Qwen3 语言模型结合，用于图像理解和多模态对话。这个稠密模型共有 38.4B 参数。
+
+  本文在单台 A3 的 4 个逻辑设备上以 TP4 部署 W8A8 权重，依次验证图文请求、8 道 GSM8K 题、900 条 MMMU 验证集样本及文本性能。实测使用 vLLM Ascend v0.30.0，历史教程标明暂不支持多机 PD 分离。
+weight_download:
+  - weight_version: W8A8
+    sources:
+      - source: ModelScope
+        url: https://modelscope.cn/models/Eco-Tech/InternVL3_5-38B-w8a8
+        command: |-
+          ```bash
+          CHECKPOINT=/models/Eco-Tech/InternVL3_5-38B-w8a8
+          REVISION=6f09b8ec4d0bc84c27dd7fc40c286de3976c0475
+          git lfs version &&
+          mkdir -p /models/Eco-Tech &&
+          GIT_LFS_SKIP_SMUDGE=1 git clone --no-checkout \
+            https://www.modelscope.cn/Eco-Tech/InternVL3_5-38B-w8a8.git "$CHECKPOINT" &&
+          git -C "$CHECKPOINT" lfs install --local &&
+          GIT_LFS_SKIP_SMUDGE=1 git -C "$CHECKPOINT" checkout --detach "$REVISION" &&
+          git -C "$CHECKPOINT" lfs pull origin &&
+          git -C "$CHECKPOINT" lfs fsck --objects HEAD
+          ```
+prerequisites:
+  - title: 评测范围
+    content: 8 道 GSM8K 题用于检查文本评测流程，MMMU 全量验证集用于评测视觉问答。对比成绩时应使用同一权重和同一数据集。
+  - title: A3 容器与运行路径
+    content: >-
+      在环境准备中复制 A3 Docker 命令到宿主机执行。该容器只映射逻辑设备 0–3（4 个），挂载 /models，并把容器工作目录设为 /models。在容器内执行场景的启动服务步骤（TP4，127.0.0.1:2002）。另开一个容器终端完成就绪检查、图文请求和评测。
+  - title: 下载固定权重
+    content: |-
+      启动容器前，在宿主机使用 Git 和 Git LFS 将固定权重下载到 /models 下的新目录。
+
+      ```bash
+      CHECKPOINT=/models/Eco-Tech/InternVL3_5-38B-w8a8
+      REVISION=6f09b8ec4d0bc84c27dd7fc40c286de3976c0475
+      git lfs version &&
+      mkdir -p /models/Eco-Tech &&
+      GIT_LFS_SKIP_SMUDGE=1 git clone --no-checkout \
+        https://www.modelscope.cn/Eco-Tech/InternVL3_5-38B-w8a8.git "$CHECKPOINT" &&
+      git -C "$CHECKPOINT" lfs install --local &&
+      GIT_LFS_SKIP_SMUDGE=1 git -C "$CHECKPOINT" checkout --detach "$REVISION" &&
+      git -C "$CHECKPOINT" lfs pull origin &&
+      git -C "$CHECKPOINT" lfs fsck --objects HEAD
+      ```
+  - title: 原始老虎图片
+    content: |-
+      在宿主机准备原教程的 JPEG。下方命令也会校验已放到目标路径的本地原件。
+
+      ```bash
+      (
+        set -euo pipefail
+        asset_dir=/models/evidence/internvl-release-retest
+        mkdir -p "$asset_dir"
+        if [ ! -f "$asset_dir/tiger.jpeg" ]; then
+          curl -fL --retry 3 --connect-timeout 10 --max-time 60 \
+            https://modelscope.oss-cn-beijing.aliyuncs.com/resource/tiger.jpeg \
+            -o "$asset_dir/tiger.jpeg.download"
+          cd "$asset_dir"
+          echo '303d9137e3f494f2fb83dc2fafa05c4143eab2316a0438a8335fe661ee8b97bf  tiger.jpeg.download' | sha256sum -c -
+          mv tiger.jpeg.download tiger.jpeg
+        fi
+        cd "$asset_dir"
+        echo '303d9137e3f494f2fb83dc2fafa05c4143eab2316a0438a8335fe661ee8b97bf  tiger.jpeg' | sha256sum -c -
+      )
+      ```
+  - title: AISBench GSM8K 小样本环境
+    content: |-
+      在容器的验证终端执行。使用固定 AISBench 提交和 OpenCompass 的 GSM8K 数据，校验训练集和测试集后再运行场景评测。
+
+      ```bash
+      (
+        set -euo pipefail
+        bench=/models/tools/aisbench-38b
+        revision=e968d1bd7f48404bd913b95560f33938072336fa
+        git init -q "$bench/benchmark"
+        git -C "$bench/benchmark" fetch --depth=1 https://gitee.com/aisbench/benchmark.git "$revision" \
+          || git -C "$bench/benchmark" fetch --depth=1 https://github.com/AISBench/benchmark.git "$revision"
+        git -C "$bench/benchmark" checkout --detach "$revision"
+        python3 -m venv "$bench/venv"
+        "$bench/venv/bin/python" -m pip install -e "$bench/benchmark" --use-pep517
+        "$bench/venv/bin/python" -m pip install \
+          -r "$bench/benchmark/requirements/api.txt" -r "$bench/benchmark/requirements/extra.txt"
+        cd "$bench/benchmark/ais_bench/datasets"
+        curl -fL --retry 3 https://opencompass.oss-cn-shanghai.aliyuncs.com/datasets/data/gsm8k.zip -o "$bench/gsm8k.zip"
+        unzip -oq "$bench/gsm8k.zip"
+        sha256sum -c <<'SHA'
+      17f347dc51477c50d4efb83959dbb7c56297aba886e5544ee2aaed3024813465  gsm8k/train.jsonl
+      3730d312f6e3440559ace48831e51066acaca737f6eabec99bccb9e4b3c39d14  gsm8k/test.jsonl
+      SHA
+      )
+      ```
+  - title: MMMU 评测环境与数据
+    content: |-
+      在容器的验证终端执行。命令从固定的 lmms-eval 提交准备四个任务文件，并校验 MMMU validation Parquet 和 900 条记录。可设置 HF_ENDPOINT 选择可访问的 Hugging Face 端点。
+
+      ```bash
+      (
+        set -euo pipefail
+        vision=/models/tools/internvl-mmmu-21eff4c
+        task_dir=/models/evidence/internvl-release-retest/mmmu-task
+        revision=21eff4c82912300f5213114afe67bee4c0e0a31c
+        data_revision=364f2e2eb107b36e07ff4c5a15f5947a759cef47
+        mkdir -p "$task_dir"
+        git init -q "$vision/lmms-eval"
+        git -C "$vision/lmms-eval" fetch --depth=1 https://github.com/EvolvingLMMs-Lab/lmms-eval.git "$revision"
+        git -C "$vision/lmms-eval" checkout --detach "$revision"
+        python3 -m venv --system-site-packages "$vision/venv"
+        "$vision/venv/bin/python" -m pip install -e "$vision/lmms-eval"
+        for helper in _default_template_yaml arial.ttf utils.py; do
+          git -C "$vision/lmms-eval" show "$revision:lmms_eval/tasks/mmmu/$helper" > "$task_dir/$helper"
+        done
+        git -C "$vision/lmms-eval" show "$revision:lmms_eval/tasks/mmmu/mmmu_val.yaml" |
+          sed -e "/^dataset_path:/a dataset_kwargs:\n  revision: $data_revision\n  data_files:\n    validation: data/validation-00000-of-00001.parquet" \
+            -e 's/^task: "mmmu_val"$/task: "mmmu_val_pinned"/' > "$task_dir/mmmu_val_pinned.yaml"
+        cd "$task_dir"
+        sha256sum -c <<'SHA'
+      f7877d5a314f6b94d15f906188f2c7f189edc8b5058faf0f87942a9174fbb481  _default_template_yaml
+      35c0f3559d8db569e36c31095b8a60d441643d95f59139de40e23fada819b833  arial.ttf
+      af694572294100a7d2cec604812a8bfcd910bae9ed0ed870735624f10ebe75b0  mmmu_val_pinned.yaml
+      b15aab0b4002a463969b1ece0049b5435179092c4b7f9c42f747b19128c32672  utils.py
+      SHA
+        export HF_ENDPOINT="${HF_ENDPOINT:-https://hf-mirror.com}"
+        export HF_HOME="$vision/hf-cache" HF_HUB_DISABLE_XET=1
+        "$vision/venv/bin/python" - <<'PY'
+      from hashlib import file_digest
+      from datasets import load_dataset
+      from huggingface_hub import hf_hub_download
+
+      repo = "lmms-lab-encoder/MMMU"
+      rev = "364f2e2eb107b36e07ff4c5a15f5947a759cef47"
+      name = "data/validation-00000-of-00001.parquet"
+      with open(hf_hub_download(repo, name, revision=rev, repo_type="dataset"), "rb") as stream:
+          assert file_digest(stream, "sha256").hexdigest() == "18e0e97776217e7b5fc992dc9594014e7adc0cc0473f624ea957c18702e16681"
+      assert len(load_dataset(repo, revision=rev, data_files={"validation": name}, split="validation")) == 900
+      PY
+      )
+      ```
+env_setup:
+  container:
+    A3:
+      content: |-
+        在宿主机启动容器，在容器内用独立终端运行服务和评测。先放置原始老虎图和已固定版本的评测文件。
+
+        ```bash
+        # A3 release container
+        IMAGE=quay.io/ascend/vllm-ascend:v0.30.0-a3-openeuler
+        docker run --rm -it --name internvl38-release --net=host --ipc=host \
+          --device /dev/davinci0 --device /dev/davinci1 --device /dev/davinci2 --device /dev/davinci3 \
+          --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc \
+          -v /usr/local/Ascend/driver:/usr/local/Ascend/driver \
+          -v /usr/local/dcmi:/usr/local/dcmi \
+          -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+          -v /etc/ascend_install.info:/etc/ascend_install.info \
+          -v /models:/models -w /models "$IMAGE" bash
+        ```
+scenarios:
+  - npu: Atlas 800I A3
+    precision: W8A8
+    deployment: 单节点
+    case: TP4
+    tags:
+      - a3-single
+    strategy: single_node_A3
+    steps:
+      - title: 启动服务
+        content: |-
+          在「环境准备」启动的 release 容器内执行。服务监听本机回环地址。
+
+          ```bash
+          # A3 release serve
+          export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+          export TASK_QUEUE_ENABLE=1
+          export HCCL_OP_EXPANSION_MODE=AIV
+          export OMP_PROC_BIND=false
+          export OMP_NUM_THREADS=1
+          export HCCL_BUFFSIZE=1536
+          export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3
+
+          MODEL_PATH=Eco-Tech/InternVL3_5-38B-w8a8
+          case "$MODEL_PATH" in
+            /*) ;;
+            *) MODEL_PATH="/models/$MODEL_PATH" ;;
+          esac
+
+          MEDIA_DIR=/models/evidence/internvl-release-retest
+          media_args=()
+          if [[ -d "$MEDIA_DIR" ]]; then
+            media_args=(--allowed-local-media-path "$MEDIA_DIR")
+          fi
+
+          vllm serve "$MODEL_PATH" \
+            --host 127.0.0.1 \
+            --port 2002 \
+            --served-model-name internvl3_5 \
+            --trust-remote-code \
+            --max-model-len 40960 \
+            --max-num-batched-tokens 16384 \
+            --tensor-parallel-size 4 \
+            --max-num-seqs 32 \
+            --gpu-memory-utilization 0.9 \
+            --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY","cudagraph_capture_sizes":[4,32,64,128,192,256,512]}' \
+            --additional-config '{"weight_nz_mode":1,"enable_cpu_binding":true,"enable_fused_mc2":1}' \
+            --mm-processor-cache-gb 0 \
+            --enable-chunked-prefill \
+            --safetensors-load-strategy prefetch \
+            "${media_args[@]}"
+          ```
+      - title: 检查服务并运行图文推理
+        content: |-
+          手动验证前，将教程原图放在 `/models/evidence/internvl-release-retest/tiger.jpeg`，并确认回复描述老虎趴在草地上。CI 使用程序生成的红色图片，并校验返回的颜色。
+
+          ```python
+          import base64
+          import io
+          import json
+          import os
+          import urllib.request
+          from pathlib import PurePosixPath
+
+          base_url = "http://127.0.0.1:2002"
+          model = "internvl3_5"
+          urllib.request.install_opener(
+              urllib.request.build_opener(urllib.request.ProxyHandler({}))
+          )
+
+          with urllib.request.urlopen(f"{base_url}/health", timeout=15) as response:
+              print(f"Health HTTP {response.status}")
+          with urllib.request.urlopen(f"{base_url}/v1/models", timeout=15) as response:
+              models = json.load(response)
+              assert any(item["id"] == model for item in models["data"]), models
+              print(f"Models HTTP {response.status}")
+
+          ci = bool(os.getenv("CI_REQUEST_PROOF_FILE"))
+          if ci:
+              from PIL import Image
+
+              image = io.BytesIO()
+              Image.new("RGB", (448, 448), "red").save(image, format="PNG")
+              image_url = "data:image/png;base64," + base64.b64encode(image.getvalue()).decode("ascii")
+              prompt = "What color fills this image? Answer with one color word."
+          else:
+              image_url = PurePosixPath("/models/evidence/internvl-release-retest/tiger.jpeg").as_uri()
+              prompt = "What animal is shown in the image, and what is it doing?"
+
+          payload = {
+              "model": model,
+              "temperature": 0,
+              "max_tokens": 64,
+              "messages": [{"role": "user", "content": [
+                  {"type": "image_url", "image_url": {"url": image_url}},
+                  {"type": "text", "text": prompt},
+              ]}],
+          }
+          request = urllib.request.Request(
+              f"{base_url}/v1/chat/completions",
+              data=json.dumps(payload).encode(),
+              headers={"Content-Type": "application/json"},
+          )
+          with urllib.request.urlopen(request, timeout=120) as response:
+              result = json.load(response)
+              print(f"Image request HTTP {response.status}")
+              print(json.dumps(result, ensure_ascii=False, indent=2))
+
+          if ci:
+              answer = result["choices"][0]["message"]["content"]
+              assert answer.strip().casefold().rstrip(".!") == "red", answer
+          ```
+      - title: 运行 AISBench GSM8K 小样本
+        content: >-
+          使用固定 AISBench 提交及 8 题 GSM8K 小样本，保留逐题预测与计分。
+
+
+          ```bash
+
+          # A3 release AISBench GSM8K demo
+
+          out=/models/evidence/internvl-release-retest/internvl38
+
+          mkdir -p "$out"
+
+          cat > "$out/gsm8k-demo.py" <<'PY'
+
+          from mmengine.config import read_base
+
+          with read_base():
+              from ais_bench.benchmark.configs.models.vllm_api.vllm_api_general_chat import models
+              from ais_bench.benchmark.configs.datasets.demo.demo_gsm8k_gen_4_shot_cot_chat_prompt import gsm8k_datasets as datasets
+          models[0]["model"] = "internvl3_5"
+
+          models[0]["host_ip"] = "127.0.0.1"
+
+          models[0]["host_port"] = 2002
+
+          models[0]["batch_size"] = 1
+
+          models[0]["max_out_len"] = 512
+
+          models[0]["generation_kwargs"]["temperature"] = 0
+
+          work_dir =
+          "/models/evidence/internvl-release-retest/internvl38/aisbench-results"
+
+          PY
+
+          (cd /models/tools/aisbench-38b/benchmark &&
+          /models/tools/aisbench-38b/venv/bin/ais_bench "$out/gsm8k-demo.py")
+
+          ```
+      - title: 试跑 MMMU 接口及计分
+        content: >-
+          用 6 条样本检查接口和计分流程。
+
+
+          ```bash
+
+          # A3 release pinned MMMU trial
+
+          out=/models/evidence/internvl-release-retest/internvl38
+
+          mkdir -p "$out"
+
+          export HF_ENDPOINT="${HF_ENDPOINT:-https://hf-mirror.com}"
+
+          export HF_HOME=/models/tools/internvl-mmmu-21eff4c/hf-cache
+          HF_HUB_DISABLE_XET=1
+
+          export OPENAI_API_KEY=EMPTY PYTHONUNBUFFERED=1
+          TOKENIZERS_PARALLELISM=false
+
+          task_dir=/models/evidence/internvl-release-retest/mmmu-task
+
+          /models/tools/internvl-mmmu-21eff4c/venv/bin/python -m lmms_eval
+          --model openai \
+            --model_args model_version=internvl3_5,base_url=http://127.0.0.1:2002/v1,num_concurrent=1,timeout=120,max_retries=1 \
+            --include_path "$task_dir" --tasks mmmu_val_pinned --batch_size 1 --seed 0 \
+            --gen_kwargs temperature=0,max_new_tokens=128 --log_samples \
+            --output_path "$out/mmmu-trial" --limit 6
+          ```
+      - title: 运行完整 MMMU 验证集
+        content: >-
+          以固定 MMMU 提交的完整 900 条验证集计分，温度为 0，输出上限为 128 token。
+
+
+          ```bash
+
+          # A3 release pinned MMMU full
+
+          out=/models/evidence/internvl-release-retest/internvl38
+
+          mkdir -p "$out"
+
+          export HF_ENDPOINT="${HF_ENDPOINT:-https://hf-mirror.com}"
+
+          export HF_HOME=/models/tools/internvl-mmmu-21eff4c/hf-cache
+          HF_HUB_DISABLE_XET=1
+
+          export OPENAI_API_KEY=EMPTY PYTHONUNBUFFERED=1
+          TOKENIZERS_PARALLELISM=false
+
+          task_dir=/models/evidence/internvl-release-retest/mmmu-task
+
+          /models/tools/internvl-mmmu-21eff4c/venv/bin/python -m lmms_eval
+          --model openai \
+            --model_args model_version=internvl3_5,base_url=http://127.0.0.1:2002/v1,num_concurrent=1,timeout=120,max_retries=1 \
+            --include_path "$task_dir" --tasks mmmu_val_pinned --batch_size 1 --seed 0 \
+            --gen_kwargs temperature=0,max_new_tokens=128 --log_samples \
+            --output_path "$out/mmmu-full"
+          ```
+      - title: 运行文本性能测试
+        content: >-
+          使用三个 seed。每轮预热 5 次、计量 100 条文本请求，记录 TTFT、TPOT、ITL 和 token 吞吐。
+
+
+          ```bash
+
+          # A3 release text benchmark
+
+          out=/models/evidence/internvl-release-retest/internvl38/text-benchmark
+
+          mkdir -p "$out"
+
+          for seed in 0 1 2; do
+            vllm bench serve --backend vllm \
+              --model /models/Eco-Tech/InternVL3_5-38B-w8a8 --served-model-name internvl3_5 \
+              --base-url http://127.0.0.1:2002 --endpoint /v1/completions --dataset-name random \
+              --random-input-len 2048 --random-output-len 128 --random-range-ratio 0 --random-prefix-len 0 \
+              --seed "$seed" --num-prompts 100 --num-warmups 5 --max-concurrency 1 --request-rate inf --ignore-eos \
+              --percentile-metrics ttft,tpot,itl,e2el --metric-percentiles 50,99 \
+              --save-result --save-detailed --result-dir "$out" --result-filename "seed-$seed.json"
+          done
+
+          ```
+performance:
+  accuracy: |-
+    在单台 Atlas 800I A3 上使用 `v0.30.0-a3-openeuler`、W8A8 和 TP4 完成测试。健康检查、模型列表和图文请求均返回 HTTP 200，图文响应描述了草地上躺着的老虎。
+
+    | 测评 | 完成情况 | 结果 |
+    | --- | --- | --- |
+    | AISBench GSM8K 小样本 | 8/8 条请求 | 答对 6/8（75.00%） |
+    | MMMU 试跑 | 6/6 条请求 | 接口和计分校验通过 |
+    | MMMU 完整验证集 | 900/900 条非空响应 | 准确率 64.22% |
+  benchmark: |-
+    文本性能测试的配置输入长度为 2048 token，每条输出 128 token，并发为 1。三轮共完成 300 条计入测评的请求。
+
+    | 随机种子 | 完成请求 | 输出吞吐（token/s） |
+    | --- | --- | --- |
+    | 0 | 100/100 | 52.5265 |
+    | 1 | 100/100 | 52.5942 |
+    | 2 | 100/100 | 52.5562 |
+references:
+  - title: 历史教程
+    url: https://docs.vllm.ai/projects/ascend/en/v0.23.0/tutorials/models/InternVL3.5.html
+  - title: v0.30.0 支持状态
+    url: https://docs.vllm.ai/projects/ascend/en/v0.30.0/tutorials/models/InternVL3.5.html
+  - title: 官方模型卡
+    url: https://huggingface.co/OpenGVLab/InternVL3_5-38B
+  - title: 公开镜像仓库
+    url: https://quay.io/repository/ascend/vllm-ascend?tab=tags
+tuning: 使用教程可执行段的并行配置与 40,960 token 上下文，按场景保留所需逻辑设备。
