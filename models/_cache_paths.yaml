@@ -66,3 +66,17 @@ aliases:
     cache_dir: Qwen3-Coder-30B-A3B-Instruct-w8a8
   - model_id: Qwen/Qwen3-VL-Embedding-2B
     cache_dir: Qwen/Qwen3-VL-Embedding-2B
+
+  # Qwen3.5-Dense 310P (PR #131) — CI resolves your_model_path from these aliases.
+  # Standard ModelScope layout uses org/name; Eco-Tech W8A8-310P is the quantized checkpoint.
+  - model_id: Qwen/Qwen3.5-2B
+    cache_dir: Qwen/Qwen3.5-2B
+
+  - model_id: Qwen/Qwen3.5-4B
+    cache_dir: Qwen/Qwen3.5-4B
+
+  - model_id: Qwen/Qwen3.5-9B
+    cache_dir: Qwen/Qwen3.5-9B
+
+  - model_id: Eco-Tech/Qwen3.5-9B-W8A8-310P
+    cache_dir: Eco-Tech/Qwen3.5-9B-W8A8-310P
