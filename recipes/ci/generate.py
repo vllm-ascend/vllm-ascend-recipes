@@ -124,6 +124,13 @@ def build_combo_url(site: str, hf_id: str, combo: dict) -> str:
     if features:
         params.append(("features", ",".join(features)))
         params.append(("fmode", ",".join(f"{k}:{v}" for k, v in features.items())))
+    # A pinned preset (and its operating point) is applied server-side, its
+    # `select` filling in features/frontend/kv_offload/nodes unless the query
+    # sets that param explicitly. `preset=baseline` drops a default preset.
+    if combo.get("preset"):
+        params.append(("preset", str(combo["preset"])))
+    if combo.get("point"):
+        params.append(("point", str(combo["point"])))
     params.append(("nodes", "1"))
     query = "&".join(f"{k}={urllib.parse.quote(v, safe=',')}" for k, v in params)
     return f"{site}/{hf_id}.json?{query}"
@@ -218,6 +225,30 @@ def assert_single_node(render: dict) -> None:
         reasons.append("selection.pd set")
     if reasons:
         raise ComboSkip("multi_node/pd not supported yet: " + ", ".join(reasons))
+
+
+def assert_preset(render: dict, combo: dict) -> None:
+    """4.2 assertion: a pinned preset must be the one that rendered.
+
+    The site applies a named preset's ``select`` server-side and echoes it in
+    ``selection.preset``. An unknown key - or a preset whose strategy the query
+    never selects - is ignored, and the hardware's default preset renders
+    instead, which would quietly verify a different configuration. ``baseline``
+    is the explicit opt-out and must render no preset.
+    """
+    preset = combo.get("preset")
+    if not preset:
+        return
+    applied = (render.get("selection") or {}).get("preset")
+    if preset == "baseline":
+        if applied is not None:
+            raise ComboFailure(f"preset=baseline requested but {applied!r} rendered")
+    elif applied != preset:
+        raise ComboFailure(f"preset {preset!r} not applied: selection.preset={applied!r}")
+    point = combo.get("point")
+    if point and (render.get("selection") or {}).get("point") != point:
+        selection = render.get("selection") or {}
+        raise ComboFailure(f"preset point {point!r} not applied: selection.point={selection.get('point')!r}")
 
 
 def resolve_spec_mode(combo: dict, argv: list[str]) -> dict:
@@ -385,6 +416,7 @@ def plan_combo(
 
     assert_not_adjusted(render)
     assert_single_node(render)
+    assert_preset(render, combo)
     env = dict(render.get("env") or {})
     argv, env = apply_override(combo, argv, env)
     features_resolved = resolve_spec_mode(combo, argv)
@@ -418,6 +450,8 @@ def plan_combo(
         "variant": combo["variant"],
         "features_requested": combo.get("features") or {},
         "features_resolved": features_resolved,
+        "preset": combo.get("preset"),
+        "point": combo.get("point"),
         "smoke_test": smoke_test,
         # Benchmarking follows the type-appropriate "Bench" snippet: the page's
         # popover for chat, the recipe YAML's performance block for rerank.

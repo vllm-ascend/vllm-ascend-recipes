@@ -164,6 +164,22 @@ def test_build_combo_url_passes_frontend():
     assert "frontend=" not in gen.build_combo_url("https://s", "org/model", combo)
 
 
+def test_build_combo_url_passes_preset_and_point():
+    # A pinned preset (and its operating point) is a first-class query param;
+    # the site applies the preset's `select` server-side.
+    combo = {
+        "hardware": "ascend_910c",
+        "variant": "ascend_w8a8",
+        "preset": "ascend_a3_w8a8_agg",
+        "point": "c16",
+    }
+    url = gen.build_combo_url("https://s", "org/model", combo)
+    assert "preset=ascend_a3_w8a8_agg&point=c16&" in url
+    combo.pop("preset")
+    combo.pop("point")
+    assert "preset=" not in gen.build_combo_url("https://s", "org/model", combo)
+
+
 # --- env value quoting (template 5.1 rule 4) --------------------------------
 
 
@@ -391,6 +407,49 @@ def test_plan_combo_rejects_adjusted_params():
     }
     with pytest.raises(gen.ComboFailure, match="adjusted params.*ascend_910c.*h200"):
         _plan(render)
+
+
+def test_plan_combo_records_applied_preset():
+    render = dict(A5_RENDER)
+    render["selection"] = {
+        "hardware": "ascend_950dt_8x",
+        "adjusted": [],
+        "pd": None,
+        "preset": "ascend_a5_w8a8_mxfp8_agg",
+    }
+    combo = dict(A5_COMBO, preset="ascend_a5_w8a8_mxfp8_agg")
+    meta = _plan(render, combo)
+    assert meta["preset"] == "ascend_a5_w8a8_mxfp8_agg"
+    assert meta["point"] is None
+
+
+def test_plan_combo_rejects_unapplied_preset():
+    # The site ignores a preset key it cannot apply and falls back to the
+    # hardware default, so the pin must be compared with what actually rendered.
+    render = dict(A5_RENDER)
+    render["selection"] = {"adjusted": [], "pd": None, "preset": "ascend_a5_w8a8_mxfp8_agg"}
+    combo = dict(A5_COMBO, preset="ascend_a5_w8a8_mxfp8_pd")
+    with pytest.raises(gen.ComboFailure, match="preset 'ascend_a5_w8a8_mxfp8_pd' not applied"):
+        _plan(render, combo)
+
+
+def test_plan_combo_rejects_unapplied_point():
+    render = dict(A5_RENDER)
+    render["selection"] = {"adjusted": [], "pd": None, "preset": "ascend_a5_w8a8_mxfp8_agg"}
+    combo = dict(A5_COMBO, preset="ascend_a5_w8a8_mxfp8_agg", point="c16")
+    with pytest.raises(gen.ComboFailure, match="preset point 'c16' not applied"):
+        _plan(render, combo)
+
+
+def test_plan_combo_baseline_drops_the_default_preset():
+    # `preset: baseline` renders no preset at all; a default that still shows up
+    # means the opt-out did not take effect.
+    combo = dict(A5_COMBO, preset="baseline")
+    assert _plan(A5_RENDER, combo)["preset"] == "baseline"
+    render = dict(A5_RENDER)
+    render["selection"] = {"adjusted": [], "pd": None, "preset": "ascend_a5_w8a8_mxfp8_agg"}
+    with pytest.raises(gen.ComboFailure, match="preset=baseline requested but 'ascend_a5_w8a8_mxfp8_agg' rendered"):
+        _plan(render, combo)
 
 
 @pytest.mark.parametrize(
