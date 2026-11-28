@@ -55,6 +55,16 @@ aliases:
   - model_id: PaddlePaddle/PaddleOCR-VL
     cache_dir: PaddlePaddle/PaddleOCR-VL
 
+  - model_id: deepseek-ai/DeepSeek-V3.1
+    cache_dir:
+      default: DeepSeek-V3.1-w8a8-mtp-QuaRot
+      # 950DT single-node needs the lighter W4A4C8 MXFP4 build: the weights
+      # the tutorial named for single-node (w4a4_mlp-w8a8c8_attn) were never
+      # published, and the W8A8C8 MXFP8 build (sized for the 8-node PD
+      # deployment) fills a 96 GB card right up to the gpu-memory-utilization
+      # budget, leaving no room for KV cache.
+      ascend_950dt: DeepSeek-V3.1-w4a4c8-mxfp4
+
   - model_id: Qwen/Qwen3-ASR-1.7B
     cache_dir: Qwen/Qwen3-ASR-1.7B
   - model_id: moonshotai/Kimi-K2.6
