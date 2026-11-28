@@ -2,17 +2,18 @@ meta:
   title: "Qwen3-Reranker"
   slug: "qwen3-reranker"
   provider: "Qwen"
-  description: "Qwen3 Reranker series for text ranking (0.6B / 4B / 8B). Built on Qwen3 dense backbones and served via vLLM-Ascend pooling runner with the /v1/rerank API."
+  description: "Historical Qwen3 Reranker recipe for text ranking (0.6B / 4B / 8B), using pinned vLLM-Ascend images and the /v1/rerank API. Model support ended in vLLM Ascend v0.30.0."
   date_added: "2026-10-15"
-  date_updated: "2026-10-15"
+  date_updated: "2026-11-04"
   difficulty: beginner
   tasks:
     - embedding
-  performance_headline: "Single-node pooling serve on Atlas 800 A2/A3 and Atlas 300I DUO"
+  performance_headline: "Historical single-node pooling deployment on A2/A3, Atlas 300I DUO, and Ascend 950DT&950PR (A5 unverified)"
   related_recipes: []
   hardware:
     atlas_800_a3: verified
     atlas_800_a2: experimental
+    ascend_950dt: experimental
     atlas_300i_duo: experimental
 
 model:
@@ -35,6 +36,7 @@ model:
   docker_image:
     atlas_800_a2: "quay.io/ascend/vllm-ascend:v0.23.0rc1"
     atlas_800_a3: "quay.io/ascend/vllm-ascend:v0.23.0rc1-a3"
+    ascend_950dt: "quay.io/ascend/vllm-ascend:v0.23.0-a5"
     atlas_300i_duo: "quay.io/ascend/vllm-ascend:v0.23.0rc1-310p"
   nightly_required: false
   install:
@@ -66,6 +68,7 @@ variants:
 compatible_strategies:
   - single_node_A3
   - single_node_A2
+  - single_node_A5
   - single_node_310p
 
 hardware_overrides: {}
@@ -82,7 +85,9 @@ config_params:
     description: "Maximum context length (input + output tokens). Keep conservative on Atlas 300I DUO to avoid OOM."
 
 overview: |-
-  The Qwen3 Reranker model series is designed for text ranking tasks. Building upon the dense foundational models of the Qwen3 series, it provides reranking models in 0.6B, 4B, and 8B sizes. This recipe shows how to serve the official original checkpoints with vLLM Ascend using the pooling runner and the OpenAI-compatible `/v1/rerank` API. Requires vLLM Ascend 0.9.2rc1 or newer.
+  The Qwen3 Reranker model series is designed for text ranking tasks. Building upon the dense foundational models of the Qwen3 series, it provides reranking models in 0.6B, 4B, and 8B sizes. This recipe serves the official original checkpoints with the pooling runner and the `/v1/rerank` API.
+
+  > **Historical version scope:** [Qwen3-Reranker support ended in vLLM Ascend v0.30.0](https://github.com/vllm-project/vllm-ascend/blob/main/docs/source/tutorials/models/Qwen3-Reranker.md). This recipe retains the pinned `v0.23.0rc1` images for A2/A3/Atlas 300I DUO and uses the separately pinned `v0.23.0-a5` image for Ascend 950DT&950PR. The A5 scenario is migrated from the pinned source tutorial and has not been validated on A5 hardware. The `min_vllm_version` field does not imply support in current releases. Do not replace these images with `latest` or nightly without validating model support and the deployment. See the [archived v0.23.0 tutorial](https://docs.vllm.ai/projects/ascend/en/v0.23.0/tutorials/models/Qwen3-Reranker.html).
 
 weight_download:
   - weight_version: BF16 (0.6B)
@@ -215,6 +220,28 @@ env_setup:
             -v /root/.cache:/root/.cache \
             -it $IMAGE bash
         ```
+    A5:
+      content: |-
+        The following command preserves the source tutorial device mounts for Ascend 950DT&950PR Products. It uses the separate historical image `v0.23.0-a5`; the tag exists in the official registry, but this A5 deployment has not been tested.
+
+        ```bash
+        export IMAGE=quay.io/ascend/vllm-ascend:v0.23.0-a5
+        docker run --rm \
+            --name vllm-ascend \
+            --net=host \
+            --shm-size=1g \
+            --device /dev/davinci0 \
+            --device /dev/davinci_manager \
+            --device /dev/hisi_hdc \
+            -v /usr/local/dcmi:/usr/local/dcmi \
+            -v /usr/local/Ascend/driver/tools/hccn_tool:/usr/local/Ascend/driver/tools/hccn_tool \
+            -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+            -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \
+            -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
+            -v /etc/ascend_install.info:/etc/ascend_install.info \
+            -v /root/.cache:/root/.cache \
+            -it $IMAGE bash
+        ```
     300I DUO:
       content: |-
         Start the docker image on each node.
@@ -241,7 +268,7 @@ env_setup:
         ```
   pip:
     content: |-
-      If you prefer not to use the Docker image, install `vllm-ascend` from source. Refer to the [Installation Guide](https://docs.vllm.ai/projects/ascend/en/latest/installation.html).
+      For historical source builds, use the release matching the pinned image and follow the [archived Installation Guide](https://docs.vllm.ai/projects/ascend/en/v0.23.0/installation.html). The current `main` branch no longer supports this model.
 
 scenarios:
   - npu: Atlas 800I A3
@@ -299,6 +326,33 @@ scenarios:
       - title: Service Verification
         content: |-
           After the service is started, verify it with the `/v1/rerank` request in the verification section below.
+  - npu: Ascend 950DT&950PR Products
+    precision: bf16
+    deployment: Single-Node
+    case: Single Node Single Card (A5)
+    tags: [a5-single]
+    strategy: single_node_A5
+    steps:
+      - title: "Start the server"
+        content: |-
+          Migrated from the source tutorial for Ascend 950DT&950PR Products. This A5 scenario is experimental and has not been validated on A5 hardware. Use the separate `v0.23.0-a5` container above; the serving arguments are shared with A3/A2.
+
+          ```bash
+          export ASCEND_RT_VISIBLE_DEVICES=0
+          export OMP_PROC_BIND=false
+          export OMP_NUM_THREADS=1
+          export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+
+          vllm serve Qwen/Qwen3-Reranker-0.6B \
+              --served-model-name Qwen/Qwen3-Reranker-0.6B \
+              --runner pooling \
+              --hf_overrides '{"architectures": ["Qwen3ForSequenceClassification"],"classifier_from_token": ["no", "yes"],"is_original_qwen3_reranker": true}' \
+              --port 8000 \
+              --max-model-len {{max_model_len}}
+          ```
+      - title: "Service Verification"
+        content: |-
+          After the service is started, verify it with the `/v1/rerank` request in the verification section below.
   - npu: Atlas 300I DUO
     precision: fp16
     deployment: Single-Node
@@ -336,6 +390,8 @@ verification: |-
   Once your server is started, verify with:
 
   ```python
+  import math
+
   import requests
 
   url = "http://127.0.0.1:8000/v1/rerank"
@@ -372,12 +428,32 @@ verification: |-
           ),
           "documents": documents,
       },
-  ).json()
-
-  print(response)
+      timeout=(10, 120),
+  )
+  response.raise_for_status()
+  payload = response.json()
+  assert isinstance(payload, dict), payload
+  results = payload.get("results")
+  assert isinstance(results, list) and len(results) == len(documents), payload
+  assert all(isinstance(row, dict) for row in results), payload
+  assert all(type(row.get("index")) is int for row in results), payload
+  assert {row["index"] for row in results} == set(range(len(documents))), payload
+  scores = {row["index"]: row.get("relevance_score") for row in results}
+  assert all(
+      isinstance(score, (int, float))
+      and not isinstance(score, bool)
+      and math.isfinite(score)
+      and 0 <= score <= 1
+      for score in scores.values()
+  ), payload
+  assert scores[0] > scores[1], scores
+  assert [row["index"] for row in results] == sorted(
+      scores, key=scores.get, reverse=True
+  ), payload
+  print(payload)
   ```
 
-  Expected result: HTTP 200 with a JSON body containing `relevance_score`. The first document (Beijing) should score much higher than the second.
+  Expected result: HTTP 200 with one finite `relevance_score` in [0, 1] per document, sorted by descending score. The assertions verify that the Beijing document ranks first; HTTP errors, invalid JSON, missing results, and incorrect rankings fail the check.
 
   For more usage examples, see the [vLLM pooling/score examples](https://github.com/vllm-project/vllm/tree/main/examples/pooling/score).
 
@@ -441,12 +517,14 @@ performance:
     ```
 
 faq: |-
-  For common environment, installation, and general parameter issues, please refer to the [Public FAQs](https://docs.vllm.ai/projects/ascend/en/latest/faqs.html).
+  For environment, installation, and general parameter issues in this historical release, refer to the [archived Public FAQs](https://docs.vllm.ai/projects/ascend/en/v0.23.0/faqs.html).
 
 references:
   - title: Qwen3-Reranker-0.6B on ModelScope
     url: https://www.modelscope.cn/models/Qwen/Qwen3-Reranker-0.6B
-  - title: Qwen3-Reranker tutorial (vLLM Ascend)
-    url: https://docs.vllm.ai/projects/ascend/en/latest/tutorials/models/Qwen3-Reranker.html
+  - title: "Archived Qwen3-Reranker tutorial (vLLM Ascend v0.23.0)"
+    url: "https://docs.vllm.ai/projects/ascend/en/v0.23.0/tutorials/models/Qwen3-Reranker.html"
   - title: vLLM Ascend GitHub
     url: https://github.com/vllm-project/vllm-ascend
+  - title: "Qwen3-Reranker source tutorial before discontinuation (pinned commit)"
+    url: https://github.com/vllm-project/vllm-ascend/blob/f8f0ef9774d4ebb89b731baac905239f7d4f1522/docs/source/tutorials/models/Qwen3-Reranker.md
